@@ -25,7 +25,7 @@ pub const LADDER_STAGES: u32 = 16;
 /// Entries addressable by one ladder pass: 2^16 = 65,536.
 pub const LADDER_WINDOW: u32 = 1 << LADDER_STAGES;
 
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, feature = "std"))]
 mod probe_count {
     use core::cell::Cell;
     std::thread_local! {
@@ -36,11 +36,11 @@ mod probe_count {
 /// Debug-build probe counter: total ladder probes executed on this thread.
 /// Zero in release builds (counter compiled out; ladder shape unchanged).
 pub fn debug_probes() -> u64 {
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "std"))]
     {
         probe_count::PROBES.with(|c| c.get())
     }
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(all(debug_assertions, feature = "std")))]
     {
         0
     }
@@ -50,7 +50,7 @@ pub fn debug_probes() -> u64 {
 /// shares the same instrumentation).
 #[inline]
 pub fn debug_tick() {
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "std"))]
     probe_count::PROBES.with(|c| c.set(c.get() + 1));
 }
 
@@ -139,7 +139,7 @@ pub fn ladder_search(oids: &[[u8; 20]], t: &[u8; 20]) -> (u32, u32) {
         };
         let lt = oid_lt_mask(&probe_oid, t);
         let lambda = in_bounds & (lt & 1);
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, feature = "std"))]
         probe_count::PROBES.with(|c| c.set(c.get() + 1));
         b += lambda * disp;
     }

@@ -7,7 +7,6 @@
 
 use crate::deflate::zlib_compress;
 use crate::{GitError, Oid};
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
 // ---------------------------------------------------------------- SHA-1 --
@@ -127,12 +126,43 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
     h.finalize()
 }
 
+/// Branch-light decimal emission of `v` into `buf` (min capacity 20).
+/// Returns the digit count. Two digits per u64 division (the itoa 2-at-a-time
+/// pattern) — byte-identical to `u64::to_string` for every u64 value; the
+/// real-git interop suite and pack checksum courts are the pin.
+fn emit_u64_decimal(v: u64, buf: &mut [u8; 20]) -> usize {
+    let mut n = 20usize;
+    let mut v = v;
+    if v == 0 {
+        buf[19] = b'0';
+        return 1;
+    }
+    while v > 99 {
+        let d = (v % 100) as u8;
+        v /= 100;
+        buf[n - 1] = b'0' + (d % 10);
+        buf[n - 2] = b'0' + (d / 10);
+        n -= 2;
+    }
+    if v > 9 {
+        buf[n - 1] = b'0' + (v % 10) as u8;
+        buf[n - 2] = b'0' + (v / 10) as u8;
+        n -= 2;
+    } else {
+        buf[n - 1] = b'0' + v as u8;
+        n -= 1;
+    }
+    20 - n
+}
+
 /// Git object name: SHA-1 over `"<type> <size>\0<content>"`.
 pub fn git_object_oid(kind: &str, content: &[u8]) -> Oid {
     let mut h = Sha1::new();
     h.update(kind.as_bytes());
     h.update(b" ");
-    h.update(content.len().to_string().as_bytes());
+    let mut lenbuf = [0u8; 20];
+    let n = emit_u64_decimal(content.len() as u64, &mut lenbuf);
+    h.update(&lenbuf[20 - n..]);
     h.update(b"\0");
     h.update(content);
     h.finalize()
@@ -390,6 +420,9 @@ fn read_varint_header(data: &[u8], pos: usize) -> Result<(u8, u64, usize), GitEr
     let obj_type = (first >> 4) & 0x7;
     if obj_type == 0 || obj_type == 5 {
         return Err(GitError::BadVarint);
+    }
+    if obj_type == 6 || obj_type == 7 {
+        return Err(GitError::UnsupportedDeltaEncoding);
     }
     let mut size = (first & 0x0F) as u64;
     let mut shift = 4u32;

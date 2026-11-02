@@ -127,18 +127,69 @@ fn fixed_lit_code(s: u16) -> (u32, u8) {
 
 /// Length code table: (base, extra bits) for symbols 257..=285.
 const LEN_TABLE: [(u16, u8); 29] = [
-    (3, 0), (4, 0), (5, 0), (6, 0), (7, 0), (8, 0), (9, 0), (10, 0), (11, 1),
-    (13, 1), (15, 1), (17, 1), (19, 2), (23, 2), (27, 2), (31, 2), (35, 3),
-    (43, 3), (51, 3), (59, 3), (67, 4), (83, 4), (99, 4), (115, 4), (131, 5),
-    (163, 5), (195, 5), (227, 5), (258, 0),
+    (3, 0),
+    (4, 0),
+    (5, 0),
+    (6, 0),
+    (7, 0),
+    (8, 0),
+    (9, 0),
+    (10, 0),
+    (11, 1),
+    (13, 1),
+    (15, 1),
+    (17, 1),
+    (19, 2),
+    (23, 2),
+    (27, 2),
+    (31, 2),
+    (35, 3),
+    (43, 3),
+    (51, 3),
+    (59, 3),
+    (67, 4),
+    (83, 4),
+    (99, 4),
+    (115, 4),
+    (131, 5),
+    (163, 5),
+    (195, 5),
+    (227, 5),
+    (258, 0),
 ];
 
 /// Distance code table: (base, extra bits) for symbols 0..=29.
 const DIST_TABLE: [(u16, u8); 30] = [
-    (1, 0), (2, 0), (3, 0), (4, 0), (5, 1), (7, 1), (9, 2), (13, 2), (17, 3),
-    (25, 3), (33, 4), (49, 4), (65, 5), (97, 5), (129, 6), (193, 6), (257, 7),
-    (385, 7), (513, 8), (769, 8), (1025, 9), (1537, 9), (2049, 10), (3073, 10),
-    (4097, 11), (6145, 11), (8193, 12), (12289, 12), (16385, 13), (24577, 13),
+    (1, 0),
+    (2, 0),
+    (3, 0),
+    (4, 0),
+    (5, 1),
+    (7, 1),
+    (9, 2),
+    (13, 2),
+    (17, 3),
+    (25, 3),
+    (33, 4),
+    (49, 4),
+    (65, 5),
+    (97, 5),
+    (129, 6),
+    (193, 6),
+    (257, 7),
+    (385, 7),
+    (513, 8),
+    (769, 8),
+    (1025, 9),
+    (1537, 9),
+    (2049, 10),
+    (3073, 10),
+    (4097, 11),
+    (6145, 11),
+    (8193, 12),
+    (12289, 12),
+    (16385, 13),
+    (24577, 13),
 ];
 
 fn len_code(len: u16) -> (u16, u8, u16) {
@@ -569,9 +620,9 @@ pub fn zlib_decompress(data: &[u8]) -> Result<Vec<u8>, GitError> {
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
+    use std::eprintln;
     use std::process::Command;
     use std::string::String;
-    use std::eprintln;
     use std::sync::OnceLock;
 
     /// Real external collaborator (Chicago): system python3 zlib. Skipped
@@ -602,10 +653,17 @@ mod tests {
         static C: OnceLock<Vec<Vec<u8>>> = OnceLock::new();
         C.get_or_init(|| {
             let v = vec![
-                Vec::new(),                                  // empty
-                vec![0x2A],                                  // 1 byte
-                { let mut r = Vec::new(); for _ in 0..10_000 { r.extend_from_slice(b"abcabcabc"); } r }, // repetitive
-                { // deterministic pseudo-random
+                Vec::new(), // empty
+                vec![0x2A], // 1 byte
+                {
+                    let mut r = Vec::new();
+                    for _ in 0..10_000 {
+                        r.extend_from_slice(b"abcabcabc");
+                    }
+                    r
+                }, // repetitive
+                {
+                    // deterministic pseudo-random
                     let mut r = Vec::with_capacity(4096);
                     let mut x = 0x1234_5678u32;
                     for _ in 0..4096 {
@@ -614,7 +672,8 @@ mod tests {
                     }
                     r
                 },
-                { // 100KB mixed corpus
+                {
+                    // 100KB mixed corpus
                     let mut r = Vec::with_capacity(100_000);
                     let mut x = 0xDEAD_BEEFu32;
                     for i in 0..100_000 {
@@ -640,7 +699,12 @@ mod tests {
                 data,
             );
             let py: u32 = std::str::from_utf8(&out).unwrap().trim().parse().unwrap();
-            assert_eq!(adler32(data), py, "adler32 mismatch on {} bytes", data.len());
+            assert_eq!(
+                adler32(data),
+                py,
+                "adler32 mismatch on {} bytes",
+                data.len()
+            );
         }
     }
 
@@ -678,7 +742,12 @@ mod tests {
                 &["import sys,zlib;d=sys.stdin.buffer.read();sys.stdout.buffer.write(zlib.decompress(d))"],
                 &z,
             );
-            assert_eq!(out, *data, "python3 could not inflate our zlib stream ({} bytes in)", data.len());
+            assert_eq!(
+                out,
+                *data,
+                "python3 could not inflate our zlib stream ({} bytes in)",
+                data.len()
+            );
         }
     }
 
@@ -690,7 +759,12 @@ mod tests {
                 data,
             );
             let back = zlib_decompress(&z).unwrap();
-            assert_eq!(back, *data, "our inflate failed on python3 zlib.compress output ({} bytes)", data.len());
+            assert_eq!(
+                back,
+                *data,
+                "our inflate failed on python3 zlib.compress output ({} bytes)",
+                data.len()
+            );
         }
     }
 
@@ -710,7 +784,9 @@ mod tests {
     #[test]
     fn compression_repeats_shrink() {
         let rep = corpora()[2].clone();
-        assert!(zlib_compress(&rep).len() < rep.len(), "repetitive corpus must compress");
+        assert!(
+            zlib_compress(&rep).len() < rep.len(),
+            "repetitive corpus must compress"
+        );
     }
 }
-

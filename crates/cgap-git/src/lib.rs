@@ -45,6 +45,10 @@ pub enum GitError {
     SizeOverflow,
     /// An offset exceeds 2^31 - 1; large-offset table not implemented in v1.
     OffsetTooLarge,
+    /// Object header carries pack type code 6 (OBJ_OFS_DELTA) or 7
+    /// (OBJ_REF_DELTA): delta objects are not produced or consumed by this
+    /// crate — the entry would otherwise be misread as a zlib body.
+    UnsupportedDeltaEncoding,
 }
 
 impl fmt::Display for GitError {
@@ -97,6 +101,12 @@ impl fmt::Display for GitError {
                  which is not implemented — keep individual packs under 2 GiB or add the \
                  large-offset table"
             ),
+            GitError::UnsupportedDeltaEncoding => write!(
+                f,
+                "pack object header carries delta type code 6 (OFS_DELTA) or 7 (REF_DELTA): \
+                 delta-encoded objects are not supported by this crate and would be misparsed \
+                 as a zlib body — re-pack with only full (stored/zlib) objects"
+            ),
         }
     }
 }
@@ -131,3 +141,22 @@ pub mod inflate;
 
 // v26.11.1 moonshot lanes (coordinator-scaffolded, additive only):
 pub mod dag;
+
+// v26.11.2 GIT lanes wire-in (FIX-06, additive pub API; 15 modules):
+pub mod a2a_swarm;
+pub mod admission_gate;
+pub mod commit_synth;
+pub mod delta_resolver;
+pub mod egress_ring;
+pub mod ingress_ring;
+pub mod mcp_driver;
+// GAP-01: mounted — digest fn injected (tree_synth precedent); the court
+// binds the real cgap_blake3::hash via the dev-dep. No real dep added.
+pub mod object_store;
+pub mod octopus_merge;
+pub mod pack_demux;
+pub mod patent_court;
+pub mod pkt_line;
+pub mod ref_store;
+pub mod retract;
+pub mod tree_synth;

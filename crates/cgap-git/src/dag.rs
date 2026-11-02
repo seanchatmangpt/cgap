@@ -109,8 +109,8 @@ use core::mem::offset_of;
 
 use alloc::{boxed::Box, vec, vec::Vec};
 
-use crate::Oid;
 use crate::pack_write::{git_object_oid, sha1};
+use crate::Oid;
 
 // Stable pack facade (DoD-2, `pack.rs`). Wired here via `#[path]` because
 // `lib.rs` is contract-off-limits to this lane: the module is reachable and
@@ -538,9 +538,8 @@ const _: () = assert!(MAX_BLOCKS == 65_536);
 const _: () = assert!(MAX_PROOF_LEVELS == 16);
 const _: () = assert!((1usize << MAX_PROOF_LEVELS) == MAX_BLOCKS);
 const _: () = assert!(MAX_PROOF_HASHES == 17);
-const _: () = assert!(PROOF_WIRE_FIXED + MAX_PROOF_LEVELS * PROOF_WIRE_SIBLING
-    + PROOF_WIRE_ROOT
-    == 618);
+const _: () =
+    assert!(PROOF_WIRE_FIXED + MAX_PROOF_LEVELS * PROOF_WIRE_SIBLING + PROOF_WIRE_ROOT == 618);
 
 // -- internal payload (divergence note 1) --
 const _: () = assert!(INTERNAL_PAYLOAD_SIZE == BLAKE3_DIGEST_LEN * 2);
@@ -617,10 +616,22 @@ fn compress(
     flags: u32,
 ) -> [u32; 16] {
     let mut state: [u32; 16] = [
-        chaining_value[0], chaining_value[1], chaining_value[2], chaining_value[3],
-        chaining_value[4], chaining_value[5], chaining_value[6], chaining_value[7],
-        IV[0], IV[1], IV[2], IV[3],
-        counter as u32, (counter >> 32) as u32, block_len, flags,
+        chaining_value[0],
+        chaining_value[1],
+        chaining_value[2],
+        chaining_value[3],
+        chaining_value[4],
+        chaining_value[5],
+        chaining_value[6],
+        chaining_value[7],
+        IV[0],
+        IV[1],
+        IV[2],
+        IV[3],
+        counter as u32,
+        (counter >> 32) as u32,
+        block_len,
+        flags,
     ];
     let mut block = block_words;
     for _ in 0..7 {
@@ -712,8 +723,7 @@ impl ChunkState {
             }
             let want = B3_BLOCK_LEN - self.block_len;
             let take = want.min(input.len());
-            self.block[self.block_len..self.block_len + take]
-                .copy_from_slice(&input[..take]);
+            self.block[self.block_len..self.block_len + take].copy_from_slice(&input[..take]);
             self.block_len += take;
             input = &input[take..];
         }
@@ -807,7 +817,8 @@ impl Hasher {
 
     fn finalize_32(&self) -> DagDigest {
         let mut output = self.chunk_state.output();
-        for parent in self.chunk_stack.iter().rev() { // SHIM-B3 target line
+        for parent in self.chunk_stack.iter().rev() {
+            // SHIM-B3 target line
             let mut block_words = [0u32; 16];
             block_words[..8].copy_from_slice(parent);
             block_words[8..].copy_from_slice(&output.chaining_value());
@@ -1159,9 +1170,7 @@ pub fn decode_dag_file(bytes: &[u8]) -> Result<DagTree, DagError> {
     if bytes[..8] != DAG_MAGIC {
         return Err(DagError::BadMagic);
     }
-    let version = u32::from_be_bytes(
-        bytes[8..12].try_into().map_err(|_| DagError::Truncated)?,
-    );
+    let version = u32::from_be_bytes(bytes[8..12].try_into().map_err(|_| DagError::Truncated)?);
     if version != DAG_FORMAT_VERSION {
         return Err(DagError::VersionMismatch(version));
     }
@@ -1169,8 +1178,7 @@ pub fn decode_dag_file(bytes: &[u8]) -> Result<DagTree, DagError> {
     let parent_oid: Oid = bytes[44..64].try_into().map_err(|_| DagError::Truncated)?;
     let block_count =
         u32::from_be_bytes(bytes[64..68].try_into().map_err(|_| DagError::Truncated)?);
-    let node_count =
-        u32::from_be_bytes(bytes[68..72].try_into().map_err(|_| DagError::Truncated)?);
+    let node_count = u32::from_be_bytes(bytes[68..72].try_into().map_err(|_| DagError::Truncated)?);
     // F-1 (wave 6, a03-wave5-audit-receipt): the 2L-1 law and the node-region
     // length are evaluated in u64. In u32 arithmetic a hostile header count
     // >= 0x8000_0000 overflows the multiply in debug builds (panic) and wraps
@@ -1191,15 +1199,20 @@ pub fn decode_dag_file(bytes: &[u8]) -> Result<DagTree, DagError> {
         return Err(DagError::Truncated);
     }
     let body_len = bytes.len() - DAG_TRAILER_SIZE;
-    let trailer: [u8; 20] = bytes[body_len..].try_into().map_err(|_| DagError::Truncated)?;
+    let trailer: [u8; 20] = bytes[body_len..]
+        .try_into()
+        .map_err(|_| DagError::Truncated)?;
     if sha1(&bytes[..body_len]) != trailer {
         return Err(DagError::ChecksumMismatch);
     }
     let mut nodes: Vec<DagTreeNode> = Vec::with_capacity(node_count as usize);
     let mut pos = DAG_HEADER_SIZE;
     for _ in 0..node_count {
-        let depth =
-            u32::from_be_bytes(bytes[pos..pos + 4].try_into().map_err(|_| DagError::Truncated)?);
+        let depth = u32::from_be_bytes(
+            bytes[pos..pos + 4]
+                .try_into()
+                .map_err(|_| DagError::Truncated)?,
+        );
         let digest: DagDigest = bytes[pos + 4..pos + 36]
             .try_into()
             .map_err(|_| DagError::Truncated)?;
@@ -1277,7 +1290,8 @@ mod tests {
     /// at seq 0/1/2 with genesis parent, from the first compliant build
     /// (this session). SHIM-ORD (descending-seq-sort shim) must move this
     /// pin or the court is vacuous.
-    const PINNED_ROOT_HEX: &str = "37a732b2b62526fd323bb2fa92877ca9a46854155a7a8041efefe11f8f7fdd6c";
+    const PINNED_ROOT_HEX: &str =
+        "37a732b2b62526fd323bb2fa92877ca9a46854155a7a8041efefe11f8f7fdd6c";
 
     /// Owned copies of the literal bodies (keeps temporaries alive).
     fn owned_bodies(bodies: &[&[u8]]) -> Vec<Vec<u8>> {
@@ -1482,7 +1496,9 @@ mod tests {
             ),
         ];
         for (len, want) in kats {
-            let got = to_hex(&blake3(&kat_input(len.parse::<usize>().expect("decimal length"))));
+            let got = to_hex(&blake3(&kat_input(
+                len.parse::<usize>().expect("decimal length"),
+            )));
             assert_eq!(&got, want, "BLAKE3 KAT at input length {len}");
         }
     }
@@ -1718,12 +1734,15 @@ mod tests {
         for k in 0..n {
             match decode_dag_file(&encoded[..k]) {
                 Err(DagError::Truncated) => truncated += 1,
-                other => panic!(
-                    "power cut at offset {k}/{n} must refuse typed Truncated, got {other:?}"
-                ),
+                other => {
+                    panic!("power cut at offset {k}/{n} must refuse typed Truncated, got {other:?}")
+                }
             }
         }
-        assert_eq!(truncated, n, "every one of the {n} cut points refuses typed");
+        assert_eq!(
+            truncated, n,
+            "every one of the {n} cut points refuses typed"
+        );
     }
 
     /// DoD-4 (§7): for a 65,536-block snapshot a proof carries exactly 16
@@ -1741,7 +1760,11 @@ mod tests {
         assert_eq!(commit.tree.node_count, (2 * n - 1) as u32);
 
         let proof = lineage_proof(&refs, &parent, 0).expect("proof");
-        assert_eq!(proof.siblings.len(), MAX_PROOF_LEVELS, "16 levels at L=2^16");
+        assert_eq!(
+            proof.siblings.len(),
+            MAX_PROOF_LEVELS,
+            "16 levels at L=2^16"
+        );
         assert_eq!(MAX_PROOF_HASHES, 17);
         let count = fold_to_root(&proof.root, &proof).expect("fold");
         assert_eq!(count, MAX_PROOF_HASHES, "17 hashes per proof");
@@ -1886,8 +1909,11 @@ mod tests {
         assert_eq!(proof, proof.clone());
 
         let err = DagError::DuplicateSeq(3);
-        assert_eq!(err.to_string(), "duplicate block seq 3: every block in a snapshot needs a \
-             distinct ordering index — renumber the blocks and recommit");
+        assert_eq!(
+            err.to_string(),
+            "duplicate block seq 3: every block in a snapshot needs a \
+             distinct ordering index — renumber the blocks and recommit"
+        );
         assert_ne!(DagError::LineageMismatch, DagError::RootMismatch);
     }
 }

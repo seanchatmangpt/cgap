@@ -49,8 +49,11 @@ mod tests {
         let parent: Oid = git_object_oid("blob", b"parent-snapshot-head");
 
         // Receipt register: commit + parent-edge binding.
-        let refs: Vec<(&[u8], u64)> =
-            bodies.iter().enumerate().map(|(i, b)| (*b, i as u64)).collect();
+        let refs: Vec<(&[u8], u64)> = bodies
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (*b, i as u64))
+            .collect();
         let commit = commit_blocks(&refs, &parent).expect("facade commit_blocks");
         assert_eq!(commit.tree.parent_oid, parent);
         assert_eq!(commit.tree.block_count, 3);
@@ -86,7 +89,10 @@ mod tests {
         let (idx_oids, idx_crcs, idx_offs) = parse_idx_v2(&idx).expect("facade parse_idx_v2");
         assert_eq!(idx_oids, entries.iter().map(|e| e.oid).collect::<Vec<_>>());
         assert_eq!(idx_crcs, entries.iter().map(|e| e.crc).collect::<Vec<_>>());
-        assert_eq!(idx_offs, entries.iter().map(|e| e.offset).collect::<Vec<_>>());
+        assert_eq!(
+            idx_offs,
+            entries.iter().map(|e| e.offset).collect::<Vec<_>>()
+        );
 
         // Cross-register binding: the OIDs the git register committed are
         // exactly the per-block OIDs the receipt register carries.

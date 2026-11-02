@@ -112,7 +112,11 @@ struct BitReader<'a> {
 
 impl<'a> BitReader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        BitReader { data, byte: 0, bit: 0 }
+        BitReader {
+            data,
+            byte: 0,
+            bit: 0,
+        }
     }
 
     fn align_byte(&mut self) {
@@ -161,7 +165,10 @@ impl Huffman {
         }
         if counts[0] as usize == lengths.len() {
             // No codes at all: only legal for an empty distance tree.
-            return Ok(Huffman { counts, symbols: Vec::new() });
+            return Ok(Huffman {
+                counts,
+                symbols: Vec::new(),
+            });
         }
         // Over-subscription check.
         let mut left: i32 = 1;
@@ -238,12 +245,17 @@ fn fixed_literal_tree() -> Huffman {
     }
     // Fixed trees are complete by construction; unwrap-equivalent via expect
     // is unavailable without std panics? core::panic works; but keep it total:
-    Huffman::from_lengths(&lengths).ok().unwrap_or_else(Huffman::empty)
+    Huffman::from_lengths(&lengths)
+        .ok()
+        .unwrap_or_else(Huffman::empty)
 }
 
 impl Huffman {
     fn empty() -> Huffman {
-        Huffman { counts: [0; 16], symbols: Vec::new() }
+        Huffman {
+            counts: [0; 16],
+            symbols: Vec::new(),
+        }
     }
 }
 
@@ -253,7 +265,9 @@ fn fixed_distance_tree() -> Huffman {
     // distances. Encoding 30 symbols with 5 bits leaves the set incomplete
     // but decodable for 0..=29, which is all we admit.
     let _ = &mut lengths;
-    Huffman::from_lengths(&lengths).ok().unwrap_or_else(Huffman::empty)
+    Huffman::from_lengths(&lengths)
+        .ok()
+        .unwrap_or_else(Huffman::empty)
 }
 
 /// Inflate a raw DEFLATE stream (RFC 1951). Returns the decompressed bytes.
@@ -302,9 +316,7 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
     Ok(out)
 }
 
-fn dynamic_trees(
-    br: &mut BitReader<'_>,
-) -> Result<(Huffman, Huffman), InflateError> {
+fn dynamic_trees(br: &mut BitReader<'_>) -> Result<(Huffman, Huffman), InflateError> {
     let hlit = br.read_bits(5)? as usize + 257;
     let hdist = br.read_bits(5)? as usize + 1;
     let hclen = br.read_bits(4)? as usize + 4;
@@ -377,7 +389,8 @@ fn inflate_block(
             256 => return Ok(()),
             257..=285 => {
                 let idx = sym as usize - 257;
-                let len = LENGTH_BASE[idx] as usize + br.read_bits(LENGTH_EXTRA[idx] as u32)? as usize;
+                let len =
+                    LENGTH_BASE[idx] as usize + br.read_bits(LENGTH_EXTRA[idx] as u32)? as usize;
                 let dsym = dt.decode(br)? as usize;
                 if dsym >= 30 {
                     return Err(InflateError::BadDistanceCode);
@@ -442,7 +455,10 @@ pub fn zlib_decode(data: &[u8]) -> Result<Vec<u8>, InflateError> {
     ]);
     let actual = adler32(&out);
     if stored != actual {
-        return Err(InflateError::AdlerMismatch { expected: stored, actual });
+        return Err(InflateError::AdlerMismatch {
+            expected: stored,
+            actual,
+        });
     }
     Ok(out)
 }
@@ -464,15 +480,28 @@ mod tests {
         use std::process::Stdio;
         let b64 = {
             // base64-encode without external crates.
-            const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            const T: &[u8; 64] =
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
             let mut out = String::new();
             for chunk in data.chunks(3) {
-                let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+                let b = [
+                    chunk[0],
+                    *chunk.get(1).unwrap_or(&0),
+                    *chunk.get(2).unwrap_or(&0),
+                ];
                 let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
                 out.push(T[(n >> 18) as usize & 63] as char);
                 out.push(T[(n >> 12) as usize & 63] as char);
-                out.push(if chunk.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
-                out.push(if chunk.len() > 2 { T[n as usize & 63] as char } else { '=' });
+                out.push(if chunk.len() > 1 {
+                    T[(n >> 6) as usize & 63] as char
+                } else {
+                    '='
+                });
+                out.push(if chunk.len() > 2 {
+                    T[n as usize & 63] as char
+                } else {
+                    '='
+                });
             }
             out
         };
@@ -497,9 +526,7 @@ mod tests {
     #[test]
     fn stored_block_round_trip() {
         // Hand-built: final stored block with "hi".
-        let data = [
-            0x01, 0x02, 0x00, 0xFD, 0xFF, b'h', b'i',
-        ];
+        let data = [0x01, 0x02, 0x00, 0xFD, 0xFF, b'h', b'i'];
         assert_eq!(inflate(&data).unwrap(), b"hi".to_vec());
     }
 
@@ -546,7 +573,10 @@ mod tests {
 
     #[test]
     fn bad_zlib_header_typed_error() {
-        assert_eq!(zlib_decode(&[0x00, 0x00, 0, 0, 0, 0]), Err(InflateError::BadZlibHeader));
+        assert_eq!(
+            zlib_decode(&[0x00, 0x00, 0, 0, 0, 0]),
+            Err(InflateError::BadZlibHeader)
+        );
     }
 
     #[test]
@@ -567,9 +597,8 @@ mod tests {
         ];
         for (case, data) in corpus.iter().enumerate() {
             for level in [1u32, 6, 9] {
-                let compressed = python_compress(data, level).unwrap_or_else(|| {
-                    panic!("python3 unavailable for case {case} level {level}")
-                });
+                let compressed = python_compress(data, level)
+                    .unwrap_or_else(|| panic!("python3 unavailable for case {case} level {level}"));
                 let out = zlib_decode(&compressed)
                     .unwrap_or_else(|e| panic!("case {case} level {level}: {e}"));
                 assert_eq!(&out, data, "case {case} level {level}");
@@ -599,7 +628,11 @@ mod tests {
                 .env("GIT_COMMITTER_EMAIL", "t@t")
                 .output()
                 .expect("git available");
-            assert!(out.status.success(), "git {args:?} failed: {}", String::from_utf8_lossy(&out.stderr));
+            assert!(
+                out.status.success(),
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
             String::from_utf8_lossy(&out.stdout).trim().to_string()
         };
         run(&["init", "-q", "."]);
@@ -615,7 +648,12 @@ mod tests {
                 .stdout(Stdio::piped())
                 .spawn()
                 .expect("git spawn");
-            child.stdin.as_mut().unwrap().write_all(content.as_bytes()).unwrap();
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(content.as_bytes())
+                .unwrap();
             let out = child.wait_with_output().unwrap();
             assert!(out.status.success());
             String::from_utf8_lossy(&out.stdout).trim().to_string()
@@ -639,7 +677,9 @@ mod tests {
         let out = Command::new("git")
             .args(["pack-objects", "--stdout"])
             .current_dir(&dir)
-            .stdin(std::process::Stdio::from(std::fs::File::open(&pack_list).unwrap()))
+            .stdin(std::process::Stdio::from(
+                std::fs::File::open(&pack_list).unwrap(),
+            ))
             .output()
             .expect("pack-objects");
         assert!(out.status.success(), "pack-objects failed");
