@@ -1,0 +1,37 @@
+# DRAFT-UNRUN (never applied). Schema UNVERIFIED vendor material.
+# Court: mutation matrix, ports lane-ipc-05 / AX-7 (ipc-05 receipt ABSENT on
+# disk — divergence named in lane-ax-02 receipt). Each mutation is an
+# anti-vacuity surface; a matrix that cannot flip is FAIL.
+apiVersion: ax.io/v1alpha1
+kind: Task
+metadata:
+  name: mutation-matrix
+  annotations:
+    cgap.dev/draft-status: "DRAFT-UNRUN"
+    cgap.dev/court-lane: "lane-ipc-05/AX-7"
+spec:
+  image: cgap-interop-court:PENDING-DIGEST  # AX-1 receipt absent; digest-pin on landing
+  workspaceRef:
+    name: cgap-interop-courts
+  debug: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  # Resource why: 2 vCPU cap mirrors lane-b06's measured load-sensitivity
+  # class (lane-b06-cscb-c7.md:26-28 — the rate-floor mutation itself only
+  # flips under load; a larger cap risks masking that flip).
+  command: ["/bin/sh", "-c"]
+  args:
+    - |
+      set -eu
+      cd /workspace/courts/interop-chicago
+      # Mutation 1: in-tree anti-vacuity flip (seed tweak / corruption).
+      go test ./ffi/ -run 'TestAntiVacuityFlip' -v -count=1
+      go test ./shm/ -run 'TestMagicCorruptionFlip' -v -count=1
+      # Mutation 2: csct C7 digest/rate mutations (b06 class).
+      cd /workspace/crates/csct && cargo run --release --bin cscb_c7_receipt_sealing
+      CSCB_MUTATE=1 cargo run --release --bin cscb_c7_receipt_sealing

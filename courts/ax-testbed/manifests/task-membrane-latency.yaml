@@ -1,0 +1,33 @@
+# DRAFT-UNRUN (never applied). Schema UNVERIFIED vendor material.
+# Court: membrane latency, ports lane-ipc-03 (receipt on disk, exits witnessed).
+apiVersion: ax.io/v1alpha1
+kind: Task
+metadata:
+  name: membrane-latency
+  annotations:
+    cgap.dev/draft-status: "DRAFT-UNRUN"
+    cgap.dev/court-lane: "lane-ipc-03"
+spec:
+  image: cgap-interop-court:PENDING-DIGEST  # AX-1 receipt absent; digest-pin on landing
+  workspaceRef:
+    name: cgap-interop-courts
+  debug: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  # Resource why: 2 vCPU cap mirrors lane-b06's measured load-sensitivity
+  # class (lane-b06-cscb-c7.md:26-28); latency medians are load-bound and the
+  # cap prevents a noisy-neighbor-shaped pass.
+  command: ["/bin/sh", "-c"]
+  args:
+    - |
+      set -eu
+      cd /workspace/courts/interop-chicago
+      go test . -run XXX -bench 'BenchmarkAdmitSingle|BenchmarkAdmitBatch1365' \
+        -benchtime 200x -count 5 -benchmem
+      # Expected magnitude per lane-ipc-03: ~180 ns/call min-of-5. TARGET
+      # until measured inside the pinned image.

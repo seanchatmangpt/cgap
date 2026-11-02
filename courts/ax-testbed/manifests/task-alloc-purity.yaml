@@ -1,0 +1,32 @@
+# DRAFT-UNRUN (never applied). Schema UNVERIFIED vendor material.
+# Court: alloc purity, ports lane-ipc-02 (receipt ABSENT on disk — see
+# lane-ax-02 receipt divergences; court source ffi/alloc_court_test.go exists).
+apiVersion: ax.io/v1alpha1
+kind: Task
+metadata:
+  name: alloc-purity
+  annotations:
+    cgap.dev/draft-status: "DRAFT-UNRUN"
+    cgap.dev/court-lane: "lane-ipc-02"
+spec:
+  image: cgap-interop-court:PENDING-DIGEST  # AX-1 receipt absent; digest-pin on landing
+  workspaceRef:
+    name: cgap-interop-courts
+  debug: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  # Resource why: 2 vCPU cap mirrors lane-b06's measured load-sensitivity
+  # class (lane-b06-cscb-c7.md:26-28 — rate gate flips exit 1 under machine
+  # contention); pinning the cap keeps the court's verdict load-bounded.
+  command: ["/bin/sh", "-c"]
+  args:
+    - |
+      set -eu
+      cd /workspace/courts/interop-chicago
+      go build ./... && go vet ./...
+      go test ./ffi/ -run 'TestSteadyStateAllocPurity|TestVersionAllocPurity|TestAntiVacuityFlip|TestAdmitPositiveControl' -v -count=1

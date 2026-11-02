@@ -1,0 +1,32 @@
+# DRAFT-UNRUN (never applied). Schema UNVERIFIED vendor material.
+# Court: shm transport, ports lane-ipc-04 (receipt on disk, 4/4 PASS witnessed).
+apiVersion: ax.io/v1alpha1
+kind: Task
+metadata:
+  name: transport-shm
+  annotations:
+    cgap.dev/draft-status: "DRAFT-UNRUN"
+    cgap.dev/court-lane: "lane-ipc-04"
+spec:
+  image: cgap-interop-court:PENDING-DIGEST  # AX-1 receipt absent; digest-pin on landing
+  workspaceRef:
+    name: cgap-interop-courts
+  debug: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  # Resource why: 2 vCPU cap mirrors lane-b06's measured load-sensitivity
+  # class (lane-b06-cscb-c7.md:26-28). Note: this court's shm mechanism is
+  # macOS-specific per lane-ipc-04 — container exec is a named divergence.
+  command: ["/bin/sh", "-c"]
+  args:
+    - |
+      set -eu
+      cd /workspace/courts/interop-chicago
+      go test ./shm/ -v -count=1
+      CGO_ENABLED=0 go test ./shm/ -count=1
+      go test ./shm/ -bench . -benchmem -count=3 -run xxx

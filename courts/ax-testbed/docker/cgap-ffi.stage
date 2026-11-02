@@ -1,0 +1,33 @@
+# docker/cgap-ffi.stage — lane AX-3 stage fragment (owner: lane AX-3).
+# Merge target: AX-1's docker/Dockerfile (AX-1 OWNS that file; AX-3 authored
+# this FRAGMENT and discloses the merge duty in lanes/lane-ax-03-dylib.md).
+#
+# GOOS honesty (documented split, NOT a port claim):
+#   * Container target = LINUX -> artifact is libcgap_ffi.so (ELF).
+#   * v26.11.1 session courts (IPC-0) measured darwin/arm64 -> .dylib.
+#     linux/arm64 re-measurement is a FINDING of this lane (courts below run
+#     in-image), not a port of the darwin numbers.
+#   * cgo consumers switch by GOOS; -L/-l flags are identical on both arms,
+#     only the artifact FILE NAME differs by platform convention:
+#       #cgo darwin LDFLAGS: -L/opt/cgap/lib -lcgap_ffi  (libcgap_ffi.dylib)
+#       #cgo linux  LDFLAGS: -L/opt/cgap/lib -lcgap_ffi  (libcgap_ffi.so)
+#   * Wrapper re-point mechanism: GENERATED cgo config (fixed -L/opt/cgap/lib
+#     path baked into the image contract), no per-consumer source rewrite.
+FROM rust:1-slim AS cgap-ffi-builder
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends binutils \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /work
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY include ./include
+COPY ontologies ./ontologies
+RUN cargo build --release -p cgap-ffi
+
+FROM rust:1-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends binutils \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=cgap-ffi-builder /work/target/release/libcgap_ffi.so \
+     /opt/cgap/lib/libcgap_ffi.so
+COPY include/cgap.h /opt/cgap/include/cgap.h

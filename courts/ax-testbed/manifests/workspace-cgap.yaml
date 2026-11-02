@@ -1,0 +1,27 @@
+# DRAFT-UNRUN: never applied. `ax` CLI absent (AX-0 gate, exit 127); cluster
+# NO-GO (lane-ax-00-gate.md:44-49). Schema is UNVERIFIED vendor-README material.
+apiVersion: ax.io/v1alpha1
+kind: Workspace
+metadata:
+  name: cgap-interop-courts
+  annotations:
+    cgap.dev/draft-status: "DRAFT-UNRUN"
+    cgap.dev/pin-source: "git rev-parse HEAD @ 2026-11-02"
+spec:
+  repository: /Users/sac/cgap
+  revision: 9a730320e9c536814e4dbbc88b66af43b7a11da8
+  files:
+    courts/interop-chicago/README.md: |
+      # interop-chicago court module
+      Standalone Go module (own go.mod), stdlib only, zero external/web deps
+      (publish-frozen law). Scaffolds the cgap interop courts.
+      Rules embedded verbatim from the vendor README at pinned SHA
+      9a730320e9c536814e4dbbc88b66af43b7a11da8:
+      - Corpus: SplitMix64 stepped from frozen seed 0xA20C_0FFE_E5A7_E000
+        (multiplier 0xBF58_476D_1CE4_E5B9 is PRNG internals, never a state).
+      - Fact layout: 24-byte records, three LE u64 (x,y,z) per fact — mirrors
+        generate_cscb_corpus.py and csct ingress FRAME_BYTES=24. NOT 64 B.
+      - Determinism court: two generations byte-identical; single-bit seed
+        tweak flips the digest (anti-vacuity). Court that cannot flip = FAIL.
+      - Two SplitMix64 variants coexist (Python canonical vs csct textbook
+        0x94D0_49BB_1331_11EB); this module mirrors the Python stream.
