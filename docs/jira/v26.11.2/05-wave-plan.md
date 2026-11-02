@@ -42,15 +42,37 @@ PARETO measurement, one lane-runner per lever (5 lane-runners), plus 1
 court-auditor (flip verification) and 1 gate-runner (G2-PARETO rollup)
 = 7 agents.
 
-Lever -> crate -> court -> measurement:
+Lever -> crate -> root cause -> target -> court -> measurement
+(per `02-pareto-levers.md`, the authoritative spec; targets are
+TARGETs until a v26.11.2 bench receipt re-measures them):
 
-| Lever | Crate | Anti-vacuity flip | Measurement |
-|---|---|---|---|
-| Gate escalation | cgap-gate | mutate a verdict level; court flips FAIL | Divan: gate eval ns |
-| SWAR FNV | cgap-core hash path | corrupt one SWAR lane; hash differs | Divan: hash throughput |
-| PLNF semi-join + radix probe | bont | drop radix probe; result changes | Divan: join latency |
-| Ring sink | storage sink | overwrite a ring slot; tail reads it | Divan: sink push ns |
-| Fused governance | gate + p28 | mutate fused branch; verdict differs | Divan: fused vs split |
+| Lever | Crate | Root cause (file:line) | Target | Anti-vacuity mutation | Measurement |
+|---|---|---|---|---|---|
+| L1 ingress digest | cgap-gate | penstock digest | <15 ns/frame | slot-byte corrupt | ns/frame |
+| L2 SWAR FNV seal | cgap-parquet | `footer.rs:119-127` | <10 ms @ 1M | window-byte flip | ms @ 1M |
+| L3 PLNF semi-join | cgap-bn3 | `unify.rs:11,35-39,274` | <75 ms @ 1M | comparator swap | s @ 1M |
+| L4 ring sink | cgap-ffi | `sovereign.rs:706-730` | <4 us/tx | header-byte corrupt | us/tx |
+| L5 fused ASC450 | gate + p28 | split passes, re-walk | <1.45 us/row | receipt bit-flip | us/row |
+
+Root-cause detail (all verified on disk in `02-pareto-levers.md`):
+
+- L1: unconditional BLAKE3 payload digest pre-admission for every
+  frame; `stage_digest_fold` 93.38 ms, ~91% of the chain mean. Fix
+  folds a cheap prefilter into the penstock `FrameView` and escalates
+  to BLAKE3 only on a policy flag.
+- L2: `crates/cgap-parquet/src/footer.rs:119-127` `fnv1a64_seeded`
+  byte-wise (`h ^= b; h *= PRIME`), 10 passes per seal/verify pair.
+  Fix: word-wise u64 SWAR FNV, byte-exact FNV-1a semantics preserved.
+- L3: `crates/cgap-bn3/src/unify.rs:11,35-39,274` nested-loop unify
+  probe (`cur` x `cand` per chunk). Fix: static-footer bit-slice
+  semi-join keyed on (s,o), noalloc radix probe scratchpad.
+- L4: `crates/cgap-ffi/src/sovereign.rs:706-730` per-call
+  `std::fs::File::create` (O_TRUNC, call site 722) + fresh boxed
+  `FileSink` alloc. Fix: ring sink leased once per lane slot inside
+  the 65,376-lane commit lease; spill to file on rotation only.
+- L5: sequential P28 validate -> ASC450 metering -> chatman seal;
+  each pass re-walks the attestation span. Fix: fuse metering into
+  the P28 section-5 span fold; chatman seal stays a distinct tail.
 
 Anti-vacuity: each lever's court runs BASELINE -> MUTANT -> RESTORE
 (sha256 fail-closed) over /tmp sandbox copies; flip-or-FAIL; skips are

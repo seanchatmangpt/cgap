@@ -1,0 +1,7 @@
+receipt | sha256[:12] | standing | lane
+docs/jira/v26.11.2/waves/w3-l1-ingress.md | 4829fc0c1e3b | ALIVE | W3-L1
+docs/jira/v26.11.2/waves/w3-l2-swar-fnv.md | 63aab2a30761 | PARTIAL | W3-L2
+docs/jira/v26.11.2/waves/w3-l5-fused.md | 8a84cbb7c07d | PARTIAL | W3-L5
+docs/jira/v26.11.2/waves/w3-t2-asm-census.md | df0e7bc50ae9 | ALIVE | W3-T2
+docs/jira/v26.11.2/waves/w3-t3-silicon.md | bfafcc919573 | PARTIAL | W3-T3
+docs/jira/v26.11.2/waves/w3-t5-pack-requal.md | 8e18261d5efe | ALIVE | W3-T5

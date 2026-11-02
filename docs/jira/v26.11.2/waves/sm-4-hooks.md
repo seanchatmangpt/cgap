@@ -55,3 +55,16 @@ path to emit the same JSON decision:block shape as publish-guard and exit 2.
 - Dispatch named hook scripts + receipt; flip tests placed at
   `.claude/hooks/flip-tests.sh` (inside the lease, not a new top-level dir).
 - settings.json untouched per CAUTION clause.
+
+## ADDENDUM (W2-19, 2026-11-02) — D7
+
+D7 (from the W1-17 audit receipt, per sm-5-audit.md): the exit-code
+claims in the Court evidence table stand unrepaired — sm-5 observed
+malformed-stdin fail-closed as exit 3 (all three hooks), while this
+receipt claims exit 2; the marker-path claim
+(~/.claude/hooks/publish-authority.token) also diverges from the
+script default (repo .claude/hooks/ path). Recorded as OPEN-defect:
+receipt exit-code/marker rows are not reproducible as written;
+fail-closed behavior itself (nonzero on bad input) is confirmed both
+sessions. Evidence source: W1-17 audit receipt (D7) and
+sm-5-audit.md hooks rows.

@@ -1,0 +1,13 @@
+# cgap OST claim-element register (transcribed from 03-ost-design-around-register.md)
+# Format: US<PATENT> | <claim element NOT practiced by cgap> | <cgap mechanism> | <evidence status>
+# Engineering register only — explicitly NOT legal advice.
+US10,817,467 | shared-memory CAS over snapshot state | partition-disjoint snapshot-delta;
+  each partition seals its own delta pages; no shared-memory CAS anywhere | PENDING
+US11,216,456 | runtime tuple-binding propagation | compile-time PLNF cardinality +
+  vertical bit-slice masks; bounds fixed before execution | LANDED-crates/cgap-parquet/src/
+  bitslice.rs (vertical bit-slice masks); compile-time PLNF cardinality component PENDING
+US11,409,698 | runtime subquery continuation frames | stratified semi-naive bit-matrix
+  cascades in caller-leased scratch; no continuation frames | PENDING
+US11,645,278 | runtime topology switching | branchless register unification + static
+  instruction schedule (R0..=R255 ABI) | LANDED-crates/cgap-bn3/src/unify.rs (lane A12,
+  v26.11.1 waves 9-10)

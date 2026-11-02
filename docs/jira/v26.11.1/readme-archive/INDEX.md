@@ -20,6 +20,13 @@ verify against the landing lanes' receipts for exact provenance.
 
 ## Post-index arrivals
 
-None observed as of the 2026-11-01 19:49 PST snapshot. Any archive file
-appearing after the snapshot is post-index: append it here with its sha256
-(`shasum -a 256 <file>`) and original path in a follow-up row.
+Rows appended by lane W3-R6 (2026-11-01 census, sha256 recomputed this
+session):
+
+| archived file | sha256 | original path |
+|---|---|---|
+| `cgap-ffi-pre-v26.11.1.md` | `3b5ca1675116a04d010d5b60ae1190737ee2a41a8f20faf0ce43b2fae80ec39b` | `crates/cgap-ffi/README.md` |
+| `cgap-umbrella-pre.md` | `fd7564e438b7276eaeb4d951bac7da175524f48c17133c95d5426fb288c5a2b6` | `crates/cgap-umbrella/README.md` |
+
+Original paths reconstructed from archived file headers; see lane receipt
+`docs/jira/v26.11.1/waves/w3-r6-archive-index.md`.

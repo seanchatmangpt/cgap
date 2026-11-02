@@ -1,0 +1,11 @@
+target | file | consts | lever
+
+chains-bn3 | crates/bench/benches/chains-bn3.rs | CANONICAL_SEED=0xBF58_476D_1CE4_E5B9 (chains-bn3.rs:33); CHAIN_EPOCH=7 (:37); KEY_DOM=8 (:77) | L3-bn3-plnf-semi-join
+
+chains-ingress | crates/bench/benches/chains-ingress.rs | CHAIN_SEED=0xC001_0000_5EED_0001 (chains-ingress.rs:54); SLOT_CAP=512 (:58); POOL=65536 (:61); EC_SHORT=9 (:65); EC_OK=0 (:68) | L1-ingress-digest-escalation
+
+chains-parquet | crates/bench/benches/chains-parquet.rs | CORPUS_SEED=0xBF58_476D_1CE4_E5B9 (chains-parquet.rs:55); LANE_SPREAD=0x2544_5491_4F6C_DD1D (:59); BLOCK_CAP=8388608 (:65) | L2-parquet-swar-fnv1a
+
+chains-seal | crates/bench/benches/chains-seal.rs | CORPUS_SEED=0xBF58_476D_1CE4_E5B9 (chains-seal.rs:55); RECORD_SPREAD=0x2544_5491_4F6C_DD1D (:59); METER_LEASE_DOMAIN=0xA18E_5000_0000_0001 (:63); RECEIPT_EPOCH_DOMAIN=0xA16E_7000_0000_0001 (:66); GENESIS_ROOT_DOMAIN=0xA16E_7000_0000_0002 (:69) | L5-seal-fused-asc450
+
+chains-sovereign | crates/bench/benches/chains-sovereign.rs | CORPUS_SEED=0xBF58_476D_1CE4_E5B9 (chains-sovereign.rs:77); RECORD_SPREAD=0x2544_5491_4F6C_DD1D (:64); ROWS_PER_FRAME=16 (:68) | L4-sovereign-ring-sink

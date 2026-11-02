@@ -1,0 +1,302 @@
+{
+ "missing": 1,
+ "registered_divergences": [
+  "cgap",
+  "cgap-arrow",
+  "cgap-audit",
+  "cgap-bn3",
+  "cgap-bont",
+  "cgap-bosym",
+  "cgap-cloud",
+  "cgap-core",
+  "cgap-crypto",
+  "cgap-ffi",
+  "cgap-fibo",
+  "cgap-gate",
+  "cgap-git",
+  "cgap-gpu",
+  "cgap-p28",
+  "cgap-parquet",
+  "cgap-storage"
+ ],
+ "rows": [
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:90",
+   "crate": "bench",
+   "local_version": "26.11.2",
+   "registry_state": "DELISTED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:99",
+   "crate": "cgap",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 2,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:14",
+   "crate": "cgap-arrow",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 2,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:90",
+   "crate": "cgap-audit",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:91",
+   "crate": "cgap-beam",
+   "local_version": "26.11.2",
+   "registry_state": "DELISTED"
+  },
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:16",
+   "crate": "cgap-blake3",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.2",
+    "num_versions": 3,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-bn3",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-bont",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-bosym",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-10-cli-state.md:1",
+   "crate": "cgap-cli",
+   "local_version": null,
+   "registry_state": "DELISTED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-cloud",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-core",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:92",
+   "crate": "cgap-court",
+   "local_version": "26.11.2",
+   "registry_state": "DELISTED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-crypto",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:88",
+   "crate": "cgap-ffi",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-fibo",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-gate",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:18",
+   "crate": "cgap-git",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 2,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-03-levers.md:32",
+   "crate": "cgap-gpu",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:91",
+   "crate": "cgap-integration",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 404
+   },
+   "registry_state": "UNPUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-p28",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:20",
+   "crate": "cgap-parquet",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 2,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "REGISTERED-DIVERGENCE",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-storage",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.1",
+    "num_versions": 1,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "MISSING",
+   "crate": "stardf-datalog",
+   "reason": "no-ledger-row"
+  }
+ ],
+ "ua": "cgap-registry-sweep/26.11.2"
+}

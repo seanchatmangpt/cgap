@@ -7,7 +7,9 @@ writes performed or permitted by this lane.
 
 Entry documents, read in order:
 `00-ard-prd.md` (charter transcription) -> `05-wave-plan.md` (wave plan
-of record) -> `02-pareto-levers.md` (lever specs, L1 landed).
+of record) -> `02-pareto-levers.md` (lever specs; all five levers are
+[TARGET-v26.11.2] — no lever has a landed waves/ receipt yet, verified
+by waves/ sweep 2026-11-01).
 
 ## 1. Opening law
 
@@ -19,25 +21,31 @@ The loop executes from disk, not operator memory. On (re)start:
 2. Read `00-ard-prd.md` -> `05-wave-plan.md` -> lever specs.
 3. Read the newest waves/ receipts to establish current standing.
 
-Landed state at transcription (verified on disk 2026-11-01/02, after a
-bounded poll): 00-ard-prd.md, 01-release-gates.md, 02-pareto-levers.md
-(L1 spec), 03-ost-design-around-register.md, 04-stardf-closure.md,
-05-wave-plan.md, RESTART-NOW.md, OVERNIGHT-LOOP.md (this file), plus
-waves/{v2-01-charter, v2-02-gates, v2-03-levers, v2-04-stardf-closure,
-v2-05-wave-plan, v2-07-census, v2-10-cli-state, v2-12-stop-list,
-v2-13-commit-manifest, sm-2-settings}.md. `HANDOFF.md`: STILL MISSING
-after the bounded poll — RESTART-NOW.md carries the recovery procedure
-and names HANDOFF as V2-11; its absence is loud here, not silent.
-Gate names in 01-release-gates.md (G1-PUBLISH ... G8-STARDF-F1) are
-the dispatch surface; 00-ard-prd.md §4 one-liners are the intent.
+Landed state, re-verified on disk 2026-11-01 (W1-09): `HANDOFF.md`
+EXISTS at the campaign root; the recovery clause below fires only on
+real absence. `waves/` holds 26 receipt files (ls exit 0, this
+session): bp-{1-claude, 2-settings, 3-hooks, 4-rules, 5-skills,
+6-reviewer, 7-stardf-claude, 8-allowlist, 10-audit}.md,
+overnight-readiness.md, sm-{1-root, 2-settings, 3-agents, 4-hooks,
+5-audit, 6-index}.md, v2-{01-charter, 02-gates, 03-levers,
+04-stardf-closure, 05-wave-plan, 07-census, 10-cli-state, 12-stop-list,
+13-commit-manifest, 14-loop}.md. Root docs: 00-ard-prd.md,
+01-release-gates.md, 02-pareto-levers.md, 03-ost-design-around-register
+.md, 04-stardf-closure.md, 05-wave-plan.md, RESTART-NOW.md,
+OVERNIGHT-PROMPT.md (the W1-W10 dispatch layer; read it for lane
+leases), OVERNIGHT-LOOP.md (this file). Gate names in
+01-release-gates.md (G1-PUBLISH ... G8-STARDF-F1) are the dispatch
+surface; 00-ard-prd.md §4 one-liners are the intent.
 
 ## 2. Wave order (serialized; lanes within a wave concurrent, disjoint leases)
 
 ### V2-A — finish the v26.11.1 tail (FIRST; blocks V2-B)
 
-Publish state per RESTART-NOW.md (live-verified at the kill): 18/22
-crates PUBLISHED at 26.11.1, including fibo + cloud — item 1 is CLOSED.
-Remaining:
+Publish state, census-current per `waves/v2-07-census.md`: 19/22
+cgap-family crates registry-verified PUBLISHED at 26.11.1 (17 of the
+v4 table + fibo + cloud; cgap-integration still HTTP 404 with its
+structural blocker cleared). RESTART-NOW.md's 18/22 census is
+SUPERSEDED (its own header says so, 2026-11-01). Remaining:
 
 1. cgap-integration publish: ONE invocation, sequenced post-window;
    stop-on-slide + 1hr backoff (§4 publish law).
@@ -183,8 +191,9 @@ claim done with any cell unrendered or any gate unwitnessed.
 - `waves/v2-13-commit-manifest.md` — PLANNED ordered commit plan over
   the 265 dirty cgap paths + 30 stardf paths; coordinator executes
   AFTER wave close; zero git writes by lanes.
-- `RESTART-NOW.md` — session-kill recovery: publish state 18/22
-  PUBLISHED 26.11.1; cgap-integration owes ONE invocation (publish-
+- `RESTART-NOW.md` — session-kill recovery: publish census 18/22 is
+  SUPERSEDED (see §2-A; census-current 19/22 per v2-07);
+  cgap-integration owes ONE invocation (publish-
   ready; stop-on-slide + 1hr backoff per §4); lawful non-publishes =
   court/beam/cli/bench.
 - `waves/v2-12-stop-list.md` + RESTART-NOW supersede any in-session

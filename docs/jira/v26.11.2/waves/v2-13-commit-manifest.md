@@ -84,3 +84,13 @@ Suggested stardf commit order: (1) arrow/ sources + new stardf-* crates + spine,
 5. **CLI regen artifacts** may fold into commit 1 (generated_cli.rs, ocel.json, command-reference.md are gen-surface).
 
 Final check after all commits: `git status --porcelain` returns only gitignored target/ debris. End state: clean except `.clap-noun-verb/` if not committed/ignored.
+
+## ADDENDUM (W2-19, 2026-11-02) — D4
+
+D4 (from the W1-17 audit receipt): Group D counts 14 bench files, but
+`ls crates/bench/benches/` = 15 on disk this session —
+`v26_10_31.rs` is present in the tree and unaccounted in the
+manifest's 14-file count (and its inline "Correction: 14" line).
+Group D total reads as 15; the sources-first commit ordering
+recommendation is unaffected. Evidence source: W1-17 audit receipt
+(D4).

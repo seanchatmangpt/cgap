@@ -12,7 +12,7 @@ Gate-runner dispatch contract (every block carries all four fields):
 - BLOCKED: typed protocol when the subject is missing or the environment cannot run it.
 
 Exit-code contract (repo CLAUDE.md): 0 pass / 1 gate fail / 2 subject missing /
-3 loud skip. Gates mutate only /tmp sandbox copies with sha256 fail-closed restore;
+3 loud skip. Gates mutate only /tmp sandbox copies with sha256-exact restore;
 never the shared tree. No Process.sleep anywhere in these gates.
 
 ---
@@ -75,8 +75,9 @@ FLIP (mandatory per level, /tmp sandbox copy of the measured kernel):
 - Mutate the kernel (e.g. remove `#[inline]` / inject a bounds check /
   add a temporary `core::hint::black_box` around the hot loop) in a /tmp
   copy, re-run the single bench, and require the level's threshold to
-  flip to FAIL. sha256 fail-closed restore of the mutated file.
+  flip to FAIL. sha256-exact restore of the mutated file.
 - A level with no flip witness is not measured; it is [SKIP] loud.
+- Restore pattern witnessed: waves/w2-13-l4l5-courts.md:80.
 
 BLOCKED:
 
@@ -108,7 +109,7 @@ FLIP:
 - Mutate the closure kernel in a /tmp sandbox copy to skip one derivation
   rule (or de-duplicate one join arm) so derived-fact count changes; the
   bench must detect the changed fact count or the throughput delta must
-  flip the threshold. sha256 fail-closed restore.
+  flip the threshold. sha256-exact restore.
 
 BLOCKED:
 
@@ -138,7 +139,7 @@ FLIP:
 
 - Mutate the DRED increment path in a /tmp sandbox copy to skip the
   entropy recompute; the entropy-variance number must change and the
-  <0.15 ns variance gate must flip. sha256 fail-closed restore.
+  <0.15 ns variance gate must flip. sha256-exact restore.
 
 BLOCKED:
 
@@ -171,7 +172,7 @@ FLIP:
 
 - In a /tmp sandbox copy, add a `Vec::new()` push (alloc symbol) or a
   `panic!` site to the no_std subject; symbol_gate.py must FAIL on the
-  copy. sha256 fail-closed restore.
+  copy. sha256-exact restore.
 
 BLOCKED:
 
@@ -199,14 +200,15 @@ RECEIPT:
   across both repos' manifests, locks, and crate sources.
 - Current state observed 2026-11-01: /Users/sac/cgap/Cargo.toml:33 carries
   a stale comment mentioning "DataFusion" (CD-1 note, no dependency;
-  Cargo.lock count = 0). That comment must be deleted before G6 exits 0.
+  Cargo.lock count = 0). G6 exits 0 only once that comment is gone.
 
 FLIP:
 
 - /tmp mutation flip: append `datafusion = "42"` to a /tmp copy of a
   workspace Cargo.toml and rerun the gate on the copy; it must FAIL.
 - Self-check corrupts a restore on a real temp copy (gate refuses a
-  restore mismatch, fail-closed).
+  restore mismatch).
+- Self-check precedent on record: waves/w2-08-gate-reruns.md.
 
 BLOCKED:
 
@@ -235,7 +237,7 @@ FLIP:
 
 - Feed the script a mutated claims file where one claim is merged with a
   prior-art mechanism (near-duplicate); the verdict must drop to 3/4 and
-  the gate must FAIL. sha256 fail-closed restore of the claims file.
+  the gate must FAIL. sha256-exact restore of the claims file.
 
 BLOCKED:
 
@@ -269,8 +271,9 @@ FLIP:
 
 - KD-12/KD-14 courts are themselves the flip courts: remove one of the 11
   mappings in a /tmp sandbox copy of the mapping table and require the
-  census to exit nonzero and the golden digest to break. sha256
-  fail-closed restore.
+  census to exit nonzero and the golden digest to break. Restore
+  sha256-exact.
+- Restore pattern witnessed: waves/w2-13-l4l5-courts.md:80.
 
 BLOCKED:
 

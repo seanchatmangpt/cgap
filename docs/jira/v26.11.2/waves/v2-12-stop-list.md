@@ -41,3 +41,14 @@ cross-read, 2026-11-02 session.
 | P3-2/5/6/8/A-3 publishers | 12 p3-pub-* markers all concluded | p3-pub-*.md (self-concluding) | STOP all |
 | VAC stragglers | vac-bench x2 landed, flips 4/4 | v26111-campaign-ledger.md L85-87 | STOP |
 | DIA/DOC stragglers | dia-1..6, doc-1..6 all landed | the 12 markers themselves | STOP |
+
+## ADDENDUM (W2-19, 2026-11-02) — D3
+
+D3 (from the W1-17 audit receipt): the stop-list text says "all 12
+p3-pub-* markers"; on-disk count is 11 (`ls
+docs/jira/v26.11.1/waves | grep -c p3-pub-` = 11 this session:
+aux-final, beam-gpu, bn3-gate, bont-bosym, core-storage,
+court-audit, crypto-p28, ffi, fibo-cloud, guard-flip,
+integration-wasm). "12" above reads as 11; the STOP rows for
+p3-pub-* are unaffected (11/11 concluded).
+Evidence source: W1-17 audit receipt (D3).

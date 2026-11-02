@@ -54,6 +54,25 @@ All targets are TARGETs until a v26.11.2 bench receipt re-measures them
   `verify_seal` -> `ChecksumMismatch { region: Body }` -> exit 101
   (court witnessed flipping in P3-17; M2 truncation law: decoder is
   span-bounded by the page header, not the row-group span).
+- Re-attribution 2026-11-02 (P2-PARETO, receipt
+  `waves/p2-pareto-reattribution.md`): the 86% "seal/verify/flush"
+  attribution above was STALE — W3-L2's SWAR FNV + the interleaved
+  `block_digest` already shrank the digest segment, so the per-stage
+  Divan legs were re-run: `digest_arm` 6.05 ms @1M (fnv checksum +
+  block_digest over the committed block), `flush_arm` 0.04 ms,
+  `encode_arm` 2.57 ms/lane, writer-path residual ~10.2 ms (2 lanes
+  through `encode_hybrid_into` + framing, ~2x the standalone
+  `rle_encode` leg). ONE landed lever: fused `SealDigests` sweep —
+  one read pass over the body feeding 6 FNV states (body checksum,
+  trailer checksum, 4 block_digest lanes) where `seal()` previously
+  made 3 passes. chain_ram 24.02 -> 23.21 ms @1M (-3.4%); seal_arm
+  17.22 -> 16.34 ms. <10 ms target NOT met by this lever. Dominant
+  stage now: the writer encode path (mmap_writer.rs `encode_hybrid_
+  into` literal-loop) — the next honest lever target. Mutation court:
+  one-bit xor flip inside `SealDigests::absorb` -> 2 seal courts FAIL
+  (FLIPPED), restore sha256-exact
+  `3b01b989d32b9cdc6806bdcbfb7a7421b09c631b3d03b2a974fb356d6746ba7a`,
+  tests green after restore.
 
 ## L3 — BN3 unify: static-footer bit-slice semi-join
 
@@ -127,16 +146,33 @@ All targets are TARGETs until a v26.11.2 bench receipt re-measures them
 - Anti-vacuity mutation: bit-flip an upstream receipt (validate must
   refuse), demote a crossing (no proof emission — `proven == N/2`
   assert flips), flip a receipt digest (verify DigestMismatch).
+- Re-measure 2026-11-01 (W3-L5, receipt
+  `waves/w3-l5-fused.md`): `fused_row` landed in cgap-p28 (anchor
+  match + folded record/seal, courts green: 37 lib tests + 2
+  lever_courts exit 0; demote-court FLIPPED, restore sha256-exact)
+  but the fused bench arm measured 3.04 µs/row @65536 vs 2.37 control —
+  the fuse ADDS the §4.4-3 sealed-state mint on licensed rows and the
+  one-lineage-per-batch mechanism is refused by the latch law for the
+  mixed corpus. <1.45 µs/row target NOT met; lever gate FAILED-BY-
+  MEASUREMENT. Re-PARETO: the irreducible cost is keyed-BLAKE3
+  roundtrips per row, not redundant traversal.
 
 ## Target summary (all TARGETs until re-measured)
 
 | lever | measured | target | floor |
 |---|---|---|---|
 | L1 ingress | 102.7 ns/frame | <15 ns/frame | >=6.8x |
+| L1 re-measure 2026-11-01 (W3-L1, receipt `waves/w3-l1-ingress.md`): two-stage escalation landed (FrameView prefilter/escalate, ESCALATE_MASK row-6 family, stage3_escalated + stage_prefilter_fold legs); ingress_chain 10.69 ms @1M = 10.20 ns/frame fastest (median 10.30) — <15 ns/frame MET, 10.1x vs >=6.8x floor; gates 11+3 courts exit 0 both profiles; escalate-always-true mutant FLIPPED, restore sha256-exact. Digest leg vacuous-zero (escalated subset empty on this corpus — receipt-recorded). | | | |
+| L1 reclassification 2026-11-01 (P2-PENSTOCK, receipt `waves/w4-p3-escalation-corpus.md`): ESCALATE_MASK (penstock.rs:271, 0x00F0 on header byte 5) is the SAME predicate as stage-1's FLAG_RESERVED_MASK (frame.rs:38, 0xF0) over all 256 flag values — escalated-AND-chain-admitted is structurally impossible, so L1's 10.20 ns/frame (10.1x) is **skip-not-pay**: the digest stage is a prefilter fold ALWAYS on chain-admitted frames, and the escalated BLAKE3 leg is permanently vacuous at chain level (law, not corpus). LeverStatus -> LANDED-skip-not-pay. Repair requires an A04 §6.3 wire-law amendment (split the reserved family; A19 register candidate) — recorded UNBUILT, out of lane ownership. | | | |
 | L2 parquet | 41.54 ms @ 1M | <10 ms @ 1M | >=5x |
+| L2 re-measure 2026-11-01 (W3-L2, receipt `waves/w3-l2-swar-fnv.md`): SWAR FNV landed + equity green (222 tests exit 0), chain_ram/chain_file @1M 42.7-43.1 ms mean — chain did NOT move; <10 ms target NOT met by this lever (chain 24.02 ms measured this lane; FNV share smaller than planned). | | | |
+| L2 re-attribution 2026-11-02 (P2-PARETO, receipt `waves/p2-pareto-reattribution.md`): fused `SealDigests` single-sweep seal (6 FNV states, 1 body pass vs 3) landed byte-exact; chain_ram 24.02 -> 23.21 ms @1M (-3.4%), seal_arm 17.22 -> 16.34 ms; 223 cgap-parquet tests exit 0; mutation FLIPPED (2 seal courts FAIL), sha256-exact restore; <10 ms target NOT met — dominant stage is now the writer encode path (`encode_hybrid_into`, mmap_writer.rs), recorded as the next lever target. | | | |
 | L3 bn3 | 1.470 s @ 1M | <75 ms @ 1M | >20x |
 | L4 sovereign | 45.8 us/tx | <4 us/tx | >=11x |
+| L4 re-measure 2026-11-01 (W3-L4, receipt `waves/a3-ring-sink.md`, witness re-run A3 2026-11-01): RingSink landed (mmap_writer.rs, BlockSink on `&mut RingSink`, spill-on-rotation, over-budget/failed-drain typed refusal) + FFI commit leg swapped to the thread-local `COMMIT_LEASE` (spill path resolved at grant; signature unchanged; 65,376/65,377 -> 0x43470004 probe verbatim). Measured (divan, /tmp/w3-l4-target): `stage_commit_parquet` (the FFI ring path) 269.1 us @256 / 4.368 ms @4096 = **1.05-1.07 us/tx** vs 45.8 recorded — <4 us/tx MET, >=43x. `ring_sink_commit` steady leg 262.1 us @256 = 1.02 us/tx; `ring_sink_spill` 6.46 ms @256 (fat slabs, forced rotation). Alloc column: 2 allocs/36 B per tx REMAIN (FooterSealer `spans.to_vec()` + `build_meta_block` Vec, footer.rs:187/326 — pre-existing, outside lane ownership; NOT 0). Courts: lever_courts 2 exit 0 (header flip -> exactly 0x5032_38FF both ways; 70k-lane LEASE refusal); commit_positive byte-identity court adjusted to rotation semantics (concatenated owner-API blocks, per-lane-slot determinism), disclosed. | | | |
+| L4 re-witness 2026-11-01 (A3, `waves/a3-ring-sink.md`): independent re-run, /tmp/a3-target. `stage_commit_parquet` 150.7 us @256 = **0.589 us/tx** / 2.472 ms @4096 = **0.603 us/tx** — <4 us/tx MET, >=76x vs 45.8. LEASE probe verbatim: 65,376 accepted, 65,377 -> 0x43470004. Alloc column NOT 0: 2 allocs/36 B per tx remain (footer.rs:187/326, pre-existing). lever_courts 2/2 exit 0; full cgap-ffi + cgap-parquet suites exit 0. | | | |
 | L5 seal | 2.37 us/row | <1.45 us/row | >=1.6x |
+| L5 re-measure 2026-11-01 (W3-L5, receipt `waves/w3-l5-fused.md`): fused_row landed + courts green (37+2 tests exit 0, demote-court FLIPPED/restore-exact), but fused arm 3.04 µs/row @65536 vs 2.37 control — REGRESSION; <1.45 µs/row target NOT met. | | | |
 
 Court plan for every lever: divan bench receipt on the same host +
 named-mutation flip in a /tmp sandbox with sha256 fail-closed

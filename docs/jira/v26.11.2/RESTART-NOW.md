@@ -1,5 +1,11 @@
 # RESTART-NOW — session-end state + recovery procedure
 
+> **SUPERSEDED (census only), 2026-11-01:** the 18/22 published census
+> below is superseded by HANDOFF.md §1 — 19/22 is current (storage flip
+> postdates this file). Live census:
+> `docs/jira/v26.11.2/waves/v2-07-census.md`. All other content here
+> stands.
+
 Written 2026-11-02 at session end (operator-side channel). The prior
 session terminated with agents mid-flight; this file is the durable
 handoff supplement to HANDOFF.md (if it landed) and OVERNIGHT-LOOP.md.

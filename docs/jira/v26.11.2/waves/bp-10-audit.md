@@ -26,3 +26,15 @@ in the final report (receipt-in-final-message).
 - G3 CLAUDE.md:31 cites OVERNIGHT-LOOP.md:128 for the publish law; the law
   lives at :146-149 (:128 is G6-NO-DF). Sm-5 flagged this; unrepaired.
 - G4 absent at poll deadline: bp-7, bp-9 receipts; overnight-readiness.md.
+
+## ADDENDUM (W2-19, 2026-11-02) — D2
+
+D2 (from the W1-17 audit receipt): the G2
+`Bash(cargo publish:*)` claim (line 7 of settings.local.json,
+"PRESENT in allow") is NOT reproducible on current disk —
+`grep -n "cargo publish" /Users/sac/cgap/.claude/settings.local.json`
+returns exit 1 (0 hits) this session. The line-7-presence claim is
+therefore marked UNVERIFIED-at-write; row 4 of the verdict table above
+inherits that standing. Divergence noted with mtime ordering recorded
+by the audit (settings.local.json was newest-mtime in tree at audit
+time). Evidence source: W1-17 audit receipt (bp-10-audit.md G2 row).
