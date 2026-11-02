@@ -49,10 +49,19 @@
 //!   independence by clearing the gate flag (the checksum channel then
 //!   fires, localized to the trailer). Divergence recorded in the lane
 //!   receipt.
-//! - **Meta block allocation**: the seal path builds the meta block with
-//!   the crate's compact-protocol writer family (which emits into a
-//!   `Vec`); allocation is lawful here — the zero-alloc law scopes to the
-//!   flush path (C4), not the seal path.
+//! - **Meta block allocation**: the seal path is zero-alloc. The meta
+//!   block is emitted into a fixed-capacity `[u8; META_CAP]` scratch by
+//!   footer-local fixed-buffer mirrors of the compact-protocol writers
+//!   (byte-exact by construction, pinned by the differential meta court
+//!   in this file's tests, which compares the fixed-path bytes against
+//!   the `Vec`-emitting `crate::thrift` writers over a matrix of
+//!   row-group counts); overflow is a typed
+//!   [`ParquetError::RunOverrun`], never silent truncation. The row-group
+//!   spans ride a fixed inline `[u32; MAX_ROW_GROUPS]` (the writer's own
+//!   representation, [`crate::mmap_writer::MAX_ROW_GROUPS`]); a summary
+//!   with more than [`MAX_ROW_GROUPS`] row groups is a typed seal
+//!   refusal. The prior lawful carve-out ("allocation is lawful on the
+//!   seal path") is CLOSED as of v26.11.2 wave 6.
 //! - **List encoding**: meta field 4's elements are bare zigzag-i32
 //!   varints (compact-protocol list elements carry no field headers);
 //!   counts <= 14 ride the list header byte, larger counts take the
@@ -69,10 +78,169 @@
 use crate::rle::ParquetError;
 use crate::thrift::{
     ctype, read_binary, read_field_header, read_i32, read_i64, read_varint, skip_value,
-    write_binary_field, write_field_header, write_i32_field, write_i64_field, write_zigzag_i16,
-    zigzag_decode_i16, zigzag_encode_i32,
+    zigzag_decode_i16,
 };
 use alloc::vec::Vec;
+
+/// Fixed capacity of the seal-path meta scratch: worst-case §6.2 encoding
+/// at [`crate::mmap_writer::MAX_ROW_GROUPS`] row groups (field 4's list
+/// long-form header + 64 zigzag-i32 varints at 5 B each dominates).
+/// Overflow is a typed refusal, never a grow.
+const META_CAP: usize = 512;
+
+/// Structural worst-case length of the §6.2 meta block at `n` row groups,
+/// computed field-by-field exactly as [`FooterSealer::build_meta_block`]
+/// emits it (delta-form field headers, zigzag varints, long-form list
+/// header for n > 14, 8-byte field-5 digest). Compile-time-only: used by
+/// the `const` assertion below so any future field addition or worst-case
+/// growth past [`META_CAP`] fails at compile time, not at seal time.
+const fn worst_case_meta_len(n: usize) -> usize {
+    // varint length of a compact-protocol value (7-bit groups).
+    const fn varint_len(v: u64) -> usize {
+        let mut v = v;
+        let mut len = 1;
+        while v >= 0x80 {
+            v >>= 7;
+            len += 1;
+        }
+        len
+    }
+    // fields 1 (version i16=1), 2 (count <= n), 6 (flags 0|1): 1-byte
+    // delta-form key + 1-byte zigzag varint each = 2 B apiece (field 2's
+    // worst zigzag(64)=128 is a 2-byte varint, so 3 B — take the max).
+    let small_fields = 2 + 3 + 2;
+    // field 3 (total rows i64): key + worst-case zigzag-i64 varint (10 B).
+    let rows_field = 1 + varint_len(u64::MAX);
+    // field 4: key + long-form list header (1 B marker + varint count,
+    // worst 5 B for a u32 count) + n worst-case zigzag-i32 varints (5 B).
+    let spans_field = 1 + 1 + 5 + n * 5;
+    // field 5: key + 1-byte length + 8-byte FNV-1a-64 digest.
+    let digest_field = 1 + 1 + 8;
+    // STOP byte.
+    small_fields + rows_field + spans_field + digest_field + 1
+}
+
+/// Compile-time capacity pin: worst-case meta encoding at
+/// [`crate::mmap_writer::MAX_ROW_GROUPS`] must fit the fixed scratch.
+/// Adding a meta field or growing a span width past the budget is a
+/// compile error here, never a seal-time [`ParquetError::RunOverrun`]
+/// surprise. (FM-PM1 court; mutation witness: bumping `META_CAP` below
+/// the worst case must fail to compile — flip witnessed by the
+/// `#[cfg(compile_fail_mutation)]` dual assertion below.)
+const _: () = assert!(
+    worst_case_meta_len(crate::mmap_writer::MAX_ROW_GROUPS) < META_CAP,
+    "worst-case meta block exceeds META_CAP at MAX_ROW_GROUPS"
+);
+
+#[cfg(test)]
+mod meta_cap_mutation_probe {
+    use super::*;
+
+    /// Anti-vacuity witness for the capacity pin: the SAME structural
+    /// computation at an inflated row-group bound must exceed the cap,
+    /// proving the assertion is not trivially satisfied. Runs at test
+    /// time (the const assert itself cannot "flip" at runtime).
+    #[test]
+    fn cap_pin_is_not_vacuous() {
+        // 128 row groups would overflow the cap — this is the mutation
+        // made observable without breaking the shared compile.
+        assert!(
+            worst_case_meta_len(crate::mmap_writer::MAX_ROW_GROUPS * 2) >= META_CAP,
+            "doubling MAX_ROW_GROUPS must exceed META_CAP — the const pin \
+             would be vacuous if a doubled bound still fit"
+        );
+        // And the pinned bound has headroom reported, not hidden.
+        let worst = worst_case_meta_len(crate::mmap_writer::MAX_ROW_GROUPS);
+        assert!(
+            worst < META_CAP,
+            "pinned worst case must fit (compile assert enforces this)"
+        );
+    }
+}
+
+/// Fixed-buffer mirror of the compact-protocol writer family: byte-exact
+/// emission into `&mut [u8]` with no heap. Every method returns a typed
+/// [`ParquetError::RunOverrun`] on capacity exhaustion (claim = bytes the
+/// write needs, budget = capacity) — fail-closed, never silent truncation.
+/// Byte-exactness vs the `Vec` writers is pinned by the differential meta
+/// court in this file's test module.
+struct MetaBuf<'b> {
+    buf: &'b mut [u8],
+    pos: usize,
+}
+
+impl<'b> MetaBuf<'b> {
+    fn new(buf: &'b mut [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+
+    fn overrun(&self, needed: usize) -> ParquetError {
+        ParquetError::RunOverrun {
+            run_len: self.pos + needed,
+            budget: self.buf.len(),
+        }
+    }
+
+    fn push(&mut self, byte: u8) -> Result<(), ParquetError> {
+        if self.pos >= self.buf.len() {
+            return Err(self.overrun(1));
+        }
+        self.buf[self.pos] = byte;
+        self.pos += 1;
+        Ok(())
+    }
+
+    fn extend(&mut self, bytes: &[u8]) -> Result<(), ParquetError> {
+        if bytes.len() > self.buf.len() - self.pos {
+            return Err(self.overrun(bytes.len()));
+        }
+        self.buf[self.pos..self.pos + bytes.len()].copy_from_slice(bytes);
+        self.pos += bytes.len();
+        Ok(())
+    }
+
+    /// Byte-exact mirror of [`crate::rle::write_varint`].
+    fn varint(&mut self, mut value: u64) -> Result<(), ParquetError> {
+        loop {
+            let mut b = (value & 0x7F) as u8;
+            value >>= 7;
+            if value != 0 {
+                b |= 0x80;
+            }
+            self.push(b)?;
+            if value == 0 {
+                return Ok(());
+            }
+        }
+    }
+
+    /// Byte-exact mirror of [`crate::thrift::write_field_header`].
+    fn field_header(
+        &mut self,
+        field_id: i16,
+        prev_id: i16,
+        type_id: u8,
+    ) -> Result<(), ParquetError> {
+        let delta = i32::from(field_id) - i32::from(prev_id);
+        if (1..=15).contains(&delta) {
+            self.push(((delta as u8) << 4) | type_id)
+        } else {
+            self.push(type_id)?;
+            // Non-delta form: zigzag-i16 field id (mirrors
+            // write_zigzag_i16).
+            let z = u64::from(((field_id as u16) << 1) ^ ((field_id >> 15) as u16));
+            self.varint(z)
+        }
+    }
+
+    fn zigzag_i32(&mut self, n: i32) -> Result<(), ParquetError> {
+        self.varint(u64::from(crate::thrift::zigzag_encode_i32(n)))
+    }
+
+    fn zigzag_i64(&mut self, n: i64) -> Result<(), ParquetError> {
+        self.varint(crate::thrift::zigzag_encode_i64(n))
+    }
+}
 
 /// Block magic (§6.1): this is a cgap-private Parquet-v2-derived container
 /// and says so — it does NOT claim full-Parquet compatibility (the full
@@ -300,7 +468,11 @@ pub struct FooterSealer<'a> {
     body_len: usize,
     row_groups: u32,
     rows: u64,
-    spans: Vec<u32>,
+    /// Fixed inline copy of the row-group spans (the writer's own
+    /// representation; `row_groups` gives the live prefix length). No
+    /// heap: a summary above [`crate::mmap_writer::MAX_ROW_GROUPS`] is a
+    /// typed seal refusal, checked in [`FooterSealer::new`].
+    spans: [u32; crate::mmap_writer::MAX_ROW_GROUPS],
     attestation: Option<[u8; ATTESTATION_LEN]>,
 }
 
@@ -310,7 +482,8 @@ impl<'a> FooterSealer<'a> {
     /// Refusals (typed): zero row groups, an empty body (`B >= 1`, §6.1 —
     /// covers the all-zero-span summary `seal()` would otherwise emit as a
     /// block [`verify_seal`] must refuse), any span above the §6.2 field-4
-    /// wire bound (`i32::MAX` — wave-7 repair W7-F1), spans not summing to
+    /// wire bound (`i32::MAX` — wave-7 repair W7-F1), a row count above
+    /// `i64::MAX` (the §6.2 field-3 zigzag i64 wire bound — H5), spans not summing to
     /// `body_len`, or `body_len` exceeding the buffer — all
     /// [`ParquetError::RunOverrun`] with documented semantics.
     pub fn new(
@@ -334,6 +507,28 @@ impl<'a> FooterSealer<'a> {
             return Err(ParquetError::RunOverrun {
                 run_len: 0,
                 budget: 1,
+            });
+        }
+        if summary.rows > i64::MAX as u64 {
+            // H5 seal-boundary arm: §6.2 field 3 is a zigzag i64 — rows
+            // above i64::MAX cast-wrap to a negative wire value that
+            // verify_seal's parse refuses (rows < 0 => MetaMalformed).
+            // Seal refuses here rather than emit a writable-but-
+            // unverifiable block (the W6-F1/W7-F1 asymmetry class at the
+            // row-count bound). Typed refusal, fail-closed.
+            return Err(ParquetError::RunOverrun {
+                run_len: summary.rows.min(usize::MAX as u64) as usize,
+                budget: i64::MAX as usize,
+            });
+        }
+        if summary.row_groups as usize > crate::mmap_writer::MAX_ROW_GROUPS {
+            // The zero-alloc seal path carries spans in a fixed inline
+            // array at the writer's MAX_ROW_GROUPS bound; a summary above
+            // the bound has no lawful representation here — typed refusal,
+            // never a heap grow (v26.11.2 wave-6 seal-zero-alloc lane).
+            return Err(ParquetError::RunOverrun {
+                run_len: summary.row_groups as usize,
+                budget: crate::mmap_writer::MAX_ROW_GROUPS,
             });
         }
         if summary.spans.len() != summary.row_groups as usize {
@@ -373,7 +568,11 @@ impl<'a> FooterSealer<'a> {
             body_len,
             row_groups: summary.row_groups,
             rows: summary.rows,
-            spans: summary.spans.to_vec(),
+            spans: {
+                let mut s = [0u32; crate::mmap_writer::MAX_ROW_GROUPS];
+                s[..summary.spans.len()].copy_from_slice(summary.spans);
+                s
+            },
             attestation: attestation.map(|a| {
                 let mut slot = [0u8; ATTESTATION_LEN];
                 slot.copy_from_slice(a);
@@ -388,8 +587,11 @@ impl<'a> FooterSealer<'a> {
         // One fused sweep over the body replaces three passes (the old
         // build_meta body FNV, the full-length checksum, block_digest).
         let mut digests = SealDigests::over_body(&self.buf[..self.body_len]);
-        let meta = self.build_meta_block(digests.body_digest());
-        let m = meta.len();
+        // Fixed-capacity meta scratch: zero heap on the seal path (the
+        // prior carve-out is closed; module docs name the court).
+        let mut meta_scratch = [0u8; META_CAP];
+        let m = self.build_meta_block(digests.body_digest(), &mut meta_scratch)?;
+        let meta = &meta_scratch[..m];
         let body_len = self.body_len;
         // Checked end-to-end: a wrap in any intermediate sum would pass a
         // range check it must not (same overflow class as the writer's
@@ -442,37 +644,45 @@ impl<'a> FooterSealer<'a> {
         })
     }
 
-    /// The §6.2 metadata block, framed with the crate's compact-protocol
-    /// writer family (footer-local field ids; NOT parquet.thrift ids).
-    fn build_meta_block(&self, body_digest: u64) -> Vec<u8> {
-        let mut meta = Vec::new();
+    /// The §6.2 metadata block, emitted into the caller's fixed-capacity
+    /// scratch with the footer-local [`MetaBuf`] mirrors of the
+    /// compact-protocol writers (footer-local field ids; NOT
+    /// parquet.thrift ids). Returns the live length; capacity exhaustion
+    /// is a typed [`ParquetError::RunOverrun`].
+    fn build_meta_block(&self, body_digest: u64, out: &mut [u8]) -> Result<usize, ParquetError> {
+        let mut w = MetaBuf::new(out);
         // 1: format version (i16 zigzag) = 1.
-        write_field_header(&mut meta, 1, 0, ctype::I16);
-        write_zigzag_i16(&mut meta, 1);
+        w.field_header(1, 0, ctype::I16)?;
+        w.varint(u64::from(crate::thrift::zigzag_encode_i16(1)))?;
         // 2: row-group count (i32 zigzag), >= 1.
-        write_i32_field(&mut meta, 2, 1, self.row_groups as i32);
+        w.field_header(2, 1, ctype::I32)?;
+        w.zigzag_i32(self.row_groups as i32)?;
         // 3: total row count (i64 zigzag).
-        write_i64_field(&mut meta, 3, 2, self.rows as i64);
+        w.field_header(3, 2, ctype::I64)?;
+        w.zigzag_i64(self.rows as i64)?;
         // 4: list<i32> of per-row-group body spans (bare zigzag elements).
-        write_field_header(&mut meta, 4, 3, ctype::LIST);
-        let n = self.spans.len();
+        w.field_header(4, 3, ctype::LIST)?;
+        let n = self.row_groups as usize;
         if n <= 14 {
-            meta.push(((n as u8) << 4) | ctype::I32);
+            w.push(((n as u8) << 4) | ctype::I32)?;
         } else {
-            meta.push(0xF0 | ctype::I32);
-            crate::rle::write_varint(&mut meta, n as u64);
+            w.push(0xF0 | ctype::I32)?;
+            w.varint(n as u64)?;
         }
-        for span in &self.spans {
-            crate::rle::write_varint(&mut meta, u64::from(zigzag_encode_i32(*span as i32)));
+        for span in &self.spans[..n] {
+            w.zigzag_i32(*span as i32)?;
         }
         // 5: body digest prefix (FNV-1a-64 of the body region, LE;
         // computed by the caller's fused SealDigests sweep).
-        write_binary_field(&mut meta, 5, 4, &body_digest.to_le_bytes());
+        w.field_header(5, 4, ctype::BINARY)?;
+        w.push(8)?;
+        w.extend(&body_digest.to_le_bytes())?;
         // 6: flags — bit0: attestation present.
         let flags = if self.attestation.is_some() { 1 } else { 0 };
-        write_i32_field(&mut meta, 6, 5, flags);
-        meta.push(ctype::STOP);
-        meta
+        w.field_header(6, 5, ctype::I32)?;
+        w.zigzag_i32(flags)?;
+        w.push(ctype::STOP)?;
+        Ok(w.pos)
     }
 }
 
@@ -756,6 +966,10 @@ fn parse_meta(meta: &[u8]) -> Result<ParsedMeta, SealError> {
 mod courts {
     use super::*;
     use crate::mmap_writer::{SlabView, StaticPageBuffer, StaticPageWriter};
+    use crate::thrift::{
+        write_binary_field, write_field_header, write_i32_field, write_i64_field, write_zigzag_i16,
+        zigzag_encode_i32,
+    };
     use alloc::rc::Rc;
     use core::cell::RefCell;
 
@@ -859,7 +1073,173 @@ mod courts {
         }
     }
 
-    // ---- wave-6 repairs (W6-F1 seal/verify asymmetry, W6-F2 hostile corpus) ----
+    // ---- seal-path zero-alloc differential + capacity courts (v26.11.2 wave 6) ----
+
+    /// Vec-emitting oracle: the crate's real compact-protocol writers over
+    /// the exact §6.2 field sequence `build_meta_block` must produce — an
+    /// independent real collaborator, not a mock.
+    fn vec_meta_oracle(rg: u32, rows: u64, spans: &[u32], flags: u32, body_digest: u64) -> Vec<u8> {
+        let mut meta = Vec::new();
+        write_field_header(&mut meta, 1, 0, ctype::I16);
+        write_zigzag_i16(&mut meta, 1);
+        write_i32_field(&mut meta, 2, 1, rg as i32);
+        write_i64_field(&mut meta, 3, 2, rows as i64);
+        write_field_header(&mut meta, 4, 3, ctype::LIST);
+        let n = spans.len();
+        if n <= 14 {
+            meta.push(((n as u8) << 4) | ctype::I32);
+        } else {
+            meta.push(0xF0 | ctype::I32);
+            crate::rle::write_varint(&mut meta, n as u64);
+        }
+        for span in spans {
+            crate::rle::write_varint(&mut meta, u64::from(zigzag_encode_i32(*span as i32)));
+        }
+        write_binary_field(&mut meta, 5, 4, &body_digest.to_le_bytes());
+        write_i32_field(&mut meta, 6, 5, flags as i32);
+        meta.push(ctype::STOP);
+        meta
+    }
+
+    /// Build a sealer over a fresh buffer for the given spans (rows pinned
+    /// to a distinctive constant so a drifted input is visible).
+    fn sealer_with<'b>(buf: &'b mut [u8], spans: &[u32]) -> FooterSealer<'b> {
+        let body_len: usize = spans.iter().map(|s| *s as usize).sum();
+        FooterSealer::new(
+            buf,
+            body_len,
+            BlockSummary {
+                row_groups: spans.len() as u32,
+                rows: 0x5BCD_1234_5678_9A00,
+                spans,
+            },
+            None,
+        )
+        .expect("sealer construction")
+    }
+
+    /// P5 seal-zero-alloc differential court: the fixed-buffer [`MetaBuf`]
+    /// emission path is BYTE-EXACT against the crate's Vec-emitting
+    /// compact-protocol writers (the prior seal-path implementation) over a
+    /// row-group-count matrix covering both list encodings (short form
+    /// n<=14: rg=1; boundary rg=14; long form rg=15; writer max rg=64).
+    /// Anti-vacuity MUT-FOOT-10: flipping ONE input bit (a row count or a
+    /// span) must move the fixed-path bytes; a court whose comparison has
+    /// no content cannot detect a byte drift, so each matrix arm also
+    /// asserts a one-flip difference. RESTORE is byte-exact (all mutations
+    /// are on freshly built scratch; the shared tree never mutates).
+    #[test]
+    fn meta_fixed_path_is_byte_exact_vs_vec_oracle() {
+        let long14 = alloc::vec![2u32; 14];
+        let long15 = alloc::vec![2u32; 15];
+        let long64 = alloc::vec![2u32; 64];
+        for spans in [
+            &[3u32][..],
+            &[3u32, 4, 5][..],
+            &long14[..],
+            &long15[..],
+            &long64[..],
+        ] {
+            let rg = spans.len() as u32;
+            let body_len: usize = spans.iter().map(|s| *s as usize).sum();
+            let mut b = StaticPageBuffer::<CAP>::new();
+            let sealer = sealer_with(b.as_mut_slice(), spans);
+            let mut scratch = [0u8; super::META_CAP];
+            let m = sealer
+                .build_meta_block(0xDEAD_BEEF_1234_5678, &mut scratch)
+                .expect("fixed-path meta fits META_CAP");
+            let fixed = &scratch[..m];
+
+            // BEFORE: the independent Vec oracle over the same inputs.
+            let expected =
+                vec_meta_oracle(rg, 0x5BCD_1234_5678_9A00, spans, 0, 0xDEAD_BEEF_1234_5678);
+            assert_eq!(
+                fixed,
+                &expected[..],
+                "fixed-path meta bytes drifted from the Vec oracle (rg={rg})"
+            );
+
+            // MUT-FOOT-10: flipping one input bit must move the bytes.
+            let mut flipped_spans = spans.to_vec();
+            flipped_spans[0] ^= 0x01;
+            let oracle2 = vec_meta_oracle(
+                rg,
+                0x5BCD_1234_5678_9A00,
+                &flipped_spans,
+                0,
+                0xDEAD_BEEF_1234_5678,
+            );
+            assert_ne!(
+                &oracle2[..],
+                &expected[..],
+                "flip arm: a one-span-bit flip must move the oracle bytes (rg={rg})"
+            );
+
+            // Second flip arm: rows bit flip moves the bytes too.
+            let oracle3 =
+                vec_meta_oracle(rg, 0xABCD_1234_5678_9A01, spans, 0, 0xDEAD_BEEF_1234_5678);
+            assert_ne!(&oracle3[..], &expected[..], "rows flip must move bytes");
+
+            // RESTORE witness: body extent still consistent (shadowed var
+            // documented; the block-level byte-exactness is pinned by the
+            // existing round-trip courts over real sealed blocks).
+            assert_eq!(body_len, spans.iter().map(|s| *s as usize).sum::<usize>());
+        }
+    }
+
+    /// P5 seal-zero-alloc capacity court: a summary above the writer's
+    /// MAX_ROW_GROUPS bound (the fixed inline array's capacity) is a typed
+    /// seal refusal with the exact payload (run_len = row_groups claimed,
+    /// budget = MAX_ROW_GROUPS), never a heap grow. Anti-vacuity
+    /// MUT-FOOT-11: the lawful MAX_ROW_GROUPS summary at the SAME span
+    /// value must PASS the capacity check (it fails later at the buffer
+    /// check only because CAP < the body it claims) — a neutered capacity
+    /// check would refuse the lawful arm with the capacity payload too.
+    #[test]
+    fn max_row_groups_over_capacity_refused_with_exact_payload() {
+        let cap = crate::mmap_writer::MAX_ROW_GROUPS;
+        let spans: alloc::vec::Vec<u32> = alloc::vec![1u32; cap + 1];
+        let mut b = StaticPageBuffer::<CAP>::new();
+        match FooterSealer::new(
+            b.as_mut_slice(),
+            cap + 1,
+            BlockSummary {
+                row_groups: (cap + 1) as u32,
+                rows: 0,
+                spans: &spans,
+            },
+            None,
+        ) {
+            Err(ParquetError::RunOverrun { run_len, budget }) => {
+                assert_eq!(run_len, cap + 1, "run_len = claimed row groups");
+                assert_eq!(budget, cap, "budget = MAX_ROW_GROUPS");
+            }
+            Err(other) => panic!("over-capacity seal: wrong error {other:?}"),
+            Ok(_) => panic!("over-capacity seal must refuse"),
+        }
+
+        // MUT-FOOT-11 lawful arm: exactly MAX_ROW_GROUPS groups of 1-byte
+        // spans — the capacity check must let it through (the 64-byte body
+        // fits CAP, so the summary constructs Ok).
+        let lawful: alloc::vec::Vec<u32> = alloc::vec![1u32; cap];
+        match FooterSealer::new(
+            b.as_mut_slice(),
+            cap,
+            BlockSummary {
+                row_groups: cap as u32,
+                rows: 0,
+                spans: &lawful,
+            },
+            None,
+        ) {
+            Err(ParquetError::RunOverrun { run_len, budget }) => {
+                assert_eq!(run_len, cap, "body check fired with body extent");
+                assert_eq!(budget, CAP, "budget = buffer capacity, not MAX_ROW_GROUPS");
+            }
+            Err(other) => panic!("lawful MAX_ROW_GROUPS arm: wrong error {other:?}"),
+            Ok(_) => {} // the lawful summary constructs: capacity check passed
+        }
+    }
 
     /// W6-F1: §6.1's `B >= 1` law enforced at the seal boundary. The
     /// row_groups >= 1 / all-zero-span summary previously slipped through

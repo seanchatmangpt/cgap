@@ -68,6 +68,12 @@ pub fn keep_mask(
         // partial: alt_support.len() == fact count, not padded).
         let lo = w * 64;
         let hi = core::cmp::min(lo + 64, alt_support.len());
+        // DREDP probe (2026-11-02): this per-lane rescue loop was swapped
+        // to word-parallel SWAR (pair-fold + swar_nonzero_u64) and
+        // MEASURED -11% (839M vs 944M facts/s, all legs, same bench
+        // method) -- the loop autovectorizes in release; the SWAR form
+        // does not. The per-lane form is KEPT on the perf fence; see
+        // docs/jira/v26.11.2/repairs/repair-16-dred-swar-wire.md.
         for lane in lo..hi {
             if alt_support[lane] != 0 {
                 k |= 1u64 << (lane - lo);
@@ -210,6 +216,270 @@ pub fn oracle_surviving(
         }
     }
     v
+}
+
+/// Cascade retraction, expressiveness note (REP4): the flat `derived_deps`
+/// bitmask cannot express per-fact dependent LISTS (it is one bit per fact:
+/// "is derived"), so a lineage EDGE relation is not representable in the
+/// masks alone. The strongest cascade the representation supports therefore
+/// takes the edge relation as an explicit caller-leased CSR adjacency
+/// ([`build_csr`]); all cascade state lives in caller-leased buffers — the
+/// hot path performs ZERO heap allocation.
+///
+/// Cascade law: fact F is cascade-purged iff F is deleted, OR F is reachable
+/// from a deleted fact through the lineage edge relation with NO alternative
+/// derivation at F (`alt_support[F] == 0`). A dependent with an alive
+/// alternative derivation survives and does NOT propagate the purge (its
+/// dependents keep a live derivation). This is the least fixpoint of:
+/// purged(root) for every deleted root; purged(d) if purged(p), edge p->d,
+/// alt(d)==0. BFS over the CSR with a mark-visited bit converges in <= facts
+/// enqueues because every fact is enqueued at most once (marked before
+/// push), so the worklist is bounded by `facts` and overflow is a caller
+/// under-provisioning error, never a silent drop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CascadeError {
+    /// worklist lease smaller than the fact count (each fact enqueues <=
+    /// once, so capacity == facts is sufficient).
+    WorklistCapacity { capacity: usize, facts: usize },
+    /// adjacency lease smaller than the edge count.
+    AdjacencyLease { needed: usize, provided: usize },
+    /// counts lease smaller than facts + 1.
+    CountsLease { needed: usize, provided: usize },
+    /// an edge endpoint is not a valid fact index.
+    EdgeOutOfRange {
+        edge_index: usize,
+        endpoint: u32,
+        facts: usize,
+    },
+}
+
+/// Build the caller-leased CSR adjacency (dependents grouped by parent) from
+/// `(parent, dependent)` lineage edges. `counts` (len facts+1) receives the
+/// exclusive-prefix-sum start offsets; `fill` (len facts) is scratch and is
+/// left in an unspecified state; `adj` (len >= edges.len()) receives the
+/// dependents. Zero allocation; typed refusals on bad leases or bad edges.
+pub fn build_csr(
+    edges: &[(u32, u32)],
+    facts: usize,
+    counts: &mut [u32],
+    fill: &mut [u32],
+    adj: &mut [u32],
+) -> Result<(), CascadeError> {
+    if counts.len() < facts + 1 {
+        return Err(CascadeError::CountsLease {
+            needed: facts + 1,
+            provided: counts.len(),
+        });
+    }
+    if adj.len() < edges.len() {
+        return Err(CascadeError::AdjacencyLease {
+            needed: edges.len(),
+            provided: adj.len(),
+        });
+    }
+    for c in counts[..=facts].iter_mut() {
+        *c = 0;
+    }
+    for (i, &(p, d)) in edges.iter().enumerate() {
+        if p as usize >= facts || d as usize >= facts {
+            return Err(CascadeError::EdgeOutOfRange {
+                edge_index: i,
+                endpoint: u32::max(p, d),
+                facts,
+            });
+        }
+        counts[p as usize] += 1;
+    }
+    // Exclusive prefix sum: counts[f] = start offset of f's dependents.
+    let mut run = 0u32;
+    for f in 0..facts {
+        let c = counts[f];
+        counts[f] = run;
+        run = run.wrapping_add(c);
+    }
+    counts[facts] = run;
+    // Scatter dependents into adj using a moving fill cursor per parent.
+    fill[..facts].copy_from_slice(&counts[..facts]);
+    for &(p, d) in edges.iter() {
+        let fp = fill[p as usize] as usize;
+        adj[fp] = d;
+        fill[p as usize] += 1;
+    }
+    Ok(())
+}
+
+/// Cascade retraction (REP4): deletes the transitive closure of deleted
+/// roots through the caller-leased CSR lineage adjacency, rescuing every
+/// dependent with an alternative derivation, then applies the STATIC
+/// single-pass rule (`keep_mask`) to everything the cascade did not purge.
+/// Appends surviving fact indices to `out` after `base`; returns the new
+/// total, or a typed [`CascadeError`] on an under-provisioned lease.
+///
+/// Semantics: deleted roots are purged UNCONDITIONALLY (deletion is the
+/// actuation; the static rule's alt rescue applies only to non-deleted
+/// derived suspects), and a dependent d of a purged parent survives iff
+/// `alt_support[d] != 0`.
+///
+/// Zero heap allocation: purged/keep masks, the BFS worklist ring, and the
+/// CSR are all caller-leased.
+pub fn cascade_retract(
+    derived_deps: &[u64],
+    del_mask: &[u64],
+    alt_support: &[u32],
+    facts: usize,
+    counts: &[u32],
+    adj: &[u32],
+    purged: &mut [u64],
+    keep: &mut [u64],
+    worklist: &mut [u32],
+    base: u32,
+    out: &mut [u32],
+) -> Result<u32, CascadeError> {
+    let words = derived_deps.len();
+    if worklist.len() < facts {
+        return Err(CascadeError::WorklistCapacity {
+            capacity: worklist.len(),
+            facts,
+        });
+    }
+    if purged.len() < words || keep.len() < words {
+        return Err(CascadeError::CountsLease {
+            needed: words,
+            provided: purged.len().min(keep.len()),
+        });
+    }
+    if counts.len() < facts + 1 {
+        return Err(CascadeError::CountsLease {
+            needed: facts + 1,
+            provided: counts.len(),
+        });
+    }
+    for w in 0..words {
+        purged[w] = 0;
+    }
+    // Seed: every deleted fact is a cascade root, enqueued exactly once
+    // (marked before push; each fact enqueues <= once -> tail <= facts).
+    let mut head = 0usize;
+    let mut tail = 0usize;
+    for w in 0..words {
+        let mut bits = del_mask[w];
+        while bits != 0 {
+            let lane = bits.trailing_zeros() as usize;
+            let f = w * 64 + lane;
+            if f < facts {
+                purged[w] |= 1u64 << lane;
+                if tail >= worklist.len() {
+                    return Err(CascadeError::WorklistCapacity {
+                        capacity: worklist.len(),
+                        facts,
+                    });
+                }
+                worklist[tail] = f as u32;
+                tail += 1;
+            }
+            bits &= bits - 1;
+        }
+    }
+    // BFS to fixpoint: follow lineage edges from purged parents, rescuing
+    // dependents with alt_support > 0 (they survive, purge does not pass
+    // through them).
+    while head < tail {
+        let f = worklist[head] as usize;
+        head += 1;
+        let lo = counts[f] as usize;
+        let hi = counts[f + 1] as usize;
+        for k in lo..hi {
+            let d = adj[k] as usize;
+            let word = d / 64;
+            let lane = d % 64;
+            if purged[word] & (1u64 << lane) == 0 && alt_support[d] == 0 {
+                purged[word] |= 1u64 << lane;
+                if tail >= worklist.len() {
+                    return Err(CascadeError::WorklistCapacity {
+                        capacity: worklist.len(),
+                        facts,
+                    });
+                }
+                worklist[tail] = d as u32;
+                tail += 1;
+            }
+        }
+    }
+    // keep = !(static suspect) | alt-rescue, AND-ed with !purged.
+    keep_mask(derived_deps, del_mask, alt_support, facts, keep);
+    for w in 0..words {
+        keep[w] &= !purged[w];
+    }
+    Ok(compact_lanes(keep, base, out))
+}
+
+/// MUTANT (court-only, doc-hidden): anti-vacuity witness (c) for the
+/// cascade. Identical to [`cascade_retract`] except the BFS loop is
+/// DROPPED: the cascade pass is skipped entirely and only the static
+/// single-pass filter runs. On the FA5 N=10,000 chain corpus this yields
+/// 9,999 phantom survivors exactly as the forensic defect describes.
+#[doc(hidden)]
+pub fn cascade_retract_mutant_nocascade(
+    derived_deps: &[u64],
+    del_mask: &[u64],
+    alt_support: &[u32],
+    facts: usize,
+    counts: &[u32],
+    adj: &[u32],
+    purged: &mut [u64],
+    keep: &mut [u64],
+    worklist: &mut [u32],
+    base: u32,
+    out: &mut [u32],
+) -> Result<u32, CascadeError> {
+    let _ = (counts, adj, purged, worklist); // the dropped cascade pass
+    keep_mask(derived_deps, del_mask, alt_support, facts, keep);
+    Ok(compact_lanes(keep, base, out))
+}
+
+/// Full-recompute ORACLE (court referee) for the cascade: rounds-based
+/// mask propagation to fixpoint, no CSR, no BFS — the naive O(V*E)-worst
+/// least-fixpoint computation. Converges because each round either purges
+/// >= 1 new fact or terminates; the fixpoint is the same least fixpoint the
+/// BFS computes (both saturate the rule: purged(root) for deleted root;
+/// purged(d) if purged(p), edge p->d, alt(d)==0).
+pub fn cascade_oracle(
+    derived_deps: &[u64],
+    del_mask: &[u64],
+    alt_support: &[u32],
+    facts: usize,
+    edges: &[(u32, u32)],
+) -> Vec<u32> {
+    let words = derived_deps.len();
+    let mut purged = vec![0u64; words];
+    for f in 0..facts {
+        if del_mask[f / 64] & (1u64 << (f % 64)) != 0 {
+            purged[f / 64] |= 1u64 << (f % 64);
+        }
+    }
+    loop {
+        let mut changed = false;
+        for &(p, d) in edges {
+            if purged[p as usize / 64] & (1u64 << (p % 64)) != 0
+                && purged[d as usize / 64] & (1u64 << (d % 64)) == 0
+                && alt_support[d as usize] == 0
+            {
+                purged[d as usize / 64] |= 1u64 << (d % 64);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let mut keep = vec![0u64; words];
+    keep_mask(derived_deps, del_mask, alt_support, facts, &mut keep);
+    for w in 0..words {
+        keep[w] &= !purged[w];
+    }
+    let mut out = vec![0u32; words * 64 + 1];
+    let n = compact_lanes(&keep, 0, &mut out);
+    out[..n as usize].to_vec()
 }
 
 #[cfg(test)]

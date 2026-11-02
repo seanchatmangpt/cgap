@@ -61,7 +61,11 @@ enum {
   CGAP_ERR_OABI_MISMATCH   = 0x43470002u, /* 'CG' + 02 */
   CGAP_ERR_SHACL_VIOLATION = 0x43470003u, /* 'CG' + 03 */
   CGAP_ERR_LEASE_EXHAUSTED = 0x43470004u, /* 'CG' + 04 */
-  CGAP_ERR_P28_SPOLIATION  = 0x503238FFu  /* 'P28' + FF */
+  /* repair-10 (lane F8): FA9's concurrent-writer refusal promoted to the
+   * C header so C consumers can match it by name; Rust twin
+   * crates/cgap-ffi/src/sovereign.rs CGAP_ERR_CONCURRENT_WRITER_DENIED. */
+  CGAP_ERR_CONCURRENT_WRITER_DENIED = 0x43470006u, /* 'CG' + 06 */
+  CGAP_ERR_P28_SPOLIATION  = 0x503238FFu /* 'P28' + FF */
 };
 
 /* --------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+[package]
+name = "cgap-branchless"
+version = "26.11.2"
+edition = "2021"
+license-file = "../../LICENSE.md"
+description = "Centralized branchless ALU/SWAR/bit-plane mechanics for cgap"
+publish = false
+
+[dependencies]

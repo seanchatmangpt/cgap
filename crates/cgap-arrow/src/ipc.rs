@@ -185,11 +185,7 @@ pub fn meta_span_for(alignment: usize) -> usize {
 /// Window length in bytes for a `body_len` body at `alignment`.
 #[must_use]
 pub fn window_len(body_len: usize, alignment: usize) -> usize {
-    PREFIX_SIZE
-        + meta_span_for(alignment)
-        + body_len
-        + pad_to(body_len, alignment)
-        + EOS_SIZE
+    PREFIX_SIZE + meta_span_for(alignment) + body_len + pad_to(body_len, alignment) + EOS_SIZE
 }
 
 /// Seal a metadata header: zero the reserved fields, FNV-1a bytes
@@ -298,7 +294,10 @@ pub fn read(
     body_out: &mut [u8],
 ) -> Result<usize, IpcError> {
     if buf.len() < PREFIX_SIZE {
-        return Err(IpcError::Truncated { needed: PREFIX_SIZE, got: buf.len() });
+        return Err(IpcError::Truncated {
+            needed: PREFIX_SIZE,
+            got: buf.len(),
+        });
     }
     let cont = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
     if cont != CONTINUATION {
@@ -324,14 +323,20 @@ pub fn read(
         return Err(IpcError::BadMagic { got: meta.magic });
     }
     if meta.reserved0 != 0 || meta.pad_tail != [0; 4] {
-        return Err(IpcError::HeaderDigestMismatch { got: meta.header_digest });
+        return Err(IpcError::HeaderDigestMismatch {
+            got: meta.header_digest,
+        });
     }
     let sealed = seal_meta(meta);
     if sealed.header_digest != meta.header_digest {
-        return Err(IpcError::HeaderDigestMismatch { got: meta.header_digest });
+        return Err(IpcError::HeaderDigestMismatch {
+            got: meta.header_digest,
+        });
     }
     if meta.alignment as usize != alignment {
-        return Err(IpcError::BadAlignment { got: meta.alignment });
+        return Err(IpcError::BadAlignment {
+            got: meta.alignment,
+        });
     }
     if let Some(exp) = expected_schema {
         for i in 0..32 {
@@ -357,15 +362,27 @@ pub fn read(
     body_out[..body_len].copy_from_slice(&buf[body_at..body_at + body_len]);
     for i in 0..body_pad {
         if buf[body_at + body_len + i] != 0 {
-            return Err(IpcError::PadNonZero { at: body_at + body_len + i });
+            return Err(IpcError::PadNonZero {
+                at: body_at + body_len + i,
+            });
         }
     }
     let eos_at = body_at + body_len + body_pad;
     if buf.len() < eos_at + EOS_SIZE {
         return Err(IpcError::MissingEos { got: 0 });
     }
-    let cont2 = u32::from_le_bytes([buf[eos_at], buf[eos_at + 1], buf[eos_at + 2], buf[eos_at + 3]]);
-    let tail = u32::from_le_bytes([buf[eos_at + 4], buf[eos_at + 5], buf[eos_at + 6], buf[eos_at + 7]]);
+    let cont2 = u32::from_le_bytes([
+        buf[eos_at],
+        buf[eos_at + 1],
+        buf[eos_at + 2],
+        buf[eos_at + 3],
+    ]);
+    let tail = u32::from_le_bytes([
+        buf[eos_at + 4],
+        buf[eos_at + 5],
+        buf[eos_at + 6],
+        buf[eos_at + 7],
+    ]);
     if cont2 != CONTINUATION || tail != EOS {
         return Err(IpcError::MissingEos { got: tail });
     }
@@ -380,4 +397,3 @@ fn expected_body(buf_len: usize, body_at: usize, alignment: usize) -> u32 {
     }
     ((buf_len - body_at) / (alignment + 1)) as u32
 }
-

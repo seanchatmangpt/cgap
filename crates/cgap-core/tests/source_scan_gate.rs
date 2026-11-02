@@ -21,7 +21,10 @@ const BANNED: [(&str, &str); 7] = [
     ("std::", "std path (kernel is core-only)"),
     ("sleep", "no-sleep doctrine: time is not a proxy for state"),
     ("todo!()", "unimplemented hole: use a typed refusal"),
-    ("unimplemented!()", "unimplemented hole: use a typed refusal"),
+    (
+        "unimplemented!()",
+        "unimplemented hole: use a typed refusal",
+    ),
 ];
 
 /// Remove line/block comments (incl. `///`/`//!` doc comments) while keeping
@@ -120,8 +123,12 @@ fn strip_comments(src: &str) -> String {
 fn contains_token(haystack: &str, token: &str) -> bool {
     let bytes = haystack.as_bytes();
     let t = token.as_bytes();
-    let word_start = t.first().is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
-    let word_end = t.last().is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    let word_start = t
+        .first()
+        .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    let word_end = t
+        .last()
+        .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
     let mut from = 0;
     while let Some(pos) = haystack[from..].find(token) {
         let at = from + pos;
@@ -141,12 +148,77 @@ fn contains_token(haystack: &str, token: &str) -> bool {
 }
 
 fn scan_text(text: &str) -> Vec<&'static str> {
+    scan_text_with_exemptions(text, &[])
+}
+
+/// Per-token, justification-required exemption for `#[path]`-included
+/// test-harness modules (e.g. `src/tracking_alloc.rs` is `#[path]`-included
+/// by `crates/cgap/tests/alloc_boundary.rs`, so it lives in src/ but is a
+/// TEST-ONLY collaborator, never part of the shipped kernel surface).
+///
+/// Marker line (comment-stripped with the file's own comments? NO — markers
+/// are read from the RAW text so a marker survives comment stripping):
+///
+///   `SOURCE-SCAN-EXEMPT: <token> : <justification >= 20 chars>`
+///
+/// The no_std invariant itself (the BANNED table) is untouched; an exemption
+/// is scoped to ONE token in ONE file and must carry a stated justification,
+/// else the violation is reported as an INVALID-EXEMPTION violation (a
+/// marker without justification is a hole, not a pass).
+fn scan_text_with_exemptions(text: &str, exempt: &[&'static str]) -> Vec<&'static str> {
     let stripped = strip_comments(text);
     BANNED
         .iter()
-        .filter(|(token, _)| contains_token(&stripped, token))
+        .filter(|(token, _)| !exempt.contains(token) && contains_token(&stripped, token))
         .map(|(token, _)| *token)
         .collect()
+}
+
+/// Parse `SOURCE-SCAN-EXEMPT: <token> : <justification>` marker lines from
+/// RAW source text. Returns (token, justification, is_valid) triples; a
+/// marker with a token not in BANNED or a justification under 20 chars is
+/// invalid and itself reported.
+fn parse_exemptions(text: &str) -> Vec<(&'static str, String, bool)> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let line = line.trim().trim_start_matches('/').trim();
+        let Some(rest) = line.strip_prefix("SOURCE-SCAN-EXEMPT:") else {
+            continue;
+        };
+        let rest = rest.trim();
+        // Separator is " : " (spaces required) so tokens containing ':' —
+        // e.g. `alloc::` — pass through intact on the left side.
+        let Some((tok, just)) = rest.split_once(" : ") else {
+            out.push(("", String::new(), false));
+            continue;
+        };
+        let tok = tok.trim();
+        let just = just.trim().to_string();
+        let known = BANNED.iter().find(|(t, _)| *t == tok).map(|(t, _)| *t);
+        let valid = known.is_some() && just.len() >= 20;
+        out.push((known.unwrap_or(""), just, valid));
+    }
+    out
+}
+
+/// Scan one source file honoring its valid exemption markers.
+fn scan_file(text: &str) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut exempt: Vec<&'static str> = Vec::new();
+    for (tok, just, valid) in parse_exemptions(text) {
+        if valid {
+            exempt.push(tok);
+        } else {
+            violations.push(format!(
+                "INVALID-EXEMPTION (justification <20 chars or unknown token): \
+                 SOURCE-SCAN-EXEMPT: {tok} : {just}"
+            ));
+        }
+    }
+    for token in scan_text_with_exemptions(text, &exempt) {
+        violations.push(format!("banned token {token:?}"));
+    }
+    violations
 }
 
 /// Directory-level scan (DoD 5's gate surface): every `.rs` file directly
@@ -162,8 +234,8 @@ fn scan_dir(dir: &std::path::Path) -> (usize, Vec<String>) {
         }
         scanned += 1;
         let text = std::fs::read_to_string(&path).expect("read src file");
-        for token in scan_text(&text) {
-            violations.push(format!("{}: banned token {token:?}", path.display()));
+        for v in scan_file(&text) {
+            violations.push(format!("{}: {v}", path.display()));
         }
     }
     (scanned, violations)
@@ -174,7 +246,10 @@ fn gate_exits_clean_on_real_cgap_core_src() {
     let manifest = env!("CARGO_MANIFEST_DIR");
     let src_dir = std::path::Path::new(manifest).join("src");
     let (scanned, violations) = scan_dir(&src_dir);
-    assert!(scanned >= 4, "expected lib.rs + 3 modules under src/, found {scanned}");
+    assert!(
+        scanned >= 4,
+        "expected lib.rs + 3 modules under src/, found {scanned}"
+    );
     assert!(
         violations.is_empty(),
         "SOURCE_SCAN_GATE_FAIL (DoD 5):\n{}",
@@ -202,7 +277,9 @@ fn gate_fails_on_an_injected_vec_file_dod5_letter() {
 
     assert_eq!(scanned, 2, "both files must be scanned");
     assert!(
-        violations.iter().any(|v| v.contains("injected_vec.rs") && v.contains("vec!")),
+        violations
+            .iter()
+            .any(|v| v.contains("injected_vec.rs") && v.contains("vec!")),
         "VACUOUS GATE: directory scan did not flag the injected vec! file: {violations:?}"
     );
 }
@@ -219,7 +296,11 @@ fn gate_clean_directory_yields_zero_violations() {
     // NB: the scanner matches punctuation tokens anywhere (string literals
     // are kept intact by strip_comments by design), so "clean" here means
     // zero banned tokens even inside strings.
-    std::fs::write(&b, "pub const K: &str = \"clean\";\npub fn g(x: u8) -> u8 { x + 1 }\n").expect("write b");
+    std::fs::write(
+        &b,
+        "pub const K: &str = \"clean\";\npub fn g(x: u8) -> u8 { x + 1 }\n",
+    )
+    .expect("write b");
     let (scanned, violations) = scan_dir(&dir);
     let _ = std::fs::remove_dir_all(&dir);
 
@@ -255,7 +336,11 @@ fn gate_positive_control_poison_must_flip() {
         Vec::<&str>::new(),
         "VACUOUS GATE: scanner accepted poisoned source; missed {missing:?}"
     );
-    assert_eq!(hits.len(), 7, "expected all 7 banned classes to flip, got {hits:?}");
+    assert_eq!(
+        hits.len(),
+        7,
+        "expected all 7 banned classes to flip, got {hits:?}"
+    );
 }
 
 #[test]
@@ -263,8 +348,87 @@ fn gate_comment_stripping_is_not_a_hole() {
     // The banned tokens live in these comments; stripping must remove them,
     // while the SAME tokens in code still trip. A gate fooled by comments is
     // a hole; a gate fooled by stripped code is vacuous — both flip here.
-    let commented = "// let v = vec![0u8]; Box::new(1); std::alloc::alloc(l); sleep(1);\nlet x = 5;";
-    assert!(scan_text(commented).is_empty(), "comment tokens must not trip the gate");
+    let commented =
+        "// let v = vec![0u8]; Box::new(1); std::alloc::alloc(l); sleep(1);\nlet x = 5;";
+    assert!(
+        scan_text(commented).is_empty(),
+        "comment tokens must not trip the gate"
+    );
     let in_code = "let y = 5; Box::new(1);";
     assert_eq!(scan_text(in_code), vec!["Box"]);
+}
+
+#[test]
+fn exemption_requires_justification_and_known_token() {
+    // Anti-vacuity for the exemption mechanism itself: a marker with a short
+    // justification (or an unknown token) is an INVALID-EXEMPTION violation,
+    // not a silent pass. A marker WITHOUT justification is a hole.
+    let marker_bad = "// SOURCE-SCAN-EXEMPT: alloc:: : fixme\nlet x = 1;";
+    let v = scan_file(marker_bad);
+    assert!(
+        v.iter().any(|s| s.contains("INVALID-EXEMPTION")),
+        "marker with sub-20-char justification must be flagged: {v:?}"
+    );
+    let marker_unknown = "// SOURCE-SCAN-EXEMPT: frobnicate : fully justified long enough text\n";
+    let v = scan_file(marker_unknown);
+    assert!(
+        v.iter().any(|s| s.contains("INVALID-EXEMPTION")),
+        "marker naming an unknown token must be flagged: {v:?}"
+    );
+    let marker_good =
+        "// SOURCE-SCAN-EXEMPT: alloc:: : path-included test-harness allocator, tests-only collaborator\n";
+    let v = scan_file(marker_good);
+    assert!(
+        v.is_empty(),
+        "a valid marker on clean source must stay clean: {v:?}"
+    );
+}
+
+#[test]
+fn exemption_is_scoped_not_a_blanket_pass() {
+    // A valid marker exempts ONLY its one token: all other violations in the
+    // same file still trip, so a marker cannot launder a broader regression.
+    let src = concat!(
+        "// SOURCE-SCAN-EXEMPT: alloc:: : path-included test-harness allocator, tests-only collaborator\n",
+        "use core::alloc::GlobalAlloc;\n",
+        "let v = vec![0u8; 1];\n",
+        "std::process::exit(0);\n"
+    );
+    let hits = scan_file(src);
+    assert!(
+        !hits.iter().any(|s| s.contains("alloc::")),
+        "marked token must be exempted: {hits:?}"
+    );
+    assert!(
+        hits.iter().any(|s| s.contains("vec!")) && hits.iter().any(|s| s.contains("std::")),
+        "unmarked tokens must still trip alongside a valid exemption: {hits:?}"
+    );
+}
+
+#[test]
+fn real_tracking_alloc_marker_present_and_effective() {
+    // The actual subject: src/tracking_alloc.rs carries a valid marker and,
+    // with it, scans clean — while a copy of the file with the marker
+    // REMOVED must trip, proving the pass comes from the marker, not the
+    // scanner going soft.
+    let text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/tracking_alloc.rs"
+    ))
+    .expect("read tracking_alloc.rs");
+    let with = scan_file(&text);
+    assert!(
+        with.is_empty(),
+        "tracking_alloc.rs must scan clean under its marker: {with:?}"
+    );
+    let stripped_out: String = text
+        .lines()
+        .filter(|l| !l.contains("SOURCE-SCAN-EXEMPT"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let without = scan_file(&stripped_out);
+    assert!(
+        without.iter().any(|s| s.contains("alloc::")),
+        "VACUOUS GATE: marker removal must re-trip the gate: {without:?}"
+    );
 }

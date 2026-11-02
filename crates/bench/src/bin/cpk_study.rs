@@ -15,7 +15,20 @@
 //! CTQ-04 gate note: this study still uses the retired 15% pin; `ctq_report`
 //! uses the p99/p50 protocol (migration pending).
 //!
-//! Stats per CTQ: N >= 100 samples (fast loops, no sleeps), mean, overall
+//! Sliding-window trials (lane G09, 2026-11-02): each gate loops its
+//! measured leg n=30 times, computes per-run throughput/time, and evaluates
+//! Cpk over the 30-sample window (mean / sigma / Cpk reported per gate).
+//!
+//! Exit contract (fail-closed): Cpk (overall) < 1.33 on ANY gate -> exit 1;
+//! all gates >= 1.33 -> exit 0. The 6-sigma charter target 1.67
+//! (docs/jira/v26.10.31/18-dflss-charter.md) is still reported as
+//! `cpk_target` for context; the exit floor 1.33 is the pinned release gate.
+//!
+//! Anti-vacuity: setting env `CPK_INJECT_FAIL=1` forces the CTQ-06 gate LSL
+//! to an unreachable 10 GiB/s, driving Cpk negative — the rig must then
+//! exit 1. A rig that passes with the injection active is vacuous.
+//!
+//! Stats per CTQ: n=30 sliding-window samples (fast loops, no sleeps), mean, overall
 //! sigma (sample stdev, n-1), within sigma (moving range, MR_bar / d2 with
 //! d2 = 1.128 for subgroups of 2). Capability indices on BOTH sigmas:
 //! C_p = (USL-LSL)/6sigma (two-sided only), C_pu = (USL-mean)/3sigma,
@@ -42,6 +55,10 @@ const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 /// d2 control-chart constant for moving ranges (subgroup size 2).
 const D2_N2: f64 = 1.128;
 const CPK_TARGET: f64 = 1.67;
+/// Pinned exit floor (lane G09): any gate Cpk (overall) < this -> exit 1.
+const CPK_EXIT_FLOOR: f64 = 1.33;
+/// Sliding-window size per gate.
+const WINDOW: usize = 30;
 
 fn log(msg: &str) {
     eprintln!("[cpk_study] {msg}");
@@ -68,7 +85,11 @@ fn capability(samples: &[f64], usl: Option<f64>, lsl: Option<f64>) -> Capability
     let n = samples.len();
     let mean = samples.iter().sum::<f64>() / n as f64;
     let ss: f64 = samples.iter().map(|s| (s - mean) * (s - mean)).sum();
-    let sigma_overall = if n > 1 { (ss / (n - 1) as f64).sqrt() } else { 0.0 };
+    let sigma_overall = if n > 1 {
+        (ss / (n - 1) as f64).sqrt()
+    } else {
+        0.0
+    };
     // Moving range: |x_i - x_{i-1}|, sigma_within = MR_bar / d2.
     let sigma_within = if n > 1 {
         let mr_sum: f64 = samples.windows(2).map(|w| (w[0] - w[1]).abs()).sum();
@@ -140,26 +161,33 @@ fn json_opt(v: Option<f64>) -> String {
 }
 
 fn main() {
-    let gates_failed: Vec<&str> = Vec::new();
+    // Anti-vacuity injection: env gate read once, logged loudly.
+    let inject = std::env::var("CPK_INJECT_FAIL").is_ok();
+    if inject {
+        log("ANTI-VACUITY: CPK_INJECT_FAIL set — CTQ-06 LSL forced to 10 GiB/s (gate must flip to exit 1)");
+    }
 
     // ------------------------------------------------- CTQ-05 samples ----
     let (ctq05, cpk05) = ctq05_admission_latency();
     // ------------------------------------------------- CTQ-06 samples ----
-    let (ctq06, cpk06) = ctq06_throughput();
+    let (ctq06, cpk06) = ctq06_throughput(inject);
     // ------------------------------------------------- CTQ-04 samples ----
     let (ctq04, cpk04) = ctq04_variance();
 
-    let mut failed = gates_failed;
+    let mut failed: Vec<&str> = Vec::new();
     for (ctq, v) in [("CTQ-05", &cpk05), ("CTQ-06", &cpk06), ("CTQ-04", &cpk04)] {
-        if *v < CPK_TARGET {
+        if *v < CPK_EXIT_FLOOR {
             failed.push(ctq);
         }
     }
 
     println!("{{");
     println!("  \"report\": \"cpk_study\",");
-    println!("  \"version\": 1,");
+    println!("  \"version\": 2,");
     println!("  \"cpk_target\": {CPK_TARGET},");
+    println!("  \"cpk_exit_floor\": {CPK_EXIT_FLOOR},");
+    println!("  \"window_n\": {WINDOW},");
+    println!("  \"anti_vacuity_injection\": {inject},");
     println!("  \"ctq05_admission_latency\": {ctq05},");
     println!("  \"ctq06_throughput\": {ctq06},");
     println!("  \"ctq04_variance\": {ctq04},");
@@ -191,7 +219,7 @@ fn main() {
 fn ctq05_admission_latency() -> (String, f64) {
     log("CTQ-05: admission latency samples, USL 35 us, one-sided C_pu");
     const N: usize = 256; // batch size, quads
-    const SAMPLES: usize = 200;
+    const SAMPLES: usize = WINDOW;
 
     let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
     let quads: Vec<LayoutQuad> = (0..N)
@@ -229,9 +257,18 @@ fn ctq05_admission_latency() -> (String, f64) {
         dg.extend_from_slice(&q.inline_digest);
     }
     let pages: [(LevelFreeType, Vec<u8>); 3] = [
-        (LevelFreeType::U32, write_page(LevelFreeType::U32, &s, N).expect("page s")),
-        (LevelFreeType::U64, write_page(LevelFreeType::U64, &t, N).expect("page t")),
-        (LevelFreeType::Bytes32, write_page(LevelFreeType::Bytes32, &dg, N).expect("page dg")),
+        (
+            LevelFreeType::U32,
+            write_page(LevelFreeType::U32, &s, N).expect("page s"),
+        ),
+        (
+            LevelFreeType::U64,
+            write_page(LevelFreeType::U64, &t, N).expect("page t"),
+        ),
+        (
+            LevelFreeType::Bytes32,
+            write_page(LevelFreeType::Bytes32, &dg, N).expect("page dg"),
+        ),
     ];
     // Byte-identity check once, outside the timed loop.
     for (ty, page) in &pages {
@@ -276,7 +313,7 @@ fn ctq05_admission_latency() -> (String, f64) {
 
     let usl = 35e-6; // 35 us, pinned per charter / ctq_report
     let cap = capability(&samples, Some(usl), None);
-    let pass = cap.cpk_overall.expect("cpu_overall present") >= CPK_TARGET;
+    let pass = cap.cpk_overall.expect("cpu_overall present") >= CPK_EXIT_FLOOR;
     let verdict = if pass { "PASS" } else { "FAIL" };
     log(&format!(
         "CTQ-05: n={} mean={:.3} us sigma_overall={:.3} us sigma_within={:.3} us Cpu(overall)={:.3} Cpu(within)={:.3} vs target {CPK_TARGET} -> {}",
@@ -288,7 +325,18 @@ fn ctq05_admission_latency() -> (String, f64) {
         cap.cpu_within.unwrap(),
         verdict
     ));
-    (emit("CTQ-05", "us_per_batch", Some(35.0), None, "us", &cap, verdict) , cap.cpk_overall.unwrap())
+    (
+        emit(
+            "CTQ-05",
+            "us_per_batch",
+            Some(35.0),
+            None,
+            "us",
+            &cap,
+            verdict,
+        ),
+        cap.cpk_overall.unwrap(),
+    )
 }
 
 // ============================================================ CTQ-06 ====
@@ -296,10 +344,10 @@ fn ctq05_admission_latency() -> (String, f64) {
 /// N samples of per-core hash throughput: hash_many_simd over 256 MiB per
 /// sample, throughput = bytes/elapsed. LSL 1.0 GiB/s (ratified) -> one-sided C_pl.
 /// Honest expectation per charter status: deep fail (<< 1.67).
-fn ctq06_throughput() -> (String, f64) {
-    log("CTQ-06: BLAKE3 throughput samples (hash_many_simd, 256 MiB/sample), LSL 1.0 GiB/s (ratified), one-sided C_pl");
+fn ctq06_throughput(inject: bool) -> (String, f64) {
+    log("CTQ-06: BLAKE3 throughput samples (hash_many_simd, 256 MiB/sample), LSL 1.0 GiB/s (ratified), one-sided C_pl, n=30 window");
     const BYTES: usize = 256 * 1024 * 1024;
-    const SAMPLES: usize = 100;
+    const SAMPLES: usize = WINDOW;
     const LSL_GIB_S: f64 = 1.0;
 
     let mut buf = vec![0u8; BYTES];
@@ -325,8 +373,10 @@ fn ctq06_throughput() -> (String, f64) {
         }
     }
 
-    let cap = capability(&samples, None, Some(LSL_GIB_S));
-    let pass = cap.cpk_overall.expect("cpl_overall present") >= CPK_TARGET;
+    // Gate LSL: ratified 1.0 GiB/s; anti-vacuity injection forces 10.
+    let gate_lsl = if inject { 10.0 } else { LSL_GIB_S };
+    let cap = capability(&samples, None, Some(gate_lsl));
+    let pass = cap.cpk_overall.expect("cpl_overall present") >= CPK_EXIT_FLOOR;
     let verdict = if pass { "PASS" } else { "FAIL" };
     log(&format!(
         "CTQ-06: n={} mean={:.2} GiB/s sigma_overall={:.2} sigma_within={:.2} Cpl(overall)={:.3} Cpl(within)={:.3} vs target {CPK_TARGET} -> {}",
@@ -338,7 +388,18 @@ fn ctq06_throughput() -> (String, f64) {
         cap.cpl_within.unwrap(),
         verdict
     ));
-    (emit("CTQ-06", "gib_per_s", None, Some(8.5), "GiB/s", &cap, verdict), cap.cpk_overall.unwrap())
+    (
+        emit(
+            "CTQ-06",
+            "gib_per_s",
+            None,
+            Some(gate_lsl),
+            "GiB/s",
+            &cap,
+            verdict,
+        ),
+        cap.cpk_overall.unwrap(),
+    )
 }
 
 // ============================================================ CTQ-04 ====
@@ -351,7 +412,7 @@ fn ctq06_throughput() -> (String, f64) {
 fn ctq04_variance() -> (String, f64) {
     log("CTQ-04: transpose+filter variance samples, USL = 15% of mean, one-sided C_pu");
     const N: usize = 4096;
-    const RUNS: usize = 100;
+    const RUNS: usize = WINDOW;
 
     let mut aos: Vec<cgap_arrow::transpose::Quad64> = Vec::with_capacity(N);
     let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
@@ -394,7 +455,7 @@ fn ctq04_variance() -> (String, f64) {
     let mean = samples.iter().sum::<f64>() / RUNS as f64;
     let usl = 1.15 * mean; // moving limit: 15% of mean
     let cap = capability(&samples, Some(usl), None);
-    let pass = cap.cpk_overall.expect("cpu_overall present") >= CPK_TARGET;
+    let pass = cap.cpk_overall.expect("cpu_overall present") >= CPK_EXIT_FLOOR;
     let verdict = if pass { "PASS" } else { "FAIL" };
     log(&format!(
         "CTQ-04: n={} mean={:.3} us USL(1.15*mean)={:.3} us sigma_overall={:.3} us sigma_within={:.3} us CV={:.2}% Cpu(overall)={:.3} vs target {CPK_TARGET} -> {}",
@@ -408,7 +469,15 @@ fn ctq04_variance() -> (String, f64) {
         verdict
     ));
     (
-        emit("CTQ-04", "us_per_run", Some(usl * 1e6), None, "us", &cap, verdict),
+        emit(
+            "CTQ-04",
+            "us_per_run",
+            Some(usl * 1e6),
+            None,
+            "us",
+            &cap,
+            verdict,
+        ),
         cap.cpk_overall.unwrap(),
     )
 }

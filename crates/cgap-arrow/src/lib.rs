@@ -77,10 +77,12 @@ pub mod runend;
 pub mod silicon;
 #[cfg(not(target_os = "none"))]
 pub mod slice;
-#[cfg(not(target_os = "none"))]
+#[cfg(all(not(target_os = "none"), feature = "nested-types"))]
 pub mod timestamps;
 #[cfg(not(target_os = "none"))]
 pub mod transpose;
+#[cfg(not(target_os = "none"))]
+pub mod validate;
 #[cfg(not(target_os = "none"))]
 pub mod varlen;
 #[cfg(not(target_os = "none"))]
@@ -106,7 +108,7 @@ pub use c_abi::{export, ArrowArray, ArrowSchema, CGAP_FLAG_NULLABLE};
 pub use foreign::{format_of, is_valid, primitive_view, ForeignError};
 #[cfg(not(target_os = "none"))]
 pub use primitive::{Primitive, PrimitiveBuilder};
-#[cfg(not(target_os = "none"))]
+#[cfg(all(not(target_os = "none"), feature = "nested-types"))]
 pub use timestamps::{TimestampMicro, TimestampMilli, TimestampNano, TimestampSecond};
 #[cfg(not(target_os = "none"))]
 pub use varlen::{Varlen, VarlenBuilder};

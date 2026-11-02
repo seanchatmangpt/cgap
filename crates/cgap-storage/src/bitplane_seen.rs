@@ -40,7 +40,24 @@ pub struct BitPlaneSeenSet<const SLOTS: usize> {
 
 impl<const SLOTS: usize> BitPlaneSeenSet<SLOTS> {
     pub const fn new() -> Self {
-        Self { len: 0, planes: [[0; SLOTS]; PLANE_COUNT] }
+        Self {
+            len: 0,
+            planes: [[0; SLOTS]; PLANE_COUNT],
+        }
+    }
+
+    /// Heap-lease constructor: allocates zeroed storage directly on the
+    /// heap (alloc_zeroed), never staging the SLOTS*PLANE_COUNT-byte value
+    /// on the caller's stack — debug builds stack-stage large inline values
+    /// before the move into `Box::new(Self::new())`, so the box must happen
+    /// at the allocation itself, not at the call site.
+    pub fn new_boxed() -> Box<Self> {
+        assert!(core::mem::size_of::<Self>() > 0);
+        unsafe {
+            let ptr = std::alloc::alloc_zeroed(core::alloc::Layout::new::<Self>()) as *mut Self;
+            assert!(!ptr.is_null(), "bitplane seen-set alloc failed");
+            Box::from_raw(ptr)
+        }
     }
 
     pub const fn len(&self) -> usize {

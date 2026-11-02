@@ -218,7 +218,7 @@
 
 extern crate alloc;
 
-use crate::sigil::{BN3Error, BN3Statement, Sigil, PAYLOAD_MASK, SIGIL_SHIFT, BN3_STATEMENT_SIZE};
+use crate::sigil::{BN3Error, BN3Statement, Sigil, BN3_STATEMENT_SIZE, PAYLOAD_MASK, SIGIL_SHIFT};
 use alloc::vec::Vec;
 
 // --- Wave 1 (frozen arena ABI, spec 4.4) --------------------------------
@@ -815,12 +815,14 @@ impl Arena {
         let slab_base = self.slab.len();
         let ftab_base = self.formulas.len();
         let result = match assign_headers(program, &mut self.formulas, 0) {
-            Ok(assign) => emit(program, &assign, &mut self.slab, &mut self.formulas).and_then(|()| {
-                verify_intervals_disjoint_and_nested(
-                    self.formulas.headers(),
-                    self.slab.len() as u32,
-                )
-            }),
+            Ok(assign) => {
+                emit(program, &assign, &mut self.slab, &mut self.formulas).and_then(|()| {
+                    verify_intervals_disjoint_and_nested(
+                        self.formulas.headers(),
+                        self.slab.len() as u32,
+                    )
+                })
+            }
             Err(e) => Err(e),
         };
         if result.is_err() {
@@ -853,7 +855,9 @@ impl Arena {
     pub fn to_image(&self) -> Vec<u8> {
         let n = self.slab.len();
         let m = self.formulas.len();
-        let mut image = Vec::with_capacity(ARENA_IMAGE_PREFIX_LEN + n * BN3_STATEMENT_SIZE + m * BN3_FORMULA_HEADER_SIZE);
+        let mut image = Vec::with_capacity(
+            ARENA_IMAGE_PREFIX_LEN + n * BN3_STATEMENT_SIZE + m * BN3_FORMULA_HEADER_SIZE,
+        );
         image.extend_from_slice(&(n as u32).to_le_bytes());
         image.extend_from_slice(&(m as u32).to_le_bytes());
         for stmt in self.slab.statements() {
@@ -911,7 +915,10 @@ impl Arena {
         if declared != got {
             // The A05 torn-write sweep: EVERY k < N lands here, whatever
             // the cut position — no torn image ever half-admits.
-            return Err(BN3Error::ImageMalformed { expected: declared, got });
+            return Err(BN3Error::ImageMalformed {
+                expected: declared,
+                got,
+            });
         }
 
         // Layer 2: statements, validated at the boundary.
@@ -934,7 +941,10 @@ impl Arena {
             cursor += BN3_FORMULA_HEADER_SIZE;
             let header = BN3FormulaHeader::from_le_bytes(raw);
             if header._pad != 0 {
-                return Err(BN3Error::ImageMalformed { expected: 0, got: header._pad as u64 });
+                return Err(BN3Error::ImageMalformed {
+                    expected: 0,
+                    got: header._pad as u64,
+                });
             }
             headers.push(header);
         }
@@ -975,9 +985,7 @@ impl Arena {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sigil::{
-        decode_term, encode_term, BN3_STATEMENT_SIZE, MAX_PAYLOAD, REGISTER_COUNT,
-    };
+    use crate::sigil::{decode_term, encode_term, BN3_STATEMENT_SIZE, MAX_PAYLOAD, REGISTER_COUNT};
     use core::mem::{align_of, offset_of, size_of};
 
     /// Real nested program for the courts: root { A; B->Q0 } with
@@ -987,10 +995,11 @@ mod tests {
     fn nested_program() -> FormulaNode {
         FormulaNode::quoted(
             vec![
-                [(
-                    Sigil::SlotConst,
-                    1,
-                ), (Sigil::VarUni, 10), (Sigil::SlotConst, 2)],
+                [
+                    (Sigil::SlotConst, 1),
+                    (Sigil::VarUni, 10),
+                    (Sigil::SlotConst, 2),
+                ],
                 [
                     (Sigil::SlotConst, 3),
                     (Sigil::SlotConst, 4),
@@ -998,14 +1007,16 @@ mod tests {
                 ],
             ],
             vec![FormulaNode::quoted(
-                vec![[(
-                    Sigil::VarExi,
-                    20,
-                ), (Sigil::SlotConst, 5), (Sigil::SlotConst, 6)]],
-                vec![FormulaNode::leaf(vec![[(
-                    Sigil::SlotConst,
-                    7,
-                ), (Sigil::SlotConst, 8), (Sigil::SlotConst, 9)]])],
+                vec![[
+                    (Sigil::VarExi, 20),
+                    (Sigil::SlotConst, 5),
+                    (Sigil::SlotConst, 6),
+                ]],
+                vec![FormulaNode::leaf(vec![[
+                    (Sigil::SlotConst, 7),
+                    (Sigil::SlotConst, 8),
+                    (Sigil::SlotConst, 9),
+                ]])],
             )],
         )
     }
@@ -1072,7 +1083,9 @@ mod tests {
     #[test]
     fn flatten_court_nested_quotation_intervals() {
         let mut arena = Arena::new();
-        arena.flatten(&nested_program()).expect("legal program flattens");
+        arena
+            .flatten(&nested_program())
+            .expect("legal program flattens");
 
         // Three formulas: root(0) ⊇ Q0(1) ⊇ Q1(2); 4 statements.
         assert_eq!(arena.formulas.len(), 3);
@@ -1087,10 +1100,7 @@ mod tests {
 
         // Whole-table law: disjoint or properly nested, no exceptions.
         assert_eq!(
-            verify_intervals_disjoint_and_nested(
-                arena.formulas.headers(),
-                arena.slab.len() as u32
-            ),
+            verify_intervals_disjoint_and_nested(arena.formulas.headers(), arena.slab.len() as u32),
             Ok(())
         );
 
@@ -1133,7 +1143,9 @@ mod tests {
     #[test]
     fn flatten_court_overlap_mutation_flips_verifier() {
         let mut arena = Arena::new();
-        arena.flatten(&nested_program()).expect("legal program flattens");
+        arena
+            .flatten(&nested_program())
+            .expect("legal program flattens");
         // Bump Q1's end: now past the slab end with a disagreeing
         // witness — the verifier must name IntervalOverlap.
         let mut headers = arena.formulas.headers().to_vec();
@@ -1187,7 +1199,9 @@ mod tests {
         // On the real flattened table: scope Q0 (header 1) cannot see
         // root (header 0) — root is not inside Q0.
         let mut arena = Arena::new();
-        arena.flatten(&nested_program()).expect("legal program flattens");
+        arena
+            .flatten(&nested_program())
+            .expect("legal program flattens");
         assert_eq!(
             arena.check_formula_ref(Some(1), 0),
             Err(BN3Error::IntervalOverlap)
@@ -1235,10 +1249,7 @@ mod tests {
         // guard — the formula table shares the same frozen u32 index
         // space (spec 4.4: FORMULA_REF payloads resolve against u32
         // interval endpoints).
-        assert_eq!(
-            header_index(u32::MAX as usize),
-            Ok(u32::MAX)
-        );
+        assert_eq!(header_index(u32::MAX as usize), Ok(u32::MAX));
         assert_eq!(
             header_index(u32::MAX as usize + 1),
             Err(BN3Error::StatementIndexOverflow)
@@ -1252,12 +1263,11 @@ mod tests {
     #[test]
     fn depth_boundary_court_64_ok_65_refuses() {
         fn chain(levels: u32) -> FormulaNode {
-            let mut node =
-                FormulaNode::leaf(vec![[
-                    (Sigil::SlotConst, 1),
-                    (Sigil::SlotConst, 2),
-                    (Sigil::SlotConst, 3),
-                ]]);
+            let mut node = FormulaNode::leaf(vec![[
+                (Sigil::SlotConst, 1),
+                (Sigil::SlotConst, 2),
+                (Sigil::SlotConst, 3),
+            ]]);
             for _ in 0..levels {
                 node = FormulaNode::quoted(Vec::new(), vec![node]);
             }
@@ -1342,10 +1352,7 @@ mod tests {
             .expect("new header");
         assert_eq!(second.start as usize, first_slab);
         assert_eq!(
-            verify_intervals_disjoint_and_nested(
-                arena.formulas.headers(),
-                arena.slab.len() as u32
-            ),
+            verify_intervals_disjoint_and_nested(arena.formulas.headers(), arena.slab.len() as u32),
             Ok(())
         );
     }
@@ -1362,10 +1369,11 @@ mod tests {
         // Q1 with a second exists statement.
         let program = FormulaNode::quoted(
             vec![
-                [(
-                    Sigil::VarUni,
-                    1,
-                ), (Sigil::SlotConst, 100), (Sigil::SlotConst, 101)],
+                [
+                    (Sigil::VarUni, 1),
+                    (Sigil::SlotConst, 100),
+                    (Sigil::SlotConst, 101),
+                ],
                 [
                     (Sigil::VarUni, 2),
                     (Sigil::SlotConst, 102),
@@ -1373,14 +1381,16 @@ mod tests {
                 ],
             ],
             vec![FormulaNode::quoted(
-                vec![[(
-                    Sigil::VarExi,
-                    3,
-                ), (Sigil::SlotConst, 103), (Sigil::SlotConst, 104)]],
-                vec![FormulaNode::leaf(vec![[(
-                    Sigil::VarExi,
-                    4,
-                ), (Sigil::SlotConst, 105), (Sigil::SlotConst, 106)]])],
+                vec![[
+                    (Sigil::VarExi, 3),
+                    (Sigil::SlotConst, 103),
+                    (Sigil::SlotConst, 104),
+                ]],
+                vec![FormulaNode::leaf(vec![[
+                    (Sigil::VarExi, 4),
+                    (Sigil::SlotConst, 105),
+                    (Sigil::SlotConst, 106),
+                ]])],
             )],
         );
         let mut arena = Arena::new();
@@ -1449,10 +1459,7 @@ mod tests {
         for _ in 0..65 {
             deep = FormulaNode::quoted(Vec::new(), vec![deep]);
         }
-        assert_eq!(
-            arena.flatten(&deep),
-            Err(BN3Error::FlattenDepthExceeded)
-        );
+        assert_eq!(arena.flatten(&deep), Err(BN3Error::FlattenDepthExceeded));
         assert_eq!(arena.slab.statements(), base_stmts.as_slice());
         assert_eq!(arena.formulas.headers(), base_headers.as_slice());
 
@@ -1479,10 +1486,7 @@ mod tests {
                 (Sigil::SlotConst, 16),
             ],
         ]);
-        assert_eq!(
-            arena.flatten(&reg),
-            Err(BN3Error::RegisterExhausted)
-        );
+        assert_eq!(arena.flatten(&reg), Err(BN3Error::RegisterExhausted));
         assert_eq!(arena.slab.statements(), base_stmts.as_slice());
         assert_eq!(arena.formulas.headers(), base_headers.as_slice());
 
@@ -1499,10 +1503,7 @@ mod tests {
             ],
             vec![FormulaNode::leaf(vec![one(22, 23, 24)])],
         );
-        assert_eq!(
-            arena.flatten(&pred),
-            Err(BN3Error::FormulaInPredicate)
-        );
+        assert_eq!(arena.flatten(&pred), Err(BN3Error::FormulaInPredicate));
         assert_eq!(arena.slab.statements(), base_stmts.as_slice());
         assert_eq!(arena.formulas.headers(), base_headers.as_slice());
 
@@ -1516,10 +1517,7 @@ mod tests {
         let h1 = arena.formulas.get(1).expect("second header");
         assert_eq!((h1.start, h1.end, h1.term_words), (1, 2, 1));
         assert_eq!(
-            verify_intervals_disjoint_and_nested(
-                arena.formulas.headers(),
-                arena.slab.len() as u32
-            ),
+            verify_intervals_disjoint_and_nested(arena.formulas.headers(), arena.slab.len() as u32),
             Ok(())
         );
     }
@@ -1652,18 +1650,38 @@ mod tests {
             assert_eq!(image.len(), BN3_FORMULA_HEADER_SIZE);
             assert_eq!(BN3FormulaHeader::from_le_bytes(image), *h);
             // Field/byte map + LE pins.
-            assert_eq!(u32::from_le_bytes([image[0], image[1], image[2], image[3]]), h.start);
-            assert_eq!(u32::from_le_bytes([image[4], image[5], image[6], image[7]]), h.end);
-            assert_eq!(u32::from_le_bytes([image[8], image[9], image[10], image[11]]), h.term_words);
-            assert_eq!(u32::from_le_bytes([image[12], image[13], image[14], image[15]]), h._pad);
+            assert_eq!(
+                u32::from_le_bytes([image[0], image[1], image[2], image[3]]),
+                h.start
+            );
+            assert_eq!(
+                u32::from_le_bytes([image[4], image[5], image[6], image[7]]),
+                h.end
+            );
+            assert_eq!(
+                u32::from_le_bytes([image[8], image[9], image[10], image[11]]),
+                h.term_words
+            );
+            assert_eq!(
+                u32::from_le_bytes([image[12], image[13], image[14], image[15]]),
+                h._pad
+            );
             // Flatten zero-initializes the pad: the wire image of an
             // admitted header carries zeros in the reserved field.
             assert_eq!(h._pad, 0);
             assert_eq!(image[12], 0);
         }
         // Representation identity is pad-blind; the law is at from_image.
-        let padded = BN3FormulaHeader { start: 1, end: 2, term_words: 1, _pad: 0xDEAD_BEEF };
-        assert_eq!(BN3FormulaHeader::from_le_bytes(padded.to_le_bytes()), padded);
+        let padded = BN3FormulaHeader {
+            start: 1,
+            end: 2,
+            term_words: 1,
+            _pad: 0xDEAD_BEEF,
+        };
+        assert_eq!(
+            BN3FormulaHeader::from_le_bytes(padded.to_le_bytes()),
+            padded
+        );
     }
 
     /// A04 identity law, arena tier: `to_image ∘ from_image` is the
@@ -1678,13 +1696,16 @@ mod tests {
             .flatten(&nested_program())
             .unwrap_or_else(|e| panic!("nested program must flatten: {e}"));
         let image = arena.to_image();
-        assert_eq!(image.len(), ARENA_IMAGE_PREFIX_LEN + 4 * BN3_STATEMENT_SIZE + 3 * BN3_FORMULA_HEADER_SIZE);
+        assert_eq!(
+            image.len(),
+            ARENA_IMAGE_PREFIX_LEN + 4 * BN3_STATEMENT_SIZE + 3 * BN3_FORMULA_HEADER_SIZE
+        );
         // Prefix pins: counts LE, then statements, then headers.
         assert_eq!(image[0..4], 4u32.to_le_bytes());
         assert_eq!(image[4..8], 3u32.to_le_bytes());
 
-        let restored = Arena::from_image(&image)
-            .unwrap_or_else(|e| panic!("own image must restore: {e}"));
+        let restored =
+            Arena::from_image(&image).unwrap_or_else(|e| panic!("own image must restore: {e}"));
         assert_eq!(restored.slab.statements(), arena.slab.statements());
         assert_eq!(restored.formulas.headers(), arena.formulas.headers());
         // Reverse direction: re-serialization is byte-exact.
@@ -1715,7 +1736,10 @@ mod tests {
             .unwrap_or_else(|e| panic!("nested program must flatten: {e}"));
         let image = arena.to_image();
         let n_bytes = image.len();
-        assert_eq!(n_bytes, ARENA_IMAGE_PREFIX_LEN + 4 * BN3_STATEMENT_SIZE + 3 * BN3_FORMULA_HEADER_SIZE);
+        assert_eq!(
+            n_bytes,
+            ARENA_IMAGE_PREFIX_LEN + 4 * BN3_STATEMENT_SIZE + 3 * BN3_FORMULA_HEADER_SIZE
+        );
 
         let mut committed = 0;
         let mut torn = 0;
@@ -1810,12 +1834,17 @@ mod tests {
         };
 
         // (e) header end beyond the restored slab → IntervalOverlap.
-        let mut img = image_with(1, 1, &[ok_stmt(1)], &[BN3FormulaHeader {
-            start: 0,
-            end: 1,
-            term_words: 1,
-            _pad: 0,
-        }]);
+        let mut img = image_with(
+            1,
+            1,
+            &[ok_stmt(1)],
+            &[BN3FormulaHeader {
+                start: 0,
+                end: 1,
+                term_words: 1,
+                _pad: 0,
+            }],
+        );
         let h_at = img.len() - BN3_FORMULA_HEADER_SIZE;
         img[h_at + 4] = 0xFF; // end = 0x000000FF > n=1
         let Err(BN3Error::IntervalOverlap) = Arena::from_image(&img) else {
@@ -1829,8 +1858,18 @@ mod tests {
             2,
             &[ok_stmt(1), ok_stmt(2), ok_stmt(3)],
             &[
-                BN3FormulaHeader { start: 0, end: 2, term_words: 2, _pad: 0 },
-                BN3FormulaHeader { start: 1, end: 3, term_words: 2, _pad: 0 },
+                BN3FormulaHeader {
+                    start: 0,
+                    end: 2,
+                    term_words: 2,
+                    _pad: 0,
+                },
+                BN3FormulaHeader {
+                    start: 1,
+                    end: 3,
+                    term_words: 2,
+                    _pad: 0,
+                },
             ],
         );
         let Err(BN3Error::IntervalOverlap) = Arena::from_image(&img) else {
@@ -1838,9 +1877,17 @@ mod tests {
         };
 
         // (g) spoliated reserved field → ImageMalformed{expected: 0}.
-        let mut img = image_with(1, 1, &[ok_stmt(1)], &[BN3FormulaHeader {
-            start: 0, end: 1, term_words: 1, _pad: 0,
-        }]);
+        let mut img = image_with(
+            1,
+            1,
+            &[ok_stmt(1)],
+            &[BN3FormulaHeader {
+                start: 0,
+                end: 1,
+                term_words: 1,
+                _pad: 0,
+            }],
+        );
         let h_at = img.len() - BN3_FORMULA_HEADER_SIZE;
         img[h_at + 12] = 0x2C;
         let Err(BN3Error::ImageMalformed { expected, got }) = Arena::from_image(&img) else {
@@ -1882,9 +1929,24 @@ mod tests {
                 ok_stmt(3),
             ],
             &[
-                BN3FormulaHeader { start: 0, end: 1, term_words: 1, _pad: 0 },
-                BN3FormulaHeader { start: 1, end: 3, term_words: 2, _pad: 0 },
-                BN3FormulaHeader { start: 2, end: 3, term_words: 1, _pad: 0 },
+                BN3FormulaHeader {
+                    start: 0,
+                    end: 1,
+                    term_words: 1,
+                    _pad: 0,
+                },
+                BN3FormulaHeader {
+                    start: 1,
+                    end: 3,
+                    term_words: 2,
+                    _pad: 0,
+                },
+                BN3FormulaHeader {
+                    start: 2,
+                    end: 3,
+                    term_words: 1,
+                    _pad: 0,
+                },
             ],
         );
         let Err(BN3Error::IntervalOverlap) = Arena::from_image(&img) else {
@@ -1900,8 +1962,13 @@ mod tests {
                 (0x03u64 << 56) | (u32::MAX as u64 + 1), // 2^32: no header
                 (0x04u64 << 56) | 1,
                 (0x00u64 << 56) | 2,
-        )],
-            &[BN3FormulaHeader { start: 0, end: 1, term_words: 1, _pad: 0 }],
+            )],
+            &[BN3FormulaHeader {
+                start: 0,
+                end: 1,
+                term_words: 1,
+                _pad: 0,
+            }],
         );
         let Err(BN3Error::IntervalOverlap) = Arena::from_image(&img) else {
             panic!("(i2) must refuse IntervalOverlap");
@@ -1983,8 +2050,8 @@ mod tests {
 
         // Image identity at the stress scale + the corrupted-copy arm.
         let image = arena.to_image();
-        let restored = Arena::from_image(&image)
-            .unwrap_or_else(|e| panic!("stress image must restore: {e}"));
+        let restored =
+            Arena::from_image(&image).unwrap_or_else(|e| panic!("stress image must restore: {e}"));
         assert_eq!(restored.slab.statements(), arena.slab.statements());
         assert_eq!(restored.to_image(), image);
         let mut corrupted = image.clone();
@@ -2052,7 +2119,12 @@ mod tests {
         else {
             panic!("init above the hard formula bound must refuse typed");
         };
-        exact_init_refusal(&requested, &bound, MAX_ARENA_FORMULAS + 1, MAX_ARENA_FORMULAS);
+        exact_init_refusal(
+            &requested,
+            &bound,
+            MAX_ARENA_FORMULAS + 1,
+            MAX_ARENA_FORMULAS,
+        );
     }
 
     /// Exact-refusal helper shared by the init court.
@@ -2079,23 +2151,45 @@ mod tests {
         assert_eq!(arena.formulas.fixed_capacity(), Some(8));
 
         let leaf = |s: u64, p: u64, o: u64| {
-            FormulaNode::leaf(vec![[(Sigil::SlotConst, s), (Sigil::VarUni, p), (Sigil::SlotConst, o)]])
+            FormulaNode::leaf(vec![[
+                (Sigil::SlotConst, s),
+                (Sigil::VarUni, p),
+                (Sigil::SlotConst, o),
+            ]])
         };
         arena.flatten(&leaf(1, 2, 3)).expect("first admission fits");
-        arena.flatten(&leaf(4, 5, 6)).expect("second admission fits");
+        arena
+            .flatten(&leaf(4, 5, 6))
+            .expect("second admission fits");
         assert_eq!(arena.slab.len(), 2);
 
         // Two statements requested with one slot left: refuse, roll back.
         let two = FormulaNode::leaf(vec![
-            [(Sigil::SlotConst, 7), (Sigil::VarUni, 8), (Sigil::SlotConst, 9)],
-            [(Sigil::SlotConst, 10), (Sigil::VarUni, 11), (Sigil::SlotConst, 12)],
+            [
+                (Sigil::SlotConst, 7),
+                (Sigil::VarUni, 8),
+                (Sigil::SlotConst, 9),
+            ],
+            [
+                (Sigil::SlotConst, 10),
+                (Sigil::VarUni, 11),
+                (Sigil::SlotConst, 12),
+            ],
         ]);
         let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) = arena.flatten(&two) else {
             panic!("over-capacity admission must refuse typed");
         };
-        assert_eq!((requested, bound), (4, 3), "exact refused ask: stmt 4 vs capacity 3");
+        assert_eq!(
+            (requested, bound),
+            (4, 3),
+            "exact refused ask: stmt 4 vs capacity 3"
+        );
         assert_eq!(arena.slab.len(), 2, "refused program leaves no residue");
-        assert_eq!(arena.slab.stmts.capacity(), 3, "no allocator traffic after init");
+        assert_eq!(
+            arena.slab.stmts.capacity(),
+            3,
+            "no allocator traffic after init"
+        );
         assert_eq!(arena.formulas.headers.capacity(), 8);
 
         // Header-side capacity: the nested program needs 3 headers
@@ -2113,15 +2207,22 @@ mod tests {
 
         // Fill the last slot, then the next admission refuses with the
         // store still exactly at capacity — no growth, ever.
-        arena.flatten(&leaf(13, 14, 15)).expect("third admission fills the arena");
+        arena
+            .flatten(&leaf(13, 14, 15))
+            .expect("third admission fills the arena");
         assert_eq!(arena.slab.len(), 3);
-        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) = arena.flatten(&leaf(16, 17, 18))
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) =
+            arena.flatten(&leaf(16, 17, 18))
         else {
             panic!("admission at full capacity must refuse typed");
         };
         assert_eq!((requested, bound), (4, 3));
         assert_eq!(arena.slab.len(), 3);
-        assert_eq!(arena.slab.stmts.capacity(), 3, "still zero growth after refusal");
+        assert_eq!(
+            arena.slab.stmts.capacity(),
+            3,
+            "still zero growth after refusal"
+        );
         assert_eq!(arena.formulas.headers.capacity(), 8);
     }
 
@@ -2146,9 +2247,16 @@ mod tests {
         assert_eq!(a.to_image(), b.to_image(), "same admissions -> same bytes");
 
         let stmts = a.slab.statements();
-        assert_eq!(stmts.as_ptr() as usize % core::mem::align_of::<BN3Statement>(), 0);
+        assert_eq!(
+            stmts.as_ptr() as usize % core::mem::align_of::<BN3Statement>(),
+            0
+        );
         for (i, stmt) in stmts.iter().enumerate() {
-            assert_eq!(a.slab.get(i as u32), Some(*stmt), "scan order == index order");
+            assert_eq!(
+                a.slab.get(i as u32),
+                Some(*stmt),
+                "scan order == index order"
+            );
             let _ = stmts.len() * BN3_STATEMENT_SIZE; // 24 B per record
         }
         assert_eq!(a.slab.len() * BN3_STATEMENT_SIZE, 96);
@@ -2165,7 +2273,11 @@ mod tests {
         else {
             panic!("zero-capacity arena must refuse the first admission");
         };
-        assert_eq!((requested, bound), (1, 0), "the first header ask vs capacity 0");
+        assert_eq!(
+            (requested, bound),
+            (1, 0),
+            "the first header ask vs capacity 0"
+        );
         assert!(arena.slab.is_empty());
         assert!(arena.formulas.is_empty());
     }

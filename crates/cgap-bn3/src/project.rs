@@ -102,6 +102,11 @@
 /// digest algorithm is Wave-2 logic (and note: the workspace hash
 /// substrate is `cgap-blake3` — the algorithm decision is recorded as an
 /// open spec note, not silently re-decided here).
+// W6-BN3NS no_std unblock (disclosed per compile-freeze SLA): the std
+// prelude's Vec left with `#![no_std]`; import the alloc form.
+extern crate alloc;
+use alloc::vec::Vec;
+
 pub const DELTA_DIGEST_LEN: usize = 32;
 
 /// Column count of the delta-row payload (spec 4.4: "columns: subject
@@ -175,7 +180,10 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 /// canonical-byte buffer in place and calls this, so the digest step
 /// performs zero allocations once warm.
 fn sha256_padded(msg: &[u8]) -> [u8; 32] {
-    debug_assert!(msg.len() % 64 == 0, "padded SHA-256 message must be block-aligned");
+    debug_assert!(
+        msg.len() % 64 == 0,
+        "padded SHA-256 message must be block-aligned"
+    );
     const K: [u32; 64] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
         0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -219,7 +227,16 @@ fn sha256_padded(msg: &[u8]) -> [u8; 32] {
             let s0 = v[0].rotate_right(2) ^ v[0].rotate_right(13) ^ v[0].rotate_right(22);
             let maj = (v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]);
             let t2 = s0.wrapping_add(maj);
-            v = [t1.wrapping_add(t2), v[0], v[1], v[2], v[3].wrapping_add(t1), v[4], v[5], v[6]];
+            v = [
+                t1.wrapping_add(t2),
+                v[0],
+                v[1],
+                v[2],
+                v[3].wrapping_add(t1),
+                v[4],
+                v[5],
+                v[6],
+            ];
         }
         for (hi, vi) in h.iter_mut().zip(v) {
             *hi = hi.wrapping_add(vi);
@@ -376,10 +393,7 @@ impl ConsequentProjector {
         // `MatchSet::default()` through this public entry; the kernel
         // path yields the same logical no-match case as a courted empty
         // batch, so the direct path must too).
-        debug_assert_eq!(
-            matches.len,
-            matches.atom_rows.first().map_or(0, Vec::len)
-        );
+        debug_assert_eq!(matches.len, matches.atom_rows.first().map_or(0, Vec::len));
         for col in matches.var_values.iter().take(rule.var_count) {
             debug_assert_eq!(col.len(), matches.len);
         }
@@ -476,7 +490,8 @@ pub const BN3_WAL_TRAILER_LEN: usize = 16;
 /// A05 §3.4: "a full record is 112 bytes". (Cited:
 /// `crates/cgap-storage/src/atomic_commit.rs:65`
 /// `pub const RECORD_SIZE: usize = HEADER_SIZE + PAYLOAD_SIZE + TRAILER_SIZE`.)
-pub const BN3_WAL_RECORD_LEN: usize = BN3_WAL_HEADER_LEN + BN3_WAL_PAYLOAD_LEN + BN3_WAL_TRAILER_LEN;
+pub const BN3_WAL_RECORD_LEN: usize =
+    BN3_WAL_HEADER_LEN + BN3_WAL_PAYLOAD_LEN + BN3_WAL_TRAILER_LEN;
 
 /// A05 §3.3 record magic 0x4A414353 ("SCAJ" as u32 LE). (Cited:
 /// `crates/cgap-storage/src/atomic_commit.rs:45`
@@ -690,7 +705,10 @@ pub fn bn3_wal_classify(bytes: &[u8]) -> Bn3WalVerdict {
         } else {
             Bn3WalTearClass::TornTrailer
         };
-        return Bn3WalVerdict::Torn { have: bytes.len(), class };
+        return Bn3WalVerdict::Torn {
+            have: bytes.len(),
+            class,
+        };
     }
     let le32 = |o: usize| read_u32_le_at(bytes, o);
     let le64 = |o: usize| read_u64_le_at(bytes, o);
@@ -804,13 +822,10 @@ pub fn frame_oabi_digest(payload: &[u8]) -> [u8; 32] {
     cgap_blake3::hash(payload)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::unify::{
-        unify_batch, BodyAtom, Rule, RuleCompiler, StatementColumns, UnifyError,
-    };
+    use crate::unify::{unify_batch, BodyAtom, Rule, RuleCompiler, StatementColumns, UnifyError};
 
     /// Test-local row-storage stand-in: proves the envelope ABI without
     /// the Wave-2 `cgap-arrow` dependency. Not a mock — a real concrete
@@ -841,10 +856,16 @@ mod tests {
 
     /// Compile a one-atom rule and run it over columns; shared helper for
     /// the projector courts (real collaborators end to end).
-    fn project_rule(body: BodyAtom, head: [u64; 3], cols: (&[u64], &[u64], &[u64])) ->
-        Result<DeltaBatch<DeltaRows>, UnifyError>
-    {
-        let rule = Rule { rule_id: 9, body: vec![body], head };
+    fn project_rule(
+        body: BodyAtom,
+        head: [u64; 3],
+        cols: (&[u64], &[u64], &[u64]),
+    ) -> Result<DeltaBatch<DeltaRows>, UnifyError> {
+        let rule = Rule {
+            rule_id: 9,
+            body: vec![body],
+            head,
+        };
         let compiled = RuleCompiler::compile(&rule)?;
         let columns = StatementColumns::new(cols.0, cols.1, cols.2)?;
         let matches = unify_batch(&compiled, &columns, 4096)?;
@@ -941,12 +962,8 @@ mod tests {
         let p = [cw(100), cw(100), cw(100)];
         let o = [cw(2), cw(3), cw(2)];
         let head = [cw(50), cw(100), vw(10)];
-        let batch = project_rule(
-            BodyAtom::new(vw(10), cw(100), vw(11)),
-            head,
-            (&s, &p, &o),
-        )
-        .unwrap();
+        let batch =
+            project_rule(BodyAtom::new(vw(10), cw(100), vw(11)), head, (&s, &p, &o)).unwrap();
 
         assert_eq!(batch.rule_id, 9);
         assert_eq!(batch.source_mask_popcount, 3, "three matches selected");
@@ -1156,7 +1173,13 @@ mod tests {
         let mut rows_chunked = DeltaRows::default();
         let mut canon_chunked = Vec::new();
         let (d3, pc3) = proj
-            .emit_into(&compiled, 5, &ms_chunk1, &mut rows_chunked, &mut canon_chunked)
+            .emit_into(
+                &compiled,
+                5,
+                &ms_chunk1,
+                &mut rows_chunked,
+                &mut canon_chunked,
+            )
             .unwrap();
         assert_eq!((d1, pc1), (d3, pc3), "chunked match set changed emission");
         assert_eq!(canon_chunked, canon_fresh);
@@ -1230,14 +1253,20 @@ mod tests {
         let mut rec = [0u8; BN3_WAL_RECORD_LEN];
         bn3_wal_encode(&desc, 7, &mut rec);
         assert_eq!(rec.len(), 112);
-        assert_eq!(u32::from_le_bytes(rec[0..4].try_into().unwrap()), BN3_WAL_MAGIC);
+        assert_eq!(
+            u32::from_le_bytes(rec[0..4].try_into().unwrap()),
+            BN3_WAL_MAGIC
+        );
         assert_eq!(
             u32::from_le_bytes(rec[96..100].try_into().unwrap()),
             BN3_WAL_TRAILER_MAGIC
         );
         assert_eq!(
             bn3_wal_classify(&rec),
-            Bn3WalVerdict::Commit(Bn3WalCommit { seq: 7, descriptor: desc })
+            Bn3WalVerdict::Commit(Bn3WalCommit {
+                seq: 7,
+                descriptor: desc
+            })
         );
     }
 
@@ -1348,7 +1377,10 @@ mod tests {
             // descriptor: damage is never laundered into a commit.
             assert_ne!(
                 bn3_wal_classify(&corrupt),
-                Bn3WalVerdict::Commit(Bn3WalCommit { seq: 3, descriptor: desc })
+                Bn3WalVerdict::Commit(Bn3WalCommit {
+                    seq: 3,
+                    descriptor: desc
+                })
             );
         }
     }
@@ -1378,7 +1410,7 @@ mod tests {
         expect[0..4].copy_from_slice(b"CGAP");
         expect[4] = 1;
         expect[5] = 0x04; // FLAG_BN3 (A04 §6 flags bit 2)
-        // reserved 6..8 stays zero
+                          // reserved 6..8 stays zero
         expect[8..16].copy_from_slice(&payload_len.to_le_bytes());
         expect[16..48].copy_from_slice(&digest);
         expect[48..128].copy_from_slice(&att);
@@ -1399,7 +1431,11 @@ mod tests {
         let batch = project_rule(
             BodyAtom::new(vw(10), cw(100), vw(11)),
             [vw(11), cw(200), vw(10)],
-            (&[cw(1), cw(2), cw(3)], &[cw(100); 3], &[cw(4), cw(5), cw(6)]),
+            (
+                &[cw(1), cw(2), cw(3)],
+                &[cw(100); 3],
+                &[cw(4), cw(5), cw(6)],
+            ),
         )
         .unwrap();
 

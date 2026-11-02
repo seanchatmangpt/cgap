@@ -491,6 +491,13 @@ fn stage_unify_join<const N: usize>(b: Bencher) {
         radix: false,
         ..Default::default()
     };
+    // M-L3-1 arm guard: this leg measures the RETIRED nested-loop probe.
+    // If Default ever flips back to radix:true (the FA3 defect class),
+    // this leg would silently measure radix-vs-radix again — fail early.
+    assert!(
+        !probe_nested.radix,
+        "nested differential leg must run radix:false"
+    );
     b.bench_local(|| {
         let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
         unify_batch_probe(
@@ -545,6 +552,52 @@ fn stage_unify_join_radix<const N: usize>(b: Bencher) {
     let corpus = build_corpus(N);
     let mut ws = Workspace::new(&corpus);
     let (c_sel, c_join) = compile_stage(&corpus);
+    // FA3 radix-default flip guard: the default-leased probe must be the
+    // L3 radix fast path. If Default regresses to radix:false (derived
+    // default), this leg would measure nested-vs-nested again (the
+    // w5-l3-remeasure defect class) — fail early, never mis-measure.
+    assert!(
+        ws.probe.radix,
+        "radix leg must run on the default radix:true probe"
+    );
+    // FA3 cache-counter probe (radix-arm liveness): one untimed probe
+    // eval. The candidate cache is invalidated per batch and rebuilt on
+    // the join atom's first chunk (miss), then served from cache on
+    // every later chunk of the SAME batch (hits) — misses=1,
+    // hits=(chunks-1). This is the class FA3 pinned; it can only be
+    // observed on the radix arm (`use_cache` requires probe.radix).
+    {
+        let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
+        unify_batch_probe(
+            &c_sel,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_sel,
+            &mut ws.probe,
+        )
+        .expect("unify selector (probe)");
+        unify_batch_probe(
+            &c_join,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_join,
+            &mut ws.probe,
+        )
+        .expect("unify join (probe)");
+        let chunks = N.div_ceil(DEFAULT_CHUNK_ROWS);
+        assert_eq!(
+            (ws.probe.cache_misses, ws.probe.cache_hits),
+            (1, (chunks - 1) as u64),
+            "cache-counter probe class: expect misses=1, hits=chunks-1 \
+             (radix candidate cache live); got misses={} hits={}",
+            ws.probe.cache_misses,
+            ws.probe.cache_hits
+        );
+        ws.probe.cache_misses = 0;
+        ws.probe.cache_hits = 0;
+    }
     b.bench_local(|| {
         let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
         unify_batch_probe(
@@ -639,11 +692,23 @@ fn build_closure_corpus(n: usize) -> ClosureCorpus {
     let chains = n / CL_CHAIN_LEN;
     assert!(chains > 0, "N too small for one chain");
     let edge = const_word(CL_EDGE_PAYLOAD);
-    let per_chain = CL_CHAIN_LEN * (CL_CHAIN_LEN - 1) / 2;
+    let per_chain = CL_CHAIN_LEN * (CL_CHAIN_LEN - 1) / 2 - (CL_CHAIN_LEN - 1);
     let expected_derived = chains * per_chain;
+    // Chains are DISJOINT: node ids are contiguous but the boundary edge
+    // of each chain (pos == CL-1 -> next chain) is dropped, so chain k
+    // spans ids [k*CL, (k+1)*CL) in isolation and the closed-form
+    // expectation `chains * per_chain` holds exactly. (MB3: the old
+    // builder emitted the boundary edge i -> i+1 for every i, merging
+    // all chains into one length-n chain whose closure demands
+    // n(n-1)/2 pairs — the fixed work slab then refused typed with
+    // ArenaCapacityExceeded mid-fixpoint.)
+    let seeds = n - chains;
     let cap = n + expected_derived;
     let mut slab = Slab::fixed(cap as u64).expect("closure slab fixed");
     for i in 0..n {
+        if i % CL_CHAIN_LEN == CL_CHAIN_LEN - 1 {
+            continue;
+        }
         let s = const_word(i as u64);
         let o = const_word(i as u64 + 1);
         slab.push(BN3Statement::from_words(s, edge, o))
@@ -664,7 +729,7 @@ fn build_closure_corpus(n: usize) -> ClosureCorpus {
         seed_slab: slab,
         cap,
         compiled,
-        expected_seed: n,
+        expected_seed: seeds,
         expected_derived,
     }
 }
@@ -751,7 +816,7 @@ impl ClosureWs {
         let mut new = 0usize;
         for i in 0..self.rows.len() {
             let (s, p, o, _) = self.rows.row(i);
-            if self.known.contains(&(s, o)) {
+            if !self.known.insert((s, o)) {
                 continue;
             }
             self.work

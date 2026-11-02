@@ -230,10 +230,16 @@ impl core::fmt::Display for BN3Error {
                 write!(f, "statement index exceeds the u32 interval space")
             }
             BN3Error::ImageMalformed { expected, got } => {
-                write!(f, "restore image violates its framing: demanded {expected}, observed {got}")
+                write!(
+                    f,
+                    "restore image violates its framing: demanded {expected}, observed {got}"
+                )
             }
             BN3Error::ArenaCapacityExceeded { requested, bound } => {
-                write!(f, "fixed-capacity arena bound: requested {requested}, bound {bound}")
+                write!(
+                    f,
+                    "fixed-capacity arena bound: requested {requested}, bound {bound}"
+                )
             }
         }
     }
@@ -541,7 +547,10 @@ mod tests {
             // Upper bound: the full u56 transport width.
             if matches!(sigil, Sigil::VarUni | Sigil::VarExi) {
                 // Encode refuses (spec Section 7 rows 2/5)...
-                assert_eq!(encode_term(sigil, MAX_PAYLOAD), Err(BN3Error::RegisterExhausted));
+                assert_eq!(
+                    encode_term(sigil, MAX_PAYLOAD),
+                    Err(BN3Error::RegisterExhausted)
+                );
                 // ...while the transport word round-trips through the
                 // total decoder (spec Section 8 upper bound, spec
                 // Section 6 totality).
@@ -610,7 +619,10 @@ mod tests {
         );
         // Row 7: reserved sigil codes -> UnknownSigil(code), the typed
         // refusal, at the boundary codes and across the RESERVED range.
-        assert_eq!(decode_term(0x05u64 << 56), Err(BN3Error::UnknownSigil(0x05)));
+        assert_eq!(
+            decode_term(0x05u64 << 56),
+            Err(BN3Error::UnknownSigil(0x05))
+        );
         assert_eq!(
             decode_term((0xFFu64 << 56) | 7),
             Err(BN3Error::UnknownSigil(0xFF))
@@ -743,7 +755,11 @@ mod tests {
             BN3Error::IntervalOverlap.to_string(),
             BN3Error::FlattenDepthExceeded.to_string(),
             BN3Error::StatementIndexOverflow.to_string(),
-            BN3Error::ImageMalformed { expected: 1, got: 0 }.to_string(),
+            BN3Error::ImageMalformed {
+                expected: 1,
+                got: 0,
+            }
+            .to_string(),
         ];
         for m in &msgs {
             assert!(!m.is_empty());
@@ -781,7 +797,11 @@ mod tests {
                 let p_word = (0x04u64 << SIGIL_SHIFT) | payload;
                 let o_word = (code << SIGIL_SHIFT) | payload;
                 let stmt = BN3Statement::from_words(s_word, p_word, o_word);
-                assert_eq!(stmt.validate(), Ok(()), "code {code:#04x} payload {payload:#x}");
+                assert_eq!(
+                    stmt.validate(),
+                    Ok(()),
+                    "code {code:#04x} payload {payload:#x}"
+                );
                 let image = stmt.to_le_bytes();
                 assert_eq!(image.len(), BN3_STATEMENT_SIZE);
                 assert_eq!(BN3Statement::from_le_bytes(image), stmt, "code {code:#04x}");
@@ -829,6 +849,9 @@ mod tests {
             (Sigil::VarExi, 3),
         )
         .unwrap_or_else(|e| panic!("good statement must encode: {e}"));
-        assert_eq!(BN3Statement::from_le_bytes(good.to_le_bytes()).validate(), Ok(()));
+        assert_eq!(
+            BN3Statement::from_le_bytes(good.to_le_bytes()).validate(),
+            Ok(())
+        );
     }
 }

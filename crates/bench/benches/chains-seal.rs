@@ -475,7 +475,7 @@ fn blake3_floor_keyed_receipt_chain<const N: usize>(b: Bencher) {
     let lease = Mutex::new(Lease::new(epoch_lease_id, u64::MAX / 2, issued_root));
     // The covered input the seal law actually hashes: DeltaS chaining the
     // previous receipt digest, sealed + verified under the live lease.
-    let mut prev_root = issued_root;
+    let prev_root = issued_root;
     b.bench(|| {
         let mut lease = lease.lock().expect("lease mutex");
         let mut prev_root = prev_root;

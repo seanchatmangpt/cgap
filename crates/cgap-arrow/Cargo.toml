@@ -11,6 +11,12 @@ license-file = "../../LICENSE.md"
 [features]
 default = []
 std = []
+# Nested/variable-width column types (A2P prune, v26.11.2): timestamps.
+# Default OFF so the embedded/wasm audit surface excludes them. The other
+# prune candidates (varlen/views/runend/slice/c_abi_nested) stay ungated —
+# each has a live dependency edge (batch.rs / audit / integration tests /
+# mutation_kills), recorded in the lane receipt.
+nested-types = []
 
 [dependencies]
 

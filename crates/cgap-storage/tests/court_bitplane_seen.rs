@@ -26,13 +26,18 @@ const N_PAIRS: usize = 10_000;
 #[test]
 fn court_membership_matches_btreeset_oracle_10k() {
     let mut rng = CorpusRng(0xA20C_0FFE_E5A7_E000);
-    let mut seen: BitPlaneSeenSet<16_384> = BitPlaneSeenSet::new();
+    // Structural fix (repair-17): the 16 MB inline set is heap-leased at
+    // construction via `new_boxed()` (alloc_zeroed — no stack staging);
+    // the court runs on the DEFAULT test-thread stack.
+    let mut seen: Box<BitPlaneSeenSet<16_384>> = BitPlaneSeenSet::new_boxed();
     let mut oracle: BTreeSet<(u64, u64)> = BTreeSet::new();
     let mut inserted = 0usize;
     for _ in 0..N_PAIRS {
         let x = rng.next();
         let z = rng.next() & 0xF;
-        let r = seen.insert(x, z).expect("capacity court: set must not fill");
+        let r = seen
+            .insert(x, z)
+            .expect("capacity court: set must not fill");
         let o = oracle.insert((x, z));
         assert_eq!(r, o, "insert result must match oracle");
         if r {
@@ -60,7 +65,10 @@ fn court_capacity_refusal_is_typed_and_loud() {
         assert!(seen.insert(i, i).unwrap());
     }
     assert!(seen.is_full());
-    assert_eq!(seen.insert(99, 99), Err(cgap_storage::bitplane_seen::SeenFull));
+    assert_eq!(
+        seen.insert(99, 99),
+        Err(cgap_storage::bitplane_seen::SeenFull)
+    );
     // Duplicates of stored pairs still resolve Ok(false), not Err.
     assert_eq!(seen.insert(0, 0), Ok(false));
     seen.clear();
@@ -72,7 +80,11 @@ fn court_mutation_flip_corrupt_plane_diverges_from_oracle() {
     // Build a small real set.
     let mut seen: BitPlaneSeenSet<64> = BitPlaneSeenSet::new();
     let mut oracle: BTreeSet<(u64, u64)> = BTreeSet::new();
-    let pairs = [(0x1234_5678_9ABC_DEF0, 1), (2, 0xFFFF_FFFF_FFFF_FFFF), (7, 7)];
+    let pairs = [
+        (0x1234_5678_9ABC_DEF0, 1),
+        (2, 0xFFFF_FFFF_FFFF_FFFF),
+        (7, 7),
+    ];
     for (x, z) in pairs {
         seen.insert(x, z).unwrap();
         oracle.insert((x, z));
@@ -90,7 +102,11 @@ fn court_mutation_flip_corrupt_plane_diverges_from_oracle() {
     let slot = 0;
     let before = mutated.plane_bit(plane, slot);
     mutated.set_plane_bit(plane, slot, before ^ 1);
-    assert_eq!(mutated.plane_bit(plane, slot), before ^ 1, "mutation must land");
+    assert_eq!(
+        mutated.plane_bit(plane, slot),
+        before ^ 1,
+        "mutation must land"
+    );
 
     // Post-mutation divergence: contains must now DISAGREE with the oracle.
     let (x0, z0) = pairs[0];

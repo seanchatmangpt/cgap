@@ -4,9 +4,9 @@ name = "cgap-core"
 version.workspace = true
 edition.workspace = true
 description = "128-byte sovereign CgapFrameHeader codec and triumvirate isomorphism kernels for the cgap substrate."
-license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A04 receipt ALIVE (docs/jira/v26.11.1/waves/a04-finish-receipt.md)
-# P28-SIL v2.1.0 sovereign license instrument:
+license-file = "../../LICENSE.md" # P28-SIL v2.1.0 sovereign license instrument:
+#   urn:avec:license:p28-sil:v2.1.0-sovereign
 #   urn:avec:license:p28-sil:v2.1.0-sovereign
 # (canonical spec identifier per LICENSE-P28-SIL.md; URN frozen per
 # docs/jira/v26.11.1/03-rename-receipt.md decision D2; cited per lane-A04

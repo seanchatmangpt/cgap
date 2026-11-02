@@ -78,6 +78,13 @@ pub const CGAP_ERR_OABI_MISMATCH: CgapStatus = 0x4347_0002;
 pub const CGAP_ERR_SHACL_VIOLATION: CgapStatus = 0x4347_0003;
 /// §2: documented lease table exhausted (`'CG' + 04`). Producers: A02+A03.
 pub const CGAP_ERR_LEASE_EXHAUSTED: CgapStatus = 0x4347_0004;
+/// `'CG' + 06` — concurrent single-writer denial on the spill path (FA9 lane
+/// w6-fa9-commit-gating; a recorded register extension, not an A19 §2 pin —
+/// the A19 status court pins the pre-existing six). The spill path is
+/// single-writer per (path, lease-holding thread): a second thread claiming
+/// an already-owned spill path is denied typed BEFORE any file operation, so
+/// it can never re-`File::create` (O_TRUNC) the holder's drained bytes.
+pub const CGAP_ERR_CONCURRENT_WRITER_DENIED: CgapStatus = 0x4347_0006;
 /// §2: P28 spoliation — digest/license predicate failure (`'P28' + FF`;
 /// attestation layout: A17 §2). Producers: A17.
 pub const CGAP_ERR_P28_SPOLIATION: CgapStatus = 0x5032_38FF;
@@ -726,6 +733,36 @@ pub unsafe extern "C" fn cgap_commit_parquet(
     // CGAP_ERR_LEASE_EXHAUSTED (never silent truncation); the lane-value
     // view is a zero-copy u32 reborrow (i32 values are domain-gated to
     // [0, 255] above, so the bit patterns are identical).
+    //
+    // ---------------------------------------------------------------------------
+    // FA9 DURABILITY DISCLOSURE (forensic-lane-09.md, suspicion 1; updated
+    // lane H3 rotation writeback, v26.11.2 hardening): this path is an
+    // IN-MEMORY transaction STAGING LATCH. Data reaches the spill file ONLY
+    // at ring-rotation drain. As of lane H3, the drain is write_all +
+    // flush + `sync_all` (mmap_writer.rs `drain_to_spill` via the
+    // `SpillSync` seam), so a COMPLETED ROTATION is power-fail durable —
+    // the rotation boundary is device-pinned before the ring re-arms.
+    // REMAINING WINDOW (stated, not hidden): bytes staged in the ring that
+    // have NOT yet been drained (head > 0, no rotation) are memory-only —
+    // a process crash loses every transaction staged since lease grant or
+    // since the last rotation (up to the whole 64 KiB ring). The
+    // staging-latch semantics are retained and now stated. `CGAP_OK` from
+    // this function means "STAGED", never "DURABLE" for undrained bytes;
+    // drained bytes are durable at the rotation boundary.
+    // stage_commit-class µs/tx figures measure the staging latch, not a
+    // durable commit — the correct label is "staged transaction latch"
+    // (see the relabel receipt, lane H3).
+    //
+    // FA9 SINGLE-WRITER GATE (suspicion 3): the spill path is acquired
+    // fail-closed before any file operation. A second thread claiming an
+    // already-owned path is denied typed (CGAP_ERR_CONCURRENT_WRITER_DENIED)
+    // BEFORE its lease grant can re-`File::create` (O_TRUNC) the holder's
+    // drained spill bytes. The thread-local COMMIT_LEASE itself stays.
+    // ---------------------------------------------------------------------------
+    match spill_gate::claim(path.as_bytes()) {
+        spill_gate::Claim::Acquired => {}
+        spill_gate::Claim::Denied => return CGAP_ERR_CONCURRENT_WRITER_DENIED,
+    }
     COMMIT_LEASE.with(|lease| {
         let slot = &mut *lease.borrow_mut();
         // Lease grant (once per lane slot): pre-open the spill handle at
@@ -787,6 +824,98 @@ struct CommitLease {
 thread_local! {
     static COMMIT_LEASE: std::cell::RefCell<Option<CommitLease>> =
         const { std::cell::RefCell::new(None) };
+}
+
+/// FA9 single-writer gate (w6-fa9-commit-gating): process-lifetime ownership
+/// registry for spill paths, keyed (path-hash, minted thread id). Fail-closed:
+/// a claim on a path owned by a DIFFERENT live lease thread is denied typed
+/// (`CGAP_ERR_CONCURRENT_WRITER_DENIED`) before any IO, so the second
+/// thread's lease grant can never `File::create` (O_TRUNC) the holder's
+/// drained spill bytes. Re-entry by the SAME (path, thread) — the lease
+/// owner's steady-state — is allowed. Ownership is released by the owning
+/// thread's `SpillOwnership` Drop (lease lifetime == thread lifetime), so a
+/// path whose owner thread has exited is free again.
+///
+/// DIVERGENCE from the dispatch (recorded in the receipt): the dispatch
+/// prescribed a single `AtomicBool` claim/release per call. A per-call global
+/// flag is insufficient for the court's required invariant ("no truncation of
+/// the first thread's data"): with release-per-call, a second thread can win
+/// the inter-call gap, GRANT (O_TRUNC), and legally truncate the holder's
+/// drained bytes — the exact FA9 finding. The gate therefore keys per
+/// (path-hash, thread) with lease-lifetime ownership instead. The residual
+/// bound is the 64-bit FNV-1a path-hash collision probability (negligible;
+/// documented, not silenced).
+#[cfg(not(target_os = "none"))]
+mod spill_gate {
+    use std::sync::Mutex;
+
+    /// Minted per-thread id (process-lifetime counter, exact and stable).
+    fn mint_thread_id() -> u64 {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    }
+
+    thread_local! {
+        static CURRENT_TID: u64 = mint_thread_id();
+    }
+
+    /// FNV-1a 64-bit over the raw path bytes (no alloc, no formatting).
+    fn fnv1a(bytes: &[u8]) -> u64 {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for &b in bytes {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x0000_0100_0000_01B3);
+        }
+        h
+    }
+
+    /// Fail-closed acquisition. Denies iff another thread owns the path.
+    /// The owner's own re-entry (steady-state commit) is allowed through.
+    pub fn claim(path: &[u8]) -> Claim {
+        // Force the Drop-guard registration for this thread so ownership is
+        // released when the lease thread exits (thread_locals are lazy; a
+        // guard never `.with`-ed never drops).
+        OWNERS_GUARD.with(|_| ());
+        let tid = CURRENT_TID.with(|&t| t);
+        let h = fnv1a(path);
+        let mut owners = OWNERS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if owners.iter().any(|&(ph, t)| ph == h && t != tid) {
+            return Claim::Denied;
+        }
+        if !owners.contains(&(h, tid)) {
+            owners.push((h, tid));
+        }
+        Claim::Acquired
+    }
+
+    /// Lease lifetime == thread lifetime: releasing this thread's spill
+    /// ownership when the lease thread exits (thread-local Drop).
+    struct OwnersGuard;
+
+    impl Drop for OwnersGuard {
+        fn drop(&mut self) {
+            let tid = CURRENT_TID.with(|&t| t);
+            if let Ok(mut owners) = OWNERS.lock() {
+                owners.retain(|&(_, t)| t != tid);
+            }
+        }
+    }
+
+    thread_local! {
+        static OWNERS_GUARD: OwnersGuard = OwnersGuard;
+    }
+
+    /// Process-lifetime ownership table. Bounded by the number of distinct
+    /// spill paths held by live lease threads in the process.
+    static OWNERS: Mutex<Vec<(u64, u64)>> = Mutex::new(Vec::new());
+
+    pub enum Claim {
+        Acquired,
+        Denied,
+    }
 }
 
 /// Typed UNSUPPORTED(scope) record — `_cgap_p28_invariant_check` stays
@@ -893,8 +1022,9 @@ const _: () = assert!(P28_INVARIANT_CHECK_UNSUPPORTED.len() > 128);
 mod wave3_courts {
     use super::{
         CgapAdmitFrameFn, CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView, CgapStatus,
-        CgapVerifyP28Fn, CGAP_ABI_VERSION, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED,
-        CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
+        CgapVerifyP28Fn, CGAP_ABI_VERSION, CGAP_ERR_CONCURRENT_WRITER_DENIED,
+        CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_OABI_MISMATCH,
+        CGAP_ERR_P28_SPOLIATION, CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -1137,6 +1267,13 @@ mod wave3_courts {
         ("CGAP_ERR_OABI_MISMATCH", CGAP_ERR_OABI_MISMATCH),
         ("CGAP_ERR_SHACL_VIOLATION", CGAP_ERR_SHACL_VIOLATION),
         ("CGAP_ERR_LEASE_EXHAUSTED", CGAP_ERR_LEASE_EXHAUSTED),
+        // repair-10 (lane F8): C twin added to include/cgap.h — the parity
+        // map below now pins 7 members; a header without the new name flips
+        // "status enum drift" (witnessed pre-fix, see repair-10 receipt).
+        (
+            "CGAP_ERR_CONCURRENT_WRITER_DENIED",
+            CGAP_ERR_CONCURRENT_WRITER_DENIED,
+        ),
         ("CGAP_ERR_P28_SPOLIATION", CGAP_ERR_P28_SPOLIATION),
     ];
 
@@ -1287,6 +1424,14 @@ mod wave3_courts {
         (
             "M12 enum member drop (INVALID_MAGIC)",
             "CGAP_ERR_INVALID_MAGIC =",
+            "",
+            "status enum drift",
+        ),
+        // repair-10 (lane F8) addition: dropping the new C-header member must
+        // flip the parity court on its named leg.
+        (
+            "M13 enum member drop (CONCURRENT_WRITER_DENIED)",
+            "CGAP_ERR_CONCURRENT_WRITER_DENIED =",
             "",
             "status enum drift",
         ),
@@ -1634,6 +1779,7 @@ int main() {
             CGAP_ERR_OABI_MISMATCH,
             CGAP_ERR_SHACL_VIOLATION,
             CGAP_ERR_LEASE_EXHAUSTED,
+            CGAP_ERR_CONCURRENT_WRITER_DENIED,
             CGAP_ERR_P28_SPOLIATION,
         ];
         for i in 0..vals.len() {
@@ -1651,12 +1797,14 @@ int main() {
         assert_eq!(CGAP_ERR_SHACL_VIOLATION, 0x4347_0003);
         assert_eq!(CGAP_ERR_LEASE_EXHAUSTED, 0x4347_0004);
         assert_eq!(CGAP_ERR_P28_SPOLIATION, 0x5032_38FF);
+        assert_eq!(CGAP_ERR_CONCURRENT_WRITER_DENIED, 0x4347_0006);
         // Value classes: 'CG' (0x4347) + nonzero nn; 'P28' (0x503238) + FF.
         for v in [
             CGAP_ERR_INVALID_MAGIC,
             CGAP_ERR_OABI_MISMATCH,
             CGAP_ERR_SHACL_VIOLATION,
             CGAP_ERR_LEASE_EXHAUSTED,
+            CGAP_ERR_CONCURRENT_WRITER_DENIED,
         ] {
             assert_eq!(v & 0xFFFF_0000, 0x4347_0000, "'CG' class");
             assert_ne!(v & 0x0000_FFFF, 0, "'CG' sequence nonzero");
@@ -1679,8 +1827,9 @@ int main() {
         }
         assert_eq!(
             got.len(),
-            6,
-            "header enum pins exactly the six register values"
+            7,
+            "header enum pins exactly the seven register values (repair-10: \
+             CONCURRENT_WRITER_DENIED promoted to the C header)"
         );
     }
 

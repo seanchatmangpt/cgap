@@ -8,8 +8,40 @@ authors.workspace = true
 license-file = "../../LICENSE.md"
 publish = true
 
+[[bench]]
+name = "bench_self_play_ingress_parquet"
+harness = false
+
+[[bench]]
+name = "bench_self_play_datalog_git"
+harness = false
+
 [dependencies]
 cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
-cgap-git = { path = "../cgap-git", version = "26.11.2" }
+cgap-git = { path = "../cgap-git", version = "26.11.2", default-features = false }
 cgap-parquet = { path = "../cgap-parquet", version = "26.11.2" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.2", default-features = false }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.2", default-features = false }
+cgap-branchless = { path = "../cgap-branchless", version = "26.11.2", default-features = false }
+cgap-bn3 = { path = "../cgap-bn3", version = "26.11.2", default-features = false }
+cgap-core = { path = "../cgap-core", version = "26.11.2", default-features = false, optional = true }
+cgap-storage = { path = "../cgap-storage", version = "26.11.2", default-features = false, optional = true }
+
+[dev-dependencies]
+# SP8 lane (DISCLOSED MINIMAL UNBLOCK, lane lease was tests/self_play_
+# concurrency_spill.rs): the spill-gate race court drives cgap_ffi's
+# sovereign surface; cgap-ffi is rlib+cdylib so a path dev-dep is the only
+# route to the dispatch gate `cargo test -p cgap --test
+# self_play_concurrency_spill`. Host-test-only; publish unaffected.
+cgap-ffi = { path = "../cgap-ffi" }
+
+[features]
+default = ["host"]
+# HOST-ONLY stage deps (SP1 feature decision): cgap-core and cgap-storage
+# are not #![no_std]-clean (95 / 198 errors on riscv32imc-unknown-none-elf,
+# no_std declared nowhere, std paths implicit). Gated here so the none-target
+# check covers the no_std-clean subset; the DRed cascade_retract stage and
+# the A04 core-frame constants compile OUT of every none-target image until
+# those crates carry no_std posture themselves.
+host = ["dep:cgap-core", "dep:cgap-storage"]

@@ -100,6 +100,10 @@ name = "chains-sovereign"
 harness = false
 
 # W3-R4 / starDF MW4: G3-MAT transitive-closure bench (semi-naive kernel,
+# landed by lane V1 as mat_closure; see w5-g3-mat-closure.md receipt).
+[[bench]]
+name = "mat_closure"
+harness = false
 
 # W4-K1 / G4-DRED: 90% churn + entropy-sweep retraction bench over the
 # splitmix64-seeded fact corpus, with an oracle set-equality court and a

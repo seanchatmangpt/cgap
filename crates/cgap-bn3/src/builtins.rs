@@ -175,6 +175,11 @@
 //! and §5.1 still carries the SHA-256("abc") literal where BLAKE3 is
 //! meant (audit-receipt divergences 3/4).
 
+// W6-BN3NS no_std unblock (disclosed per compile-freeze SLA): the std
+// prelude's Vec left with `#![no_std]`; import the alloc form.
+extern crate alloc;
+use alloc::vec::Vec;
+
 use crate::sigil::{Sigil, PAYLOAD_BITS};
 
 // --- Closed opcode registry (spec Section 3) ----------------------------
@@ -318,9 +323,8 @@ const _: () = assert!(OP_CRYPTO_BLAKE3 == 0x20);
 const _: () = assert!(OP_CRYPTO_BLAKE3_WIDE == 0x21);
 const _: () = assert!(LOG_NS_FIRST == OP_LOG_TRACE && LOG_NS_LAST == OP_LOG_COUNTERS);
 const _: () = assert!(MATH_NS_FIRST == OP_MATH_GREATER_THAN && MATH_NS_LAST == OP_MATH_MIN);
-const _: () = assert!(
-    CRYPTO_NS_FIRST == OP_CRYPTO_BLAKE3 && CRYPTO_NS_LAST == OP_CRYPTO_BLAKE3_WIDE
-);
+const _: () =
+    assert!(CRYPTO_NS_FIRST == OP_CRYPTO_BLAKE3 && CRYPTO_NS_LAST == OP_CRYPTO_BLAKE3_WIDE);
 const _: () = assert!(LOG_NS_LAST < MATH_NS_FIRST);
 const _: () = assert!(MATH_NS_LAST < CRYPTO_NS_FIRST);
 const _: () = assert!(ALL_OPCODES.len() == OPCODE_COUNT);
@@ -395,7 +399,10 @@ impl core::fmt::Display for BuiltinError {
         match self {
             BuiltinError::UnknownOpcode(op) => write!(f, "unknown builtin opcode 0x{op:02X}"),
             BuiltinError::Overflow { a, b } => {
-                write!(f, "56-bit overflow: {a} +* {b} exceeds 0x{PAYLOAD_CEILING:X}")
+                write!(
+                    f,
+                    "56-bit overflow: {a} +* {b} exceeds 0x{PAYLOAD_CEILING:X}"
+                )
             }
             BuiltinError::AssertFailed { actual } => {
                 write!(f, "log:assert failed: actual register value {actual}")
@@ -404,7 +411,10 @@ impl core::fmt::Display for BuiltinError {
                 write!(f, "crypto range [{ptr}, {ptr}+{len}) outside the slab")
             }
             BuiltinError::ReservedOperand { opcode, field } => {
-                write!(f, "opcode 0x{opcode:02X}: reserved field `{field}` must be zero")
+                write!(
+                    f,
+                    "opcode 0x{opcode:02X}: reserved field `{field}` must be zero"
+                )
             }
         }
     }
@@ -445,22 +455,14 @@ pub struct BuiltinContext {
 impl BuiltinPayload {
     /// Total constructor: any four bytes are a legal payload word.
     pub const fn new(opcode: u8, dst: u8, a: u8, b: u8) -> Self {
-        Self {
-            opcode,
-            dst,
-            a,
-            b,
-        }
+        Self { opcode, dst, a, b }
     }
 
     /// Pack the payload into the low 32 bits of the 56-bit term payload.
     /// Total: the high 24 reserved bits are zero by construction (four
     /// bytes cannot dirty them).
     pub const fn encode(&self) -> u64 {
-        self.opcode as u64
-            | (self.dst as u64) << 8
-            | (self.a as u64) << 16
-            | (self.b as u64) << 24
+        self.opcode as u64 | (self.dst as u64) << 8 | (self.a as u64) << 16 | (self.b as u64) << 24
     }
 
     /// Unpack a 56-bit term payload into a builtin payload. Refuses dirty
@@ -577,7 +579,9 @@ pub fn dispatch(
                 });
             }
             let a = regs[payload.a as usize];
-            let prod = a.checked_mul(10).ok_or(BuiltinError::Overflow { a, b: 10 })?;
+            let prod = a
+                .checked_mul(10)
+                .ok_or(BuiltinError::Overflow { a, b: 10 })?;
             if prod > PAYLOAD_CEILING {
                 return Err(BuiltinError::Overflow { a, b: 10 });
             }
@@ -720,9 +724,15 @@ mod tests {
         assert_eq!(ALL_OPCODES[7], CRYPTO_NS_FIRST);
         assert_eq!(ALL_OPCODES[8], CRYPTO_NS_LAST);
         // Namespace windows hold every member and exclude every neighbor.
-        assert!(ALL_OPCODES[..3].iter().all(|&op| (LOG_NS_FIRST..=LOG_NS_LAST).contains(&op)));
-        assert!(ALL_OPCODES[3..7].iter().all(|&op| (MATH_NS_FIRST..=MATH_NS_LAST).contains(&op)));
-        assert!(ALL_OPCODES[7..].iter().all(|&op| (CRYPTO_NS_FIRST..=CRYPTO_NS_LAST).contains(&op)));
+        assert!(ALL_OPCODES[..3]
+            .iter()
+            .all(|&op| (LOG_NS_FIRST..=LOG_NS_LAST).contains(&op)));
+        assert!(ALL_OPCODES[3..7]
+            .iter()
+            .all(|&op| (MATH_NS_FIRST..=MATH_NS_LAST).contains(&op)));
+        assert!(ALL_OPCODES[7..]
+            .iter()
+            .all(|&op| (CRYPTO_NS_FIRST..=CRYPTO_NS_LAST).contains(&op)));
     }
 
     /// Payload-layout court: 4 bytes, align 1, pinned byte offsets, and the
@@ -870,7 +880,10 @@ mod tests {
         );
         let mut regs = regs_with(&[(1, 1)]);
         let payload = BuiltinPayload::new(0x12, 9, 1, 0);
-        assert!(run(payload, &mut regs, &[]).is_ok(), "b=0 is the legal form");
+        assert!(
+            run(payload, &mut regs, &[]).is_ok(),
+            "b=0 is the legal form"
+        );
     }
 
     /// `math:min` known answers (spec 5.1): total, bounds 0 and Max.
@@ -922,11 +935,18 @@ mod tests {
         let word = dispatch(payload, &mut regs, SLAB, &mut ctx).expect("in-bounds range");
         // Byte-for-byte: full digest in the context.
         assert_eq!(ctx.last_digest, EXPECTED, "context digest vs spec literal");
-        assert_eq!(ctx.last_digest, cgap_blake3::hash(SLAB), "context digest vs direct call");
+        assert_eq!(
+            ctx.last_digest,
+            cgap_blake3::hash(SLAB),
+            "context digest vs direct call"
+        );
         // Register landing: first 7 bytes little-endian, 56-bit-safe.
         assert_eq!(word, digest_word56(&EXPECTED));
         assert_eq!(regs[9], word);
-        assert!(word <= MAX_PAYLOAD, "landing must respect the 56-bit domain");
+        assert!(
+            word <= MAX_PAYLOAD,
+            "landing must respect the 56-bit domain"
+        );
     }
 
     /// `crypto:blake3_wide` known answer (spec 5.1): 4 KiB input through
@@ -940,7 +960,10 @@ mod tests {
         let mut ctx = BuiltinContext::default();
         let word = dispatch(payload, &mut regs, &slab, &mut ctx).expect("in-bounds range");
         let direct_simd = cgap_blake3::hash_many_simd(&slab);
-        assert_eq!(ctx.last_digest, direct_simd, "dispatch vs direct hash_many_simd");
+        assert_eq!(
+            ctx.last_digest, direct_simd,
+            "dispatch vs direct hash_many_simd"
+        );
         assert_eq!(ctx.last_digest, cgap_blake3::hash(&slab), "= 0x20 semantic");
         assert_eq!(word, digest_word56(&direct_simd));
         assert_eq!(regs[9], word);
@@ -1087,7 +1110,11 @@ mod tests {
             let payload = BuiltinPayload::new(op, 200, 100, 50);
             let word = payload.encode();
             assert!(word <= MAX_PAYLOAD, "encoded word must fit 56 bits");
-            assert_eq!(BuiltinPayload::decode(word), Ok(payload), "opcode 0x{op:02X}");
+            assert_eq!(
+                BuiltinPayload::decode(word),
+                Ok(payload),
+                "opcode 0x{op:02X}"
+            );
         }
         // Byte-level layout check against the spec: [opcode | dst | a | b].
         let word = BuiltinPayload::new(0x11, 0x22, 0x33, 0x44).encode();
@@ -1117,10 +1144,7 @@ mod tests {
     fn builtin_error_surface_court() {
         let errors = [
             BuiltinError::UnknownOpcode(0xAB),
-            BuiltinError::Overflow {
-                a: 1,
-                b: 2,
-            },
+            BuiltinError::Overflow { a: 1, b: 2 },
             BuiltinError::AssertFailed { actual: 42 },
             BuiltinError::InvalidRange { ptr: 9, len: 1 },
             BuiltinError::ReservedOperand {
@@ -1193,14 +1217,54 @@ mod tests {
         let slab: Vec<u8> = (0..16u32).map(|i| i as u8).collect();
         // (name, init, payload, slab_len_used) — all refusal outcomes.
         let cases: [(&str, [(usize, u64); 2], BuiltinPayload, usize); 8] = [
-            ("unknown", [(1, 1), (2, 2)], BuiltinPayload::new(0x00, 9, 1, 2), 16),
-            ("sum-overflow", [(1, MAX_PAYLOAD), (2, 1)], BuiltinPayload::new(0x11, 9, 1, 2), 16),
-            ("sum-oob-operand", [(1, MAX_PAYLOAD + 1), (2, 0)], BuiltinPayload::new(0x11, 9, 1, 2), 16),
-            ("mul10-overflow", [(1, MAX_PAYLOAD), (2, 0)], BuiltinPayload::new(0x12, 9, 1, 0), 16),
-            ("mul10-reserved-b", [(1, 1), (3, 7)], BuiltinPayload::new(0x12, 9, 1, 3), 16),
-            ("crypto-oob", [(1, 17), (2, 1)], BuiltinPayload::new(0x20, 9, 1, 2), 16),
-            ("crypto-wrap", [(1, 1), (2, u64::MAX)], BuiltinPayload::new(0x20, 9, 1, 2), 16),
-            ("assert-failed", [(5, 42), (6, 43)], BuiltinPayload::new(0x02, 5, 6, 0), 16),
+            (
+                "unknown",
+                [(1, 1), (2, 2)],
+                BuiltinPayload::new(0x00, 9, 1, 2),
+                16,
+            ),
+            (
+                "sum-overflow",
+                [(1, MAX_PAYLOAD), (2, 1)],
+                BuiltinPayload::new(0x11, 9, 1, 2),
+                16,
+            ),
+            (
+                "sum-oob-operand",
+                [(1, MAX_PAYLOAD + 1), (2, 0)],
+                BuiltinPayload::new(0x11, 9, 1, 2),
+                16,
+            ),
+            (
+                "mul10-overflow",
+                [(1, MAX_PAYLOAD), (2, 0)],
+                BuiltinPayload::new(0x12, 9, 1, 0),
+                16,
+            ),
+            (
+                "mul10-reserved-b",
+                [(1, 1), (3, 7)],
+                BuiltinPayload::new(0x12, 9, 1, 3),
+                16,
+            ),
+            (
+                "crypto-oob",
+                [(1, 17), (2, 1)],
+                BuiltinPayload::new(0x20, 9, 1, 2),
+                16,
+            ),
+            (
+                "crypto-wrap",
+                [(1, 1), (2, u64::MAX)],
+                BuiltinPayload::new(0x20, 9, 1, 2),
+                16,
+            ),
+            (
+                "assert-failed",
+                [(5, 42), (6, 43)],
+                BuiltinPayload::new(0x02, 5, 6, 0),
+                16,
+            ),
         ];
         for (name, init, payload, slab_len) in cases {
             let mut regs = regs_with(&init);

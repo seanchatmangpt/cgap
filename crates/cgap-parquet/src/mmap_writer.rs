@@ -722,8 +722,51 @@ pub struct RingSink {
     ring: alloc::boxed::Box<[u8; 65_536]>,
     head: usize,
     wraps: u64,
-    spill: Option<std::fs::File>,
+    spill: Option<alloc::boxed::Box<dyn SpillSync>>,
     io_failed: bool,
+}
+
+/// Rotation-drain seam (lane H3, v26.11.2 hardening): the durability
+/// contract of the spill handle, stated once. A drain is write_all +
+/// flush + `sync_all` — the committed region leaves the page cache before
+/// `drain_to_spill` reports success, so the rotation boundary is
+/// power-fail durable. The trait exists so the drain path's durability is
+/// observable (a court counts `sync_all` calls through a real recorder),
+/// not for simulation: the production impl is the real `std::fs::File`.
+/// Sealed boundary (lane AE1, v26.11.2 countermeasure): `SpillSync` is
+/// supertrait-bounded on a crate-private marker so out-of-crate code
+/// cannot mint new production impls (E0277). The production impl is the
+/// real `std::fs::File`; the only other impl is the in-crate `#[cfg(test)]`
+/// recorder that H3's rotation court observes through. This replaces the
+/// former `with_dyn` court-only constructor openness: the seam stays alive
+/// strictly inside the owning crate.
+#[cfg(feature = "std")]
+mod private {
+    /// Crate-private seal marker. Nameable only inside `cgap-parquet`.
+    pub trait Sealed {}
+    // Production impl.
+    impl Sealed for std::fs::File {}
+}
+
+#[cfg(feature = "std")]
+pub trait SpillSync: private::Sealed {
+    /// Persist `bytes` to the spill handle, power-fail durable on `Ok`.
+    fn drain_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()>;
+}
+
+#[cfg(feature = "std")]
+impl SpillSync for std::fs::File {
+    fn drain_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        use std::io::Write;
+        self.write_all(bytes)?;
+        self.flush()?;
+        // FA9 rotation writeback (lane H3): without this, drained bytes are
+        // only crash-of-committer durable — a power cut right after a
+        // rotation could lose the whole drained run. sync_all (fsync on
+        // macOS, msync-equivalent fcntl on Linux) pins the run to the
+        // device before the ring re-arms.
+        self.sync_all()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -735,6 +778,16 @@ impl RingSink {
     /// grant time); `None` means rotation is a typed refusal (there is no
     /// silent wrap-and-drop).
     pub fn new(spill: Option<std::fs::File>) -> Self {
+        Self::with_dyn(spill.map(|f| alloc::boxed::Box::new(f) as alloc::boxed::Box<dyn SpillSync>))
+    }
+
+    /// Seam constructor (court use): inject an in-crate sealed `SpillSync`
+    /// impl — post-AE1 the trait is sealed on a crate-private marker, so
+    /// the only impls are `std::fs::File` and the `#[cfg(test)]` recorder
+    /// the H3 court observes through; no out-of-crate impl can exist.
+    /// Not part
+    /// of the public API — production always goes through [`RingSink::new`].
+    pub(crate) fn with_dyn(spill: Option<alloc::boxed::Box<dyn SpillSync>>) -> Self {
         Self {
             ring: alloc::boxed::Box::new([0u8; 65_536]),
             head: 0,
@@ -773,6 +826,14 @@ impl RingSink {
     /// gets a typed refusal via the empty-window path. `io_failed` clears
     /// on a successful retry drain.
     fn drain_to_spill(&mut self) -> Result<(), ParquetError> {
+        // FA9 rotation writeback (lane H3, v26.11.2 hardening): the drain is
+        // write_all + flush + `sync_all` via the [`SpillSync`] seam — the
+        // committed region is device-pinned BEFORE `drain_to_spill` returns
+        // Ok, so the rotation boundary is power-fail durable. REMAINING
+        // WINDOW (stated, not hidden): bytes still in the ring that have
+        // not yet been drained (head > 0, no rotation yet) are memory-only
+        // — the staging-latch semantics are unchanged and documented at the
+        // FFI disclosure block (sovereign.rs FA9 DURABILITY DISCLOSURE).
         let n = self.head;
         if n == 0 {
             return Ok(());
@@ -784,11 +845,7 @@ impl RingSink {
                 budget: 0,
             });
         };
-        use std::io::Write;
-        let wrote = file
-            .write_all(&self.ring[..n])
-            .and_then(|_| file.flush())
-            .is_ok();
+        let wrote = file.drain_bytes(&self.ring[..n]).is_ok();
         self.io_failed = !wrote;
         if !wrote {
             return Err(ParquetError::RunOverrun {
@@ -1738,5 +1795,132 @@ mod courts {
                 elapsed.as_secs_f64() * 1000.0
             );
         }
+    }
+
+    // ---- FA9 rotation writeback court (lane H3) ----
+
+    // std-gated: RingSink, SpillSync and private::Sealed exist only under
+    // `feature = "std"` (FIX-02: default-features `cargo test -p
+    // cgap-parquet` exited 101 on these bare items; mirrored the tier_h
+    // `#[cfg(all(test, feature = "std"))]` convention).
+    #[cfg(all(test, feature = "std"))]
+    /// Recorder spill: a REAL SpillSync impl (not a mock -- it genuinely
+    /// stores the bytes and counts durability barriers), used to observe
+    /// that the rotation drain persists + syncs before reporting Ok.
+    struct RecordingSpill {
+        stored: alloc::vec::Vec<u8>,
+        syncs: usize,
+        writes: usize,
+    }
+
+    #[cfg(all(test, feature = "std"))]
+    impl RecordingSpill {
+        fn new() -> Self {
+            Self {
+                stored: alloc::vec::Vec::new(),
+                syncs: 0,
+                writes: 0,
+            }
+        }
+    }
+
+    #[cfg(all(test, feature = "std"))]
+    type SharedRec = alloc::rc::Rc<std::cell::RefCell<RecordingSpill>>;
+
+    #[cfg(all(test, feature = "std"))]
+    impl private::Sealed for SharedRec {}
+
+    #[cfg(all(test, feature = "std"))]
+    impl SpillSync for SharedRec {
+        fn drain_bytes(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+            use std::io::Write;
+            let mut rec = self.borrow_mut();
+            rec.writes += 1;
+            rec.stored.write_all(bytes)?;
+            rec.syncs += 1; // the durability barrier the court counts
+            Ok(())
+        }
+    }
+
+    #[cfg(all(test, feature = "std"))]
+    #[test]
+    fn fa9_rotation_drain_is_sync_durable_and_bytes_reach_the_spill() {
+        // Part 1 (real recorder): a ring wrap drains through SpillSync; the
+        // recorder saw exactly one write + sync per rotation, and the stored
+        // bytes equal the committed region.
+        let rec: SharedRec = alloc::rc::Rc::new(std::cell::RefCell::new(RecordingSpill::new()));
+        let payload: alloc::vec::Vec<u8> = (0..CAP).map(|i| (i * 31 + 7) as u8).collect();
+        {
+            let mut sink = RingSink::with_dyn(Some(alloc::boxed::Box::new(rec.clone())));
+            let mut bs: &mut RingSink = &mut sink;
+            use BlockSink as _;
+            let win = bs.window(CAP); // fills the ring exactly
+            assert_eq!(win.len(), CAP);
+            win.copy_from_slice(&payload);
+            bs.commit(CAP).expect("commit fill");
+            // One more byte forces the rotation.
+            let mut bs2: &mut RingSink = &mut sink;
+            let win = bs2.window(1);
+            assert_eq!(win.len(), 1, "rotation must hand back a fresh window");
+        }
+        let observed = rec.borrow();
+        assert_eq!(observed.writes, 1, "one drain write per rotation");
+        assert_eq!(
+            observed.syncs, 1,
+            "rotation drain must issue a sync_all barrier; the /tmp no-sync \
+             mutant must zero this count and flip the court"
+        );
+        assert_eq!(
+            observed.stored[..],
+            payload[..],
+            "drained == committed region"
+        );
+
+        // Part 1b (structural arm over the PRODUCTION impl): the recorder
+        // is a separate SpillSync impl, so it cannot witness the File
+        // impl's barrier. The production sync_all lives in
+        // `impl SpillSync for std::fs::File`; this arm asserts its text is
+        // present WITHIN THAT IMPL's span (anchored: from the impl header
+        // to the impl's closing brace at column 0 — not a fixed byte
+        // window, so the anchor tracks the impl body however it grows or
+        // is reordered). The /tmp no-sync mutant REMOVES that line and
+        // flips this assertion — witnessed flip: MUTEXIT=1.
+        let src = include_str!("mmap_writer.rs");
+        let impl_start = src
+            .find("impl SpillSync for std::fs::File")
+            .expect("production File impl present");
+        let impl_end = src[impl_start..]
+            .find("\n}")
+            .map(|rel| impl_start + rel)
+            .expect("impl closing brace present");
+        assert!(impl_end > impl_start, "impl span must be non-degenerate");
+        let impl_body = &src[impl_start..impl_end];
+        assert!(
+            impl_body.contains("self.sync_all()"),
+            "production SpillSync for File must issue sync_all (mutation \
+             witness: removing the barrier must fail this court)"
+        );
+
+        // Part 2 (real File, on-disk witness): rotate through a real spill
+        // file in /tmp, reopen from disk, assert the payload survived.
+        let dir = std::env::temp_dir().join(alloc::format!("cgap-h3-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        let path = dir.join("spill.bin");
+        let f = std::fs::File::create(&path).expect("create spill");
+        let payload2: alloc::vec::Vec<u8> = (0..CAP).map(|i| (i * 17 + 3) as u8).collect();
+        {
+            let mut sink2 = RingSink::new(Some(f));
+            let mut bs: &mut RingSink = &mut sink2;
+            use BlockSink as _;
+            let win = bs.window(CAP);
+            win.copy_from_slice(&payload2);
+            bs.commit(CAP).expect("commit fill 2");
+            let mut bs2: &mut RingSink = &mut sink2;
+            let win = bs2.window(1);
+            assert_eq!(win.len(), 1);
+        }
+        let from_disk = std::fs::read(&path).expect("read spill from disk");
+        assert_eq!(from_disk[..], payload2[..], "synced spill survives on disk");
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 }

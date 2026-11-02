@@ -1,15 +1,20 @@
-//! Register-file ABI (Wave 1 freeze) + Wave 2 branchless-selection kernel
-//! for the SIMD unifier. Spec: `docs/jira/v26.11.1/lanes/A12-simd-unifier.md`
-//! Sections 4.2-4.4 and 7, with the statement ABI **cited, not redefined**
-//! from `docs/jira/v26.11.1/lanes/A11-bn3-arena.md` Sections 4.1-4.3
+//! Register-file ABI + branchless-selection kernel for the SIMD unifier.
+//! Spec: `docs/jira/v26.11.1/lanes/A12-simd-unifier.md` Sections 4.2-4.4
+//! and 7, with the statement ABI **cited, not redefined** from
+//! `docs/jira/v26.11.1/lanes/A11-bn3-arena.md` Sections 4.1-4.3
 //! (`crate::sigil::BN3Statement` / term words, frozen in `sigil.rs`).
 //!
-//! Wave 1 froze the register ABI: band partition, widths, and the typed
-//! error surface, pinned by compile-time asserts. Wave 2 (this file now)
-//! adds the core engines: [`RuleCompiler`] (rule words -> register
+//! Landed state (v26.11.2 convergence): the register ABI (band partition,
+//! widths, typed error surface) is pinned by compile-time asserts; the core
+//! engines are in this file — [`RuleCompiler`] (rule words -> register
 //! assignments), the per-atom mask kernels over columnar term words, the
-//! nested-loop join (spec 3.2, chosen for v1), selection emission, and the
-//! fixpoint driver that feeds the [`crate::project::ConsequentProjector`].
+//! join probe (RADIXFIX: radix-mask default, nested-loop leg retained and
+//! court-guarded in `chains-bn3.rs`), selection emission, and the fixpoint
+//! driver (W6-BFX: [`SplitStore`] borrowed-prefix + owned-delta-tail view)
+//! that feeds the [`crate::project::ConsequentProjector`]. Posture:
+//! W6-BN3NS `no_std` (alloc collections, no std dep); the fixpoint is NOT
+//! budget-0 (H8 honesty court, `noalloc.rs` counting allocator); the AE6
+//! behavioral patent-gate delta is the campaign G7 admission surface.
 //!
 //! Authority note (spec A11 Section 5): A11 guarantees the 8-bit term-word
 //! payload transports a register number `R_n`, `n` in `0..=255`; the
@@ -95,7 +100,57 @@
 
 use crate::project::{ConsequentProjector, DeltaBatch, DeltaRows};
 use crate::sigil::{self, Sigil};
-use std::collections::{HashMap, HashSet};
+// W6-BN3NS no_std strip: alloc collections + core hash traits. The
+// workspace carries no hashbrown, so alloc::collections is the
+// dependency-free no_std form (justification in
+// docs/jira/v26.11.2/waves/w6-bn3-nostd-borrowed-driver.md).
+extern crate alloc;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::vec::Vec;
+use core::hash::Hasher;
+
+/// W5 deterministic hasher, retained as a frozen artifact only. The
+/// current `seen` membership structure is the W6-BN3NS
+/// `BTreeSet<(u64, u64, u64)>`; this struct is NOT in the hot loop. It
+/// was once the static-seeded FxHash-style multiply-xor over the
+/// `(u64, u64, u64)` triple, chosen because std `RandomState` carried a
+/// TLS once-init `blr` into the hot loop (historical note:
+/// waves/p2-asm-0blr-census.md, LBB68_43); after the BTreeSet move that
+/// rationale no longer applies and the struct is retained solely as the
+/// frozen seed artifact pinned to 0xBF58_476D_1CE4_E5B9 lineage.
+#[allow(dead_code)] // W6-BN3NS: retained frozen seed artifact (0xBF58_476D_1CE4_E5B9); seen-set moved to BTreeSet
+pub(crate) struct FixpointHasher(u64);
+
+impl Default for FixpointHasher {
+    fn default() -> Self {
+        FixpointHasher(0xBF58_476D_1CE4_E5B9)
+    }
+}
+
+impl Hasher for FixpointHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    #[inline]
+    fn write(&mut self, _bytes: &[u8]) {
+        // (u64,u64,u64) keys only ever arrive via write_u64 below; the
+        // fallback stays correct (not a stub) for any other caller.
+        for chunk in _bytes.chunks(8) {
+            let mut buf = [0u8; 8];
+            buf[..chunk.len()].copy_from_slice(chunk);
+            let v = u64::from_le_bytes(buf);
+            self.0 = (self.0 ^ v).wrapping_mul(0x517C_C1B7_2722_0A95);
+        }
+    }
+    #[inline]
+    fn write_u64(&mut self, v: u64) {
+        self.0 = (self.0 ^ v).wrapping_mul(0x517C_C1B7_2722_0A95);
+    }
+}
+
+// BuildHasherDefault<FixpointHasher>::default().build_hasher() yields
+// FixpointHasher::default() = seeded state (0xBF58_476D_1CE4_E5B9).
 
 /// Total width of the virtual register file: `R0..=R255`, the full 8-bit
 /// register-number space the `Sigil::VarUni`/`VarExi` payloads transport.
@@ -366,6 +421,68 @@ impl<'a> StatementColumns<'a> {
     }
 }
 
+/// Borrowed/owned row source for the unify evaluation core (W6-BFX): a
+/// read-only abstraction over "the store this round evaluates against".
+/// [`StatementColumns`] is the plain borrowed store; [`SplitStore`] is the
+/// fixpoint driver's borrowed-prefix + owned-delta-tail view, which lets
+/// the driver evaluate over prefix and derived rows WITHOUT ever copying
+/// the caller's input columns to the heap.
+trait ColView {
+    /// Row count.
+    fn n(&self) -> usize;
+    /// One word: slot `0..=2`, global row index `0..n()`. For
+    /// [`StatementColumns`] this is exactly `col(slot)[row]`; for
+    /// [`SplitStore`] rows `< prefix.len()` read the borrowed prefix,
+    /// rows after it read the owned delta tail.
+    fn w(&self, slot: usize, row: usize) -> u64;
+}
+
+impl ColView for StatementColumns<'_> {
+    #[inline]
+    fn n(&self) -> usize {
+        self.len()
+    }
+    #[inline]
+    fn w(&self, slot: usize, row: usize) -> u64 {
+        self.col(slot)[row]
+    }
+}
+
+/// Borrowed-prefix + owned-delta-tail store view (W6-BFX): the fixpoint
+/// driver evaluates each round against prefix (the caller's columns,
+/// never copied) followed by the delta tail (only derived rows, appended
+/// in derivation order). Row order matches the retired full-store copy
+/// (`prefix || delta` in append order), so match order, match sets, and
+/// termination behavior are bit-identical.
+struct SplitStore<'a> {
+    prefix: &'a StatementColumns<'a>,
+    ds: &'a [u64],
+    dp: &'a [u64],
+    do_: &'a [u64],
+}
+
+impl ColView for SplitStore<'_> {
+    #[inline]
+    fn n(&self) -> usize {
+        self.prefix.len() + self.ds.len()
+    }
+    #[inline]
+    fn w(&self, slot: usize, row: usize) -> u64 {
+        let plen = self.prefix.len();
+        if row < plen {
+            self.prefix.col(slot)[row]
+        } else {
+            let t = row - plen;
+            match slot {
+                0 => self.ds[t],
+                1 => self.dp[t],
+                2 => self.do_[t],
+                other => unreachable!("SplitStore::w: slot {other} out of range 0..=2"),
+            }
+        }
+    }
+}
+
 /// The `R0..R255` register file (spec 4.2): scalar staging for constant
 /// loads and per-match variable binding. Band accesses are checked — a
 /// violation is the typed `UnifyError::RegisterBandViolation`, never a
@@ -495,9 +612,9 @@ impl RuleCompiler {
 #[derive(Default)]
 struct Interner {
     const_pool: Vec<u64>,
-    const_index: HashMap<u64, u8>,
+    const_index: BTreeMap<u64, u8>,
     vars: Vec<u8>,
-    var_index: HashMap<u8, u8>,
+    var_index: BTreeMap<u8, u8>,
     var_first: Vec<(usize, usize)>,
 }
 
@@ -619,7 +736,7 @@ pub struct EvalScratch {
 /// High-water marks mirror `EvalScratch::hw_rows`/`hw_vars`: the peak
 /// bucket-table occupancy and mask width are recorded per chunk so a
 /// caller can prewarm/reserve off the hot path.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct JoinProbeScratch {
     /// Radix probe enabled (default). `false` = nested-loop probe
     /// (the pre-L3 micro-architecture, kept as the M-L3-1 arm).
@@ -632,6 +749,20 @@ pub struct JoinProbeScratch {
     /// L1-resident scratchpad of the L3 design contract
     /// (13-arrow-star-schema.md): 4096 x 4 B = 16 KiB.
     pub bucket_head: Vec<u32>,
+    /// Occupancy summary (BH7 XOR-filter pre-gate, repair-20): bit `b`
+    /// of word `b/64` is set iff `bucket_head[b] != u32::MAX` (bucket
+    /// non-empty), accumulated during `bucket_candidates` from the real
+    /// chain build — so bit=0 ⇒ chain empty is EXACT, not a
+    /// probabilistic fingerprint. The probe loop tests this single word
+    /// bit before touching `bucket_head[b]`, skipping the head fetch +
+    /// sentinel compare for empty buckets. NOTE: a byte-fingerprint
+    /// summary (OR-fold of inserted key bytes) is UNSOUND for this gate
+    /// and was rejected: OR is a union of byte SETS, so two distinct
+    /// keys' union can contain a byte tuple no single key has — bit=1
+    /// would not imply possible membership and bit=0 would not imply
+    /// absence; only per-bucket occupancy read off the built chains is
+    /// exact. 4096 buckets / 64 = 64 words, 512 B.
+    pub bucket_occupancy: Vec<u64>,
     /// Singly-linked chain over candidate-list positions: `next_chain[c]`
     /// is the next candidate position in bucket `radix_bucket(key[c])`.
     /// Chains are built candidate-ascending (build walks positions in
@@ -671,6 +802,35 @@ pub struct JoinProbeScratch {
     /// lease.
     pub cache_hits: u64,
     pub cache_misses: u64,
+}
+
+/// L3 (W3 lever / FA3 radix-default flip): explicit `Default` so the
+/// default probe matches the docstring — `radix: true` (the L3 fast
+/// path). The retired nested-loop arm is selected explicitly
+/// (`radix: false`), never by accident of a derived default. All other
+/// field defaults are identical to the former `#[derive(Default)]`
+/// (empty buffers, `u64::MAX` cache key, zero counters/marks).
+impl Default for JoinProbeScratch {
+    fn default() -> Self {
+        Self {
+            radix: true,
+            mask_s: Vec::new(),
+            bucket_head: Vec::new(),
+            bucket_occupancy: Vec::new(),
+            next_chain: Vec::new(),
+            key_set: Vec::new(),
+            hw_bucket_rows: 0,
+            hw_mask_words: 0,
+            cand_rows_cache: Vec::new(),
+            cand_spans_cache: Vec::new(),
+            cand_binds_cache: Vec::new(),
+            cache_key: u64::MAX,
+            cache_len: 0,
+            rebuild_per_chunk: false,
+            cache_hits: 0,
+            cache_misses: 0,
+        }
+    }
 }
 
 /// Radix bucket count: 2^12 = 4096 buckets — the L1-resident scratchpad
@@ -727,17 +887,21 @@ fn probe_cache_key(rule: &CompiledRule, ai: usize, n: usize) -> u64 {
 fn bucket_candidates(
     head: &mut Vec<u32>,
     next: &mut Vec<u32>,
-    key_col: &[u64],
+    occ: &mut Vec<u64>,
+    key_at: impl Fn(usize) -> u64,
     rows: &[u32],
 ) {
     head.clear();
     head.resize(RADIX_BUCKETS, u32::MAX);
+    occ.clear();
+    occ.resize(RADIX_BUCKETS.div_ceil(64), 0);
     next.clear();
     next.resize(rows.len(), 0);
     for c in (0..rows.len()).rev() {
-        let b = radix_bucket(key_col[rows[c] as usize]);
+        let b = radix_bucket(key_at(rows[c] as usize));
         next[c] = head[b];
         head[b] = c as u32;
+        occ[b >> 6] |= 1u64 << (b & 63);
     }
 }
 
@@ -790,7 +954,20 @@ pub fn emit_join_masks(
     bound_keys: &[u64],
     out_masks: &mut [u64],
 ) -> u64 {
-    let n = cols.len();
+    emit_join_masks_view(cols, join_atom, const_pool, bound_keys, out_masks)
+}
+
+/// [`emit_join_masks`] over any [`ColView`] (W6-BFX): the fixpoint driver's
+/// split store uses the same point-range mask algebra over borrowed-prefix
+/// + delta-tail rows. Identical masks bit-for-bit (same row order).
+fn emit_join_masks_view<V: ColView>(
+    cols: &V,
+    join_atom: &[CompiledTerm; 3],
+    const_pool: &[u64],
+    bound_keys: &[u64],
+    out_masks: &mut [u64],
+) -> u64 {
+    let n = cols.n();
     let groups = n.div_ceil(64);
     assert!(
         out_masks.len() >= groups,
@@ -803,7 +980,6 @@ pub fn emit_join_masks(
     let first_var_slot = (0..3)
         .find(|&si| matches!(join_atom[si], CompiledTerm::Var(_)))
         .unwrap_or(0);
-    let key_col = cols.col(first_var_slot);
     let mut rows = 0u64;
     for g in 0..groups {
         let lo = g * 64;
@@ -811,7 +987,7 @@ pub fn emit_join_masks(
         let mut m_key = 0u64;
         let mut m_const = 0u64;
         for t in lo..hi {
-            let w = key_col[t] & PAYLOAD_WINDOW_MASK;
+            let w = cols.w(first_var_slot, t) & PAYLOAD_WINDOW_MASK;
             let mut hit = false;
             for &k in bound_keys {
                 hit |= lane_eq_mask(w, k & PAYLOAD_WINDOW_MASK) != 0;
@@ -820,7 +996,7 @@ pub fn emit_join_masks(
             let mut mc = MASK_ALL;
             for &si in &const_slots {
                 if let CompiledTerm::Const(creg) = join_atom[si] {
-                    mc &= lane_eq_mask(cols.col(si)[t], const_pool[creg as usize]);
+                    mc &= lane_eq_mask(cols.w(si, t), const_pool[creg as usize]);
                 }
             }
             m_const |= ((mc == MASK_ALL) as u64) << (t - lo);
@@ -839,10 +1015,10 @@ pub fn emit_join_masks(
 /// success the fresh bindings this row contributes are written to
 /// `binds` (cleared first); returns `false` if the row fails any slot.
 /// Allocation-free after warmup: `binds`/`seen` are caller-owned scratch.
-fn atom_local_match_into(
+fn atom_local_match_into<V: ColView>(
     const_pool: &[u64],
     atom: &[CompiledTerm; 3],
-    cols: &StatementColumns<'_>,
+    cols: &V,
     row: usize,
     bound: &[bool],
     binds: &mut Vec<(usize, u64)>,
@@ -857,7 +1033,7 @@ fn atom_local_match_into(
     // retired early-return form. One branch, on the final mask.
     let mut acc = MASK_ALL;
     for si in 0..3 {
-        let w = cols.col(si)[row];
+        let w = cols.w(si, row);
         match atom[si] {
             CompiledTerm::Const(creg) => {
                 acc &= lane_eq_mask(w, const_pool[creg as usize]);
@@ -869,7 +1045,7 @@ fn atom_local_match_into(
                 }
                 match seen.iter().copied().find(|&(_, fi)| fi == idx) {
                     Some((fs, _)) => {
-                        acc &= lane_eq_mask(w, cols.col(fs)[row]);
+                        acc &= lane_eq_mask(w, cols.w(fs, row));
                     }
                     None => {
                         seen.push((si, idx));
@@ -937,6 +1113,23 @@ pub fn unify_batch_probe(
     out: &mut MatchSet,
     probe: &mut JoinProbeScratch,
 ) -> Result<(), UnifyError> {
+    unify_batch_probe_view(rule, cols, chunk_size, scratch, out, probe)
+}
+
+/// [`unify_batch_probe`] over any [`ColView`] (W6-BFX): the concrete pub
+/// signature is preserved verbatim for the zero-alloc callers; the
+/// fixpoint driver reaches the split store through this generic core.
+/// Identical chunking, probe order, and match semantics — the view is
+/// read-only, and `StatementColumns`' `ColView` impl is exactly
+/// `col(slot)[row]` (zero-cost monomorphization on the concrete path).
+fn unify_batch_probe_view<V: ColView>(
+    rule: &CompiledRule,
+    cols: &V,
+    chunk_size: usize,
+    scratch: &mut EvalScratch,
+    out: &mut MatchSet,
+    probe: &mut JoinProbeScratch,
+) -> Result<(), UnifyError> {
     if chunk_size == 0 {
         return Err(UnifyError::InvalidChunkSize);
     }
@@ -960,7 +1153,7 @@ pub fn unify_batch_probe(
     for col in out.var_values.iter_mut() {
         col.clear();
     }
-    let n = cols.len();
+    let n = cols.n();
     let mut start = 0usize;
     while start < n {
         let end = (start + chunk_size).min(n);
@@ -979,9 +1172,9 @@ pub fn unify_batch_probe(
 /// One chunk of the nested-loop evaluation (Wave-2 algorithm, Wave-4
 /// buffers): identical match semantics and match order to the Wave-2
 /// `eval_chunk`, with every heap buffer drawn from [`EvalScratch`].
-fn eval_chunk_into(
+fn eval_chunk_into<V: ColView>(
     rule: &CompiledRule,
-    cols: &StatementColumns<'_>,
+    cols: &V,
     start: usize,
     end: usize,
     sc: &mut EvalScratch,
@@ -1086,13 +1279,13 @@ fn eval_chunk_into(
         // (`radix == false`) and the `rebuild_per_chunk` arm keep the
         // per-chunk rebuild in `sc.cand_*` (the M-L3-1 measurement arm).
         let use_cache = probe.radix && !probe.rebuild_per_chunk && !sc.bound_slots.is_empty();
-        let ck = probe_cache_key(rule, ai, cols.len());
+        let ck = probe_cache_key(rule, ai, cols.n());
         let mut rebuilt_cache = false;
         if use_cache && probe.cache_key != ck {
             probe.cand_rows_cache.clear();
             probe.cand_spans_cache.clear();
             probe.cand_binds_cache.clear();
-            for j in 0..cols.len() {
+            for j in 0..cols.n() {
                 if atom_local_match_into(
                     &rule.const_pool,
                     atom,
@@ -1120,7 +1313,7 @@ fn eval_chunk_into(
             sc.cand_rows.clear();
             sc.cand_spans.clear();
             sc.cand_binds.clear();
-            for j in 0..cols.len() {
+            for j in 0..cols.n() {
                 if atom_local_match_into(
                     &rule.const_pool,
                     atom,
@@ -1156,7 +1349,10 @@ fn eval_chunk_into(
             // order (candidates visited in ascending index order within
             // each bucket) — is identical to the nested loop.
             let key_slot = sc.bound_slots[0].0;
-            let key_col = cols.col(key_slot);
+            // W6-BFX: the key "column" is an indexed view over the
+            // ColView (split-store rows read prefix or delta by global
+            // index); bucket_candidates takes the closure directly.
+            let key_at = |g: usize| cols.w(key_slot, g);
             // Optional semi-join prefilter arm (levers L3 point 2): a
             // single-bound-slot join whose distinct bound-key set is
             // tiny (<= [`KEY_PREFILTER_MAX`]) pre-masks the candidate
@@ -1175,8 +1371,8 @@ fn eval_chunk_into(
             let prefilter = single && probe.key_set.len() <= KEY_PREFILTER_MAX;
             probe.mask_s.clear();
             if prefilter {
-                probe.mask_s.resize(cols.len().div_ceil(64), 0);
-                let _ = emit_join_masks(
+                probe.mask_s.resize(cols.n().div_ceil(64), 0);
+                let _ = emit_join_masks_view(
                     cols,
                     &rule.atoms[ai],
                     &rule.const_pool,
@@ -1195,14 +1391,16 @@ fn eval_chunk_into(
                 bucket_candidates(
                     &mut probe.bucket_head,
                     &mut probe.next_chain,
-                    key_col,
+                    &mut probe.bucket_occupancy,
+                    key_at,
                     &probe.cand_rows_cache,
                 );
             } else if !use_cache {
                 bucket_candidates(
                     &mut probe.bucket_head,
                     &mut probe.next_chain,
-                    key_col,
+                    &mut probe.bucket_occupancy,
+                    key_at,
                     &sc.cand_rows,
                 );
             }
@@ -1224,6 +1422,12 @@ fn eval_chunk_into(
             for m in 0..cur {
                 let kv = sc.cur_vars[sc.bound_slots[0].1][m];
                 let b = radix_bucket(kv);
+                // Repair-20 (BH7 XOR-filter pre-gate): exact occupancy
+                // bit first — bit=0 ⇒ chain provably empty, skip the
+                // bucket_head fetch + sentinel compare entirely.
+                if probe.bucket_occupancy[b >> 6] >> (b & 63) & 1 == 0 {
+                    continue;
+                }
                 let mut c = probe.bucket_head[b];
                 while c != u32::MAX {
                     let j = cand_rows[c as usize];
@@ -1234,7 +1438,7 @@ fn eval_chunk_into(
                     let (b0, blen) = cand_spans[c as usize];
                     let mut ok = MASK_ALL;
                     for &(si, vidx) in &sc.bound_slots {
-                        ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
+                        ok &= lane_eq_mask(cols.w(si, j as usize), sc.cur_vars[vidx][m]);
                     }
                     if ok != MASK_ALL {
                         c = probe.next_chain[c as usize];
@@ -1260,7 +1464,7 @@ fn eval_chunk_into(
                     let (b0, blen) = sc.cand_spans[c];
                     let mut ok = MASK_ALL;
                     for &(si, vidx) in &sc.bound_slots {
-                        ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
+                        ok &= lane_eq_mask(cols.w(si, j as usize), sc.cur_vars[vidx][m]);
                     }
                     if ok != MASK_ALL {
                         continue;
@@ -1279,8 +1483,8 @@ fn eval_chunk_into(
                 }
             }
         }
-        std::mem::swap(&mut sc.cur_rows, &mut sc.nxt_rows);
-        std::mem::swap(&mut sc.cur_vars, &mut sc.nxt_vars);
+        core::mem::swap(&mut sc.cur_rows, &mut sc.nxt_rows);
+        core::mem::swap(&mut sc.cur_vars, &mut sc.nxt_vars);
     }
 
     // Append the aligned chunk state into the shared accumulators. The
@@ -1335,11 +1539,20 @@ pub fn unify_to_fixpoint_opt(
         .iter()
         .map(RuleCompiler::compile)
         .collect::<Result<Vec<_>, _>>()?;
-    let mut store_s: Vec<u64> = cols.s.to_vec();
-    let mut store_p: Vec<u64> = cols.p.to_vec();
-    let mut store_o: Vec<u64> = cols.o.to_vec();
+    // W6-BFX (borrowed-prefix + owned-delta-tail): the caller's columns
+    // are NEVER copied to the heap. Derived rows append to small owned
+    // delta buffers only; each round evaluates over `prefix || delta` in
+    // append order — the identical row sequence the retired full-store
+    // copy presented, so match order, derived-fact sets, and termination
+    // behavior (`seen` is membership-only) are unchanged.
+    let mut ds: Vec<u64> = Vec::new();
+    let mut dp: Vec<u64> = Vec::new();
+    let mut do_: Vec<u64> = Vec::new();
     // Termination machinery only (see fn docs): membership, never order.
-    let mut seen: HashSet<(u64, u64, u64)> = (0..cols.len())
+    // W6-BN3NS: BTreeSet<(u64, u64, u64)> (D5-verified membership-only) —
+    // no hasher at all, so no RandomState TLS and no hash calls in the
+    // hot loop; ordered B-tree gives the same insert/contains semantics.
+    let mut seen: BTreeSet<(u64, u64, u64)> = (0..cols.len())
         .map(|i| (cols.s[i], cols.p[i], cols.o[i]))
         .collect();
 
@@ -1348,21 +1561,45 @@ pub fn unify_to_fixpoint_opt(
     // (allocation discipline; match semantics unchanged).
     let mut scratch = EvalScratch::default();
     let mut matches = MatchSet::default();
+    // W6-BFX: one JoinProbeScratch hoisted to driver scope and leased
+    // through `unify_batch_probe_view` for every rule x round — the radix
+    // bucket tables + semi-join mask buffers are owned once, never
+    // re-allocated per rule per round (the retired
+    // `unify_batch_into` arm allocated a fresh one at each call).
+    let mut probe = JoinProbeScratch::default();
     let mut batches = Vec::new();
     let mut epoch: u32 = 0;
     loop {
         epoch += 1;
         let mut new_rows = 0usize;
         for rule in &compiled {
-            let snapshot = StatementColumns::new(&store_s, &store_p, &store_o)?;
-            unify_batch_into(rule, &snapshot, chunk_size, &mut scratch, &mut matches)?;
+            // Round view: borrowed prefix (caller's columns, zero-copy)
+            // plus the owned delta tail. `SplitStore` borrows the delta
+            // buffers; pushes below extend them, so the view is rebuilt
+            // per rule (never held across a push).
+            {
+                let store = SplitStore {
+                    prefix: cols,
+                    ds: &ds,
+                    dp: &dp,
+                    do_: &do_,
+                };
+                unify_batch_probe_view(
+                    rule,
+                    &store,
+                    chunk_size,
+                    &mut scratch,
+                    &mut matches,
+                    &mut probe,
+                )?;
+            }
             let batch = projector.project(rule, epoch as u64, &matches)?;
             for i in 0..batch.rows.len() {
                 let t = (batch.rows.s[i], batch.rows.p[i], batch.rows.o[i]);
                 if seen.insert(t) {
-                    store_s.push(t.0);
-                    store_p.push(t.1);
-                    store_o.push(t.2);
+                    ds.push(t.0);
+                    dp.push(t.1);
+                    do_.push(t.2);
                     new_rows += 1;
                 }
             }
@@ -1384,7 +1621,6 @@ pub fn unify_to_fixpoint_opt(
 // binary's single Counting allocator must stay the one counting substrate.
 pub(crate) mod tests {
     use super::*;
-    use std::collections::BTreeSet;
 
     // --- Wave-1 ABI courts (kept verbatim) --------------------------------
 
@@ -1542,10 +1778,10 @@ pub(crate) mod tests {
         s: &[u64],
         p: &[u64],
         o: &[u64],
-        binding: &mut HashMap<u8, u64>,
+        binding: &mut BTreeMap<u8, u64>,
         out: &mut Vec<(u64, u64, u64)>,
     ) {
-        fn resolve(w: u64, binding: &HashMap<u8, u64>) -> Option<u64> {
+        fn resolve(w: u64, binding: &BTreeMap<u8, u64>) -> Option<u64> {
             if w >> 56 == SIG_VAR {
                 binding.get(&((w & sigil::PAYLOAD_MASK) as u8)).copied()
             } else {
@@ -1558,7 +1794,7 @@ pub(crate) mod tests {
             s: &[u64],
             p: &[u64],
             o: &[u64],
-            binding: &mut HashMap<u8, u64>,
+            binding: &mut BTreeMap<u8, u64>,
             out: &mut Vec<(u64, u64, u64)>,
         ) {
             if ai == rule.body.len() {
@@ -1632,7 +1868,7 @@ pub(crate) mod tests {
             let mut grew = false;
             for (ri, rule) in rules.iter().enumerate() {
                 let mut out = Vec::new();
-                let mut binding = HashMap::new();
+                let mut binding = BTreeMap::new();
                 naive_match_rule(rule, &vs, &vp, &vo, &mut binding, &mut out);
                 for row in out {
                     if closure.insert(row) {
@@ -1939,7 +2175,7 @@ pub(crate) mod tests {
         // Occurs-check reference: the naive oracle's independent matcher
         // derives exactly the same two rows, same order (M12-8 semantics).
         let mut out = Vec::new();
-        let mut binding = HashMap::new();
+        let mut binding = BTreeMap::new();
         naive_match_rule(&rule, &s, &p, &o, &mut binding, &mut out);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0], (cw(7), cw(100), cw(1)));
@@ -2203,7 +2439,7 @@ pub(crate) mod tests {
                 let batches =
                     unify_to_fixpoint_opt(&c.rules, &cols, DEFAULT_MAX_ROUNDS, chunk).unwrap();
                 let mut emitted: BTreeSet<(u64, u64, u64)> = BTreeSet::new();
-                let mut rule_ids: HashSet<u32> = HashSet::new();
+                let mut rule_ids: BTreeSet<u32> = BTreeSet::new();
                 for b in &batches {
                     rule_ids.insert(b.rule_id);
                     for i in 0..b.rows.len() {
@@ -2446,6 +2682,13 @@ pub(crate) mod tests {
         let projector = ConsequentProjector::new();
         let mut scratch = EvalScratch::default();
         let mut out = MatchSet::default();
+        // FA3 radix-default flip: lease the probe so the L3 radix tables
+        // (bucket_head/next_chain/key_set/mask_s/cand caches) are warmed
+        // by the passes below and the measured window stays zero-alloc.
+        // A fresh-per-call probe (`unify_batch_into`) would rebuild them
+        // inside the measured window by design.
+        let mut probe = JoinProbeScratch::default();
+        debug_assert!(probe.radix, "leased probe must default to radix");
         let mut rows = crate::project::DeltaRows::default();
         let mut canon = Vec::new();
 
@@ -2458,7 +2701,15 @@ pub(crate) mod tests {
         let mut reference: Vec<([u8; 32], Vec<(u64, u64, u64, u16)>)> = Vec::new();
         for _pass in 0..2 {
             for c in &compiled {
-                unify_batch_into(c, &cols, DEFAULT_CHUNK_ROWS, &mut scratch, &mut out).unwrap();
+                unify_batch_probe(
+                    c,
+                    &cols,
+                    DEFAULT_CHUNK_ROWS,
+                    &mut scratch,
+                    &mut out,
+                    &mut probe,
+                )
+                .unwrap();
                 let (d, _) = projector
                     .emit_into(c, 1, &out, &mut rows, &mut canon)
                     .unwrap();
@@ -2483,7 +2734,15 @@ pub(crate) mod tests {
         let mut capture_delta = 0usize;
         for (k, c) in compiled.iter().enumerate() {
             let before = current_allocs();
-            unify_batch_into(c, &cols, DEFAULT_CHUNK_ROWS, &mut scratch, &mut out).unwrap();
+            unify_batch_probe(
+                c,
+                &cols,
+                DEFAULT_CHUNK_ROWS,
+                &mut scratch,
+                &mut out,
+                &mut probe,
+            )
+            .unwrap();
             scan_delta += current_allocs() - before;
 
             let before = current_allocs();

@@ -122,8 +122,39 @@ impl<const CAP: usize, const BYTES: usize> PresenceMask<CAP, BYTES> {
     /// Popcount of present rows (never counts padding bits: they are
     /// structurally kept clear by [`Self::ALL_VALID`]/[`Self::EMPTY`]
     /// plus the `i < CAP` guards).
+    ///
+    /// Word-wise SWAR form (lane H11): the storage is word-padded by
+    /// construction — `mask_bytes` (:42-49) returns `ceil(cap/64)*8`,
+    /// a multiple of 8 — so the byte-fold into `u64` words covers the
+    /// whole buffer with no tail byte. Byte-exactness vs the per-byte
+    /// form is pinned by [`Self::count_per_byte_oracle`] and the
+    /// differential court below.
     #[must_use]
     pub const fn count(&self) -> usize {
+        let mut n = 0usize;
+        let mut w = 0;
+        while w < BYTES / 8 {
+            // Const-friendly byte fold; LLVM lowers this to a word
+            // load, then one `count_ones` per word (loop eliminated).
+            let mut word = 0u64;
+            let mut b = 0;
+            while b < 8 {
+                word |= (self.bits[w * 8 + b] as u64) << (b * 8);
+                b += 1;
+            }
+            n += word.count_ones() as usize;
+            w += 1;
+        }
+        n
+    }
+
+    /// Byte-exactness oracle (lane H11): the pre-change per-byte
+    /// popcount, retained verbatim. `count() == count_per_byte_oracle()`
+    /// must hold for every mask state; the differential court asserts
+    /// it over exhaustive small masks and randomized large ones.
+    #[must_use]
+    #[doc(hidden)]
+    pub const fn count_per_byte_oracle(&self) -> usize {
         let mut n = 0;
         let mut b = 0;
         while b < Self::MASK_BYTES {

@@ -31,7 +31,7 @@ use cgap_bn3::unify::{
 };
 use divan::counter::ItemsCount;
 use divan::{black_box, Bencher};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Canonical corpus seed (charter Method discipline, verbatim).
 const CANONICAL_SEED: u64 = 0xBF58_476D_1CE4_E5B9;

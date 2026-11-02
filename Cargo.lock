@@ -54,8 +54,15 @@ version = "26.11.2"
 dependencies = [
  "cgap-arrow 26.11.2",
  "cgap-blake3 26.11.2",
+ "cgap-bn3",
+ "cgap-branchless",
+ "cgap-core",
+ "cgap-ffi",
+ "cgap-gate",
  "cgap-git 26.11.2",
+ "cgap-p28",
  "cgap-parquet 26.11.2",
+ "cgap-storage",
 ]
 
 [[package]]
@@ -117,6 +124,10 @@ dependencies = [
 
 [[package]]
 name = "cgap-bosym"
+version = "26.11.2"
+
+[[package]]
+name = "cgap-branchless"
 version = "26.11.2"
 
 [[package]]
@@ -184,6 +195,9 @@ dependencies = [
 [[package]]
 name = "cgap-gate"
 version = "26.11.2"
+dependencies = [
+ "cgap-branchless",
+]
 
 [[package]]
 name = "cgap-git"
@@ -196,6 +210,7 @@ name = "cgap-git"
 version = "26.11.2"
 dependencies = [
  "cgap-blake3 26.11.2",
+ "cgap-bn3",
  "cgap-parquet 26.11.2",
 ]
 

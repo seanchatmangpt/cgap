@@ -206,7 +206,7 @@ mod tests {
             let max_lane = (1u32 << w) - 1;
             let absent = 1u32 << w; // out of lane domain -> cannot match
             for &n in &SIZES {
-                let src = gen_src(n, (64 / w as usize));
+                let src = gen_src(n, 64 / w as usize);
                 let lanes = unpack_ref(unpack, &src, n);
                 let mut needles: Vec<u32> = vec![0, max_lane, absent]; // min, max, absent
                 if n > 0 {
@@ -249,7 +249,7 @@ mod tests {
             (W4, unpack_4bit as UnpackFn, unpack_4bit_filtered as FusedFn),
             (W8, unpack_8bit as UnpackFn, unpack_8bit_filtered as FusedFn),
         ] {
-            let src = gen_src(65, (64 / w as usize));
+            let src = gen_src(65, 64 / w as usize);
             let lanes = unpack_ref(unpack, &src, 65);
             let needle = lanes[64] as u32; // the lone tail lane's value
             let mut fused_out = vec![0xAAu64; 65];

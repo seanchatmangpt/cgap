@@ -427,10 +427,9 @@ fn digest_arm<const ROWS: usize>(b: Bencher) {
     })
     .expect("setup write_slab");
     let sealed = w.seal(Some(&att)).expect("setup seal");
-    let block_len = sealed.bytes().len();
-    let digest = *sealed.digest();
+    let _block_len = sealed.bytes().len();
+    let _digest = *sealed.digest();
     let block: Box<[u8]> = sealed.bytes().to_vec().into_boxed_slice();
-    drop(sealed);
 
     b.bench(|| {
         let checksum = cgap_parquet::footer::fnv1a64(black_box(&block));
@@ -467,7 +466,6 @@ fn flush_arm<const ROWS: usize>(b: Bencher) {
     let sealed = w.seal(Some(&att)).expect("setup seal");
     let block_len = sealed.bytes().len();
     let block: Box<[u8]> = sealed.bytes().to_vec().into_boxed_slice();
-    drop(sealed);
     let mem = vec![0u8; BLOCK_CAP].into_boxed_slice();
 
     // Setup gate: one flush commits block_len bytes into the window.

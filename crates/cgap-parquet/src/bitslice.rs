@@ -891,7 +891,7 @@ mod tests {
                 }
             }
             best
-        };
+        }
 
         let single = time(|| {
             scan_range_vertical(black_box(&packed_a), w, lo, hi, black_box(&mut mask));

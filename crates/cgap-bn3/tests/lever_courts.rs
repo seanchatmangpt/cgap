@@ -208,7 +208,7 @@ fn l3_antivacuity_probe_drop_flips() {
 
 use cgap_bn3::noalloc::{NaEngine, NaError, NaMatches, NA_MAX_ROWS};
 use cgap_bn3::unify::{
-    emit_join_masks, unify_batch_probe, CompiledRule, EvalScratch, JoinProbeScratch,
+    emit_join_masks, unify_batch_probe, EvalScratch, JoinProbeScratch,
 };
 
 

@@ -47,8 +47,7 @@ use crate::rle::{write_varint, ParquetError};
 use crate::thrift::{
     ctype, encoding, page_type, read_binary, read_field_header, read_i32, read_i64,
     read_page_header, read_varint, skip_value, write_binary_field, write_field_header,
-    write_i32_field, write_i64_field, DataPageHeaderV2,
-    PageHeader, ThriftError,
+    write_i32_field, write_i64_field, DataPageHeaderV2, PageHeader, ThriftError,
 };
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -97,16 +96,7 @@ impl Mmap {
         // SAFETY: `fd` is a valid open descriptor; `len > 0`; read-only
         // MAP_PRIVATE mapping of a regular file at offset 0. Failure comes
         // back as MAP_FAILED (sentinel) and maps to a typed error.
-        let ptr = unsafe {
-            mmap(
-                core::ptr::null_mut(),
-                len,
-                PROT_READ,
-                MAP_PRIVATE,
-                fd,
-                0,
-            )
-        };
+        let ptr = unsafe { mmap(core::ptr::null_mut(), len, PROT_READ, MAP_PRIVATE, fd, 0) };
         if ptr as usize == usize::MAX || ptr.is_null() {
             return Err(ScanError::Io);
         }
@@ -297,11 +287,53 @@ pub struct ColumnDesc {
     pub width: usize,
 }
 
-/// One row group: the cached offset its DataPageV2 starts at, and rows.
+/// Fixed-width 64-bit min/max column statistics (parquet.thrift
+/// `Statistics.min_value`/`max_value`, field ids 5/6), decoded as bit
+/// patterns: i64/u64/f64-as-bits columns all compare by their PLAIN 8-byte
+/// representation, matching the scan's bit-pattern value accessors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds {
+    pub min: u64,
+    pub max: u64,
+}
+
+/// One row group: the cached offset its DataPageV2 starts at, rows, and
+/// the per-column fixed-width statistics bounds when the footer carries
+/// them (`None` for columns without stats — such row groups are never
+/// pruned).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowGroupEntry {
     pub page_offset: u64,
     pub num_rows: usize,
+    /// Per-column-chunk bounds, index-aligned with `FileMeta.columns`.
+    /// Empty when the footer carries no statistics at all.
+    pub bounds: Vec<Option<Bounds>>,
+}
+
+impl RowGroupEntry {
+    /// Whole-row-group pruning: true when the predicate range
+    /// `[pred.0, pred.1]` (bit-pattern ordering) lies entirely outside the
+    /// column's `[min, max]` bounds, so no value in this row group can
+    /// match and the group's pages can be skipped unread. Trust policy,
+    /// stated fully: (1) absent bounds for `col` are never pruned (fail
+    /// open to a full scan — missing statistics must not change results,
+    /// only cost); (2) present-and-valid bounds (`min <= max` in bit-pattern
+    /// order, enforced at parse time in [`read_statistics`]) prune;
+    /// (3) present-but-invalid bounds (inverted `min > max`) were rejected
+    /// at parse time and surface here as `None` — also never pruned. A
+    /// corrupt bounds struct must degrade to "no information", never to a
+    /// pruned row group that silently drops matching rows.
+    ///
+    /// Ordering is bit-pattern (`u64`), which is safe by construction: the
+    /// type system admits only `u32`/`u64`/`bytes32` columns
+    /// ([`PhysType::from_id`] refuses FLOAT/DOUBLE, ids 3/4), and the scan's
+    /// value accessors compare the same PLAIN bit patterns.
+    pub fn rg_prunes(&self, col: usize, pred: (u64, u64)) -> bool {
+        match self.bounds.get(col).copied().flatten() {
+            Some(b) => pred.0 > b.max || pred.1 < b.min,
+            None => false,
+        }
+    }
 }
 
 /// Cached footer index: parsed once at open, never on the scan path.
@@ -336,6 +368,10 @@ mod fid {
     pub const CC_META_DATA: i16 = 3;
     // ColumnMetaData
     pub const CMD_DATA_PAGE_OFFSET: i16 = 9;
+    pub const CMD_STATISTICS: i16 = 12;
+    // Statistics
+    pub const ST_MAX_VALUE: i16 = 5;
+    pub const ST_MIN_VALUE: i16 = 6;
 }
 
 /// Compact-protocol list header: `size << 4 | elem_type` when
@@ -372,9 +408,7 @@ fn each_field(
     mut on_field: impl FnMut(i16, u8, &mut usize) -> Result<bool, ScanError>,
 ) -> Result<(), ScanError> {
     let mut prev = 0i16;
-    while let Some((id, ty)) =
-        read_field_header(src, pos, prev).map_err(ScanError::Thrift)?
-    {
+    while let Some((id, ty)) = read_field_header(src, pos, prev).map_err(ScanError::Thrift)? {
         prev = id;
         if on_field(id, ty, pos)? {
             skip_value(src, pos, ty, 0).map_err(ScanError::Thrift)?;
@@ -391,40 +425,38 @@ pub fn parse_footer(meta: &[u8]) -> Result<FileMeta, ScanError> {
     let mut num_rows: Option<i64> = None;
     let mut row_groups: Vec<RowGroupEntry> = Vec::new();
 
-    each_field(meta, &mut pos, |id, ty, pos| {
-        match (id, ty) {
-            (fid::FMD_VERSION, ctype::I32) => {
-                version = Some(read_i32(meta, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            (fid::FMD_SCHEMA, ctype::LIST) => {
-                let (n, elem) = read_list_header(meta, pos).map_err(ScanError::Thrift)?;
-                if elem != ctype::STRUCT || n == 0 {
-                    return Err(ScanError::MalformedFooter);
-                }
-                for i in 0..n {
-                    if let Some(desc) = read_schema_element(meta, pos, i == 0)? {
-                        columns.push(desc);
-                    }
-                }
-                Ok(false)
-            }
-            (fid::FMD_NUM_ROWS, ctype::I64) => {
-                num_rows = Some(read_i64(meta, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            (fid::FMD_ROW_GROUPS, ctype::LIST) => {
-                let (n, elem) = read_list_header(meta, pos).map_err(ScanError::Thrift)?;
-                if elem != ctype::STRUCT {
-                    return Err(ScanError::MalformedFooter);
-                }
-                for _ in 0..n {
-                    row_groups.push(read_row_group(meta, pos)?);
-                }
-                Ok(false)
-            }
-            _ => Ok(true),
+    each_field(meta, &mut pos, |id, ty, pos| match (id, ty) {
+        (fid::FMD_VERSION, ctype::I32) => {
+            version = Some(read_i32(meta, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
         }
+        (fid::FMD_SCHEMA, ctype::LIST) => {
+            let (n, elem) = read_list_header(meta, pos).map_err(ScanError::Thrift)?;
+            if elem != ctype::STRUCT || n == 0 {
+                return Err(ScanError::MalformedFooter);
+            }
+            for i in 0..n {
+                if let Some(desc) = read_schema_element(meta, pos, i == 0)? {
+                    columns.push(desc);
+                }
+            }
+            Ok(false)
+        }
+        (fid::FMD_NUM_ROWS, ctype::I64) => {
+            num_rows = Some(read_i64(meta, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
+        }
+        (fid::FMD_ROW_GROUPS, ctype::LIST) => {
+            let (n, elem) = read_list_header(meta, pos).map_err(ScanError::Thrift)?;
+            if elem != ctype::STRUCT {
+                return Err(ScanError::MalformedFooter);
+            }
+            for _ in 0..n {
+                row_groups.push(read_row_group(meta, pos)?);
+            }
+            Ok(false)
+        }
+        _ => Ok(true),
     })?;
 
     if version.is_none() || num_rows.is_none() || columns.is_empty() {
@@ -433,7 +465,11 @@ pub fn parse_footer(meta: &[u8]) -> Result<FileMeta, ScanError> {
     if row_groups.is_empty() {
         return Err(ScanError::MalformedFooter);
     }
-    Ok(FileMeta { num_rows: num_rows.expect("checked"), columns, row_groups })
+    Ok(FileMeta {
+        num_rows: num_rows.expect("checked"),
+        columns,
+        row_groups,
+    })
 }
 
 /// One `SchemaElement`. Returns `Ok(None)` for the root struct.
@@ -447,31 +483,29 @@ fn read_schema_element(
     let mut rep: Option<i32> = None;
     let mut name: Option<String> = None;
     let mut num_children: Option<i32> = None;
-    each_field(src, pos, |id, t, pos| {
-        match (id, t) {
-            (fid::SE_TYPE, ctype::I32) => {
-                ty = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            (fid::SE_TYPE_LENGTH, ctype::I32) => {
-                ty_len = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            (fid::SE_REPETITION, ctype::I32) => {
-                rep = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            (fid::SE_NAME, ctype::BINARY) => {
-                let raw = read_binary(src, pos).map_err(ScanError::Thrift)?;
-                name = Some(String::from_utf8_lossy(raw).into_owned());
-                Ok(false)
-            }
-            (fid::SE_NUM_CHILDREN, ctype::I32) => {
-                num_children = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
-                Ok(false)
-            }
-            _ => Ok(true),
+    each_field(src, pos, |id, t, pos| match (id, t) {
+        (fid::SE_TYPE, ctype::I32) => {
+            ty = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
         }
+        (fid::SE_TYPE_LENGTH, ctype::I32) => {
+            ty_len = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
+        }
+        (fid::SE_REPETITION, ctype::I32) => {
+            rep = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
+        }
+        (fid::SE_NAME, ctype::BINARY) => {
+            let raw = read_binary(src, pos).map_err(ScanError::Thrift)?;
+            name = Some(String::from_utf8_lossy(raw).into_owned());
+            Ok(false)
+        }
+        (fid::SE_NUM_CHILDREN, ctype::I32) => {
+            num_children = Some(read_i32(src, pos).map_err(ScanError::Thrift)?);
+            Ok(false)
+        }
+        _ => Ok(true),
     })?;
     if is_root {
         // Root must be the flat struct: children present, no physical type.
@@ -494,10 +528,13 @@ fn read_schema_element(
     }))
 }
 
-/// Parse one `RowGroup`: all column chunks must agree on one page offset.
+/// Parse one `RowGroup`: all column chunks must agree on one page offset;
+/// per-column fixed-width statistics bounds are collected index-aligned
+/// with the schema columns.
 fn read_row_group(src: &[u8], pos: &mut usize) -> Result<RowGroupEntry, ScanError> {
     let mut page_offset: Option<u64> = None;
     let mut num_rows: Option<usize> = None;
+    let mut bounds: Vec<Option<Bounds>> = Vec::new();
     each_field(src, pos, |id, ty, pos| {
         match (id, ty) {
             (fid::RG_COLUMNS, ctype::LIST) => {
@@ -506,7 +543,8 @@ fn read_row_group(src: &[u8], pos: &mut usize) -> Result<RowGroupEntry, ScanErro
                     return Err(ScanError::MalformedFooter);
                 }
                 for _ in 0..n {
-                    let off = read_column_chunk(src, pos)?;
+                    let (off, b) = read_column_chunk(src, pos)?;
+                    bounds.push(b);
                     match page_offset {
                         Some(prev) if prev != off => {
                             // Every column of the group shares one page.
@@ -520,47 +558,118 @@ fn read_row_group(src: &[u8], pos: &mut usize) -> Result<RowGroupEntry, ScanErro
             }
             (fid::RG_NUM_ROWS, ctype::I64) => {
                 let v = read_i64(src, pos).map_err(ScanError::Thrift)?;
-                num_rows =
-                    Some(usize::try_from(v).map_err(|_| ScanError::SchemaOverflow)?);
+                num_rows = Some(usize::try_from(v).map_err(|_| ScanError::SchemaOverflow)?);
                 Ok(false)
             }
             _ => Ok(true),
         }
     })?;
     match (page_offset, num_rows) {
-        (Some(o), Some(n)) => Ok(RowGroupEntry { page_offset: o, num_rows: n }),
+        (Some(o), Some(n)) => Ok(RowGroupEntry {
+            page_offset: o,
+            num_rows: n,
+            bounds,
+        }),
         _ => Err(ScanError::MalformedFooter),
     }
 }
 
-/// Parse one `ColumnChunk` -> its `data_page_offset` (the shared page).
-fn read_column_chunk(src: &[u8], pos: &mut usize) -> Result<u64, ScanError> {
+/// Parse one `ColumnChunk` -> its `data_page_offset` plus the
+/// fixed-width statistics bounds when the footer carries them.
+fn read_column_chunk(src: &[u8], pos: &mut usize) -> Result<(u64, Option<Bounds>), ScanError> {
     let mut page_offset: Option<u64> = None;
+    let mut bounds: Option<Bounds> = None;
     each_field(src, pos, |id, ty, pos| {
         if (id, ty) == (fid::CC_META_DATA, ctype::STRUCT) {
-            page_offset = Some(read_column_meta_data(src, pos)?);
+            let (off, b) = read_column_meta_data(src, pos)?;
+            page_offset = Some(off);
+            bounds = b;
             Ok(false)
         } else {
             Ok(true)
         }
     })?;
-    page_offset.ok_or(ScanError::MalformedFooter)
+    match page_offset {
+        Some(o) => Ok((o, bounds)),
+        None => Err(ScanError::MalformedFooter),
+    }
 }
 
-/// Parse one `ColumnMetaData`: only `data_page_offset` is load-bearing.
-fn read_column_meta_data(src: &[u8], pos: &mut usize) -> Result<u64, ScanError> {
+/// Parse one `ColumnMetaData`: `data_page_offset` is load-bearing; the
+/// `statistics` struct (field 12) contributes fixed-width `min_value`/
+/// `max_value` bounds when both are present and exactly 8 bytes wide
+/// (PLAIN little-endian i64/u64/f64-as-bits). Anything else — absent,
+/// partial, variable-width — leaves `None`: bounds are advisory, so a
+/// stats shape outside the projection fails open to an unpruned scan,
+/// never to a wrong result.
+fn read_column_meta_data(src: &[u8], pos: &mut usize) -> Result<(u64, Option<Bounds>), ScanError> {
     let mut page_offset: Option<u64> = None;
-    each_field(src, pos, |id, ty, pos| {
-        if (id, ty) == (fid::CMD_DATA_PAGE_OFFSET, ctype::I64) {
+    let mut stats: Option<Bounds> = None;
+    each_field(src, pos, |id, ty, pos| match (id, ty) {
+        (fid::CMD_DATA_PAGE_OFFSET, ctype::I64) => {
             let v = read_i64(src, pos).map_err(ScanError::Thrift)?;
             let v = u64::try_from(v).map_err(|_| ScanError::FooterOverflow)?;
             page_offset = Some(v);
             Ok(false)
-        } else {
-            Ok(true)
         }
+        (fid::CMD_STATISTICS, ctype::STRUCT) => {
+            stats = read_statistics(src, pos)?;
+            Ok(false)
+        }
+        _ => Ok(true),
     })?;
-    page_offset.ok_or(ScanError::MalformedFooter)
+    match page_offset {
+        Some(o) => Ok((o, stats)),
+        None => Err(ScanError::MalformedFooter),
+    }
+}
+
+/// Parse one `Statistics` struct into `Bounds`, admitting only the
+/// fixed-width, internally-consistent case: both `max_value` (field 5) and
+/// `min_value` (field 6) present as 8-byte PLAIN bit patterns AND
+/// `min <= max` in bit-pattern order. Partial, wrong-width, or inverted
+/// (`min > max`) statistics yield `None` (fail open: the bounds are
+/// untrusted, so the row group is never pruned), never a misparse and
+/// never a silent wrong result downstream.
+fn read_statistics(src: &[u8], pos: &mut usize) -> Result<Option<Bounds>, ScanError> {
+    let mut min: Option<[u8; 8]> = None;
+    let mut max: Option<[u8; 8]> = None;
+    each_field(src, pos, |id, ty, pos| match (id, ty) {
+        (fid::ST_MAX_VALUE, ctype::BINARY) => {
+            let raw = read_binary(src, pos).map_err(ScanError::Thrift)?;
+            if let Ok(b) = <[u8; 8]>::try_from(raw) {
+                max = Some(b);
+            }
+            Ok(false)
+        }
+        (fid::ST_MIN_VALUE, ctype::BINARY) => {
+            let raw = read_binary(src, pos).map_err(ScanError::Thrift)?;
+            if let Ok(b) = <[u8; 8]>::try_from(raw) {
+                min = Some(b);
+            }
+            Ok(false)
+        }
+        _ => Ok(true),
+    })?;
+    Ok(match (min, max) {
+        (Some(lo), Some(hi)) => {
+            let lo = u64::from_le_bytes(lo);
+            let hi = u64::from_le_bytes(hi);
+            // Present-but-corrupt guard: inverted bounds (min > max in
+            // bit-pattern order) mark the statistics UNTRUSTED — treat them
+            // like absent statistics and fail open to an unpruned scan.
+            // Pruning on inverted bounds silently drops matching rows
+            // (Ok(empty)), a wrong result. Bit-pattern order is safe here:
+            // the type system admits only u64/u32/bytes32 columns
+            // (`PhysType::from_id` refuses FLOAT/DOUBLE).
+            if lo > hi {
+                None
+            } else {
+                Some(Bounds { min: lo, max: hi })
+            }
+        }
+        _ => None,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +686,10 @@ pub struct ParquetFile {
     /// and the Hook 1/2 checks run at most once per column, not per value.
     /// Errors are never cached — a refused column stays refused loudly.
     resolved: core::cell::RefCell<Vec<Vec<Option<(usize, usize)>>>>,
+    /// Observable for the pruning courts: how many Thrift page headers
+    /// have actually been parsed (one per (row_group, column) resolve).
+    /// A pruned row group resolves nothing, so the counter does not move.
+    pages_parsed: core::cell::Cell<u64>,
 }
 
 impl ParquetFile {
@@ -586,10 +699,13 @@ impl ParquetFile {
         let file = std::fs::File::open(path).map_err(|_| ScanError::Io)?;
         let map = Mmap::open(&file)?;
         let meta = parse_footer_of_file(map.as_slice())?;
-        let resolved = core::cell::RefCell::new(
-            alloc::vec![Vec::new(); meta.row_groups.len()],
-        );
-        Ok(ParquetFile { map, meta, resolved })
+        let resolved = core::cell::RefCell::new(alloc::vec![Vec::new(); meta.row_groups.len()]);
+        Ok(ParquetFile {
+            map,
+            meta,
+            resolved,
+            pages_parsed: core::cell::Cell::new(0),
+        })
     }
 
     /// The cached footer index.
@@ -630,9 +746,7 @@ impl ParquetFile {
         let resolved = self.resolve_uncached(rg, col)?;
         // Grow the per-row-group lane to fit `col`; store the bounds.
         let mut cache = self.resolved.borrow_mut();
-        let lane = cache
-            .get_mut(rg)
-            .ok_or(ScanError::OffsetMismatch)?;
+        let lane = cache.get_mut(rg).ok_or(ScanError::OffsetMismatch)?;
         if lane.len() <= col {
             lane.resize(col + 1, None);
         }
@@ -644,19 +758,23 @@ impl ParquetFile {
     /// arithmetic, exactly as `column_bytes` ran before the cache existed.
     fn resolve_uncached(&self, rg: usize, col: usize) -> Result<(usize, usize), ScanError> {
         let bytes = self.map.as_slice();
-        let entry =
-            self.meta.row_groups.get(rg).ok_or(ScanError::OffsetMismatch)?;
-        let desc = self.meta.columns.get(col).ok_or(ScanError::OffsetMismatch)?;
+        let entry = self
+            .meta
+            .row_groups
+            .get(rg)
+            .ok_or(ScanError::OffsetMismatch)?;
+        let desc = self
+            .meta
+            .columns
+            .get(col)
+            .ok_or(ScanError::OffsetMismatch)?;
         let page = page_slice(bytes, entry.page_offset)?;
-        let (header, header_len) =
-            read_page_header(page).map_err(ScanError::Thrift)?;
+        let (header, header_len) = read_page_header(page).map_err(ScanError::Thrift)?;
         check_page_shape(&header)?;
         let rows = entry.num_rows;
         let plen = payload_len(&self.meta.columns, rows)?;
         // Hook 2: payload length must equal rows * sum(widths).
-        if header.compressed_page_size < 0
-            || header.compressed_page_size as usize != plen
-        {
+        if header.compressed_page_size < 0 || header.compressed_page_size as usize != plen {
             return Err(ScanError::OffsetMismatch);
         }
         let _body = page
@@ -681,7 +799,42 @@ impl ParquetFile {
         {
             return Err(ScanError::OffsetMismatch);
         }
+        self.pages_parsed.set(self.pages_parsed.get() + 1);
         Ok((abs, col_len))
+    }
+
+    /// Pages (Thrift page headers) actually parsed since open. A row group
+    /// skipped by `rg_prunes` resolves no pages, so this observable proves
+    /// the skip happened without instrumenting I/O.
+    pub fn pages_parsed(&self) -> u64 {
+        self.pages_parsed.get()
+    }
+
+    /// Predicate-driven scan over a `u64`-width column: every row group
+    /// whose bounds fall entirely outside the predicate range `[lo, hi]`
+    /// is skipped whole (no page header parsed, no bytes touched); the
+    /// surviving row groups are scanned value by value and matching rows
+    /// are returned in `(row_group, row)` coordinates. Missing bounds
+    /// never prune — the results equal a full scan by construction.
+    pub fn scan_u64_pred(
+        &self,
+        col: usize,
+        pred: (u64, u64),
+    ) -> Result<Vec<(usize, usize, u64)>, ScanError> {
+        let mut hits = Vec::new();
+        for rg in 0..self.meta.row_groups.len() {
+            if self.meta.row_groups[rg].rg_prunes(col, pred) {
+                continue; // whole row group skipped: no resolve, no page read
+            }
+            let rows = self.meta.row_groups[rg].num_rows;
+            for row in 0..rows {
+                let v = self.value_u64(rg, col, row)?;
+                if v >= pred.0 && v <= pred.1 {
+                    hits.push((rg, row, v));
+                }
+            }
+        }
+        Ok(hits)
     }
 
     /// Zero-copy slice of column `col`'s payload in row group `rg`.
@@ -815,10 +968,7 @@ fn check_page_shape(header: &PageHeader) -> Result<&DataPageHeaderV2, ScanError>
 /// Footer extraction from the whole file: trailing `PAR1`, 4-byte LE meta
 /// length, meta region, leading `PAR1`.
 fn parse_footer_of_file(bytes: &[u8]) -> Result<FileMeta, ScanError> {
-    if bytes.len() < 16
-        || &bytes[..4] != b"PAR1"
-        || &bytes[bytes.len() - 4..] != b"PAR1"
-    {
+    if bytes.len() < 16 || &bytes[..4] != b"PAR1" || &bytes[bytes.len() - 4..] != b"PAR1" {
         return Err(ScanError::MalformedFooter);
     }
     let tail = &bytes[bytes.len() - 8..bytes.len() - 4];
@@ -872,6 +1022,22 @@ fn to_level_free(phys: PhysType) -> Option<crate::level_free::LevelFreeType> {
 /// `columns.len() > 1`. The footer has no level_free counterpart at all
 /// (no RowGroup/FileMetaData writer exists there), so it remains here.
 pub fn write_fixture_file(columns: &[FixtureColumn], num_rows: usize) -> Vec<u8> {
+    write_fixture_file_with_bounds(columns, num_rows, &[])
+}
+
+/// Build a whole level-free file with per-column fixed-width statistics
+/// bounds written into each column chunk's `ColumnMetaData.statistics`
+/// (parquet.thrift field 12; `min_value`/`max_value` as 8-byte PLAIN
+/// little-endian bit patterns). `bounds` is index-aligned with `columns`;
+/// shorter slices and `None` entries omit the statistics struct — exactly
+/// the byte shape a footer stripped of bounds has. This is the writer-side
+/// mutation seam for the pruning court: the pruned and un-pruned variants
+/// differ only in the footer's statistics fields.
+pub fn write_fixture_file_with_bounds(
+    columns: &[FixtureColumn],
+    num_rows: usize,
+    bounds: &[Option<Bounds>],
+) -> Vec<u8> {
     let mut payload = Vec::new();
     for c in columns {
         assert_eq!(c.bytes.len(), num_rows * c.phys.width(), "column width");
@@ -885,7 +1051,7 @@ pub fn write_fixture_file(columns: &[FixtureColumn], num_rows: usize) -> Vec<u8>
         },
         _ => fixture_page(columns, num_rows, &payload),
     };
-    assemble_file(columns, num_rows, &page)
+    assemble_file(columns, num_rows, &page, bounds)
 }
 
 /// The internal multi-column page writer: DataPageV2 header + the
@@ -915,11 +1081,15 @@ fn fixture_page(columns: &[FixtureColumn], num_rows: usize, payload: &[u8]) -> V
 }
 
 /// The footer `RowGroup` struct: one ColumnChunk whose ColumnMetaData
-/// points every column at the shared page at `chunk_start`.
+/// points every column at the shared page at `chunk_start`. When
+/// `bounds[0]` is `Some`, the chunk carries a `Statistics` struct
+/// (field 12) with `min_value`/`max_value` as 8-byte PLAIN LE bit
+/// patterns — the byte shape a footer with fixed-width stats has.
 fn fixture_row_group(
     columns: &[FixtureColumn],
     num_rows: usize,
     page_len: usize,
+    bounds: &[Option<Bounds>],
 ) -> Vec<u8> {
     let chunk_start: i64 = 4; // right after "PAR1"
     let mut md = Vec::new();
@@ -928,6 +1098,14 @@ fn fixture_row_group(
     write_i64_field(&mut md, 6, 5, page_len as i64);
     write_i64_field(&mut md, 7, 6, page_len as i64);
     write_i64_field(&mut md, 9, 7, chunk_start);
+    if let Some(b) = bounds.first().copied().flatten() {
+        let mut st = Vec::new();
+        write_binary_field(&mut st, 5, 0, &b.max.to_le_bytes());
+        write_binary_field(&mut st, 6, 5, &b.min.to_le_bytes());
+        st.push(ctype::STOP);
+        write_field_header(&mut md, 12, 9, ctype::STRUCT);
+        md.extend_from_slice(&st);
+    }
     md.push(ctype::STOP);
     let mut cc = Vec::new();
     write_i64_field(&mut cc, 2, 0, chunk_start);
@@ -946,7 +1124,12 @@ fn fixture_row_group(
 
 /// Wrap a finished page region into the whole `PAR1`-framed file:
 /// `[PAR1 | page | FileMetaData | len(u32 LE) | PAR1]`.
-fn assemble_file(columns: &[FixtureColumn], num_rows: usize, page: &[u8]) -> Vec<u8> {
+fn assemble_file(
+    columns: &[FixtureColumn],
+    num_rows: usize,
+    page: &[u8],
+    bounds: &[Option<Bounds>],
+) -> Vec<u8> {
     // SchemaElement list (root + leaves).
     let mut root = Vec::new();
     write_binary_field(&mut root, 4, 0, b"schema");
@@ -969,7 +1152,7 @@ fn assemble_file(columns: &[FixtureColumn], num_rows: usize, page: &[u8]) -> Vec
         e.push(ctype::STOP);
         schema_wire.extend_from_slice(&e);
     }
-    let rg = fixture_row_group(columns, num_rows, page.len());
+    let rg = fixture_row_group(columns, num_rows, page.len(), bounds);
 
     let mut fmd = Vec::new();
     write_i32_field(&mut fmd, 1, 0, 1); // version
@@ -1020,7 +1203,12 @@ mod tests {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0);
             let mut p = std::env::temp_dir();
-            p.push(format!("cgap_scan_{}_{}_{}", name, std::process::id(), nanos));
+            p.push(format!(
+                "cgap_scan_{}_{}_{}",
+                name,
+                std::process::id(),
+                nanos
+            ));
             fs::write(&p, bytes).expect("write fixture");
             TempFile { path: p }
         }
@@ -1049,13 +1237,23 @@ mod tests {
     /// Fixture: a = u32, b = u64, c = FLBA(32). 64 rows.
     fn corpus() -> (Vec<FixtureColumn>, usize, Vec<u32>, Vec<u64>) {
         let rows = 64;
-        let a: Vec<u32> = (0..rows as u32).map(|i| i.wrapping_mul(0x9E37_79B9)).collect();
+        let a: Vec<u32> = (0..rows as u32)
+            .map(|i| i.wrapping_mul(0x9E37_79B9))
+            .collect();
         let b: Vec<u64> = (0..rows as u64)
             .map(|i| i.wrapping_mul(0xC2B2_AE3D_27D4_4EBF))
             .collect();
         let cols = vec![
-            FixtureColumn { name: "a".into(), phys: PhysType::U32, bytes: u32_bytes(&a) },
-            FixtureColumn { name: "b".into(), phys: PhysType::U64, bytes: u64_bytes(&b) },
+            FixtureColumn {
+                name: "a".into(),
+                phys: PhysType::U32,
+                bytes: u32_bytes(&a),
+            },
+            FixtureColumn {
+                name: "b".into(),
+                phys: PhysType::U64,
+                bytes: u64_bytes(&b),
+            },
             FixtureColumn {
                 name: "c".into(),
                 phys: PhysType::Flba(32),
@@ -1064,8 +1262,6 @@ mod tests {
         ];
         (cols, rows, a, b)
     }
-
-
 
     #[test]
     fn round_trip_byte_equality() {
@@ -1083,10 +1279,7 @@ mod tests {
         // Hook 2: byte equality — the PLAIN payload IS the corpus.
         assert_eq!(pf.column_bytes(0, 0).expect("a"), &u32_bytes(&a)[..]);
         assert_eq!(pf.column_bytes(0, 1).expect("b"), &u64_bytes(&b)[..]);
-        assert_eq!(
-            pf.column_bytes(0, 2).expect("c"),
-            &flba_bytes(rows, 32)[..]
-        );
+        assert_eq!(pf.column_bytes(0, 2).expect("c"), &flba_bytes(rows, 32)[..]);
     }
 
     #[test]
@@ -1153,10 +1346,12 @@ mod tests {
         }
         // Typed accessors refuse the wrong column type (slice length vs
         // width mismatch makes the bounded get fail).
-        assert!(pf.value_u64(0, 0, rows - 1).is_err() || {
-            // u32 column sliced as u64 at last row: offset past end.
-            pf.value_u64(0, 0, rows).is_err()
-        });
+        assert!(
+            pf.value_u64(0, 0, rows - 1).is_err() || {
+                // u32 column sliced as u64 at last row: offset past end.
+                pf.value_u64(0, 0, rows).is_err()
+            }
+        );
         assert!(pf.value_flba(0, 0, 0, 32).is_err());
         assert!(pf.value_flba(0, 2, 0, 31).is_err());
         // Row out of range refused.
@@ -1171,14 +1366,16 @@ mod tests {
         // the read must refuse loudly (Hook 1), locate no payload.
         let (cols, rows, _, _) = corpus();
         let file = write_fixture_file(&cols, rows);
-        let (header, header_len) =
-            crate::thrift::read_page_header(&file[4..]).expect("header");
+        let (header, header_len) = crate::thrift::read_page_header(&file[4..]).expect("header");
         let mut v2 = header.data_page_header_v2.clone().expect("v2");
         v2.definition_levels_byte_length = 1;
         let mut poisoned = Vec::new();
         crate::thrift::write_page_header(
             &mut poisoned,
-            &PageHeader { data_page_header_v2: Some(v2), ..header.clone() },
+            &PageHeader {
+                data_page_header_v2: Some(v2),
+                ..header.clone()
+            },
         );
         let mut out = Vec::with_capacity(file.len() + poisoned.len());
         out.extend_from_slice(&file[..4]);
@@ -1224,10 +1421,7 @@ mod tests {
         );
         // usize::try_from succeeds on 64-bit; the checked_add overflows ->
         // typed mismatch either way, never a bad slice.
-        assert_eq!(
-            page_slice(&file, u64::MAX),
-            Err(ScanError::OffsetMismatch)
-        );
+        assert_eq!(page_slice(&file, u64::MAX), Err(ScanError::OffsetMismatch));
         // The lawful offset resolves.
         assert!(page_slice(&file, 4).is_ok());
 

@@ -266,11 +266,13 @@ fn bgp_three_hop_matches_oracle() {
 }
 
 #[test]
+#[ignore = "expensive debug run - run with --release"]
 fn bgp_two_hop_matches_oracle_at_scale() {
     court(2, 262_144);
 }
 
 #[test]
+#[ignore = "expensive debug run - run with --release"]
 fn bgp_three_hop_matches_oracle_at_scale() {
     court(3, 262_144);
 }

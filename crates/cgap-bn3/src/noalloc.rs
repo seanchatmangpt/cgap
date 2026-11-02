@@ -461,10 +461,18 @@ fn na_unify_inner(
             &mut n_fresh,
         ) {
             push_match(
-                &mut engine.cur_rows, &mut engine.cur_vars, &mut engine.cur_len,
-                &engine.nxt_rows, &engine.nxt_vars,
-                rule.atom_count, rule.var_count, usize::MAX,
-                i as u32, usize::MAX, &fresh, n_fresh,
+                &mut engine.cur_rows,
+                &mut engine.cur_vars,
+                &mut engine.cur_len,
+                &engine.nxt_rows,
+                &engine.nxt_vars,
+                rule.atom_count,
+                rule.var_count,
+                usize::MAX,
+                i as u32,
+                usize::MAX,
+                &fresh,
+                n_fresh,
             )?;
         }
     }
@@ -513,23 +521,39 @@ fn na_unify_inner(
                 for k in starts[b]..fill[b] {
                     let j = engine.radix_rows[k as usize] as usize;
                     if !atom_local_match(
-                        rule, &rule.atoms[ai], cols, j,
-                        &engine.bound, &mut fresh, &mut n_fresh,
+                        rule,
+                        &rule.atoms[ai],
+                        cols,
+                        j,
+                        &engine.bound,
+                        &mut fresh,
+                        &mut n_fresh,
                     ) {
                         continue;
                     }
                     let mut ok = MASK_ALL;
                     for &(si, vidx) in &bound_slots[..bound_slots_n] {
-                        ok &= lane_eq_mask(col(cols, si as usize)[j], engine.cur_vars[m][vidx as usize]);
+                        ok &= lane_eq_mask(
+                            col(cols, si as usize)[j],
+                            engine.cur_vars[m][vidx as usize],
+                        );
                     }
                     if ok != MASK_ALL {
                         continue;
                     }
                     push_match(
-                        &mut engine.nxt_rows, &mut engine.nxt_vars, &mut engine.nxt_len,
-                        &engine.cur_rows, &engine.cur_vars,
-                        rule.atom_count, rule.var_count, m,
-                        j as u32, ai, &fresh, n_fresh,
+                        &mut engine.nxt_rows,
+                        &mut engine.nxt_vars,
+                        &mut engine.nxt_len,
+                        &engine.cur_rows,
+                        &engine.cur_vars,
+                        rule.atom_count,
+                        rule.var_count,
+                        m,
+                        j as u32,
+                        ai,
+                        &fresh,
+                        n_fresh,
                     )?;
                 }
             }
@@ -537,22 +561,39 @@ fn na_unify_inner(
             for m in 0..engine.cur_len {
                 for j in 0..cols.len() {
                     if !atom_local_match(
-                        rule, &rule.atoms[ai], cols, j,
-                        &engine.bound, &mut fresh, &mut n_fresh,
+                        rule,
+                        &rule.atoms[ai],
+                        cols,
+                        j,
+                        &engine.bound,
+                        &mut fresh,
+                        &mut n_fresh,
                     ) {
                         continue;
                     }
                     let mut ok = MASK_ALL;
                     for &(si, vidx) in &bound_slots[..bound_slots_n] {
-                        ok &= lane_eq_mask(col(cols, si as usize)[j], engine.cur_vars[m][vidx as usize]);
+                        ok &= lane_eq_mask(
+                            col(cols, si as usize)[j],
+                            engine.cur_vars[m][vidx as usize],
+                        );
                     }
                     if ok != MASK_ALL {
                         continue;
                     }
                     push_match(
-                        &mut engine.nxt_rows, &mut engine.nxt_vars, &mut engine.nxt_len,                        &engine.cur_rows, &engine.cur_vars,
-                        rule.atom_count, rule.var_count, m,
-                        j as u32, ai, &fresh, n_fresh,
+                        &mut engine.nxt_rows,
+                        &mut engine.nxt_vars,
+                        &mut engine.nxt_len,
+                        &engine.cur_rows,
+                        &engine.cur_vars,
+                        rule.atom_count,
+                        rule.var_count,
+                        m,
+                        j as u32,
+                        ai,
+                        &fresh,
+                        n_fresh,
                     )?;
                 }
             }
@@ -576,8 +617,8 @@ fn na_unify_inner(
 #[cfg(test)]
 mod courts {
     use super::*;
-    use crate::unify::{BodyAtom, RuleCompiler};
     use crate::unify::tests::current_allocs;
+    use crate::unify::{BodyAtom, RuleCompiler};
 
     const SEED: u64 = 0xBF58_476D_1CE4_E5B9;
 
@@ -645,7 +686,11 @@ mod courts {
             } else {
                 // 10% P2: keeps the join rule's match count well inside
                 // NA_MAX_MATCHES (selectivity knob, documented).
-                let pred = if lcg(&mut st) % 10 == 0 { cw(200) } else { cw(100) };
+                let pred = if lcg(&mut st) % 10 == 0 {
+                    cw(200)
+                } else {
+                    cw(100)
+                };
                 p.push(pred);
                 o.push(cw(1 + lcg(&mut st) % 200));
             }
@@ -673,7 +718,11 @@ mod courts {
         for rule in &rules {
             let alloc_rule = RuleCompiler::compile(rule).unwrap();
             let na_rule = na_compile(rule).unwrap();
-            assert_eq!(alloc_rule.var_count, na_rule.var_count, "rule {}", rule.rule_id);
+            assert_eq!(
+                alloc_rule.var_count, na_rule.var_count,
+                "rule {}",
+                rule.rule_id
+            );
             for idx in 0..na_rule.var_count {
                 let (fa, fs) = na_rule.var_first[idx];
                 assert_eq!(
@@ -686,7 +735,11 @@ mod courts {
             for chunk in [4096usize, 1] {
                 let want = crate::unify::unify_batch(&alloc_rule, &cols, chunk).unwrap();
                 na_unify(&na_rule, &cols, &mut engine, &mut out).unwrap();
-                assert_eq!(want.len, out.len, "rule {} chunk {chunk} match count", rule.rule_id);
+                assert_eq!(
+                    want.len, out.len,
+                    "rule {} chunk {chunk} match count",
+                    rule.rule_id
+                );
                 for m in 0..out.len {
                     for a in 0..na_rule.atom_count {
                         assert_eq!(
@@ -742,7 +795,6 @@ mod courts {
         assert_eq!(out.var_value(1, 1), cw(2));
     }
 
-
     /// Positive control (anti-vacuity): the counting-allocator counter
     /// MUST move for a fresh `Vec` inside the same measurement window —
     /// a zero-alloc court whose counter cannot leave zero is measuring
@@ -753,7 +805,10 @@ mod courts {
         let before = current_allocs();
         let probe: Vec<u8> = (0..64u8).collect();
         let delta = current_allocs() - before;
-        assert!(delta >= 1, "counter read {delta} allocs for a fresh Vec — vacuous");
+        assert!(
+            delta >= 1,
+            "counter read {delta} allocs for a fresh Vec — vacuous"
+        );
         assert_eq!(probe.len(), 64);
     }
 
@@ -820,7 +875,10 @@ mod courts {
             body: vec![BodyAtom::new((0x02u64 << 56) | 5, cw(100), vw(11))],
             head: [vw(11), cw(100), vw(11)],
         };
-        assert_eq!(na_compile(&bad_sigil), Err(NaError::UnsupportedTermSigil(0x02)));
+        assert_eq!(
+            na_compile(&bad_sigil),
+            Err(NaError::UnsupportedTermSigil(0x02))
+        );
         let fref_p = Rule {
             rule_id: 1,
             body: vec![BodyAtom::new(vw(10), (0x03u64 << 56) | 7, vw(11))],
@@ -901,7 +959,10 @@ mod courts {
         let na = na_compile(&rule).unwrap();
         let mut engine = boxed_zeroed::<NaEngine>();
         let mut out = boxed_zeroed::<NaMatches>();
-        assert_eq!(na_unify(&na, &cols, &mut engine, &mut out), Err(NaError::MatchCapacity));
+        assert_eq!(
+            na_unify(&na, &cols, &mut engine, &mut out),
+            Err(NaError::MatchCapacity)
+        );
     }
 
     /// Corpus determinism court: same seed, identical rows.
