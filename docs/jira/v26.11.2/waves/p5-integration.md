@@ -29,9 +29,10 @@ error. p4-terminus census (00:0x) predates this integration.
 
 ## Defect ledger standing (re-read from p4-terminus Table 2)
 
-- D1 blake3 NEON UB: FIXED in tree; repair version 26.11.3 owed on
-  publish lift. NOT re-flipped this session (flip receipts of
-  p1-blake3 stand).
+- D1 blake3 NEON UB: FIXED in tree; repair publish owed on lift
+  (version UNDECIDED — lane receipts propose 26.11.3; no operator
+  order exists on the version). NOT re-flipped this session (flip
+  receipts of p1-blake3 stand).
 - D2 arrow stale generated_version: CLOSED-LOCAL — on-disk
   crates/cgap-arrow/src/generated_version.rs reads 26.11.2 (re-read
   this session); only the published 26.11.2 tarball is stale. Publish-scope.
@@ -46,7 +47,8 @@ error. p4-terminus census (00:0x) predates this integration.
   wrong-repo "avec" prose replaced with cgap-context prose; channel
   unchanged (floating nightly); landed in a9827591.
 - D8 cgap-ffi publish dep skew, D9 wasm-footprint host-link: OPEN,
-  publish-scope (needs parquet/arrow 26.11.3 tier on lift).
+  publish-scope (need parquet/arrow repair publishes on lift; version
+  UNDECIDED by operator).
 
 ## Commits (coordinator-owned git transitions)
 
@@ -61,8 +63,9 @@ Working tree 0 dirty after. No rebase, no force-push.
 ## Publish freeze (retained)
 
 FROZEN at 26.11.1: audit, cloud, ffi, fibo, gpu, wasm-footprint;
-ABSENT: cgap-integration (first publish owed). Repair tier 26.11.3 owed
-on lift: blake3 (D1), arrow (D2), then ffi (D8) after parquet. Registry
+ABSENT: cgap-integration (first publish owed). Repair publishes owed
+on lift: blake3 (D1), arrow (D2), then ffi (D8) after parquet;
+versioning of that tier UNDECIDED by operator. Registry
 sweep (GOAL-LOOP terminal) remains BLOCKED on lift.
 
 ## Standing
