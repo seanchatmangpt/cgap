@@ -100,3 +100,13 @@ table.
 - v2-13-commit-manifest.md
 - v2-14-loop.md
 - w1-06-handoff-completion.md (this lane's receipt)
+
+## 4. p5-integration addendum (2026-11-02, post-crash finish)
+
+Operator order: finish everything except publishes. Wave landed as
+commits a9827591 (source) + docs + 603726a4 (ggen projections); tree
+0 dirty; workspace build 0, cgap-court 14/14, boundary --strings/--deps
+exit 0, zero_string_gate + self-check exit 0. D7 closed; D2/D8/D9
+publish-scope OPEN; D4/D5/D6 OPEN as typed. Publishes FROZEN. Receipt:
+waves/p5-integration.md. Loop terminal condition (registry sweep exit 0)
+BLOCKED on operator publish lift.
