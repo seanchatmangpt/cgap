@@ -51,6 +51,10 @@ courts:
     @echo "== court 3/3: cfg_homology --mutant =="
     bash scripts/cfg_homology.sh --mutant
 
+# LSPA-6: LSP tier-2 aarch64 wire court + AE4 disasm court (staleness-guarded)
+branchless:
+    python3 scripts/verify_lsp_branchless.py
+
 # Newest 20 receipts + Standing tally (STANDING template row excluded by case)
 receipts:
     @ls -lt docs/jira/v26.10.31/receipts/ | head -20
@@ -68,3 +72,22 @@ dod:
 # Portfolio status bin (bin owned by wave-10 lane 11; fails until landed)
 status:
     cargo run -q --manifest-path crates/cli/Cargo.toml --bin status
+
+# Lease janitor: scan /tmp for lane build-root leases (DX-3); dry-run default,
+# `just leases --clean` deletes orphaned leases only (grammar fail-closed).
+leases:
+    python3 scripts/lease_janitor.py
+
+# DX-1: per-lane doctor checks (stale-server, orphan leases, workspace count, dirty census).
+
+# DX-1: per-lane doctor checks (stale-server, orphan leases, workspace count, dirty census).
+# Exit model as `doctor`: 0 GREEN / 1 any-WARN informational / 2 RED.
+doctor-agents:
+    @python3 scripts/doctor_agent_lanes.py; rc=$?; if [ $rc -eq 2 ]; then exit 2; fi; exit $rc
+
+# DX-8: per-target test census (compile-abort vs real-FAIL classification).
+# Usage: just census [ARGS="--crate cgap-git,cgap-parquet"]. Exit 1 only on real FAILs;
+# COMPILE-ABORT prints LOUD-PENDING and exits 0 unless ARGS includes --strict.
+export CENSUS_ARGS := ''
+census:
+    python3 scripts/test_census.py {{CENSUS_ARGS}}

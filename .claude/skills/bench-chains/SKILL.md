@@ -7,13 +7,35 @@ description: >-
   docs/jira/v26.11.2/02-pareto-levers.md.
 ---
 
-# Bench chains (five staged end-to-end benches)
+# Bench chains (staged end-to-end benches)
 
-Five `[[bench]]` targets in `crates/bench/Cargo.toml` (lines 79-97):
-chains-ingress, chains-parquet, chains-bn3, chains-seal, chains-sovereign.
-Each is one seeded corpus fed through a real pipeline with per-stage
-checksum/identity asserts; each names its anti-vacuity mutations in its
-header comment. Harness = false (divan), pin `divan = "=0.1.21"`.
+## Leg inventory (v26.11.2)
+
+- `chains-*` five staged end-to-end benches: chains-ingress,
+  chains-parquet, chains-bn3, chains-seal, chains-sovereign. Each is one
+  seeded corpus fed through a real pipeline with per-stage
+  checksum/identity asserts; each names its anti-vacuity mutations in its
+  header comment. Harness = false (divan), pin `divan = "=0.1.21"`.
+- `mat_closure` — materialized closure facts/s/core bench (G3-MAT-BENCH;
+  receipt w5-g3-mat-closure.md; in-bench fence: derived count strictly
+  greater than `mutant_base_only_count` every bucket).
+- `dred_churn` — SWAR retraction churn + entropy sweep (W4-K1/G4-DRED;
+  receipt w5-g4-dred-churn.md; courts a/b/c in header).
+- `closure_ladder` — post-C3 ladder leg inside chains-bn3
+  (chains-bn3.rs `closure_ladder`, hop-count ladder over the BN3 arena).
+- `closure` — prior-campaign closure bench (retained, not deleted).
+
+## Fences
+
+- DREDP fence (dred_churn + dred.rs flatness court): RELATIVE ratio fence
+  only — ENTROPY_VARIANCE max/min ns/lane < 4.0. The gate text's absolute
+  "< 0.15 ns" does not lawfully bind (disclosed reconciliation in the
+  dred_churn.rs header); absolute ns/lane spread is printed
+  informationally, never alone.
+- cpk_study gate: `cargo run -p bench --bin cpk_study` — 6-sigma
+  capability study over the lever distributions, C_pk >= 1.67, exit 1
+  fail-closed (repair-13-cpk-study.md; gate math vs display literal
+  divergence disclosed there).
 
 ## Run
 

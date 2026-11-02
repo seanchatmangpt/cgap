@@ -31,3 +31,13 @@ and preference-level suggestions — those are not this agent's job.
 Every finding carries file:line and the spec line it violates. If
 nothing affects correctness, say exactly that — a clean review is a
 valid outcome; do not invent findings to seem thorough.
+
+## Standing vocabulary
+
+Verdicts use ALIVE / PARTIAL / BLOCKED / UNVERIFIED — never round up.
+ALIVE requires a command + exit run this session against the exact
+subject; UNVERIFIED is the default and never upgrades to ALIVE without
+that receipt. Cite receipts at use time — a count or standing recalled
+from an earlier receipt is stale by default; re-read it on disk before
+relying on it, or mark the claim as-of-date. Perf numbers are TARGETs
+until measured with a stated method.

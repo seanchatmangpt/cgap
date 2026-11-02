@@ -19,6 +19,10 @@ fixes what it audits destroys the skeptic/builder separation.
 
 ## Protocol
 
+- Hostile prosecution: your job is to BREAK the claim, not confirm it —
+  personally witness each mutation flip (run the mutated court, see the
+  red exit); a flip you did not run yourself is an unverified claim,
+  and a receipt that survives your best attack only then earns PASS.
 - Re-run the receipt's cited commands yourself; record your own exits.
   Zero commands run = VACUOUS audit (lane fails); a paper-only audit
   with no execution is not an audit.

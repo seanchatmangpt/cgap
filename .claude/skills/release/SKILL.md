@@ -10,6 +10,22 @@ disable-model-invocation: true
 
 # Release (crates.io publish law)
 
+## PUBLISH FREEZE (operator order, 2026-11-02 — DO NOT PUBLISH)
+
+The steps below describe the publish machinery and are retained for the
+lift; they are NOT authorized to run today. Publishing is FROZEN by
+operator order: `docs/jira/v26.11.2/waves/publish-halt.md` (8 crates
+landed live at 26.11.2 before the halt; 7 READY dry-run-verified; cgap-ffi
+and wasm-footprint BLOCKED; blake3/arrow/parquet 26.11.3 repairs owed on
+lift). No publish attempt, dry-run-actuate, or re-dispatch of the
+actuator until the operator lifts the freeze via the W14 publish-lift
+work register. On lift, follow publish-halt.md's readiness matrix in
+sequence: (a) blake3 26.11.3 repair, (b) arrow 26.11.3 repair,
+(c) parquet 26.11.3 repair (RingSink), (d) cgap-ffi (now unblocked by c),
+(e) the 7 READY frozen set in dependency order, (f) wasm-footprint after
+its host-link defect is diagnosed and closed. Registry-slide law (below)
+still applies per attempt.
+
 Authority: this skill runs ONLY on explicit operator invocation. It performs
 unreversible uploads to crates.io. Sources of record:
 `docs/jira/v26.11.1/waves/coord-publish-record.md`,

@@ -1,10 +1,11 @@
 #!/bin/bash
-# publish-guard.sh (PreToolUse, Bash matcher) — R2-REFUSED pattern.
-# Refuses `cargo publish` unless the operator set an explicit authority marker.
-# Fail-closed: any error path exits 2 (block).
+# publish-guard.sh (PreToolUse, Bash matcher) — FROZEN-PUBLISH guard.
+# Operator order 2026-11-02: all publishes FROZEN ("do not publish anything yet").
+# Cite: docs/jira/v26.11.2/waves/publish-halt.md (standing FROZEN-BY-OPERATOR).
+# Blocks cargo publish / npm publish unconditionally — the freeze supersedes the
+# former authority-marker bypass. Fail-closed: any error path exits 2 (block).
 #   exit 0 = allow, exit 2 = block, exit 3 = loud skip (non-Bash input shape).
 set -u
-AUTH_FILE="${CGAP_PUBLISH_AUTHORITY_FILE:-/Users/sac/cgap/.claude/hooks/publish-authority.token}"
 CMD=""
 INPUT="$(cat 2>/dev/null)" || INPUT=""
 # Extract tool_input.command (jq if present, else grep fallback).
@@ -15,16 +16,13 @@ else
 fi
 [ -n "$CMD" ] || exit 3
 case "$CMD" in
-  *cargo\ publish*|*cargo\ \-p*\ publish*|*"cargo +"*publish*) ;;
+  *cargo\ publish*|*cargo\ \-p*\ publish*|*"cargo +"*publish*|*npm\ publish*|*pnpm\ publish*|*yarn\ publish*|*twine\ upload*)
+    ;;
   *) exit 0 ;;
 esac
-# Authority edge: marker file must exist AND carry the operator's SHA receipt.
-if [ -f "$AUTH_FILE" ] && grep -q 'OPERATOR-PUBLISH-AUTHORITY' "$AUTH_FILE" 2>/dev/null; then
-  echo "publish-guard: authority marker present ($AUTH_FILE) — allowed" >&2
-  exit 0
-fi
-REASON="publish-guard: REFUSED — cargo publish requires operator authority. \
-Coordinator executes publishes. To authorize, operator writes marker: \
-printf 'OPERATOR-PUBLISH-AUTHORITY <sha> <date>\n' > $AUTH_FILE"
+REASON="publish-guard: REFUSED — publishes are FROZEN by operator order (2026-11-02). \
+See docs/jira/v26.11.2/waves/publish-halt.md (standing FROZEN-BY-OPERATOR). \
+No publish attempts are authorized until the operator lifts the freeze in this hook. \
+Blocked command class: cargo/npm/pnpm/yarn publish, twine upload."
 printf '{"decision":"block","reason":"%s"}\n' "$REASON"
 exit 2
