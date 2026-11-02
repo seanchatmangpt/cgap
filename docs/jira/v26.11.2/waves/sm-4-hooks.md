@@ -68,3 +68,17 @@ receipt exit-code/marker rows are not reproducible as written;
 fail-closed behavior itself (nonzero on bad input) is confirmed both
 sessions. Evidence source: W1-17 audit receipt (D7) and
 sm-5-audit.md hooks rows.
+
+## ERRATA (W7 census, 2026-11-02)
+
+W7 drift census (waves/w7-errata.md) re-grounded the Deliverables
+publish-guard row against the script itself
+(`.claude/hooks/publish-guard.sh`): default authority path is the
+REPO-LOCAL `/Users/sac/cgap/.claude/hooks/publish-authority.token`
+(:7), not `~/.claude/hooks/...`; absent-command / empty-CMD input is a
+loud-skip EXIT 3 (:16), not exit 2 (exit 2 is the block path, :30).
+Three receipt rows non-reproducible as written: (a) "default
+`~/.claude/hooks/publish-authority.token`", (b) "parse error/absent
+command exits 2", (c) the Court-evidence exit codes relying on (b).
+Consistent with the pre-existing W2-19/D7 addendum above; fail-closed
+(nonzero-on-bad-input) remains confirmed.

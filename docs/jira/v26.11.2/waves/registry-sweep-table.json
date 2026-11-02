@@ -1,23 +1,11 @@
 {
  "missing": 1,
  "registered_divergences": [
-  "cgap",
-  "cgap-arrow",
   "cgap-audit",
-  "cgap-bn3",
-  "cgap-bont",
-  "cgap-bosym",
   "cgap-cloud",
-  "cgap-core",
-  "cgap-crypto",
   "cgap-ffi",
   "cgap-fibo",
-  "cgap-gate",
-  "cgap-git",
-  "cgap-gpu",
-  "cgap-p28",
-  "cgap-parquet",
-  "cgap-storage"
+  "cgap-gpu"
  ],
  "rows": [
   {
@@ -28,27 +16,27 @@
    "registry_state": "DELISTED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:99",
    "crate": "cgap",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 2,
+    "max_version": "26.11.2",
+    "num_versions": 3,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:14",
    "crate": "cgap-arrow",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 2,
+    "max_version": "26.11.2",
+    "num_versions": 3,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
@@ -87,43 +75,48 @@
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-bn3",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-bont",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-bosym",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
+  },
+  {
+   "cell": "MISSING",
+   "crate": "cgap-branchless",
+   "reason": "no-ledger-row"
   },
   {
    "cell": "PASS",
@@ -146,14 +139,14 @@
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-core",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
@@ -166,14 +159,14 @@
    "registry_state": "DELISTED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-crypto",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
@@ -205,27 +198,27 @@
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-gate",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:18",
    "crate": "cgap-git",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 2,
+    "max_version": "26.11.2",
+    "num_versions": 3,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
@@ -254,48 +247,43 @@
    "registry_state": "UNPUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
+   "cell": "PASS",
    "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
    "crate": "cgap-p28",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
-    "yanked": false
-   },
-   "registry_state": "PUBLISHED"
-  },
-  {
-   "cell": "REGISTERED-DIVERGENCE",
-   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:20",
-   "crate": "cgap-parquet",
-   "local_version": "26.11.2",
-   "registry_detail": {
-    "http": 200,
-    "max_version": "26.11.1",
+    "max_version": "26.11.2",
     "num_versions": 2,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "REGISTERED-DIVERGENCE",
-   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
-   "crate": "cgap-storage",
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.1/waves/coord-publish-record.md:20",
+   "crate": "cgap-parquet",
    "local_version": "26.11.2",
    "registry_detail": {
     "http": 200,
-    "max_version": "26.11.1",
-    "num_versions": 1,
+    "max_version": "26.11.2",
+    "num_versions": 3,
     "yanked": false
    },
    "registry_state": "PUBLISHED"
   },
   {
-   "cell": "MISSING",
-   "crate": "stardf-datalog",
-   "reason": "no-ledger-row"
+   "cell": "PASS",
+   "court_pointer": "docs/jira/v26.11.2/waves/v2-07-census.md:101",
+   "crate": "cgap-storage",
+   "local_version": "26.11.2",
+   "registry_detail": {
+    "http": 200,
+    "max_version": "26.11.2",
+    "num_versions": 2,
+    "yanked": false
+   },
+   "registry_state": "PUBLISHED"
   }
  ],
  "ua": "cgap-registry-sweep/26.11.2"

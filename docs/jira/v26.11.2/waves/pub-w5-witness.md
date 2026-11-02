@@ -20,3 +20,13 @@ PENDING — poll running (background task b3v7q0s3p).
 ```json
 {"lane":"PUB-W5","status":"PENDING","window":{"start":"2026-11-02T07:25:18Z","interval_s":60,"deadline_min":120}}
 ```
+
+## ERRATA (W7 census, 2026-11-02)
+
+W7 drift census (waves/w7-errata.md): this receipt carries ZERO
+witnessed command+exit blocks — baseline table and poll status record
+claims with no command line or exit code; the poll itself terminated
+PENDING with no observed outcome recorded. Per the p4-terminus Table 4
+metagate standard (waves/p4-terminus.md:65-82), VACUOUS-class as
+written; all rows here are UNVERIFIED. Successor witness must embed
+actual curl commands + exits per read, and a terminal observed state.

@@ -272,3 +272,19 @@ Failure of automated tools to detect Institutional Entity status or capture the 
 *Declared, sealed, and cryptographically pinned across the AVEC Substrate.*
 
 `urn:avec:license:p28-sil:v2.1.0-sovereign`
+
+
+---
+
+## ERRATA RIDER (2026-11-02, TC-08 / cull-08)
+
+Section 1.5 (line 69): the statutory restatement of the Chatman
+Invariant embeds "(mod Sigma_PQC)". That term is INVENTED LORE with
+zero code referent (cgapprd-02-equation-grounding.md:47-57, v26.11.2
+audit of record). Legal text is not silently edited; this dated rider
+qualifies the statutory restatement: the invariant's landed trace is
+the three typed commit trailers (`lease-phi`, `lease-delta`,
+`lease-receipt`) with fail-closed tag verification (BLAKE3 classical);
+the PQC seal remains an unbuilt Wave-3 seam
+(cgapprd-02-equation-grounding.md:70-81). Clause 1.5 retained verbatim
+above; where the clause and this rider diverge, the rider governs.

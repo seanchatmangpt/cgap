@@ -99,3 +99,74 @@ Perf claims in this receipt: none — census only, no timing ran.
 ## JSON footer
 
 {"lane":"p2-asm","files_written":["docs/jira/v26.11.2/waves/p2-asm-0blr-census.md"],"commands":[{"cmd":"cargo build --release -p cgap-bn3 -p cgap-arrow -p cgap-storage -p cgap-gate -p cgap-p28","exit":1,"note":"bont excluded; 5 crates ok"},{"cmd":"cargo build --release -p cgap-bont","exit":0},{"cmd":"cargo rustc --release -- --emit asm x6 crates","exit":0},{"cmd":"cargo test --release -p cgap-p28 --no-run","exit":0},{"cmd":"objdump -d p28 test binary + python census","exit":0}],"courts_run":[],"standing":"PARTIAL","divergences":[{"region":"bn3 unify_to_fixpoint_opt","finding":"CRITICAL: 1 in-region blr x8 at bn3 .s line 10230 (LBB68_43), std RandomState::new TLS once-init inlined from std"},{"region":"cgap-storage anti-join","finding":"MISSING: no anti-join kernel exists; cell loudly missing"},{"region":"clean","finding":"bn3 semi-join callers, bont shacl_mask::brute_force, arrow ipc::emit/read/seal_meta, gate ingress(+inlined prefilter8), p28 fused_row monomorphization, storage closure cells: 0 blr / 0 br xN / 0 brk"}]}
+
+
+---
+
+## Addendum (lane D6, 2026-11-02) — post-D5 re-census + storage closure/dred census
+
+Method of record re-run (w3-t2-asm-census.md:23-29), fresh
+`CARGO_TARGET_DIR=/tmp/d6-target` asm this session.
+
+### bn3 post-D5-fix (FixpointHasher landed: unify.rs:105, seed 0xBF58_476D_1CE4_E5B9, use :1379)
+
+| Region | blr | br xN | brk | vs p2 |
+|---|---|---|---|---|
+| unify::unify_to_fixpoint_opt (1143 ln) | **0** | 0 | 0 | p2 CRITICAL blr=1 CLOSED (flip witnessed) |
+| unify::unify_to_fixpoint (6 ln thunk) | 0 | 0 | 0 | unchanged |
+| unify::emit_join_masks | 0 | 0 | 0 | unchanged |
+| unify::bucket_candidates | 0 | 0 | 0 | unchanged |
+| unify::unify_batch_probe | 0 | 0 | 0 | unchanged |
+
+New typed remainder (not in p2's named set): `unify::RuleCompiler::compile`
+(std RandomState TLS once-init blr, asm .s 3990-3994; source unify.rs:1672/1979
+`HashMap::new()`) + hashbrown `rehash_in_place` blr x21 (std internal). Whole-file
+blr=2. 22 RandomState lines remain, all direct `bl` targets.
+
+### storage (same census pass)
+
+| Region | blr | br xN | brk | note |
+|---|---|---|---|---|
+| closure::semi_naive_closure (624 ln) | **1** | 0 | 0 | DIVERGES from p2 (p2: 0) — std RandomState TLS once-init, closure.rs:39 HashSet::new() |
+| closure::naive_closure (445 ln) | 0 | 0 | 0 | unchanged |
+| closure::mutant_base_only_count | 1 | 0 | 0 | same std once-init class (adjacent, p2 said 0) |
+| closure::SeenSet::new / default | 1/1 | 0 | 0 | same std once-init class |
+| dred::retract / retract_inverted / retract_unchecked / oracle_surviving / compact_lanes | 0 | 0 | 0 | all clean |
+| anti-join kernel | — | — | — | still MISSING (grep -rli anti_join = 0 hits, exit 1) |
+
+Verdict: bn3 unify hot path 7/7 clean post-D5 (CRITICAL closed, flip witnessed);
+typed remainder = std RandomState once-init blr at unify.rs:1672/1979 +
+closure.rs:39 (D5-style static-seeded hasher is the known fix pattern).
+Full receipt: `w5-asm-census-repair.md`.
+
+## Addendum (lane BN3D, 2026-11-02) — post-W10 re-census: whole-file CLEAN, standing ALIVE
+
+Method of record re-run (w3-t2-asm-census.md:23-29), fresh
+`CARGO_TARGET_DIR=/tmp/bn3d-target cargo rustc -p cgap-bn3 --release -- --emit asm`
+this session, exit 0; artifact
+`/tmp/bn3d-target/release/build/cgap-bn3/72306c3797b03464/out/cgap_bn3-72306c3797b03464.s`.
+Same python symbol-bounded census (symbol-prefix region bounds, `\bblr\b` /
+`\bbr x` / `\bbrk\b` / `\bbl\s` line regexes).
+
+| Region | lines | blr | br xN | brk | bl | vs prior |
+|---|---|---|---|---|---|---|
+| unify::unify_to_fixpoint_opt | 1565 | **0** | 0 | 0 | 76 | stays clean |
+| unify::RuleCompiler::compile | 432 | **0** | 0 | 0 | 23 | D6 typed remainder CLOSED |
+| unify::emit_join_masks | 493 | 0 | 0 | 0 | 15 | stays clean |
+| unify::bucket_candidates | 127 | 0 | 0 | 0 | 6 | stays clean |
+| unify::unify_batch_probe | 3870 | 0 | 0 | 0 | 139 | stays clean |
+| unify::unify_to_fixpoint | tail-call `b`, no standalone region | — | — | — | — | thunk, no blr reachable from its 2 refs |
+
+Whole-file blr=0, TLVP/TLVPPAGE=0 (grep -c, both 0). The D6 typed remainder
+(std RandomState TLS once-init `blr` in `RuleCompiler::compile`, asm .s
+3990-3994; + hashbrown `rehash_in_place` blr x21) is GONE — W10 closed the
+source (unify.rs HashMap/RandomState now 0 hits; grep exits 1; seen-set +
+const/var index are alloc BTreeSet/BTreeMap). W10's receipt-level blr claim is
+now VERIFIED by fresh asm, not receipt-hearsay.
+
+Standing flip: bn3 unify regions ALIVE-CLEAN (was PARTIAL on the compile
+remainder + the storage closure RandomState cells, which are OUT of this
+lane's scope — those storage cells remain as recorded, un-re-censused here).
+`cargo test -p cgap-bn3` exit 0: 119 + 2 + 7 = 128 passed, 0 failed, 2
+ignored (pre-existing bgp_hop_courts), run this session after the doc-only
+unify.rs edits — doc changes did not perturb the gate.

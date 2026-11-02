@@ -8,6 +8,6 @@
 | bgp_equi_join | `crates/cgap-bn3/src/unify.rs:786` | k-hop BGP chain join reduced to mask-AND composition over SoA columns (emit_join_masks) | crates/cgap-bn3/tests/bgp_hop_courts.rs (p1-bgp) |
 | dred_antijoin | `crates/cgap-storage/src/dred.rs:116` | retraction antijoin reduced to SWAR keep-mask AND-NOT over derived-dep bitplanes | waves/p1-dred-retraction-antijoin.md court_retraction_matches_oracle |
 | radix_semijoin | `crates/cgap-bn3/src/unify.rs:690-750` | bound-key semi-join reduced to radix-bucketed probe with caller-leased scratch (JoinProbeScratch) | waves/w2-12-l3-court.md M-L3-1 |
-| shacl_mask_eval | `crates/cgap-bont/src/shacl_mask.rs:128` | SHACL shape evaluation reduced to bitmask mask-plan over SlotId columns (vs brute_force oracle) | shacl_mask.rs:301 in-src differential court; cargo test -p cgap-bont --lib exit 0 (p3-pack witnessed) |
+| shacl_mask_eval | `crates/cgap-bont/src/shacl_mask.rs:128` | SHACL shape evaluation reduced to bitmask mask-plan over SlotId columns (vs brute_force oracle) | waves/p1-shacl-columnar-mask-kernels.md M1+M2 sandbox mutation flips |
 | state_lineage | `crates/cgap-git/src/dag.rs:1048` | state lineage reduced to BLAKE3 merkle-root chain proof over DAG commit blocks | waves/p1-lineage-workflow.md tamper courts |
 | transitive_closure | `crates/cgap-storage/src/closure.rs:94` | graph transitive closure reduced to semi-naive delta iteration over packed-hash seen-set | waves/p1-closure-closure.md court1_oracle_set_equality |

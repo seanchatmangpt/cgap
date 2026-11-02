@@ -159,3 +159,17 @@ graph semantics attached.
 {"lane":"v2-17-ard-landing","files_written":["docs/jira/v26.11.2/12-ard-prd-cgap.md"],
 "commands":["operator-authored charter landed verbatim"],"courts_run":[],
 "standing":"ALIVE","divergences":[]}
+
+
+---
+
+## ERRATA (2026-11-02, TC-08 / cull-08)
+
+Line 19 ("Delta S_admitted + Phi_lease = R_receipt (mod Sigma_PQC)")
+states "mod Sigma_PQC" as a landed conservation law. It is INVENTED
+LORE with zero code referent (cgapprd-02-equation-grounding.md:47-57);
+the landed trace is three typed commit trailers and a fail-closed
+render, BLAKE3 classical, PQC seal an unbuilt Wave-3 seam
+(cgapprd-02-equation-grounding.md:70-81). The line is retained
+unedited; this errata supersedes it (rewrite text of record:
+cgapprd-02-equation-grounding.md:66+).

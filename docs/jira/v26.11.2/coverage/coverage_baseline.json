@@ -1,0 +1,622 @@
+{
+ "lane": "C01",
+ "artifact": "reduced per-crate summary; raw export in coverage_export.json",
+ "crates": {
+  "cgap-arrow": {
+   "fn_cov": 764,
+   "fn_tot": 931,
+   "line_cov": 4104,
+   "line_tot": 4480,
+   "reg_cov": 9242,
+   "reg_tot": 10959,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvNtCsiKYuwnqUMBw_10cgap_arrow5c_abi17release_slot_swapCs2Ysa0NuUWki_8cgap_ffi",
+     "file": "cgap-arrow/src/c_abi.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCsiKYuwnqUMBw_10cgap_arrow5c_abi13release_arraylECs2Ysa0NuUWki_8cgap_ffi",
+     "file": "cgap-arrow/src/c_abi.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs2_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_5Batch3get0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs2_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_5Batch7try_new0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs2_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_5Batch7try_news_0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs4_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_12BatchBuilder10column_mut0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs4_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_12BatchBuilder3len0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvMs4_NtCsiKYuwnqUMBw_10cgap_arrow5batchNtB7_12BatchBuilder6finish0B9_",
+     "file": "cgap-arrow/src/batch.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-blake3": {
+   "fn_cov": 87,
+   "fn_tot": 89,
+   "line_cov": 837,
+   "line_tot": 904,
+   "reg_cov": 3113,
+   "reg_tot": 3283,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvCs4GEL50CBiVg_11cgap_blake319hash_many_simd_4way",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvCs4GEL50CBiVg_11cgap_blake38compress",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 1,
+     "name": "_RNvCs3BwHdrZrkJj_11cgap_blake38compress",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 7
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCs4GEL50CBiVg_11cgap_blake311multi_chunk20compress_chunks_4way",
+     "file": "cgap-blake3/src/multi_chunk.rs",
+     "regs": 7
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCs4GEL50CBiVg_11cgap_blake311multi_chunk25compress_chunks_4way_neon",
+     "file": "cgap-blake3/src/multi_chunk.rs",
+     "regs": 140
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCs4GEL50CBiVg_11cgap_blake35testss_28test_gpu_crossover_heuristic",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 13
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCs4GEL50CBiVg_11cgap_blake35testss_50test_simd_parent_reduction_parity_64_to_128_chunks",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 22
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCs4GEL50CBiVg_11cgap_blake35testss_56test_official_blake3_vectors_multi_block_and_merkle_tree",
+     "file": "cgap-blake3/src/lib.rs",
+     "regs": 30
+    }
+   ]
+  },
+  "cgap-gate": {
+   "fn_cov": 75,
+   "fn_tot": 76,
+   "line_cov": 594,
+   "line_tot": 699,
+   "reg_cov": 1092,
+   "reg_tot": 1190,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvNtNtCs42YstLIBEzq_9cgap_gate8penstock6courts13null_baseline",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 0
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCsalPnqDAbZ5U_9cgap_gate8penstock10prefilter8Cs4LWIV285TCU_12lever_courts",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 3
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtNtCs42YstLIBEzq_9cgap_gate8penstock19nostd_hygiene_court20module_body_stripped",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 5
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtNtCs42YstLIBEzq_9cgap_gate8penstock19nostd_hygiene_courts_42nostd_hygiene_module_body_has_no_std_paths",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 5
+    },
+    {
+     "count": 1,
+     "name": "_RNCNvNtNtCs42YstLIBEzq_9cgap_gate8penstock6courtss_43allocator_hook_witness_bare_call_zero_alloc0B7_",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 1
+    },
+    {
+     "count": 1,
+     "name": "_RNCNvNtNtCs42YstLIBEzq_9cgap_gate8penstock6courtss_43allocator_hook_witness_bare_call_zero_allocs0_0B7_",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 1
+    },
+    {
+     "count": 1,
+     "name": "_RNCNvNtNtCs42YstLIBEzq_9cgap_gate8penstock6courtss_43allocator_hook_witness_bare_call_zero_allocs1_0B7_",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 1
+    },
+    {
+     "count": 1,
+     "name": "_RNCNvNtNtCs42YstLIBEzq_9cgap_gate8penstock6courtss_43allocator_hook_witness_bare_call_zero_allocs2_0B7_",
+     "file": "cgap-gate/src/penstock.rs",
+     "regs": 1
+    }
+   ]
+  },
+  "cgap-branchless": {
+   "fn_cov": 115,
+   "fn_tot": 125,
+   "line_cov": 1006,
+   "line_tot": 1011,
+   "reg_cov": 2925,
+   "reg_tot": 3677,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNCNvNtCseczIvLhif7F_15cgap_branchless6select22checked_uniform_select0B5_",
+     "file": "cgap-branchless/src/select.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtCseczIvLhif7F_15cgap_branchless6select22checked_uniform_selects_0B5_",
+     "file": "cgap-branchless/src/select.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless4scan15prefix_max_u8x8",
+     "file": "cgap-branchless/src/scan.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless4scan15prefix_or_u64x8",
+     "file": "cgap-branchless/src/scan.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless4scan15swar_lt_harvest",
+     "file": "cgap-branchless/src/scan.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless4scan16prefix_and_u64x8",
+     "file": "cgap-branchless/src/scan.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless9transpose13transpose_8x8B3_",
+     "file": "cgap-branchless/src/transpose.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs68lbrfqMOdY_15cgap_branchless9transpose15transpose_64x64B3_",
+     "file": "cgap-branchless/src/transpose.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-parquet": {
+   "fn_cov": 837,
+   "fn_tot": 925,
+   "line_cov": 6772,
+   "line_tot": 7321,
+   "reg_cov": 14741,
+   "reg_tot": 16384,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNCNvNtCs8B6tsDSUbde_12cgap_parquet9byteslice17scan_eq_byteslice0B5_",
+     "file": "cgap-parquet/src/byteslice.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest5rle_wKt1_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest5rle_wKt8_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest7plain_wKt100_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest7plain_wKt10_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest7plain_wKt20_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest7plain_wKt40_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RINvNtCs8B6tsDSUbde_12cgap_parquet17compiled_manifest7plain_wKt80_EB4_",
+     "file": "cgap-parquet/src/compiled_manifest.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-p28": {
+   "fn_cov": 193,
+   "fn_tot": 241,
+   "line_cov": 1937,
+   "line_tot": 2104,
+   "reg_cov": 3422,
+   "reg_tot": 3987,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNCNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5testss_23spoliation_loader_courts_00B9_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5tests16run_loader_childs0_0B7_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5tests16run_loader_childs1_0B7_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5tests16run_loader_childs2_0B7_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5tests16run_loader_childs_0B7_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCsjq6mOKUeUQ7_8cgap_p284trap5testss_38check_returns_zero_iff_intrinsic_valid0B7_",
+     "file": "cgap-p28/src/trap.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMs4_NtCsjq6mOKUeUQ7_8cgap_p286asc450INtB5_11Asc450MeterpE13ceiling_centsB7_",
+     "file": "cgap-p28/src/asc450.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCsjq6mOKUeUQ7_8cgap_p286asc45010bytes32_eq",
+     "file": "cgap-p28/src/asc450.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-ffi": {
+   "fn_cov": 243,
+   "fn_tot": 305,
+   "line_cov": 2472,
+   "line_tot": 2831,
+   "reg_cov": 3503,
+   "reg_tot": 3856,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs2Ysa0NuUWki_8cgap_ffi9sovereign18wave_f2_p28_courtss_43verify_cdylib_symbol_table_gains_verify_p280B7_",
+     "file": "cgap-ffi/src/sovereign.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs2Ysa0NuUWki_8cgap_ffi9sovereign18wave_f2_p28_courtss_43verify_cdylib_symbol_table_gains_verify_p28s_0B7_",
+     "file": "cgap-ffi/src/sovereign.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "cgap_batch_rows",
+     "file": "cgap-ffi/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "cgap_version",
+     "file": "cgap-ffi/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtNtCs2Ysa0NuUWki_8cgap_ffi9sovereign12wave9_courts4tail",
+     "file": "cgap-ffi/src/sovereign.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtNtCs2Ysa0NuUWki_8cgap_ffi11oabi_lookup13surface_court4tail",
+     "file": "cgap-ffi/src/oabi_lookup.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNCNvNtNtCs2Ysa0NuUWki_8cgap_ffi10xip_tables9r2_courts15oabi_shape_gate0s_0B9_",
+     "file": "cgap-ffi/src/xip_tables.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs2Ysa0NuUWki_8cgap_ffi10xip_tables9r2_courts11cargo_build0B7_",
+     "file": "cgap-ffi/src/xip_tables.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-audit": {
+   "fn_cov": 0,
+   "fn_tot": 0,
+   "line_cov": 0,
+   "line_tot": 0,
+   "reg_cov": 0,
+   "reg_tot": 0,
+   "cold": []
+  },
+  "cgap-gpu": {
+   "fn_cov": 6,
+   "fn_tot": 8,
+   "line_cov": 31,
+   "line_tot": 40,
+   "reg_cov": 39,
+   "reg_tot": 49,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer12from_mmu_bufB2_",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer8is_emptyB2_",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 0
+    },
+    {
+     "count": 1,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer10raw_handleB2_",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 3
+    },
+    {
+     "count": 1,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer14from_raw_parts",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 9
+    },
+    {
+     "count": 1,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer3lenB2_",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 3
+    },
+    {
+     "count": 1,
+     "name": "_RNvMCspR2o67DNLK_8cgap_gpuNtB2_17MetalSharedBuffer8from_bufB2_",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 4
+    },
+    {
+     "count": 1,
+     "name": "_RNvXs_CspR2o67DNLK_8cgap_gpuNtB4_17MetalSharedBufferNtNtNtCs20ztldruFRR_4core3ops4drop4Drop4drop",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 5
+    },
+    {
+     "count": 1,
+     "name": "_RNvNtCspR2o67DNLK_8cgap_gpu5testss_34test_metal_shared_buffer_zero_copy",
+     "file": "cgap-gpu/src/lib.rs",
+     "regs": 15
+    }
+   ]
+  },
+  "cgap-bont": {
+   "fn_cov": 221,
+   "fn_tot": 354,
+   "line_cov": 2098,
+   "line_tot": 2432,
+   "reg_cov": 3113,
+   "reg_tot": 4585,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvMNtCskYC7u0EHw3h_9cgap_bont10shacl_maskNtB2_9CorpusRng3new",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMNtCskYC7u0EHw3h_9cgap_bont10shacl_maskNtB2_9CorpusRng5below",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMNtCskYC7u0EHw3h_9cgap_bont10shacl_maskNtB2_9CorpusRng8next_u64",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMs_NtCskYC7u0EHw3h_9cgap_bont10shacl_maskNtB4_8MaskPlan3new",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMs_NtCskYC7u0EHw3h_9cgap_bont10shacl_maskNtB4_8MaskPlan8evaluate",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCskYC7u0EHw3h_9cgap_bont10shacl_mask11brute_force",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCskYC7u0EHw3h_9cgap_bont10shacl_mask13rdf_type_slot",
+     "file": "cgap-bont/src/shacl_mask.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvMNtCskYC7u0EHw3h_9cgap_bont14shacl_compilerNtB2_10ReasonCode4name",
+     "file": "cgap-bont/src/shacl_compiler.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-bosym": {
+   "fn_cov": 53,
+   "fn_tot": 62,
+   "line_cov": 632,
+   "line_tot": 729,
+   "reg_cov": 920,
+   "reg_tot": 1017,
+   "cold": [
+    {
+     "count": 0,
+     "name": "_RNvMs4_NtCs3U2S9mEhCDq_10cgap_bosym4slabNtB5_11GraphExport8is_empty",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvXs_NtCs3U2S9mEhCDq_10cgap_bosym4slabNtB4_6Sha256NtNtCs20ztldruFRR_4core7default7Default7default",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs3U2S9mEhCDq_10cgap_bosym4slab14ingress_courtss_30court_ingress_wired_into_parse0B7_",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNvNtCs3U2S9mEhCDq_10cgap_bosym4slab17fibo_graph_export",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs3U2S9mEhCDq_10cgap_bosym4slab5testss_39emit_real_vocabulary_archive_when_gated0B7_",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs3U2S9mEhCDq_10cgap_bosym4slab5testss_39emit_real_vocabulary_archive_when_gateds_0B7_",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtNtCs3U2S9mEhCDq_10cgap_bosym4slab5testss_42t2_truncation_fails_closed_at_every_offset0B7_",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    },
+    {
+     "count": 0,
+     "name": "_RNCNvNtCs3U2S9mEhCDq_10cgap_bosym4slab17fibo_graph_export0B5_",
+     "file": "cgap-bosym/src/slab.rs",
+     "regs": 0
+    }
+   ]
+  },
+  "cgap-court": {
+   "fn_cov": 0,
+   "fn_tot": 0,
+   "line_cov": 0,
+   "line_tot": 0,
+   "reg_cov": 0,
+   "reg_tot": 0,
+   "cold": []
+  },
+  "cgap-fibo": {
+   "fn_cov": 0,
+   "fn_tot": 0,
+   "line_cov": 0,
+   "line_tot": 0,
+   "reg_cov": 0,
+   "reg_tot": 0,
+   "cold": []
+  },
+  "cgap-cloud": {
+   "fn_cov": 0,
+   "fn_tot": 0,
+   "line_cov": 0,
+   "line_tot": 0,
+   "reg_cov": 0,
+   "reg_tot": 0,
+   "cold": []
+  }
+ }
+}

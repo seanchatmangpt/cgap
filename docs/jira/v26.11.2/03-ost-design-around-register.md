@@ -16,7 +16,7 @@ DIFFERENT, not a paraphrase of the claim.
 
 | # | Patent | OST patented mechanism | v26.11.2 design-around (distinct mechanism) | Refused alternative |
 |---|--------|------------------------|---------------------------------------------|---------------------|
-| 1 | US 10,817,467 | shared-memory CAS over snapshot state | partition-disjoint snapshot-delta: each partition seals its own delta pages; no shared-memory CAS anywhere | any CAS/lock-based snapshot merge |
+| 1 | US 10,817,467 | shared-memory CAS over snapshot state | immutable columnar append-only ring commits — a pre-leased 64 KiB ring sink with rotation drain to a pre-opened spill handle, typed RunOverrun refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding every commit | any CAS/lock-based snapshot merge |
 | 2 | US 11,216,456 | runtime tuple-binding propagation | compile-time PLNF cardinality + vertical bit-slice masks; bounds fixed before execution | runtime sideways information passing |
 | 3 | US 11,409,698 | runtime subquery continuation frames | stratified semi-naive bit-matrix cascades in caller-leased scratch; no continuation frames | runtime subquery continuation |
 | 4 | US 11,645,278 | runtime topology switching | branchless register unification + static instruction schedule (R0..=R255 ABI) | dynamic topology dispatch |
@@ -27,42 +27,78 @@ Per-row implementation-evidence status (PENDING = named for v26.11.2, no
 cgap implementation yet; statement-evidence = waves/ receipt naming the
 mechanism).
 
-1. US 10,817,467 — evidence run 2026-11-01 (lane W2-7, receipt
-   waves/w2-07-ost-greps.md):
-   `grep -rnE 'CAS|compare_exchange|AtomicU64'
+1. US 10,817,467 — LANDED 2026-11-02 (lane G7F, operator order to
+   re-scope the row-1 design-around to the LANDED mechanism).
+   Prior KNOWN-DIVERGENCE (2026-11-02 lane G7R) is retained below as
+   the honest refinement note: the re-scoped claim is explicitly a
+   SINGLE ring; partition-sealed delta pages are a further
+   refinement, not claimed.
+   New design-around wording (register row 1): immutable columnar
+   append-only ring commits — a pre-leased 64 KiB ring sink with
+   rotation drain to a pre-opened spill handle, typed RunOverrun
+   refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding
+   every commit.
+   Landed cites (marker greps verified this session): RingSink
+   (9 hits), drain_to_spill (2 hits), RunOverrun (30 hits) at
+   crates/cgap-parquet/src/mmap_writer.rs:721-842 (RingSink;
+   drain_to_spill :781-802; RunOverrun :829-842); BLAKE3 hash-chain
+   receipt leg prev_hash+BLAKE3 link
+   (crates/cgap-ffi/src/receipt_chain.rs:34-76).
+   Single-writer enforcement (FA9FIX, added 2026-11-02 lane C13):
+   typed pre-IO concurrent-writer denial CGAP_ERR_CONCURRENT_WRITER_DENIED
+   = 0x4347_0006 (crates/cgap-ffi/src/sovereign.rs:87, spill_gate
+   Claim::Denied before any spill IO, sovereign.rs:758-764); race
+   court crates/cgap-ffi/tests/fa9_commit_gating.rs (226 lines,
+   register pin + spill_gate race; the formerly unenforced
+   single-writer premise of this row is now mechanically enforced).
+   Courts re-witnessed:
+   waves/w5-ring-rewitness.md. Gate: DISTINCT-MECHANISM (exit 0 on
+   this row, run 2026-11-02, lane G7F).
+   Prior refinement note (G7R, 2026-11-02): the earlier design-around
+   wording ("partition-disjoint snapshot-delta; each partition seals
+   its own delta pages") has NO landed cgap artifact — zero
+   `partition`-sealing surface in crates/cgap-storage/src +
+   crates/cgap-parquet/src (sole `partition_point` hits are
+   binary-search calls, unrelated). The W3-L4 RingSink pre-leased
+   ring commit leg is a SINGLE ring with a hash-chain receipt leg,
+   NOT per-partition sealed delta pages. Negative-surface evidence on
+   record (lane W2-7, 2026-11-01): `grep -rnE
+   'CAS|compare_exchange|AtomicU64'
    crates/cgap-storage/src/ crates/cgap-parquet/src/` → exit 1,
-   0 hits (no shared-memory CAS surface in src). Full-crate sweep
-   (src+tests) = 13 hits, ALL in tests/ harness code: `AtomicU64`
-   unique-counters (tests/common/mod.rs:14,18;
-   offset_fuzz.rs:317,318) + `CASE_TIMEOUT`/`LCG_CASES` substring
-   matches on CAS — zero `compare_exchange`. Verdict:
-   DISTINCT-MECHANISM (negative-surface evidence on record).
-   Adjacent statement on record: stardf RDF-5 incremental
+   0 hits (no shared-memory CAS surface). Adjacent statement on
+   record: stardf RDF-5 incremental
    (/Users/sac/stardf/arrow/docs/ost/incremental.md) seals immutable
    footer-sequenced delta pages, recomputes views PER-DELTA-PAGE.
-2. US 11,216,456 — bit-slice half implemented, PLNF half PENDING.
-   Cite on disk, re-checked 2026-11-01: crates/cgap-parquet/
-   src/bitslice.rs (930 lines; vertical bit-slice masks; canonical
-   SplitMix64 court seed cite at bitslice.rs:687-699). PLNF
-   compile-time cardinality: still PENDING — no cgap implementation
-   evidence this session; recorded honestly as PENDING.
+2. US 11,216,456 — RE-SCOPED 2026-11-02 (lane G7R, operator order):
+   the DISTINCT claim covers the vertical bit-slice masks with bounds
+   fixed before execution — the component that answers the patent
+   element ("runtime tuple-binding propagation": cgap computes
+   qualifying-row masks via vertical bit-slices + semi-join, bounds
+   pre-execution, no runtime propagation). Cite on disk:
+   crates/cgap-parquet/src/bitslice.rs (930 lines; canonical
+   SplitMix64 court seed cite at bitslice.rs:687-699). The
+   compile-time PLNF cardinality component is a NAMED OPEN ITEM, not
+   part of the DISTINCT claim. Gate: DISTINCT-MECHANISM (exit 0 on
+   this row, run 2026-11-02).
    Underlying statement evidence on record: stardf SIP-ALT
    (/Users/sac/stardf/arrow/docs/ost/sip-alt.md) cites
    "NOT-practiced: US 11,216,456 / US 11,409,698 claim classes" via
    precomputed structural planning from sealed per-file per-predicate
-   count tables. cgap partial impl evidence: crates/cgap-parquet/src/
-   bitslice.rs (vertical bit-slice masks). Compile-time PLNF
-   cardinality: PENDING.
-3. US 11,409,698 — evidence run 2026-11-01 (lane W2-7):
-   `grep -rniE 'continuation|Fiber|Generator|resume'
-   crates/cgap-bn3/ crates/cgap-bont/` → exit 1 on the
-   continuation|Fiber|resume subset, 0 hits (no continuation-frame
-   surface). Broadened sweep 5 hits, all doc-comment "corpus/row
-   generator" prose in tests (unify.rs:133,1250,1262,1879;
-   shacl_compiler.rs:2888) — no runtime Generator/Fiber type.
-   Verdict: continuation surface zero = DISTINCT-MECHANISM
-   negative-surface evidence; semi-naive cascade
-   implementation: still PENDING.
+   count tables.
+3. US 11,409,698 — LANDED 2026-11-02 (lane G7R). Cite:
+   crates/cgap-bn3/src/unify.rs. Mechanism evidence: static
+   RuleCompiler rule-to-register compilation (unify.rs:469-531),
+   semi-join bit-matrix cascades (`semi_join_masks`, unify.rs:783;
+   per-row survival mask, unify.rs:665) over caller-leased probe
+   scratch (unify.rs:650, JoinProbeScratch). No continuation frames
+   (negative-surface run 2026-11-01 lane W2-7: 0 mechanism hits; the
+   sole src hit unify.rs:1688 is a `///` doc-comment "Generator"
+   mention, classified non-mechanism and disclosed in
+   ost_report.json). Note: the register's design-around wording says
+   "stratified"; the landed cascade is semi-naive delta-round strata
+   (crates/cgap-storage/src/closure.rs:94 semi_naive_closure) — the
+   strata mapping is per-delta-round, disclosed here. Gate verdict
+   DISTINCT-MECHANISM (exit 0 on this row, run 2026-11-02).
 4. US 11,645,278 — implementation evidence on disk, re-checked
    2026-11-01: crates/cgap-bn3/src/unify.rs (lane A12, v26.11.1
    waves 9-10): register-file ABI R0..=R255 (unify.rs:100,169),
@@ -98,9 +134,13 @@ mechanism).
 - Written 2026-11-01 by V2-PATENT (court-auditor); evidence greps
   and row updates this session by lane W2-7 (receipt
   waves/w2-07-ost-greps.md), repo /Users/sac/cgap, branch main.
-- Standing: transcription ALIVE; row 1 DISTINCT-MECHANISM
-  (negative-surface src grep exit 1, 0 hits); row 2 partial
-  (bitslice.rs re-checked on disk, PLNF PENDING); row 3
-  continuation surface zero (DISTINCT-MECHANISM negative-surface),
-  semi-naive cascade impl PENDING; row 4 DISTINCT-MECHANISM
-  (A12 unify.rs cited, no topology/dyn dispatch surface).
+- Standing (updated 2026-11-02, lane G7F): row 1 LANDED (re-scoped
+  to the single-ring design-around per operator order — RingSink +
+  drain_to_spill + RunOverrun in mmap_writer.rs:721-842, BLAKE3
+  prev_hash chain in receipt_chain.rs:34-76, single-writer
+  enforcement CGAP_ERR_CONCURRENT_WRITER_DENIED 0x4347_0006
+  (sovereign.rs:87; fa9_commit_gating.rs court); partition-sealed delta
+  pages remain a declared refinement, not claimed); rows 2, 3, 4
+  DISTINCT-MECHANISM. Gate 4/4 DISTINCT exit 0 run 2026-11-02 lane
+  G7F; flip court (merged-duplicate mutation) drops to exit 1,
+  receipt waves/w6-g7-patent-gate-flip.md.

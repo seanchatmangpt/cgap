@@ -101,7 +101,7 @@ table.
 - v2-14-loop.md
 - w1-06-handoff-completion.md (this lane's receipt)
 
-## 4. p5-integration addendum (2026-11-02, post-crash finish)
+## 5. p5-integration addendum (2026-11-02, post-crash finish)
 
 Operator order: finish everything except publishes. Wave landed as
 commits a9827591 (source) + docs + 603726a4 (ggen projections); tree
@@ -110,3 +110,93 @@ exit 0, zero_string_gate + self-check exit 0. D7 closed; D2/D8/D9
 publish-scope OPEN; D4/D5/D6 OPEN as typed. Publishes FROZEN. Receipt:
 waves/p5-integration.md. Loop terminal condition (registry sweep exit 0)
 BLOCKED on operator publish lift.
+
+## 6. Post-CL1 addendum (2026-11-02, lane F11)
+
+Re-read from receipts on disk this session (F11 read-only except this
+section plus waves/w-commitplan-v2.md). CL1 re-locked ggen.lock:
+`make gate0` went exit 2 (FM-PACK-008 stale pin, pre-existing W1
+defect) to exit 0 after `rm ggen.lock && ggen sync run`, with a
+byte-identical second-run replay PASS and `cargo check -p cgap` exit 0
+(closure/lane-01-lockfile-sync.md:5-21; new lock sha256 a1356da1...f36).
+
+### 6.1 Gate-status deltas (supersedes the matching SS2 rows above)
+
+| Gate | New standing | Evidence (file:line on disk) |
+|---|---|---|
+| G7-PATENT | **PASS 4/4 DISTINCT-MECHANISM, exit 0** — SS2 row STALE, refuted | SS6.1a |
+| G2-PARETO | L3 radix **LANDED-MET**; rollup rows still UNVERIFIED | SS6.1b |
+
+### 6.1a G7-PATENT evidence
+
+- Stale row: 01-release-gates.md:242-244 (obs. 2026-11-01, script
+  absent then). Refuted by execution this session, see below.
+- w6-g7-patent-gate-flip.md:41 (PASS 4/4, EXIT=0) and :55 (mutation
+  2/4 DISTINCT -> FAIL exit 1, anti-vacuity flip).
+- countermeasures/lane-06-behavioral-patent-gate.md:35
+  (`verify_ost_design_around.py` exit 0, 4/4 DISTINCT + behavioral
+  court PASS); :59-61 (candidate-count mutation flips the court,
+  exit 101, mtime-bumped restore); :67-68 (court and gate ALIVE
+  this session).
+- convergence/lane-13-g7-patent-final-audit.md:24,43 (stable 4/4
+  across two report runs; mutation 2/4 DISTINCT -> FAIL, exit 1).
+
+### 6.1b G2-PARETO evidence
+
+- repair-06 supersedes w5-l3-remeasure's 0.97-0.98x
+  nested-vs-nested verdict (measured the derived default defect).
+- repairs/repair-06-radix-default-flip.md:58-66: real radix:nested
+  5.6x @65,536; **78.3x @1M** median; target <75 ms MET (23.72 ms
+  fastest, 3.2x headroom); floor >20x MET.
+- :76-81 anti-vacuity: sandbox flip Default `radix: true`->`false`
+  -> court FAILED, cargo exit 1; sha256-exact restore, mtime bumped,
+  rerun exit 0.
+- repair-06:82-84 honest-failure note: divan emits no timing table
+  under direct-binary invocation; all recorded numbers are
+  `cargo bench` exit 0 runs.
+
+### 6.2 Deployment envelope + gate0
+
+- Envelope: **39,184 / 131,072 B, verdict=OK**, exit 0
+  (hardening/lane-13-enclave-budget-witness.md:23,32; baseline
+  39,062 -> 39,184, +122 B per :93). `--deploy-mutant` breach flips
+  (mutant ELF 66,176 B > tier0 49,152 B) per
+  convergence/lane-08-budget-script-hardening.md:33-34.
+- gate0: baseline exit 2 (FM-PACK-008) -> post-re-lock **exit 0**
+  (byte-stable replay cmp PASS + freestanding C header compile PASS,
+  12 projections unchanged, `written: []`);
+  closure/lane-01-lockfile-sync.md:18-20.
+
+### 6.3 Wave index (closure/hardening/countermeasures/convergence family)
+
+84 receipts across the post-crash hardening family
+(docs/jira/v26.11.2/): closure/ 4, hardening/ 11, countermeasures/ 10
+(9 lane receipts incl. lane-f12-residual-seed + residuals.toml
+machine-readable residual seed), convergence/ 6, exhaustive/ 11,
+explore/ 12
+(11 lanes + BRANCHLESS-REUSE-MASTER-MAP.md), adversarial/ 12
+(11 forensic lanes FA1-FA11 + THE-SMOKING-GUN-REPORT.md), repairs/ 6,
+mega-bench/ 12 (11 lanes + MEGA-REPORT-v26.11.2.md). Related docs
+counted separately: research/ 28, plans/ 3, paper/ 2, patent/ 2.
+[Registered count-method divergence: dispatch said "~100 receipts";
+84 is the exact on-disk count of the named family, 112 if research/
+is included.]
+
+### 6.4 Register pointers
+
+- **Unified defect register (W3)**:
+  adversarial/THE-SMOKING-GUN-REPORT.md — chief-prosecutor synthesis
+  of forensic lanes FA1-FA11; verdict: kernels MEASURED HONESTLY,
+  rollups SOLD DISHONESTLY (disclosure-laundering); two fraud-class
+  findings: FA3 (L3 radix bench leg never executed the radix path it
+  verdicts — since repaired by repair-06, q.v. SS6.1) and the
+  second-writer commit finding. Pointer per dispatch; the smoking-gun
+  report is the on-disk referent for the unified register.
+- **Deferred register (W8)**: residual UNRECEIPTED-CLAIM carry-forward
+  from the receipt-lint census — 142 UNRECEIPTED-CLAIMs flagged at
+  waves/w2-20-terminus.md:97; w-lint-fix.md:41-45 clears the top-3
+  offender files and carries the remainder (7 each) to the next W8
+  lane. Full-sweep W8 pass: NOT YET EXECUTED on disk (no w8 receipt in
+  waves/ as of this session) — loud, not silent.
+- **Publishes**: FROZEN (unchanged from SS4; operator lift required).
+  Loop terminal condition stays BLOCKED on that lift.

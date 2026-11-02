@@ -1,9 +1,10 @@
 # cgap
 
-Sovereign `#![no_std]` columnar/deductive substrate; 22-crate root
+Sovereign `#![no_std]` columnar/deductive substrate; 23-crate root
 workspace at 26.11.1, 18 crates on crates.io (`bench` there is a name
 collision, not ours; `cgap-beam`/`cgap-integration`/`cgap-court`/
-`cgap-verification` are registry-absent). cgap-datafusion was removed
+`cgap-branchless`/`cgap-verification` are registry-absent or
+`publish = false`). cgap-datafusion was removed
 (`docs/jira/v26.11.1/waves/cgap-datafusion-removal.md:6`) — do not
 re-scaffold. Campaign: v26.11.2 starDF (`docs/jira/v26.11.2/
 00-ard-prd.md`; runbook `OVERNIGHT-LOOP.md`, wave plan `05-wave-plan.md`).
@@ -19,6 +20,10 @@ python3 scripts/boundary_gate.py        # campaign boundary gate (fail-closed)
 python3 scripts/zero_string_gate.py     # zero-string gate (--self-check = non-vacuity proof)
 just doctor/status via justfile         # side-bins run with --manifest-path crates/cli/Cargo.toml
 cd crates/cli && rm Cargo.toml && ggen sync run && python3 manifest_patch.py   # CLI regen (byte-identical replay)
+make gate0                            # ggen sync x2 byte-identical replay + freestanding header compile
+                                      #   FM-PACK-008 fix: rm ggen.lock && ggen sync run (twice, cmp)
+cargo bench -p bench --bench chains-ingress -- <stage_leg>   # exact leg name; divan omits
+                                      #   all-zero alloc cols — absent means 0 only if courts corroborate
 ```
 
 Gate exit codes: 0 pass / 1 gate fail / 2 subject missing / 3 loud skip.
@@ -31,9 +36,14 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   concurrent with lever lanes (`docs/jira/v26.11.2/OVERNIGHT-LOOP.md:146-149`).
 - Registry slide (index reject or timeout): back off 1 hour. No retry
   storms.
-- `publish = false`: bench (registry name collision), beam, court
-  (structural [[test]]-only) — 19/22 published, 3 guarded
-  table at `docs/jira/v26.11.2/01-release-gates.md:28-32`.
+- `publish = false` (explicit, on disk, re-derived 2026-11-02): bench
+  (registry name collision), beam, branchless, court (structural
+  [[test]]-only); `cgap-verification`/`csct`/`cli` are on disk but NOT
+  root members. gate/p28/crypto carry `publish = true` explicitly.
+  12/23 members declare an explicit flag (8 true, 4 false); the other
+  11 default to publishable. Prior "19/22 published" was UNVERIFIED
+  registry state — guarded table at
+  `docs/jira/v26.11.2/01-release-gates.md:28-32`.
 
 ## CLI (ggen six-pack generated)
 
@@ -87,6 +97,9 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
   bump mtimes or `cargo clean` between mutation and restore.
 - cwd resets to repo root between Bash calls — absolute paths only.
 - No Process.sleep: bounded polls on observables; the runtime owns time.
+- llvm tools: `~/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/` (NOT toolchain `bin/`); that toolchain's `llc` lacks a riscv backend — `/opt/homebrew/opt/llvm/bin/` has one.
+- Footprint truth is LINKED ELF, not audit-profile rlib: audit rlibs (lto=false, cgu=16) run ~2.8-3.2x CGU sprawl; release rlibs hold bitcode-only `.rcgu.o` llvm-size refuses. Linked truth = /tmp no_std caller crate (`#![no_main]` + panic_handler + black_box-ed inputs; z/lto=fat/cgu=1/panic=abort, target riscv32imc). Constant inputs fold to vacuum ELFs — volatile/black_box the prologue. rustc `-C lto` conflicts with cargo's `-C embed-bitcode=no` on lib targets.
+- CGAP status codes never conflate: 0x4347_0004=CGAP_ERR_LEASE_EXHAUSTED (`sovereign.rs:80`), 0x5032_38FF=CGAP_ERR_P28_SPOLIATION (`trap.rs:36`), 0x4347_0006=CONCURRENT_WRITER_DENIED (`sovereign.rs:87`). RingSink lease ceiling is 65,376 LANES derived from a 65,536-BYTE StaticPageBuffer (bytes≠lanes; data-dependent).
 
 ## Agents
 
@@ -97,7 +110,9 @@ generics. Subagent prompts carry the absolute repo path + contract block.
 ## Agent fan-outs
 
 - Never `git add -A` — stage explicit paths; `target-*/` build roots are
-  lease debris (`.gitignore` is the backstop, not the mechanism).
+  lease debris (`.gitignore` is the backstop, not the mechanism;
+  `python3 scripts/lease_janitor.py --clean` / `just leases` reclaims
+  orphaned leases, fail-closed on the naming grammar).
 - No stop/resume mid-wave (kills in-flight work); one `resumeFromRunId`
   pass at completion. Post-run truth is `journal.jsonl`.
 - Agents corrupt long-file writes (~1 in 5 over ~100 lines): write in
@@ -109,6 +124,11 @@ generics. Subagent prompts carry the absolute repo path + contract block.
 - BSD xargs has no `-a`; use `while read -r; do ...; done < file`.
 - `$?` after a pipe is the last command's rc — check
   `git rev-parse origin/main`, don't trust `git push | tail`.
+- Exit codes: capture un-piped, or via
+  `python3 scripts/run_checked.py --out /tmp/x.log -- <cmd>`
+  (tees output, prints/propagates the command's OWN rc; timeout→124,
+  spawn-fail→127) — witnessed hit 4× on 2026-11-02
+  (`docs/jira/v26.11.2/lanes/lane-dx-05-run-checked.md`).
 - `sed -i ''` (empty arg) on macOS.
 - Slow push: check payload (`git diff-tree --stat <sha> | tail -1`),
   background with a long window, never kill mid-pack.

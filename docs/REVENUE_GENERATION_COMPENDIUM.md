@@ -448,3 +448,28 @@ Every technical, architectural, and performance claim in this compendium is grou
 ```
 
 *Compiled, verified, and sealed under the Operating Doctrine (`A = μ(O*)`, `R = receipt(A)`).*
+
+---
+
+## ERRATA (2026-11-02, TC-08 / cull-08 doc retirement)
+
+**Errata 1 — Sigma_PQC (was :103).** The conservation-invariant
+equation at line 103 ("... (mod Sigma_PQC)") states a modular
+arithmetic attestation law as landed. It is not: `mod Sigma_PQC` is
+INVENTED LORE with zero code referent in any crate
+(cgapprd-02-equation-grounding.md:47-57). The landed trace is three
+typed commit trailers (`lease-phi`, `lease-delta`, `lease-receipt`)
+with a fail-closed render; the digest is BLAKE3 (classical); any PQC
+seal is an unbuilt Wave-3 seam (cgapprd-02-equation-grounding.md:70-81;
+A16-chatman-pqc.md:97-99 flags it UNKNOWN). Rewrite text of record:
+cgapprd-02-equation-grounding.md:66+ ("Exact rewrite of the equation
+block").
+
+**Errata 2 — 5.70 ns/frame penstock admission (was :59, :237, :288).**
+The 5.70 ns/frame figure failed re-derivation: manual 5.70 FAILED;
+re-derived receipt is fastest 7.35 ns/frame, median 8.13, receipted
+7.71 within drift (audit/tps-01-reality-ledger.md:21,28,
+docs/jira/v26.11.2/). The 175.5M frames/sec/core derivative figure
+shares the same defect. Assertable form: "7.35-8.13 ns/frame
+re-derived, receipted 7.71". Original lines retained above unedited;
+this errata supersedes them.

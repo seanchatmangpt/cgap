@@ -100,3 +100,17 @@ design targets. UNVERIFIED as to any measured numbers — see
 - 06-stardf-git-odb.md
 - 12-distance-bounding-rtt.md
 - 19-press-release.md
+
+
+---
+
+## TOMBSTONE (2026-11-02, TC-08 / cull-08)
+
+Line 36 ("The receipt turnstile: Delta S_admitted + Phi_lease =
+R_receipt (mod Sigma_PQC)") restates `mod Sigma_PQC` as landed law.
+Sigma_PQC is INVENTED LORE with zero code referent
+(cgapprd-02-equation-grounding.md:47-57). This prior-milestone doc is
+tombstoned for that claim; redirect to the rewrite text of record:
+docs/jira/v26.11.2/12-ard-prd-cgap.md (as superseded by its 2026-11-02
+errata) and cgapprd-02-equation-grounding.md:66+ (v26.11.2/audit/).
+Original table row retained unedited.

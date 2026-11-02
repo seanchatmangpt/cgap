@@ -34,3 +34,13 @@ shared-tree code edits.
 ALIVE — files written and swept this session. Rule loading is exercised
 by Claude Code on the next session touching a matching path (UNVERIFIED
 until then; no court exists for frontmatter parsing itself).
+
+## ERRATA (W7 census, 2026-11-02)
+
+W7 drift census (waves/w7-errata.md): the Standing self-mark above
+correctly scoped rule-loading as UNVERIFIED (exercised next-session
+only); the W7 census CONFIRMS that mark and annotates it as
+STILL-UNVERIFIED — no rule-loading court has run since 2026-11-02, and
+the four rule files remain unwitnessed at the frontmatter-parsing
+layer. The files-written/sweep ALIVE claim (on-disk state) is
+unaffected.

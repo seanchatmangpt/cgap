@@ -28,7 +28,9 @@ In scope for v26.10.29:
 
 - `crates/cgap-arrow`: in-memory columnar substrate, `no_std` + `alloc`, zero external
   dependencies. Includes multi-column `Batch` / `BatchBuilder` with 64-byte hardware
-  cache alignment verification, 16 KiB MMU page-aligned arena (`mmu_arena.rs`), zero-probe
+  cache alignment verification (Quad64 layout, `layout.rs:36`; the CSCB fact frame is
+  a separate 24-byte = 3x u64 LE frame, FRAME_BYTES=24), 16 KiB MMU page-aligned
+  arena (`mmu_arena.rs`), zero-probe
   perfect minimal hashing (`perfect_hash.rs`), in-register $GF(2^{128})$ homomorphic
   fingerprinting (`fingerprint.rs`), sovereign `#![no_std]` BLAKE3 (`blake3.rs`), the
   `branchless` zero-stall primitive library (18+ primitives), and `chase_lev` lock-free

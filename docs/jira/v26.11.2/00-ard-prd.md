@@ -160,3 +160,7 @@ authoring graph). The crates/stardf-datalog member is cgap-side Arrow-shaped
 materialization code with a borrowed name — rename owed at integration; it carries no
 stardf-project charter. All v26.11.2 docs are re-based on this split; stardf-referencing
 sections are OUT-OF-SCOPE annotations, not open work.
+Frame layout note (CGAP-PRD-05, 2026-11-02): the CSCB fact frame is 24 B =
+3x u64 LE (FRAME_BYTES=24; ring bound 32,768/24 = 1,365 facts). The 64 B
+figure exists only as cgap-arrow's Quad64 quad-buffer layout (layout.rs:36),
+not a fact-frame size — audit/cgapprd-03-frame-layout.md.

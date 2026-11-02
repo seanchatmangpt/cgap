@@ -60,3 +60,15 @@ any crates beyond this set remain UNPUBLISHED and are not witnessed.
   "standing": "ALIVE"
 }
 ```
+
+## ERRATA (W7 census, 2026-11-02)
+
+W7 drift census (waves/w7-errata.md): this receipt claims standing
+ALIVE but carries ZERO witnessed command+exit blocks — the ladder table
+and JSON footer record outcomes with no command line or exit code for
+any read. Per the p4-terminus Table 4 metagate standard
+(waves/p4-terminus.md:65-82), zero witnessed command+exit = VACUOUS.
+This witness is VACUOUS-class as written; its ALIVE claim is
+reclassified UNVERIFIED (registry observations not reproducible from
+the receipt text). Any successor witness must embed the actual curl
+command line and exit code per read.

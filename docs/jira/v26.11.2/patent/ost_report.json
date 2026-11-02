@@ -1,0 +1,118 @@
+{
+  "gate": "G7-PATENT",
+  "claims_file": "/Users/sac/cgap/docs/jira/v26.11.2/patent/claims.txt",
+  "claims_sha256": "963230bbb7167761de5bf0436bf2386a493d7e2b1e2df4bd676f0c53cdad35ac",
+  "corpus": "/Users/sac/purrdf/corpora",
+  "rows": [
+    {
+      "patent": "US10,817,467",
+      "element": "shared-memory CAS over snapshot state",
+      "mechanism": "immutable columnar append-only ring\ncommits \u2014 a pre-leased 64 KiB ring sink with rotation drain to a pre-opened spill handle,\ntyped RunOverrun refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding every\ncommit (re-scoped 2026-11-02 to the LANDED mechanism per operator order; partition-sealed\ndelta pages remain a further refinement, not claimed \u2014 see the KNOWN-DIVERGENCE note in\n03-ost-design-around-register.md)",
+      "status_raw": "LANDED-crates/cgap-parquet/src/mmap_writer.rs\n(RingSink; drain_to_spill; RunOverrun) + crates/cgap-ffi/src/receipt_chain.rs\n(BLAKE3 prev_hash chain)",
+      "grep_family": "CAS/compare_exchange/AtomicU64/shared-memory (src-scoped)",
+      "grep_command": "grep -rnE CAS|compare_exchange|AtomicU64|shared-memory /Users/sac/cgap/crates/cgap-storage/src /Users/sac/cgap/crates/cgap-parquet/src",
+      "grep_exit": 1,
+      "src_hits": [],
+      "tests_hits": [],
+      "evidence_cite": "crates/cgap-parquet/src/mmap_writer.rs",
+      "evidence_present": true,
+      "evidence_markers": {
+        "crates/cgap-parquet/src/mmap_writer.rs:RingSink": true,
+        "crates/cgap-parquet/src/mmap_writer.rs:drain_to_spill": true,
+        "crates/cgap-parquet/src/mmap_writer.rs:RunOverrun": true,
+        "crates/cgap-ffi/src/sovereign.rs:CGAP_ERR_CONCURRENT_WRITER_DENIED": true,
+        "crates/cgap-ffi/src/sovereign.rs:0x4347_0006": true,
+        "crates/cgap-ffi/tests/fa9_commit_gating.rs:CGAP_ERR_CONCURRENT_WRITER_DENIED": true,
+        "crates/cgap-ffi/tests/fa9_commit_gating.rs:0x4347_0006": true
+      },
+      "src_hit_classification": [],
+      "verdict": "DISTINCT-MECHANISM",
+      "reason": "zero src hits for patented mechanism; landed cite verified"
+    },
+    {
+      "patent": "US11,216,456",
+      "element": "runtime tuple-binding propagation",
+      "mechanism": "vertical bit-slice masks with bounds\nfixed before execution (DISTINCT surface re-scoped 2026-11-02 per operator order \u2014 the\ncompile-time PLNF cardinality component is a named open item, tracked in\n03-ost-design-around-register.md, NOT part of the DISTINCT claim)",
+      "status_raw": "LANDED-crates/cgap-parquet/src/bitslice.rs\n(vertical bit-slice masks; bounds fixed pre-execution)",
+      "grep_family": "runtime tuple-binding propagation (src-scoped)",
+      "grep_command": "grep -rnE tuple[_ ]?binding|TupleBinding|propagate_binding /Users/sac/cgap/crates",
+      "grep_exit": 1,
+      "src_hits": [],
+      "tests_hits": [],
+      "evidence_cite": "crates/cgap-parquet/src/bitslice.rs",
+      "evidence_present": true,
+      "evidence_markers": {
+        "crates/cgap-parquet/src/bitslice.rs:bit-slice": true,
+        "crates/cgap-parquet/src/bitslice.rs:Pack `values` into the vertical": true
+      },
+      "src_hit_classification": [],
+      "verdict": "DISTINCT-MECHANISM",
+      "reason": "zero src hits for patented mechanism; landed cite verified"
+    },
+    {
+      "patent": "US11,409,698",
+      "element": "runtime subquery continuation frames",
+      "mechanism": "static RuleCompiler rule-to-register\ncompilation; semi-join bit-matrix cascades (semi_join_masks) over caller-leased\nprobe scratch; no continuation frames",
+      "status_raw": "LANDED-crates/cgap-bn3/src/unify.rs",
+      "grep_family": "continuation/Fiber/Generator/resume frames (src-scoped)",
+      "grep_command": "grep -rnE continuation|Fiber|Generator|resume /Users/sac/cgap/crates/cgap-bn3/src /Users/sac/cgap/crates/cgap-bont/src",
+      "grep_exit": 0,
+      "src_hits": [
+        "/Users/sac/cgap/crates/cgap-bn3/src/unify.rs:1887:    /// Generator with the \"every rule fires\" witness (spec DoD 7): the"
+      ],
+      "tests_hits": [],
+      "evidence_cite": "crates/cgap-bn3/src/unify.rs",
+      "evidence_present": true,
+      "evidence_markers": {
+        "crates/cgap-bn3/src/unify.rs:semi_join_masks": true,
+        "crates/cgap-bn3/src/unify.rs:caller-leased": true,
+        "crates/cgap-bn3/src/unify.rs:RuleCompiler": true
+      },
+      "src_hit_classification": [
+        {
+          "hit": "/Users/sac/cgap/crates/cgap-bn3/src/unify.rs:1887:    /// Generator with the \"every rule fires\" witness (spec DoD 7): the",
+          "mechanism": false,
+          "reason": "doc-comment prose (comment-only line)"
+        }
+      ],
+      "verdict": "DISTINCT-MECHANISM",
+      "reason": "zero src hits for patented mechanism; landed cite verified"
+    },
+    {
+      "patent": "US11,645,278",
+      "element": "runtime topology switching",
+      "mechanism": "branchless register unification + static\ninstruction schedule (R0..=R255 ABI)",
+      "status_raw": "LANDED-crates/cgap-bn3/src/unify.rs (lane A12,\nv26.11.1 waves 9-10)",
+      "grep_family": "topology switching / dyn dispatch (src-scoped)",
+      "grep_command": "grep -rnE topology|Topology|Box<dyn|&dyn  /Users/sac/cgap/crates/cgap-bn3/src",
+      "grep_exit": 0,
+      "src_hits": [
+        "/Users/sac/cgap/crates/cgap-bn3/src/sigil.rs:773:        let _: &dyn core::error::Error = &BN3Error::PayloadOverflow;"
+      ],
+      "tests_hits": [],
+      "evidence_cite": "crates/cgap-bn3/src/unify.rs",
+      "evidence_present": true,
+      "evidence_markers": {
+        "crates/cgap-bn3/src/unify.rs:R0": true,
+        "crates/cgap-bn3/src/unify.rs:RegisterOverflow": true
+      },
+      "src_hit_classification": [
+        {
+          "hit": "/Users/sac/cgap/crates/cgap-bn3/src/sigil.rs:773:        let _: &dyn core::error::Error = &BN3Error::PayloadOverflow;",
+          "mechanism": false,
+          "reason": "error-trait upcast (&dyn core::error::Error), not dispatch"
+        }
+      ],
+      "verdict": "DISTINCT-MECHANISM",
+      "reason": "zero src hits for patented mechanism; landed cite verified"
+    }
+  ],
+  "duplicate_mechanism_groups": [],
+  "all_distinct": true,
+  "behavioral_court": {
+    "command": "cargo test -p cgap --test patent_behavioral_court",
+    "exit": 0,
+    "pass": true
+  },
+  "gate_exit": 0
+}

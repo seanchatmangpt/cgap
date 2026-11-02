@@ -7,7 +7,6 @@ use std::fs;
 
 use cgap_blake3::hash;
 use cgap_bont::oabi::{OabiError, OabiPackV1};
-use cgap_bont::primitives::lex_hash;
 use cgap_cloud::{
     PACK_DIGEST_HEX, CLASS_BLOB, CLASS_COMPUTE, CLASS_COUNT, CLASS_EVENTSTREAM,
     CLASS_VAULT, CIMI_CREDENTIAL_SLOT, CIMI_EVENT_SLOT, CIMI_JOB_SLOT, CIMI_MACHINE_SLOT,
