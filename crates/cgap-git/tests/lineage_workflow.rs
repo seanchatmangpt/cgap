@@ -33,9 +33,7 @@ use cgap_git::dag::{
     FrameFields, GENESIS_OID,
 };
 use cgap_git::idx_read::IdxV2;
-use cgap_git::pack_write::{
-    build_pack_and_idx, crc32, git_object_oid, parse_pack_v2, sha1,
-};
+use cgap_git::pack_write::{build_pack_and_idx, crc32, git_object_oid, parse_pack_v2, sha1};
 use cgap_git::Oid;
 use cgap_parquet::footer::{verify_seal, BlockSummary, CorruptRegion, FooterSealer, SealError};
 

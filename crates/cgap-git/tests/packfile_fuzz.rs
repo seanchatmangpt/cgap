@@ -39,9 +39,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use cgap_git::pack_write::{
-    build_pack_and_idx, git_object_oid, parse_idx_v2, parse_pack_v2,
-};
+use cgap_git::pack_write::{build_pack_and_idx, git_object_oid, parse_idx_v2, parse_pack_v2};
 use cgap_git::GitError;
 
 // ------------------------------------------------------------------- LCG --
@@ -92,10 +90,10 @@ fn draw_size(lcg: &mut Lcg) -> usize {
         return 0; // empty-blob surface stays covered
     }
     let (lo, hi) = match lcg.below(10) {
-        0..=3 => (0, 4 * KIB),                // tiny
-        4..=6 => (4 * KIB, 64 * KIB),         // small
-        7..=8 => (64 * KIB, 256 * KIB),       // medium
-        _ => (256 * KIB, 1 * MIB + 1),        // large
+        0..=3 => (0, 4 * KIB),          // tiny
+        4..=6 => (4 * KIB, 64 * KIB),   // small
+        7..=8 => (64 * KIB, 256 * KIB), // medium
+        _ => (256 * KIB, 1 * MIB + 1),  // large
     };
     lo + lcg.below((hi - lo) as u64) as usize
 }
@@ -157,10 +155,9 @@ fn synthesize_blob(lcg: &mut Lcg, size: usize) -> Vec<u8> {
         }
         _ => {
             const VOCAB: &[&str] = &[
-                "pack", "blob", "idx", "zlib", "deflate", "sha1", "crc32",
-                "offset", "fanout", "trailer", "ladder", "court", "wave",
-                "fuzz", "cgap", "git", "object", "type", "size", "header",
-                "varint", "checksum", "corrupt", "mutant",
+                "pack", "blob", "idx", "zlib", "deflate", "sha1", "crc32", "offset", "fanout",
+                "trailer", "ladder", "court", "wave", "fuzz", "cgap", "git", "object", "type",
+                "size", "header", "varint", "checksum", "corrupt", "mutant",
             ];
             let mut i = 0usize;
             while i < size {
@@ -183,9 +180,7 @@ fn synthesize_blob(lcg: &mut Lcg, size: usize) -> Vec<u8> {
 
 fn require_git() -> String {
     match Command::new("git").arg("--version").output() {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().to_string()
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
         Ok(out) => panic!(
             "SKIP-REFUSAL: git binary exists but `git --version` failed (exit {:?}): {}",
             out.status.code(),
@@ -495,9 +490,7 @@ fn fuzz_40_accept_matrix_git_and_crate_agree() {
                             ));
                         }
                         // crate pack-parse at the same offset: size + crc agree
-                        if let Some(p) =
-                            parsed.iter().find(|p| p.offset as u64 == g.offset)
-                        {
+                        if let Some(p) = parsed.iter().find(|p| p.offset as u64 == g.offset) {
                             if p.size != g.size {
                                 failures.push(format!(
                                     "case {case}: size mismatch at offset {}: crate={} git={}",

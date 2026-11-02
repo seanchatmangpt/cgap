@@ -123,8 +123,7 @@ fn build_fixture() -> (Vec<u8>, Vec<IdxEntry>) {
         });
     }
     let zero_pack_sum: Oid = [0u8; 20];
-    let idx_bytes =
-        write_idx_v2(&mut entries, &zero_pack_sum).expect("synthetic idx must build");
+    let idx_bytes = write_idx_v2(&mut entries, &zero_pack_sum).expect("synthetic idx must build");
     assert_eq!(entries.len(), N_OBJECTS as usize);
     (idx_bytes, entries)
 }
@@ -241,7 +240,10 @@ fn ladder_result_constancy_under_cpu_noise() {
         let mut got = Vec::with_capacity(LOOKUPS * 13);
         let t0 = Instant::now();
         for p in &probes {
-            encode(idx.lookup(&p.oid).expect("lookup must stay in-window"), &mut got);
+            encode(
+                idx.lookup(&p.oid).expect("lookup must stay in-window"),
+                &mut got,
+            );
         }
         let dt = t0.elapsed().as_secs_f64();
         times_ms.push(dt * 1_000.0);
@@ -267,7 +269,8 @@ fn ladder_result_constancy_under_cpu_noise() {
         }
         // RESULT-constancy gate 2: matches writer-side ground truth.
         assert_eq!(
-            got, expected,
+            got,
+            expected,
             "sweep {} results diverge from writer-recorded ground truth",
             sweep + 1
         );
@@ -293,10 +296,7 @@ fn ladder_result_constancy_under_cpu_noise() {
         );
     }
     let min = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = times_ms
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let max = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let mean = times_ms.iter().sum::<f64>() / SWEEPS as f64;
     println!("\nTIMING SPREAD (honest, load-dependent — NOT a gate):");
     println!("  min             = {:>10.3} ms", min);

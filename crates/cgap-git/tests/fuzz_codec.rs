@@ -198,6 +198,7 @@ fn git_bucket(e: &GitError) -> &'static str {
         GitError::BadVarint => "BadVarint",
         GitError::SizeOverflow => "SizeOverflow",
         GitError::OffsetTooLarge => "OffsetTooLarge",
+        GitError::UnsupportedDeltaEncoding => "UnsupportedDeltaEncoding",
     }
 }
 
@@ -274,13 +275,16 @@ fn buckets_str(t: &[(&'static str, usize)]) -> String {
 }
 
 fn first_diff(a: &[u8], b: &[u8]) -> Option<usize> {
-    a.iter().zip(b.iter()).position(|(x, y)| x != y).or_else(|| {
-        if a.len() != b.len() {
-            Some(core::cmp::min(a.len(), b.len()))
-        } else {
-            None
-        }
-    })
+    a.iter()
+        .zip(b.iter())
+        .position(|(x, y)| x != y)
+        .or_else(|| {
+            if a.len() != b.len() {
+                Some(core::cmp::min(a.len(), b.len()))
+            } else {
+                None
+            }
+        })
 }
 
 fn distinct_flip_positions(rng: &mut Lcg, n_bits: usize, k: usize) -> Vec<usize> {
@@ -331,15 +335,17 @@ fn fuzz_roundtrip_200_corpora_entropy_mixtures() {
             "case {case}: compressor not deterministic"
         );
 
-        let back = zlib_decompress(&z)
-            .unwrap_or_else(|e| panic!("case {case} size {size} class {class}: zlib_decompress failed: {e}"));
+        let back = zlib_decompress(&z).unwrap_or_else(|e| {
+            panic!("case {case} size {size} class {class}: zlib_decompress failed: {e}")
+        });
         assert_eq!(
             back, data,
             "case {case} size {size} class {class}: deflate::zlib_decompress round-trip mismatch"
         );
 
-        let back2 = zlib_decode(&z)
-            .unwrap_or_else(|e| panic!("case {case} size {size} class {class}: zlib_decode failed: {e}"));
+        let back2 = zlib_decode(&z).unwrap_or_else(|e| {
+            panic!("case {case} size {size} class {class}: zlib_decode failed: {e}")
+        });
         assert_eq!(
             back2, data,
             "case {case} size {size} class {class}: inflate::zlib_decode round-trip mismatch"
@@ -348,13 +354,23 @@ fn fuzz_roundtrip_200_corpora_entropy_mixtures() {
         let d = deflate_fixed(&data);
         let (back3, used) = deflate_inflate(&d)
             .unwrap_or_else(|e| panic!("case {case}: raw deflate::inflate failed: {e}"));
-        assert_eq!(used, d.len(), "case {case}: consumed bytes != stream length");
-        assert_eq!(back3, data, "case {case}: raw round-trip mismatch (deflate::inflate)");
+        assert_eq!(
+            used,
+            d.len(),
+            "case {case}: consumed bytes != stream length"
+        );
+        assert_eq!(
+            back3, data,
+            "case {case}: raw round-trip mismatch (deflate::inflate)"
+        );
 
         let body = &z[2..z.len() - 4];
         let back4 = raw_inflate(body)
             .unwrap_or_else(|e| panic!("case {case}: raw inflate::inflate failed: {e}"));
-        assert_eq!(back4, data, "case {case}: raw round-trip mismatch (inflate::inflate)");
+        assert_eq!(
+            back4, data,
+            "case {case}: raw round-trip mismatch (inflate::inflate)"
+        );
     }
     eprintln!(
         "[fuzz_codec] roundtrip: cases=200 ok=200 sizes={min_size}..={max_size} \
@@ -414,7 +430,10 @@ fn fuzz_bitflip_500_typed_error_or_exact_bytes() {
         let flips = distinct_flip_positions(&mut rng, stream.len() * 8, k);
         let mutated = apply_flips(stream, &flips);
 
-        for (which, dec) in [("zlib_decompress", dec_git(&mutated)), ("zlib_decode", dec_inflate(&mutated))] {
+        for (which, dec) in [
+            ("zlib_decompress", dec_git(&mutated)),
+            ("zlib_decode", dec_inflate(&mutated)),
+        ] {
             match dec {
                 Dec::Panic(m) => panics.push(format!(
                     "bitflip case {case} base {bi} reader {which} flips {flips:?}: PANIC: {m}"
@@ -454,12 +473,30 @@ fn fuzz_bitflip_500_typed_error_or_exact_bytes() {
          zlib_decompress exact={r1_exact} typed_err={r1_err} | zlib_decode exact={r2_exact} \
          typed_err={r2_err}"
     );
-    eprintln!("[fuzz_codec] bitflip GitError buckets: {}", buckets_str(&git_tally));
-    eprintln!("[fuzz_codec] bitflip InflateError buckets: {}", buckets_str(&inf_tally));
+    eprintln!(
+        "[fuzz_codec] bitflip GitError buckets: {}",
+        buckets_str(&git_tally)
+    );
+    eprintln!(
+        "[fuzz_codec] bitflip InflateError buckets: {}",
+        buckets_str(&inf_tally)
+    );
 
-    assert_eq!(flips1 + flips2 + flips3, 500, "court must run exactly 500 mutations");
-    assert_eq!(r1_exact + r1_err, 500, "reader 1 must classify all 500 mutations");
-    assert_eq!(r2_exact + r2_err, 500, "reader 2 must classify all 500 mutations");
+    assert_eq!(
+        flips1 + flips2 + flips3,
+        500,
+        "court must run exactly 500 mutations"
+    );
+    assert_eq!(
+        r1_exact + r1_err,
+        500,
+        "reader 1 must classify all 500 mutations"
+    );
+    assert_eq!(
+        r2_exact + r2_err,
+        500,
+        "reader 2 must classify all 500 mutations"
+    );
     assert!(
         panics.is_empty(),
         "{} decode PANICS (the finding):\n{}",
@@ -515,7 +552,11 @@ fn fuzz_truncation_sweep_20_streams_every_prefix() {
     let s3 = gen_corpus(&mut brng, 2, 1000);
     streams.push(zlib_stored_stream(&s3, 64));
     originals.push(s3);
-    assert_eq!(streams.len(), 20, "court contract: 20 valid truncation streams");
+    assert_eq!(
+        streams.len(),
+        20,
+        "court contract: 20 valid truncation streams"
+    );
 
     let (mut prefixes, mut r1_ok, mut r1_err, mut r2_ok, mut r2_err) =
         (0usize, 0usize, 0usize, 0usize, 0usize);
@@ -532,7 +573,10 @@ fn fuzz_truncation_sweep_20_streams_every_prefix() {
         for prefix in 0..=stream.len() {
             prefixes += 1;
             let p = &stream[..prefix];
-            for (which, dec) in [("zlib_decompress", dec_git(p)), ("zlib_decode", dec_inflate(p))] {
+            for (which, dec) in [
+                ("zlib_decompress", dec_git(p)),
+                ("zlib_decode", dec_inflate(p)),
+            ] {
                 match dec {
                     Dec::Panic(m) => panics.push(format!(
                         "truncation stream {si} prefix {prefix}/{}/ reader {which}: PANIC: {m}",
@@ -617,7 +661,10 @@ fn fuzz_truncation_sweep_20_streams_every_prefix() {
     // may decode to the exact original bytes.
     assert_eq!(r1_ok, 20, "reader 1: only full-length prefixes may decode");
     assert_eq!(r2_ok, 20, "reader 2: only full-length prefixes may decode");
-    assert_eq!(raw_ok, 8, "raw sweep: 4 streams x 2 readers, full prefix only");
+    assert_eq!(
+        raw_ok, 8,
+        "raw sweep: 4 streams x 2 readers, full prefix only"
+    );
     assert!(
         panics.is_empty(),
         "{} truncation PANICS (the finding):\n{}",
@@ -662,15 +709,29 @@ fn court_nonvacuity_controlled_mutations_must_flip() {
     let mut m = stream.clone();
     let n = m.len();
     m[n - 1] ^= 0x80;
-    assert!(zlib_decompress(&m).is_err(), "VACUOUS GATE: adler flip accepted (reader 1)");
-    assert!(zlib_decode(&m).is_err(), "VACUOUS GATE: adler flip accepted (reader 2)");
+    assert!(
+        zlib_decompress(&m).is_err(),
+        "VACUOUS GATE: adler flip accepted (reader 1)"
+    );
+    assert!(
+        zlib_decode(&m).is_err(),
+        "VACUOUS GATE: adler flip accepted (reader 2)"
+    );
 
     // (c) single flip in the zlib header (0x78^0x01=0x79 -> check%31 != 0)
     //     -> must refuse with the header error, deterministically.
     let mut m = stream.clone();
     m[0] ^= 0x01;
-    assert!(zlib_decompress(&m).is_err(), "VACUOUS GATE: header flip accepted (reader 1)");
-    assert!(zlib_decode(&m).is_err(), "VACUOUS GATE: header flip accepted (reader 2)");
+    assert!(
+        zlib_decompress(&m).is_err(),
+        "VACUOUS GATE: header flip accepted (reader 1)"
+    );
+    assert!(
+        zlib_decode(&m).is_err(),
+        "VACUOUS GATE: header flip accepted (reader 2)"
+    );
     assert_eq!(zlib_decode(&m), Err(InflateError::BadZlibHeader));
-    eprintln!("[fuzz_codec] nonvacuity: 3 controlled mutations flipped the gate; pristine anchor passed");
+    eprintln!(
+        "[fuzz_codec] nonvacuity: 3 controlled mutations flipped the gate; pristine anchor passed"
+    );
 }

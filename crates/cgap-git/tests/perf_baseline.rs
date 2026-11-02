@@ -26,7 +26,10 @@ use cgap_git::Oid;
 struct Lcg(u64);
 impl Lcg {
     fn next_u8(&mut self) -> u8 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.0 >> 33) as u8
     }
     fn bytes(&mut self, n: usize) -> Vec<u8> {
@@ -54,9 +57,7 @@ fn mib_s(bytes: usize, secs: f64) -> f64 {
 fn perf_baseline_git_plane() {
     let blobs = corpus();
     let total: usize = blobs.iter().map(|b| b.len()).sum();
-    println!(
-        "\n=== cgap-git perf baseline (64 MiB corpus, 256 x 256 KiB blobs) ==="
-    );
+    println!("\n=== cgap-git perf baseline (64 MiB corpus, 256 x 256 KiB blobs) ===");
     println!("machine-context caveat: concurrent wave lanes; informational, no gate");
 
     // ---- 1. pack write throughput (min-of-3) ----
@@ -120,14 +121,22 @@ fn perf_baseline_git_plane() {
         } else {
             hit += 1;
         }
-        if idx_view.lookup(&t).expect("lookup must not error").is_some() {
+        if idx_view
+            .lookup(&t)
+            .expect("lookup must not error")
+            .is_some()
+        {
             miss += 1; // reused as hit-counter for present targets
         }
     }
     let dt_lookup = t0.elapsed().as_secs_f64();
     let probes_after = cgap_git::ladder::debug_probes();
     std::hint::black_box(&miss);
-    assert_eq!(hit as usize, LOOKUPS as usize / 2, "half the targets present");
+    assert_eq!(
+        hit as usize,
+        LOOKUPS as usize / 2,
+        "half the targets present"
+    );
     assert_eq!(miss as usize, LOOKUPS as usize / 2, "half the targets hit");
     let rate = LOOKUPS as f64 / dt_lookup;
     println!(
@@ -145,12 +154,12 @@ fn perf_baseline_git_plane() {
             16 * LOOKUPS,
             "ladder must execute exactly 16 probes per lookup"
         );
-        println!("ladder probes: {} = 16 x {} (exact, debug counter)", delta, LOOKUPS);
-    } else {
-        assert_eq!(
-            delta, 0,
-            "probe counter must be compiled out in release"
+        println!(
+            "ladder probes: {} = 16 x {} (exact, debug counter)",
+            delta, LOOKUPS
         );
+    } else {
+        assert_eq!(delta, 0, "probe counter must be compiled out in release");
         println!(
             "ladder constant-16-stage: structural (probe counter compiled out in release; \
              no data-dependent exits in ladder.rs)"
@@ -200,7 +209,11 @@ fn perf_baseline_git_plane() {
         oid_list.push_str(&format!("{oid_str} blob\n"));
     }
     let t0 = std::time::Instant::now();
-    let _pack_name = run(&["pack-objects", "."], Some(oid_list.as_bytes()), "git pack-objects");
+    let _pack_name = run(
+        &["pack-objects", "."],
+        Some(oid_list.as_bytes()),
+        "git pack-objects",
+    );
     let dt_git = t0.elapsed().as_secs_f64();
     println!(
         "GIT REFERENCE: `git pack-objects` on same 64 MiB corpus: {:.1} MiB/s ({:.3}s, \
@@ -208,7 +221,9 @@ fn perf_baseline_git_plane() {
         mib_s(total, dt_git),
         dt_git
     );
-    println!("NOTE: git reference includes process spawn overhead; not a gate, comparison point only");
+    println!(
+        "NOTE: git reference includes process spawn overhead; not a gate, comparison point only"
+    );
 
     let _ = std::fs::remove_dir_all(&tmp);
 }

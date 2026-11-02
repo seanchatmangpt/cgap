@@ -180,9 +180,8 @@ const _: () = assert!(core::mem::offset_of!(PhiLease, lease_id) == 0);
 const _: () = assert!(core::mem::offset_of!(PhiLease, tick) == 32);
 const _: () = assert!(core::mem::offset_of!(PhiLease, tick_ceiling) == 40);
 const _: () = assert!(core::mem::offset_of!(PhiLease, issued_root) == 48);
-const _: () = assert!(
-    PHI_LEASE_LEN == LEASE_ID_LEN + TICK_LEN + TICK_CEILING_LEN + ISSUED_ROOT_LEN
-);
+const _: () =
+    assert!(PHI_LEASE_LEN == LEASE_ID_LEN + TICK_LEN + TICK_CEILING_LEN + ISSUED_ROOT_LEN);
 
 impl PhiLease {
     /// The canonical 80-byte encoding: `lease_id || tick(LE) ||
@@ -214,6 +213,280 @@ impl PhiLease {
             tick: u64::from_le_bytes(tick_bytes),
             tick_ceiling: u64::from_le_bytes(ceiling_bytes),
             issued_root,
+        }
+    }
+}
+
+/// Lane AE8 additive type-state guard: an affine `Fresh → Spent` state
+/// machine wrapping the frozen §5 [`Lease`] WITHOUT touching its internals.
+///
+/// The frozen pin stands unchanged: `Tick` stays a private monotonic
+/// newtype, exhaustion still TRAPS via `Lease::tick` (delegated), and there
+/// is still no API that accepts a caller-supplied tick. What the guard adds
+/// is a TYPE-level law on top: a spent guard is `LeaseGuard<Spent>` and no
+/// method converts it back to `LeaseGuard<Fresh>` — rewind-at-the-type-level
+/// is unrepresentable, witnessable as E0599 (see `guard_compile_rejection`
+/// court below and its CONTROL mutation).
+pub mod guard {
+    use super::{Lease, ISSUED_ROOT_LEN, LEASE_ID_LEN};
+    use core::marker::PhantomData;
+
+    /// Fresh state: the guard may still spend ticks.
+    pub struct Fresh;
+    /// Terminal state: no tick path exists on this type at all.
+    pub struct Spent;
+
+    /// Affine guard over a frozen [`Lease`]. `S` is `Fresh` or `Spent`.
+    pub struct LeaseGuard<S> {
+        lease: Lease,
+        _state: PhantomData<S>,
+    }
+
+    impl<S> LeaseGuard<S> {
+        /// Pure read-through of the frozen monotonic counter (§5).
+        pub fn current_tick(&self) -> u64 {
+            self.lease.current_tick()
+        }
+
+        /// 32 B lease identity read-through (§3.2).
+        pub fn lease_id(&self) -> &[u8; LEASE_ID_LEN] {
+            self.lease.lease_id()
+        }
+
+        /// 32 B key-epoch binding read-through (§3.2).
+        pub fn issued_root(&self) -> &[u8; ISSUED_ROOT_LEN] {
+            self.lease.issued_root()
+        }
+
+        /// Fixed ceiling read-through (§3.2).
+        pub fn tick_ceiling(&self) -> u64 {
+            self.lease.tick_ceiling()
+        }
+    }
+
+    impl LeaseGuard<Fresh> {
+        /// Mints a guard around a fresh lease (zero tick, ceiling > 0;
+        /// §5 — delegates the zero-ceiling trap to [`Lease::new`]).
+        pub fn mint(
+            lease_id: [u8; LEASE_ID_LEN],
+            tick_ceiling: u64,
+            issued_root: [u8; ISSUED_ROOT_LEN],
+        ) -> Self {
+            LeaseGuard {
+                lease: Lease::new(lease_id, tick_ceiling, issued_root),
+                _state: PhantomData,
+            }
+        }
+
+        /// §5 advance, delegated verbatim: pre-advance value returned,
+        /// counter incremented, exhaustion still TRAPS (frozen pin — the
+        /// guard does NOT soften the panic into a typed refusal; that
+        /// decision belongs to the §5 owner, recorded as DESIGN-TARGET in
+        /// the lane-08 receipt).
+        pub fn spend_tick(&mut self) -> u64 {
+            self.lease.tick()
+        }
+
+        /// Affine transition `Fresh → Spent`. Consumes the guard by value;
+        /// there is no inverse.
+        pub fn retire(self) -> LeaseGuard<Spent> {
+            LeaseGuard {
+                lease: self.lease,
+                _state: PhantomData,
+            }
+        }
+    }
+
+    impl LeaseGuard<Spent> {
+        /// Terminal state: unwraps the frozen lease (its tick is wherever
+        /// spending left it — monotonic, never reset).
+        pub fn release(self) -> Lease {
+            self.lease
+        }
+        // DELIBERATE ABSENCE (the AE8 law): no `rewind`, no `to_fresh`, no
+        // `Into<LeaseGuard<Fresh>>`, no `Default`. A spent guard cannot go
+        // back; the compiler, not a runtime check, enforces it.
+    }
+}
+
+#[cfg(test)]
+mod guard_courts {
+    use super::guard::{Fresh, LeaseGuard, Spent};
+    use super::Lease;
+
+    /// AE8 runtime court: spending through the guard advances the frozen
+    /// counter exactly as `Lease::tick` does (strictly increasing,
+    /// read-through agrees). Anti-vacuity mutation: a guard whose
+    /// `spend_tick` returned without advancing would flip this (same M1
+    /// class as the wave-7 `monotonicity_court`).
+    #[test]
+    fn guard_spend_sequence_is_monotonic_delegated() {
+        let mut g = LeaseGuard::mint([7u8; 32], 16, [9u8; 32]);
+        for expected in 0..4u64 {
+            assert_eq!(g.spend_tick(), expected, "pre-advance value");
+            assert_eq!(g.current_tick(), expected + 1, "read-through");
+        }
+        let spent = g.retire();
+        assert_eq!(spent.current_tick(), 4);
+        let lease: Lease = spent.release();
+        assert_eq!(lease.current_tick(), 4, "release preserves the tick");
+    }
+
+    /// AE8 runtime court: `retire` is affine-by-value — after moving the
+    /// guard into `retire`, the `Fresh` binding is gone; `Spent` exposes no
+    /// `spend_tick`. The runtime part pins observable state; the compile
+    /// part is pinned by `guard_compile_rejection`.
+    #[test]
+    fn retire_consumes_and_terminal_state_has_no_tick_path() {
+        let g: LeaseGuard<Fresh> = LeaseGuard::mint([1u8; 32], 8, [3u8; 32]);
+        assert_eq!(g.current_tick(), 0);
+        let spent: LeaseGuard<Spent> = g.retire();
+        assert_eq!(spent.current_tick(), 0, "retire does not spend a tick");
+        let _lease = spent.release();
+    }
+
+    /// AE8 compile-rejection court: a program that attempts state inversion
+    /// (`Spent -> Fresh` via a `rewind()` call) MUST fail to compile against
+    /// the real crate. Observed as a REAL rustc subprocess; the court
+    /// demands an E0599-class rejection.
+    ///
+    /// CONTROL mutation (anti-vacuity, run in the same court): the identical
+    /// call shape against an in-file stand-in that HAS `rewind` must
+    /// COMPILE — proving the baseline rejection is attributable to the
+    /// guard's missing rewind (the AE8 law), not to rustc noise or a path
+    /// typo. If the guard ever grew a rewind, the BASELINE would compile,
+    /// `find_rlib` would return None or the baseline rustc would exit 0 —
+    /// either way this court flips.
+    #[test]
+    fn guard_compile_rejection_state_inversion_is_unrepresentable() {
+        // CONTROL first: same call shape, stand-in WITH rewind -> compiles.
+        let control = std::env::temp_dir().join("ae8_guard_control.rs");
+        std::fs::write(
+            &control,
+            "pub struct G; pub struct F;\n\
+             impl G { pub fn rewind(self) -> F { F } }\n\
+             fn main() {\n\
+             let g = G;\n\
+             let _f: F = g.rewind();\n\
+             }\n",
+        )
+        .expect("write control mutant");
+        let out = std::process::Command::new("rustc")
+            .arg("--edition")
+            .arg("2021")
+            .arg("--crate-type")
+            .arg("bin")
+            .arg(&control)
+            .arg("-o")
+            .arg(control.with_extension("bin"))
+            .output()
+            .expect("spawn rustc for control mutant");
+        assert!(
+            out.status.success(),
+            "AE8 CONTROL DEATH: the rewind-shaped call does not compile \
+             even against a stand-in that HAS rewind — the baseline \
+             rejection below is not attributable to the guard API; stderr: {}",
+            std::string::String::from_utf8_lossy(&out.stderr)
+        );
+
+        // BASELINE: the same call against the REAL crate MUST be rejected.
+        // The workspace target layout is nonstandard, so the extern paths
+        // come from a shallow artifact scan near the test binary.
+        let crypto = find_artifact("libcgap_crypto", ".rmeta")
+            .expect("locate libcgap_crypto rmeta near this test binary");
+        let blake3 = find_artifact("libcgap_blake3", ".rlib")
+            .expect("locate libcgap_blake3 rlib near this test binary");
+        let mutant = std::env::temp_dir().join("ae8_guard_mutant.rs");
+        std::fs::write(
+            &mutant,
+            "fn main() {\n\
+             let g = cgap_crypto::lease::guard::LeaseGuard::<\n\
+             cgap_crypto::lease::guard::Fresh>::mint([0u8; 32], 8, [0u8; 32]);\n\
+             let spent = g.retire();\n\
+             let _back: cgap_crypto::lease::guard::LeaseGuard<\n\
+             cgap_crypto::lease::guard::Fresh> = spent.rewind();\n\
+             }\n",
+        )
+        .expect("write mutant");
+        let out = std::process::Command::new("rustc")
+            .arg("--edition=2021")
+            .arg("--emit=metadata")
+            .arg("--crate-type=lib")
+            .arg(format!("--extern=cgap_crypto={}", crypto.display()))
+            .arg(format!("--extern=cgap_blake3={}", blake3.display()))
+            .arg("-L")
+            .arg(format!("dependency={}", crypto.parent().unwrap().display()))
+            .arg("-L")
+            .arg(format!("dependency={}", blake3.parent().unwrap().display()))
+            .arg(&mutant)
+            .output()
+            .expect("spawn rustc for mutant");
+        let stderr = std::string::String::from_utf8_lossy(&out.stderr);
+        assert!(
+            !out.status.success(),
+            "AE8 VACUOUS GATE: `Spent::rewind` COMPILED against the real \
+             crate — the type-level no-rewind law is absent; stderr: {stderr}"
+        );
+        assert!(
+            stderr.contains("E0599") || stderr.contains("E0433"),
+            "AE8 WRONG-REASON DEATH: mutant rejected without an \
+             E0599/E0433-style method-resolution signature; stderr: {stderr}"
+        );
+        let _ = std::fs::remove_file(&control);
+        let _ = std::fs::remove_file(&mutant);
+    }
+
+    /// Locates a built crate artifact (`name` + `ext`, e.g.
+    /// `libcgap_crypto` + `.rmeta`) near this test binary. The workspace
+    /// target layout here is nonstandard (artifacts live under
+    /// `build/<crate>/<hash>/out/`), so the search walks up from the test
+    /// executable scanning shallowly.
+    fn find_artifact(name: &str, ext: &str) -> Option<std::path::PathBuf> {
+        fn name_matches(n: &str, name: &str, ext: &str) -> bool {
+            n.starts_with(name) && n.ends_with(ext)
+        }
+        fn shallow(dir: &std::path::Path, name: &str, ext: &str) -> Option<std::path::PathBuf> {
+            std::fs::read_dir(dir)
+                .ok()?
+                .flatten()
+                .map(|e| e.path())
+                .find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| name_matches(n, name, ext))
+                        .unwrap_or(false)
+                })
+        }
+        let mut dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+        loop {
+            if let Some(p) = shallow(&dir, name, ext) {
+                return Some(p);
+            }
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for e in entries.flatten() {
+                    let p = e.path();
+                    if p.is_dir() {
+                        let hit =
+                            shallow(&p, name, ext).or_else(|| shallow(&p.join("out"), name, ext));
+                        if hit.is_some() {
+                            return hit;
+                        }
+                        // third level: <dir>/<hash>/out
+                        if let Ok(subs) = std::fs::read_dir(&p) {
+                            for q in subs.flatten().map(|e| e.path()) {
+                                if q.is_dir() {
+                                    if let Some(hit) = shallow(&q.join("out"), name, ext) {
+                                        return Some(hit);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !dir.pop() {
+                return None;
+            }
         }
     }
 }

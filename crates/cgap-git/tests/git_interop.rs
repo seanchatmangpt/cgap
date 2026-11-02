@@ -23,9 +23,7 @@ use cgap_git::idx_read::IdxV2;
 
 fn require_git() -> String {
     match Command::new("git").arg("--version").output() {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim().to_string()
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
         Ok(out) => panic!(
             "SKIP-REFUSAL: git binary exists but `git --version` failed (exit {:?}): {}",
             out.status.code(),
@@ -254,12 +252,10 @@ fn direction_a_git_idx_parsed_by_crate_reader() {
         assert!(
             cf.status_ok,
             "git cat-file failed for {}: {}",
-            oids[i],
-            cf.stderr
+            oids[i], cf.stderr
         );
         assert_eq!(
-            cf.stdout_bytes,
-            *content,
+            cf.stdout_bytes, *content,
             "cat-file content mismatch for {}",
             oids[i]
         );
@@ -279,7 +275,11 @@ fn direction_a_fanout_total_matches_git_census() {
         let b = blob(0x500 + i, 128);
         let p = repo.root.join(format!("b{i}.bin"));
         fs::write(&p, &b).unwrap();
-        let ho = run(&repo.root, &["hash-object", "-w", p.to_str().unwrap()], "ho");
+        let ho = run(
+            &repo.root,
+            &["hash-object", "-w", p.to_str().unwrap()],
+            "ho",
+        );
         assert!(ho.status_ok, "{}", ho.stderr);
         oids.push(ho.stdout.trim().to_string());
     }
@@ -290,7 +290,10 @@ fn direction_a_fanout_total_matches_git_census() {
     oids.sort();
     oids.dedup();
     assert_eq!(idx.fanout(255) as usize, oids.len());
-    assert_eq!(idx.fanout(0) as usize, oids.iter().filter(|o| o.starts_with("00")).count());
+    assert_eq!(
+        idx.fanout(0) as usize,
+        oids.iter().filter(|o| o.starts_with("00")).count()
+    );
 }
 
 // ------------------------------------------------------------- Direction B --
@@ -341,7 +344,10 @@ fn direction_b_git_accepts_cgap_pack() {
                 "cat-file content mismatch for {oid_hex}"
             );
         }
-        eprintln!("[court B] PASS: git {} fully accepts cgap-git pack+idx", git_version);
+        eprintln!(
+            "[court B] PASS: git {} fully accepts cgap-git pack+idx",
+            git_version
+        );
         return;
     }
 

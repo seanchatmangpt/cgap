@@ -205,8 +205,6 @@
 //! point the status codes below become re-exports of A19's register
 //! (DoD 10).
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 /// Total frame header length in bytes — A04 §6/§6.1: 128 B total, align 64.
 pub const HEADER_LEN: usize = 128;
 
@@ -649,14 +647,13 @@ fn read_u16_le(bytes: &[u8], off: usize) -> u16 {
 /// same codegen note — early-exit byte loop, no slice helpers).
 #[inline]
 fn is_zero_at(bytes: &[u8], off: usize, len: usize) -> bool {
-    let mut i = 0;
-    while i < len {
-        if bytes[off + i] != 0 {
-            return false;
-        }
-        i += 1;
-    }
-    true
+    // REP5 swap: the centralized SWAR all-zero detect in cgap-branchless
+    // (`swar_all_zero_vl`) — identical all-zero semantics for every input
+    // (early exit per nonzero chunk instead of per nonzero byte), so
+    // admission decisions are byte-identical. Differential court:
+    // cgap-branchless `penstock::courts::all_zero_differential_vs_shipped`
+    // (50k slices + structural edges vs the sha256-pinned shipped oracle).
+    cgap_branchless::penstock::swar_all_zero_vl(&bytes[off..off + len])
 }
 
 /// L1 two-stage escalation prefilter (v26.11.2 lever L1): one unaligned
@@ -675,14 +672,13 @@ fn is_zero_at(bytes: &[u8], off: usize, len: usize) -> bool {
 /// reads nothing past byte 8.
 #[inline]
 pub fn prefilter8(bytes: &[u8]) -> u64 {
-    let mut v = [0u8; 8];
-    let mut i = 0;
-    while i < 8 {
-        v[i] = bytes[i];
-        i += 1;
-    }
-    let w = u64::from_le_bytes(v);
-    (w ^ (w >> 7)).wrapping_mul(0x2544_5491_4F6C_DD1D)
+    // REP5 swap: consume the centralized primitive in cgap-branchless
+    // (`penstock_prefilter8` = `penstock_prefilter8_mix`, the exact shipped
+    // formula). Differential court: cgap-branchless
+    // `penstock::courts::prefilter_differential_vs_shipped` (50k corpus vs
+    // the sha256-pinned shipped oracle); mutation court M-mix proves the
+    // court flips on a seed-conflation corruption of the constant.
+    cgap_branchless::penstock::penstock_prefilter8(bytes)
 }
 
 // ===========================================================================
@@ -700,6 +696,8 @@ pub fn prefilter8(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod courts {
     use super::*;
+    use alloc::string::{String, ToString};
+    use alloc::vec::Vec;
 
     // -- Real counting allocator (§8.2; local mirror of the audit crate's
     // -- CountingAlloc — divergence recorded in the module docs) ----------

@@ -8,3 +8,9 @@ license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A14 receipt ALIVE (docs/jira/v26.11.1/waves/a14-finish-receipt.md)
 
 [lib]
+
+# W6 lane B7: consume the centralized branchless ALU/SWAR mechanics crate.
+# Body-site swaps deferred: none of the current penstock sites match a
+# shipped branchless primitive exactly (see waves/w6-b7-gate-consume.md).
+[dependencies]
+cgap-branchless = { workspace = true }

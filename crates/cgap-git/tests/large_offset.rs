@@ -218,9 +218,7 @@ fn case2_escape_offsets_2p31_2p31_plus_4096_2p32_minus_1() {
     let idx = IdxV2::parse(&bytes).expect("parse large-table idx");
     idx.verify_idx_checksum().expect("idx checksum valid");
     assert_all_rows_exact(&idx, &entries);
-    println!(
-        "RECEIPT case2: 3/3 escape rows exact (0x80000000, 0x80001000, 0xFFFFFFFF)"
-    );
+    println!("RECEIPT case2: 3/3 escape rows exact (0x80000000, 0x80001000, 0xFFFFFFFF)");
 }
 
 /// Case 3 (re-assert): the writer refuses every offset `>= 2^31` as a typed
@@ -332,12 +330,14 @@ fn case5_mixed_three_object_idx_small_boundary_large() {
     // Escape words only where the offset requires them.
     for (i, (_, off)) in entries.iter().enumerate() {
         let w = small_word(&bytes, n, i);
-        assert_eq!((w & 0x8000_0000) != 0, *off >= LARGE_MIN, "row {i} MSB iff large");
+        assert_eq!(
+            (w & 0x8000_0000) != 0,
+            *off >= LARGE_MIN,
+            "row {i} MSB iff large"
+        );
     }
     assert_all_rows_exact(&idx, &entries);
-    println!(
-        "RECEIPT case5: small=12 boundary=0x7FFFFFFF large=0x80001000 — 3/3 lookups exact"
-    );
+    println!("RECEIPT case5: small=12 boundary=0x7FFFFFFF large=0x80001000 — 3/3 lookups exact");
 }
 
 /// Case 6 (beyond-spec probe): offsets above `2^32` are the reason the

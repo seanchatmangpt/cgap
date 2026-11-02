@@ -1884,7 +1884,7 @@ mod tests {
 
         // Positive control: the genesis anchor IS the digest of the canonical
         // 80-B record (§5 offset 40).
-        let mut m = meter(100, 0xA41);
+        let m = meter(100, 0xA41);
         assert_eq!(
             m.attestation_digest(),
             canon_digest,

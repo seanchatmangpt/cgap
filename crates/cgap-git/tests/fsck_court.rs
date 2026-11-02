@@ -26,7 +26,9 @@ fn require_git() -> String {
             out.status.code(),
             String::from_utf8_lossy(&out.stderr)
         ),
-        Err(e) => panic!("SKIP-REFUSAL: git binary not runnable: {e}. Court cannot run without real git."),
+        Err(e) => {
+            panic!("SKIP-REFUSAL: git binary not runnable: {e}. Court cannot run without real git.")
+        }
     }
 }
 
@@ -107,7 +109,9 @@ fn install_pack(repo: &Repo, pack: &[u8], idx: &[u8]) -> (PathBuf, PathBuf) {
 }
 
 fn cgap_blob(seed: u8, len: usize) -> Vec<u8> {
-    (0..len).map(|i| (i as u8).wrapping_mul(31).wrapping_add(seed)).collect()
+    (0..len)
+        .map(|i| (i as u8).wrapping_mul(31).wrapping_add(seed))
+        .collect()
 }
 
 // ------------------------------------------------------------------ court --
@@ -297,7 +301,11 @@ fn negative_control_corrupted_git_built_pack_is_rejected() {
         &[
             "verify-pack",
             "-v",
-            corrupt_repo.pack_dir().join(format!("pack-{pack_name}.idx")).to_str().unwrap(),
+            corrupt_repo
+                .pack_dir()
+                .join(format!("pack-{pack_name}.idx"))
+                .to_str()
+                .unwrap(),
         ],
         "git verify-pack (control corrupt)",
     );

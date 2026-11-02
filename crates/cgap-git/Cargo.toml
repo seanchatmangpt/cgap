@@ -21,3 +21,5 @@ std = []
 # dependency to the published kernel ([dependencies] stays empty).
 cgap-blake3 = { path = "../cgap-blake3" }
 cgap-parquet = { path = "../cgap-parquet" }
+
+cgap-bn3 = { path = "../cgap-bn3" }
