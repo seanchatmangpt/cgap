@@ -124,9 +124,7 @@
       "Bash(git log *)",
       "Bash(git diff *)"
     ],
-    "ask": [
-      "Bash(git push *)"
-    ],
+    "ask": [],
     "deny": [
       "Read(./.env)",
       "Read(./.env.local)",
