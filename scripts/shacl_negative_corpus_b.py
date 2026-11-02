@@ -122,7 +122,10 @@ def canon_hash(g: Graph) -> str:
     """
     ih = to_isomorphic(g).internal_hash()
     # rdflib >=7 returns an int digest; older returns a hashlib object.
-    digest = ih.digest() if hasattr(ih, "digest") else str(ih).encode("utf-8")
+    if isinstance(ih, int):
+        digest = str(ih).encode("utf-8")
+    else:
+        digest = ih.digest()
     return hashlib.sha256(digest).hexdigest()
 
 
@@ -137,6 +140,7 @@ def validate(g: Graph):
     conforms, results_graph, _text = pyshacl.validate(
         data_graph=g, shacl_graph=g, inference="none", advanced=False
     )
+    assert isinstance(results_graph, Graph)
     codes: set[str] = set()
     messages: list[str] = []
     for r in results_graph.subjects(RDF.type, SH.ValidationResult):
@@ -333,7 +337,8 @@ def ask(g: Graph, query_template: str, aum: Decimal) -> tuple[bool, URIRef | Non
         sel = g.query(query_template.replace("ASK WHERE",
                                              "SELECT ?dutyAction WHERE") % lit)
         for row in sel:
-            duty_action = row.dutyAction
+            action = getattr(row, "dutyAction", None)
+            duty_action = URIRef(action) if isinstance(action, str) else action
             break
     return bool(res.askAnswer), duty_action
 

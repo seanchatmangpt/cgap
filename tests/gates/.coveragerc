@@ -1,0 +1,14 @@
+# LANE C06 — coverage config for the scripts/ gate surface.
+# Branch coverage, parallel-mode data files (one per gate invocation),
+# combined by `coverage combine` in enforce_coverage_floor.py.
+[run]
+branch = True
+parallel = True
+data_file = /tmp/c06-cov/.coverage
+source = /Users/sac/cgap/scripts
+
+[report]
+precision = 1
+# Not excluding any code: the 90% branch floor is honest or it is red.
+exclude_lines =
+    pragma: no cover

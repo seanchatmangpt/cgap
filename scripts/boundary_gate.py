@@ -128,17 +128,31 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # --- Frozen gate ABI (A20 §6.2, §6.3, §9) — unchanged from Wave 1 -----------
+#
+# Exit ABI (repo gate contract, CLAUDE.md; lane-12 normalization):
+#   0  PASS      — gate verdict green (witnessed paths, unchanged)
+#   1  REFUSE    — typed gate refusal: VACUOUS GATE, red baseline, corrupted
+#                  restore, untriaged survivor, cross-gate red, bad input
+#   2  SUBJECT_MISSING — prerequisite/subject absent: covered crate dir
+#                  missing from the tree, a --targets file missing
+#   3  SKIP_LOUD — the mode ran but observed nothing (loud [SKIP], never a
+#                  fake pass): --strings over covered crates with zero
+#                  scannable source files
 
 EXIT_PASS = 0          # §9: gate passes
 EXIT_REFUSE = 1        # §6.3: typed refusal — VACUOUS GATE, red baseline,
                        # corrupted restore, untriaged survivor, Wave-4 mode.
+EXIT_SUBJECT_MISSING = 2   # lane-12: subject/prerequisite missing (loud)
+EXIT_SKIP_LOUD = 3         # lane-12: loud [SKIP] — nothing observed
 
 KILL_RATE_MIN = 0.98                       # §6.2: gate passes iff >= 0.98
 VERDICT_ABI_VERSION = 1                    # must equal VERDICT_ABI_VERSION
@@ -148,7 +162,8 @@ SHA256_BYTES = 32                          # §6.1 manifests, sha256 fail-closed
 MAX_COURTS_PER_RUN = 32                    # mirrors tests/court_verdict.rs
 
 # §9 DoD command surface — CLI mode names frozen at Wave 1.
-CLI_MODES = ("--mutate", "--shim-court-only", "--deps", "--strings")
+CLI_MODES = ("--mutate", "--shim-court-only", "--deps", "--strings",
+             "--self-check-deps")
 
 # §6.1 step 7 JSON ledger schema keys, frozen (order = emission order).
 LEDGER_SCHEMA = (
@@ -1110,9 +1125,11 @@ def covered_crate_dirs():
     """Absolute dirs of the covered crates; refuse fail-closed on absence."""
     missing = [c for c in COVERED_CRATES if not os.path.isdir(os.path.join(REPO, c))]
     if missing:
+        # lane-12 exit ABI: a missing covered crate is a missing SUBJECT,
+        # not a gate verdict — typed exit 2 (was EXIT_REFUSE).
         print("DEPS GATE: covered crates missing from the tree: %s" % missing,
               file=sys.stderr)
-        sys.exit(EXIT_REFUSE)
+        sys.exit(EXIT_SUBJECT_MISSING)
 
 
 def parse_runtime_deps(crate_dir):
@@ -1213,6 +1230,7 @@ def mode_strings(report=None):
     allow = reg["allowlist"]
     rows = []
     hits = 0
+    files_scanned = 0  # lane-12: loud-skip accounting (exit 3 on zero)
     for crate in COVERED_CRATES:
         base = os.path.join(REPO, crate)
         for root, dirs, files in os.walk(base):
@@ -1220,6 +1238,7 @@ def mode_strings(report=None):
             for fn in sorted(files):
                 if not (fn.endswith(".rs") or fn.endswith(".toml")):
                     continue
+                files_scanned += 1
                 p = os.path.join(root, fn)
                 try:
                     body = open(p, encoding="utf-8", errors="replace").read()
@@ -1246,6 +1265,16 @@ def mode_strings(report=None):
                             })
                             print("  HIT %s:%d [%s] %s"
                                   % (rel, n, tag, line.strip()[:120]))
+    # lane-12 exit ABI: a scan over ZERO scannable files enforces nothing —
+    # a silent pass here would be vacuous. Loud [SKIP], typed exit 3 (the
+    # witnessed green path on the real tree scans thousands of files and
+    # still exits 0, unchanged).
+    if files_scanned == 0:
+        print("[SKIP] STRINGS GATE: 0 scannable .rs/.toml files across %d "
+              "covered crates — nothing observed, no verdict enforced "
+              "(§10 loud-skip class; exit 3)" % len(COVERED_CRATES),
+              file=sys.stderr)
+        return EXIT_SKIP_LOUD
     # CROSS-GATE SEAM (Wave 7, a07-wave6 audit open item 4): §6.4 single-
     # kernel law at seal time — this gate's verdict INHERITS the canonical
     # A07 artifact-scan verdict over the same tree. The audit's finding —
@@ -1344,6 +1373,100 @@ def mode_deps_strings(which, report=None):
         print(TYPED_REASON_NOT_IMPLEMENTED, file=sys.stderr)
         return EXIT_REFUSE
     return rc
+
+
+def mode_self_check_deps(report=None):
+    """G16 non-vacuity arm for the §6.4 --deps gate (Wave FIX-05). Chicago
+    discipline: a REAL manifest fixture under /tmp, assertions on final
+    state (exit-class verdicts), no mocks, no shared-tree mutation.
+
+    Arms:
+      G (green) — a sandbox copy of the real crates/cgap-core/Cargo.toml
+          classifies with E=0 runtime externals; the gate's verdict
+          computation over the fixture yields EXIT_PASS. A clean fixture
+          that refuses is a false positive — the arm refuses.
+      P (poison) — the same fixture with a poison registry dep appended
+          (`poison-registry-dep = "1.0.0"`); the classification MUST mark
+          it EXTERNAL and the gate verdict computation MUST yield
+          EXIT_REFUSE (exit 1) with "EXTERNAL: poison-registry-dep" in the
+          evidence. A poison fixture that stays green is a VACUOUS gate —
+          the arm refuses.
+
+    Exit contract mirrors the gate: 0 pass / 1 refuse / 2 missing subject /
+    3 loud skip (loud skip fires iff the real manifest to copy is absent).
+    """
+    real_manifest = os.path.join(REPO, "crates/cgap-core/Cargo.toml")
+    if not os.path.isfile(real_manifest):
+        print("[SKIP] DEPS SELF-CHECK: subject manifest missing: %s"
+              % real_manifest, file=sys.stderr)
+        return EXIT_SUBJECT_MISSING
+    tmp_root = tempfile.mkdtemp(prefix="boundary-deps-court-")
+    try:
+        fixture = os.path.join(tmp_root, "cgap-core")
+        os.makedirs(fixture, exist_ok=True)
+        manifest = os.path.join(fixture, "Cargo.toml")
+        shutil.copyfile(real_manifest, manifest)
+
+        def gate_verdict(externals):
+            """The gate's own verdict rule (mode_deps lines): E=0 -> pass."""
+            return EXIT_PASS if not externals else EXIT_REFUSE
+
+        # --- Arm G: clean fixture must stay green (exit 0) -------------
+        name, external, total = parse_runtime_deps(fixture)
+        if external:
+            print("DEPS SELF-CHECK FAILED (arm G): clean fixture %s "
+                  "classified EXTERNAL=%r — the clean arm must stay green "
+                  "or the poison flip carries no information"
+                  % (manifest, external), file=sys.stderr)
+            return EXIT_REFUSE
+        rc_g = gate_verdict(external)
+        if rc_g != EXIT_PASS:
+            print("DEPS SELF-CHECK FAILED (arm G): verdict %d on E=0 "
+                  "fixture" % rc_g, file=sys.stderr)
+            return EXIT_REFUSE
+        print("  G clean      cgap-core fixture E=0 -> exit 0  OK")
+
+        # --- Arm P: poison fixture must flip to refuse (exit 1) --------
+        with open(manifest, "a", encoding="utf-8") as f:
+            # NOTE: the real manifest's tail section is [dev-dependencies]
+            # (dev-deps are not runtime); the poison must land under a
+            # runtime [dependencies] header or the court tests nothing.
+            f.write("\n[dependencies]\n"
+                    "poison-registry-dep = \"1.0.0\"\n")
+        name, external, total = parse_runtime_deps(fixture)
+        evidence = "EXTERNAL: %s" % ",".join(external)
+        if "poison-registry-dep" not in external:
+            print("DEPS SELF-CHECK FAILED (arm P): poison registry dep "
+                  "NOT classified EXTERNAL (external=%r, evidence=%r) — "
+                  "VACUOUS GATE: the deps classification enforces nothing"
+                  % (external, evidence), file=sys.stderr)
+            return EXIT_REFUSE
+        rc_p = gate_verdict(external)
+        if rc_p != EXIT_REFUSE:
+            print("DEPS SELF-CHECK FAILED (arm P): verdict %d on poisoned "
+                  "fixture (expected %d EXIT_REFUSE)" % (rc_p, EXIT_REFUSE),
+                  file=sys.stderr)
+            return EXIT_REFUSE
+        print("  P poison     registry dep -> %s -> exit 1  OK" % evidence)
+        print("DEPS SELF-CHECK: both arms flipped (clean=exit 0, "
+              "poison=exit 1); --deps classification is non-vacuous")
+
+        ledger = {
+            "abi_version": VERDICT_ABI_VERSION,
+            "mode": "self-check-deps",
+            "kill_rate": None,
+            "arms": {
+                "G_clean": {"exit": rc_g, "externals": []},
+                "P_poison": {"exit": rc_p,
+                             "externals": ["poison-registry-dep"],
+                             "evidence": evidence},
+            },
+            "fixture": tmp_root,
+        }
+        write_report(ledger, report)
+        return EXIT_PASS
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
 
 
 def mode_cross_gate_court(report=None):
@@ -1693,9 +1816,19 @@ def mode_interference_court(report=None):
                 import importlib.util
                 nspec = importlib.util.spec_from_file_location(
                     "bg_neutered", neutered_path)
-                nmod = importlib.util.module_from_spec(nspec)
+                nmod = None
+                loader = None
+                if nspec is None or nspec.loader is None:
+                    failures.append("V: neutered module spec/loader unavailable: %s"
+                                    % neutered_path)
+                else:
+                    loader = nspec.loader
+                    nmod = importlib.util.module_from_spec(nspec)
                 try:
-                    nspec.loader.exec_module(nmod)
+                    if nmod is not None and loader is not None:
+                        loader.exec_module(nmod)
+                    else:
+                        nmod = None
                 except Exception as exc:  # noqa: BLE001
                     failures.append("V: neutered module failed to load: %s"
                                     % exc)
@@ -1757,8 +1890,10 @@ def parse_targets(spec):
                   % t, file=sys.stderr)
             sys.exit(EXIT_REFUSE)
         if not os.path.isfile(os.path.join(REPO, norm)):
+            # lane-12 exit ABI: missing target file = missing subject (exit 2);
+            # path escapes/duplicates above stay typed refusals (exit 1).
             print("TARGET MISSING: %s" % t, file=sys.stderr)
-            sys.exit(EXIT_REFUSE)
+            sys.exit(EXIT_SUBJECT_MISSING)
     if len(set(targets)) != len(targets):
         print("DUPLICATE TARGET in --targets", file=sys.stderr)
         sys.exit(EXIT_REFUSE)
@@ -1792,6 +1927,14 @@ def main():
                          "foreign). All mutations on temp copies; the "
                          "canonical tree is never written.")
     ap.add_argument("--deps", action="store_true", help="§6.4 dep gate")
+    ap.add_argument("--self-check-deps", action="store_true",
+                    help="G16 non-vacuity arm for the --deps gate: a real "
+                         "/tmp manifest fixture must classify clean (exit "
+                         "0) and a poison registry dep appended to a copy "
+                         "of the real manifest must flip it to exit 1 with "
+                         "EXTERNAL evidence; /tmp-only, the shared tree is "
+                         "never mutated. A poison fixture that stays green "
+                         "is a VACUOUS gate; the court exits 1.")
     ap.add_argument("--strings", action="store_true",
                     help="§6.4 string gate")
     ap.add_argument("--report", default=None, help="ledger JSON output path")
@@ -1823,6 +1966,9 @@ def main():
         # lock) close the class. Held for the process lifetime; advisory
         # flock releases on process death, so no stale wedge.
         acquire_campaign_lock()
+
+    if args.self_check_deps:
+        sys.exit(mode_self_check_deps(args.report))
 
     if args.deps or args.strings:
         which = []

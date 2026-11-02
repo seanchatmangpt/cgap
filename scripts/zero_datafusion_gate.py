@@ -191,7 +191,11 @@ datafusion = "1"
 
 def copy_subject(root_dir: Path, sandbox: Path) -> None:
     """Copy the scan corpus into the sandbox (ignore .git/target/docs)."""
-    ignore = shutil.ignore_patterns(".git", "target", "docs", "*.lock")
+    # S200-1 (cull-01 KEEP+fix): vendor/nanoarrow/python/subprojects/
+    # arrow-nanoarrow is a self-recursive symlink (-> ../..); copytree
+    # follows it into an infinite loop. Skip it by name.
+    ignore = shutil.ignore_patterns(".git", "target", "docs", "*.lock",
+                                    "arrow-nanoarrow")
     shutil.copytree(root_dir, sandbox, dirs_exist_ok=True, ignore=ignore)
     for name in ("Cargo.toml", "Cargo.lock"):
         src = root_dir / name
@@ -217,7 +221,15 @@ def self_check(root_dir: Path, target_dir: Path | None) -> tuple[bool, bool, str
             note = f"clean twin not green: {probes}"
         root_copy = sandbox / "Cargo.toml"
         txt = root_copy.read_text(encoding="utf-8")
-        root_copy.write_text(txt + POISON_BLOCK, encoding="utf-8")
+        # The root manifest already carries [workspace.dependencies] (:41);
+        # appending a duplicate table is a TOML parse error (probes ERROR,
+        # not HIT). Merge the poison key into the existing section instead.
+        if "[workspace.dependencies]" in txt:
+            txt = txt.replace("[workspace.dependencies]",
+                              "[workspace.dependencies]\ndatafusion = \"1\"", 1)
+            root_copy.write_text(txt, encoding="utf-8")
+        else:
+            root_copy.write_text(txt + POISON_BLOCK, encoding="utf-8")
         probes, _ = run_probes(sandbox, target_dir)
         poison_killed = classify(probes) == EXIT_VIOLATION
         if not poison_killed:

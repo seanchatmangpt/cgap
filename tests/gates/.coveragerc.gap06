@@ -1,0 +1,15 @@
+# LANE GAP-06 — PRIVATE coverage config (do not share data_file with C06).
+# Witnessed this session: two lanes driving tests/gates/.coveragerc's
+# data_file (/tmp/c06-cov/.coverage) race combine/erase — the combined db
+# was deleted/clobbered mid-run by a concurrent writer. This rcfile keeps
+# GAP-06's data in a lane-leased path.
+[run]
+branch = True
+parallel = True
+data_file = /tmp/gap06-cov/.coverage
+source = /Users/sac/cgap/scripts
+
+[report]
+precision = 1
+exclude_lines =
+    pragma: no cover

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Gate 3 (schema level): C Data Interface schema-parity harness.
 
-Extends gate3_cdata.py from wire parity to schema parity. Same cdylib
+TC-03 merge: this gate now SUBSUMES gate3_cdata.py (tombstoned 2026-11-02,
+cull-01 VERIFIED-REDUNDANT). Config 0 (n=100_000, null_every=7) is cdata's
+exact assert set: rows==n, non-null export slots, type int32, null_count
+n//7, bitwise validity+values buffers (checks 1, 2, 4). Same cdylib
 (target/debug/libcgap_ffi.dylib) and same ctypes surface — NO new cgap-ffi
 exports; all schema-level facts are proven through pyarrow's public API on
 the imported array:

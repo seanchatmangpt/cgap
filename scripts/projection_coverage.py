@@ -518,10 +518,11 @@ def check(root, git_dir, verbose=True):
         "matched_bytes": sum(f["bytes"] for f in gen if f["status"] == "IDENTICAL"),
         "hand_files": len(hand),
         "hand_bytes": sum(f["bytes"] for f in hand),
+        "pct_regenerable": 0.0,
     }
     t = rep["totals"]
     t["pct_regenerable"] = round(100.0 * t["matched_bytes"] / t["tracked_bytes"], 4) \
-        if t["tracked_bytes"] else 0.0
+        if t["tracked_bytes"] else 0
     if rep["fails"]:
         for f in rep["fails"]:
             log("FAIL: %s" % f)

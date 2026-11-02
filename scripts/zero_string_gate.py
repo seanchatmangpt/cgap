@@ -26,6 +26,12 @@ disagreement, vocabulary absent, unparsable vocabulary archive — all
 GATE-REFUSED: <class> <subject>, exit 1. Any exception unwinds to a handler
 emitting GATE-REFUSED: internal-error and exit 1.
 
+Exit ABI (lane-12 normalization, v1.4.2): 0 pass / 1 typed gate refusal /
+2 subject-or-prerequisite missing (vocab missing/unparsable, workspace or
+member manifest missing, no artifacts built, tool missing) / 3 loud skip
+(scan completed but every discovered artifact was [SKIP]ed). See the
+Exit-ABI block at GATE_VERSION.
+
 Exit 0 requires ALL of: (a) >= 1 artifact scanned per enumerated, non-
 excluded crate; (b) vocabulary loaded non-empty; (c) zero vocabulary hits
 in fail-set sections; (d) zero refusals.
@@ -145,7 +151,37 @@ import tempfile
 from pathlib import Path
 from typing import NoReturn
 
-GATE_VERSION = "1.4.1"
+GATE_VERSION = "1.4.2"
+
+# ---------------------------------------------------------------------------
+# Exit ABI (repo gate contract, CLAUDE.md; lane-12 normalization):
+#   0  PASS      — all four §"Exit 0 requires" conditions hold (witnessed
+#                  paths, unchanged)
+#   1  REFUSE    — typed GATE-REFUSED gate verdict: hits red, vacuous,
+#                  corrupted/unparsable subject, bad input, internal error
+#   2  SUBJECT_MISSING — prerequisite/subject absent: vocabulary missing or
+#                  unparsable, workspace manifest missing/malformed, member
+#                  manifest missing, no artifacts built ("run cargo build
+#                  first"), scan tool missing
+#   3  SKIP_LOUD — the run completed but every discovered artifact was
+#                  loud-[SKIP]ed (scanned=0, skipped>0): nothing observed,
+#                  never a fake pass
+# ---------------------------------------------------------------------------
+
+# GateRefused reason_class values that mean the SUBJECT/prerequisite is
+# missing (exit 2) rather than the gate refusing the tree's content (exit 1).
+SUBJECT_MISSING_CLASSES = frozenset({
+    "vocab-missing",
+    "vocab-empty",
+    "vocab-unparsable",
+    "workspace-manifest",
+    "member-manifest-missing",
+    "crate-no-artifacts",
+    "no-artifacts-scanned",
+    "execution-crate-no-artifacts",
+    "artifact-vanished",
+    "tool-missing",
+})
 
 # ---------------------------------------------------------------------------
 # .bosym v0 framing constants — mirror of crates/cgap-bosym/src/slab.rs
@@ -412,9 +448,12 @@ CRATE_EXCLUSIONS = {
 # match the real package names (cgap-cli/cgap-integration/cgap-audit), so
 # the presence assertion never bit on them; the real names are added so
 # the structural precondition holds on the actual workspace.
+# cull-05 RE-TARGET (TC-01): the ghost keys "cli"/"integration" are
+# dropped — only the real package names count; a manifest key naming a
+# ghost no longer qualifies for the producer exemption.
 DOC_EXECUTION_FAMILY = {
     "cgap", "cgap-ffi", "cgap-arrow", "cgap-beam", "cgap-parquet",
-    "cgap-git", "cgap-blake3", "cgap-gpu", "cli", "integration",
+    "cgap-git", "cgap-blake3", "cgap-gpu",
     "wasm-footprint",
     "cgap-cli", "cgap-integration", "cgap-audit",
 }
@@ -1303,6 +1342,15 @@ def cmd_scan(args) -> int:
                           f"doc execution family with zero scanned artifacts at profile={args.profile}; "
                           "run cargo build first (structural anti-vacuity precondition)")
     if zero_scanned:
+        # lane-12 exit ABI: every discovered artifact loud-[SKIP]ed (e.g. all
+        # wasm, out-of-v1-scope) is a loud skip (exit 3), not a refusal; no
+        # artifacts discovered at all remains the crate-no-artifacts refusal
+        # (exit 2 via the SUBJECT_MISSING_CLASSES mapping in main).
+        if total_scanned == 0 and total_skip > 0:
+            print(f"[SKIP] SCAN-SUMMARY scanned=0 skipped_artifacts={total_skip} "
+                  f"crates={len(crates)} hits=0 — nothing observed, no verdict "
+                  f"enforced (loud skip, exit 3)", file=sys.stderr)
+            return 3
         raise GateRefused("crate-no-artifacts", ",".join(sorted(zero_scanned)),
                           f"non-excluded member crates with zero scanned artifacts at profile={args.profile}")
     if total_scanned == 0:
@@ -1370,6 +1418,13 @@ def cmd_dep_direction(args) -> int:
     for (p, sec, off, ref) in adv_refs:
         print(f"DEP-DIR-ADV(non-fail-section) {p} {sec} {off} {ref}")
     if zero:
+        # lane-12 exit ABI: all-skipped run = loud skip (exit 3); nothing
+        # discovered = subject missing (crate-no-artifacts -> exit 2 in main).
+        if checked == 0 and skipped > 0:
+            print(f"[SKIP] DEP-DIR-SUMMARY checked=0 skipped_artifacts={skipped} "
+                  f"crates={len(crates)} violations=0 — nothing observed "
+                  f"(loud skip, exit 3)", file=sys.stderr)
+            return 3
         raise GateRefused("crate-no-artifacts", ",".join(sorted(zero)),
                           f"non-exempt member crates with zero artifacts at profile={args.profile}; "
                           "run cargo build first")
@@ -2246,6 +2301,10 @@ def main(argv=None) -> int:
         return cmd_scan(args)
     except GateRefused as e:
         print(str(e), file=sys.stderr)
+        # lane-12 exit ABI: subject/prerequisite-missing refusal classes map
+        # to exit 2; all other typed refusals stay exit 1 (unchanged).
+        if e.reason_class in SUBJECT_MISSING_CLASSES:
+            return 2
         return 1
     except Exception:
         import traceback

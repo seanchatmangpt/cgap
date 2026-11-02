@@ -1,0 +1,145 @@
+{
+  "_schema": "BR12 consume-then-census justified exceptions (lane AE5 2026-11-02; C05 candidate additions 2026-11-02, see _c05_note)",
+  "_c05_note": "Lane C05 (dead-code excision wave) census 2026-11-02: the nine *_c05_candidate entries below are UNCONSUMED pub fns whose definitions live in crates/cgap-branchless/src/{scan,transpose}.rs — files under an in-flight lane's lease in the same wave. Scope fence: C05 records them as excision candidates, does NOT excise; owning lane consumes or deletes them. Until then the plain gate exits 1 (DEAD_LIBRARY_SHOWROOM x9); this is a known-red state owned by the branchless lane, not a gate defect.",
+  "_law": "Every entry needs a justification + consume-then-census plan. A symbol unconsumed in production and absent here exits 1 (DEAD_LIBRARY_SHOWROOM). An entry naming no enumerated pub fn exits 1 (stale).",
+  "checked_uniform_select": {
+    "class": "B2-select",
+    "justification": "KNOWN-unconsumed since landing (FA2/FA6/BR12 register). B2 select machinery has no production caller yet; kept for the branchless ALU kernel contract.",
+    "plan": "Consume-then-census: wire cgap-gate bounded-select ingress or remove in the next pruning wave."
+  },
+  "cmov_u64": {
+    "class": "B2-select",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume from cgap-gate penstock constant-time paths or remove."
+  },
+  "eytzinger_next": {
+    "class": "B4-eytzinger",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12). Eytzinger machinery has no production caller.",
+    "plan": "Consume in cgap-gate key lookup or remove; census gate will refuse a silent re-add."
+  },
+  "eytzinger_restore": {
+    "class": "B4-eytzinger",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "As eytzinger_next."
+  },
+  "eytzinger_search": {
+    "class": "B4-eytzinger",
+    "showroom_safe": true,
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "As eytzinger_next."
+  },
+  "to_eytzinger_layout": {
+    "class": "B4-eytzinger",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "As eytzinger_next."
+  },
+  "penstock_prefilter8_mix": {
+    "class": "B6-penstock",
+    "justification": "Const mix helper; folded/inlined into cgap-branchless's own penstock_prefilter8 at codegen — no external symbol ref survives. The consumed composite (penstock_prefilter8) is must-consume and gated.",
+    "plan": "No action; must-consume composite covers the logic."
+  },
+  "poison_mask": {
+    "class": "B2-arithmetic",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume from cgap-p28 quota paths or remove."
+  },
+  "pred_inc": {
+    "class": "B2-select",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove in pruning wave."
+  },
+  "radix_bucket_12": {
+    "class": "B5-radix",
+    "justification": "DIVERGENCE (recorded in lane receipt): the AE5 dispatch asserted this is consumed via the 'B5 precedent'; the as-of-now census shows ZERO production refs outside cgap-branchless. Honest classification: unconsumed, exception-justified.",
+    "plan": "Consume-then-census: wire into cgap-gate partitioned-scan bucketing or delete in the next pruning wave; once consumed, remove this entry — the gate then enforces it as must-consume."
+  },
+  "saturated_subs_p28": {
+    "class": "B2-arithmetic",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume from cgap-p28 attestation counters or remove."
+  },
+  "select_slice": {
+    "class": "B2-select",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove."
+  },
+  "swar_eq_u64": {
+    "class": "B3-swar",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume from cgap-gate byte filters or remove."
+  },
+  "swar_has_zero_byte": {
+    "class": "B3-swar",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove."
+  },
+  "swar_lt": {
+    "class": "B3-swar",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove."
+  },
+  "swar_range_mask": {
+    "class": "B3-swar",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove."
+  },
+  "swar_splat": {
+    "class": "B3-swar",
+    "justification": "KNOWN-unconsumed (FA2/FA6/BR12).",
+    "plan": "Consume or remove."
+  },
+  "count_leading_eq_u8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs:214 — file under an in-flight lane lease (scope fence). C05 does not excise; recorded as candidate for the owning lane.",
+    "plan": "Owning lane: consume from a production consumer or delete from scan.rs; then REMOVE this entry so the gate enforces the composite as consumed."
+  },
+  "prefix_and_u64x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs:45 — in-flight lane file.",
+    "plan": "Owning lane: consume or delete from scan.rs; then REMOVE this entry."
+  },
+  "prefix_max_u8x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "CONSUMED at source level (crates/csct/src/bin/cscb_c1_c2_ingress.rs:82, lane cull-05) but CENSUS-INVISIBLE: verify_dead_library.py scans release-rlib rcgu objects of CONSUMERS=[cgap-gate,cgap-parquet,cgap-p28,cgap-ffi] only; csct is a standalone-crate bin whose codegen lands in an executable, so refs=0 (measured 2026-11-02, lane TC-07). Entry restored to keep the gate green; removal is pending the gate census covering csct bin objects.",
+    "plan": "Gate-owner lane: extend the verify_dead_library.py census to csct bin objects (or admit csct as a consumer); THEN REMOVE this entry — expected to hold at exit 0 (FLIP-2 witness, lane TC-07)."
+  },
+  "prefix_or_u64x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  },
+  "prefix_sum_u32x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  },
+  "prefix_xor_u64x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  },
+  "segmented_prefix_sum_u32x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/scan.rs:120 — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  },
+  "transpose_8x8": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/transpose.rs — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  },
+  "transpose_64x64": {
+    "class": "C05-candidate",
+    "c05_candidate": true,
+    "justification": "UNCONSUMED per C05 census 2026-11-02. Defined in crates/cgap-branchless/src/transpose.rs — in-flight lane file.",
+    "plan": "Owning branchless lane: consume or delete; then REMOVE this entry."
+  }
+}

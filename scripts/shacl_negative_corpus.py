@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 from pyshacl import validate
-from rdflib import Graph, Literal, Namespace, RDF
+from rdflib import Graph, Literal, Namespace, RDF, URIRef
 from rdflib.namespace import XSD
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -100,14 +100,17 @@ def extract_ttl(text: str) -> str:
     return "".join(out)
 
 
-def read_family(g: Graph, shape: Namespace) -> dict:
+def read_family(g: Graph, shape: URIRef) -> dict:
     """Walk a sh:NodeShape's sh:property blocks: pinned hasValue terms, the
     constraint kind per path, target class, and the artifact-pinned REFUSAL
     code from each sh:message."""
-    family = {"class": g.value(shape, SH.targetClass), "paths": [], "by_path": {}}
+    shape_class = g.value(shape, SH.targetClass)
+    assert shape_class is not None
+    family = {"class": shape_class, "paths": [], "by_path": {}}
     for pshape in g.objects(shape, SH.property):
         path = g.value(pshape, SH.path)
-        message = str(g.value(pshape, SH.message, default="") or "")
+        assert path is not None
+        message = str(g.value(pshape, SH.message) or "")
         match = CODE_RE.search(message)
         if match is None:
             raise SystemExit(f"FATAL: no REFUSAL code in message for {path}: {message!r}")
@@ -136,7 +139,7 @@ def mutant_term(case_value, pinned: Literal) -> Literal:
     return Literal(case_value, datatype=pinned.datatype)
 
 
-def build_graph(base: Graph, family: dict, node: Namespace, path_override, value: Literal) -> Graph:
+def build_graph(base: Graph, family: dict, node: URIRef, path_override, value: Literal) -> Graph:
     """Ontology + one fully-populated typed instance of the family class.
     path_override gets `value`; every other family path gets its pinned value."""
     g = Graph()
@@ -158,10 +161,11 @@ def run_engine(g: Graph) -> dict:
     validate_ontology.sh). Returns the conforms boolean, the set of REFUSAL
     codes over the whole results graph, and per-focus-node code sets."""
     conforms, results_graph, _text = validate(data_graph=g, shacl_graph=None)
+    assert isinstance(results_graph, Graph)
     codes_all, codes_by_node = set(), {}
     for result in results_graph.subjects(RDF.type, SH.ValidationResult):
         focus = results_graph.value(result, SH.focusNode)
-        message = str(results_graph.value(result, SH.resultMessage, default="") or "")
+        message = str(results_graph.value(result, SH.resultMessage) or "")
         match = CODE_RE.search(message)
         if match is None:
             continue

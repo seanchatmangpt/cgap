@@ -290,8 +290,13 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
         # --manifest-path is used for those.
         real_name = pkg.get("name", name)
         standalone = "workspace" in manifests.get(name, {})
+        mpath = manifests.get(name, {}).get("_manifest_dir") if standalone else None
         if standalone:
             mpath = manifests.get(name, {}).get("_manifest_dir")
+            if mpath is None:
+                f.fail(f"{name}: standalone crate but no _manifest_dir recorded")
+                print(f"    FAIL  standalone crate {name}: _manifest_dir missing")
+                continue
             cmd = [
                 "cargo", "package", "--no-verify", "--allow-dirty",
                 "--manifest-path", str(mpath / "Cargo.toml"),
@@ -325,6 +330,10 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
                 print(f"      | {ln}")
 
         if standalone:
+            if mpath is None:
+                f.fail(f"{name}: standalone crate but no _manifest_dir recorded")
+                print(f"    FAIL  standalone crate {name}: _manifest_dir missing")
+                continue
             crate_glob = sorted((mpath.parent / "target" / "package").glob(f"{real_name}-*.crate"))
         else:
             crate_glob = sorted((root_dir / "target" / "package").glob(f"{real_name}-*.crate"))
@@ -337,6 +346,10 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
                 f.fail(f"{name}: cargo package exited 0 but no .crate under target/package/")
 
         if standalone:
+            if mpath is None:
+                f.fail(f"{name}: standalone crate but no _manifest_dir recorded")
+                print(f"    FAIL  standalone crate {name}: _manifest_dir missing")
+                continue
             list_cmd = [
                 "cargo", "package", "--list", "--allow-dirty",
                 "--manifest-path", str(mpath / "Cargo.toml"),

@@ -144,7 +144,7 @@ def main():
             i += 1
     subs, err = enumerate_subjects(repo)
     if subs is None:
-        print("SUBJECT-MISSING: " + err)
+        print("SUBJECT-MISSING: " + (err or "unknown enumeration failure"))
         print("REGISTRY-SWEEP: FAIL 23 missing")
         return 2
     if cli_manifest:
