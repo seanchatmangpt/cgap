@@ -1,0 +1,17 @@
+[package]
+name = "csct"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+cgap-blake3 = { path = "../cgap-blake3" }
+cgap-core = { path = "../cgap-core" }
+cgap-bn3 = { path = "../cgap-bn3" }
+# Lane B05 minimal unblock (disclosed per compile-freeze SLA): the cscb_c6_retraction
+# court dogfoods the real cgap-storage DRed surface; test-only dep is not expressible
+# for a bin, so this is a normal dep. cgap-storage itself is zero-external-dep.
+cgap-storage = { path = "../cgap-storage" }
+
+# Standalone crate (like crates/cli); lane CSCT-L5 minimal unblock, disclosed per compile-freeze SLA.
+[workspace]
