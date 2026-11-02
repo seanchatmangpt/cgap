@@ -1,4 +1,6 @@
 [package]
+repository.workspace = true
+license-file.workspace = true
 name = "cgap-court"
 version.workspace = true
 edition.workspace = true

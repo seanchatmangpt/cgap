@@ -1,7 +1,7 @@
 # cgap-p28
 
-**Status: NOT-PUBLISHED** — verified against crates.io this session
-(no crate record). Workspace-local moonshot crate.
+**Status: NOT-PUBLISHED** — as last witnessed (v26.11.1 wave; no crate
+record). Workspace-local moonshot crate.
 
 ## What it is
 
@@ -16,16 +16,24 @@ reserved-MUST-be-zero. License URN is a frozen byte-pin:
 Also home to the ASC-450 trapdoor checks (`src/asc450.rs`) and the trap
 surface (`src/trap.rs`).
 
-## Test receipt (run this session)
+- Crate version: **26.11.2** (`version.workspace = true`; workspace
+  26.11.2).
+- Status: **PARTIAL** — reality receipt
+  `docs/jira/v26.11.2/waves/crate-reality/cgap-p28.md`; historical
+  receipt `docs/jira/v26.11.1/waves/a17-finish-receipt.md`.
+
+## Test receipt (v26.11.2 reality wave — census 46 tests)
 
 ```
-cargo test -p cgap-p28   # exit 0
-  36 passed (lib) + 6 passed (p28_invariant_courts) = 42/0
+# unit-test target: COMPILE-ABORT (71 errors, cfg(test)-only)
+#   census law: compile-abort is not a failure count
+cargo test -p cgap-p28 --test p28_invariant_courts --test lever_courts
+#   exit 0 — 8 passed, 0 failed
 ```
 
-Receipt of record: `docs/jira/v26.11.1/waves/a17-finish-receipt.md`
-(baseline pre-write 36+0, post-write 42/0; mutation gate — poisoning the
-attestation flips the court to exit 101 with the named verdict).
+Substance census (4,522 LOC / 32 pub fns / 46 `#[test]`). The 71-error
+unit-target abort is session-observed and pre-existing at the reality
+wave's read time.
 
 ## The 640-bit sweep and the 11-survivor law
 

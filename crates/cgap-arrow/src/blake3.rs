@@ -306,7 +306,11 @@ pub fn hash(data: &[u8]) -> [u8; 32] {
         let mut block = [0u32; 16];
         block[..8].copy_from_slice(&left_child);
         block[8..].copy_from_slice(&right_child);
-        let flags = if stack_len == 0 { PARENT | ROOT } else { PARENT };
+        let flags = if stack_len == 0 {
+            PARENT | ROOT
+        } else {
+            PARENT
+        };
         let out = compress_scalar(&IV, &block, 0, 64, flags);
         if stack_len == 0 {
             let mut cv8 = [0u32; 8];

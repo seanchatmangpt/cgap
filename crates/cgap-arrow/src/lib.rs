@@ -40,6 +40,7 @@ extern crate alloc;
 pub mod bitmask;
 pub mod blake3;
 pub mod chase_lev;
+pub mod ipc;
 pub mod slab;
 
 #[cfg(not(target_os = "none"))]

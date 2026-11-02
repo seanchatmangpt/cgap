@@ -47,7 +47,7 @@ static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 use cgap_parquet::footer::{verify_seal, ATTESTATION_LEN};
 use cgap_parquet::mmap_writer::{BlockSink, SlabView, StaticPageWriter};
-use cgap_parquet::page::decode_page_into;
+use cgap_parquet::page::{decode_page_into, write_data_page_v2};
 use cgap_parquet::rle::{rle_encode, ParquetError};
 use divan::{black_box, Bencher};
 
@@ -172,10 +172,14 @@ impl BlockSink for BorrowedFileSink<'_> {
         }
         self.file
             .write_all(&self.scratch[..len])
-            .map_err(|_| ParquetError::RunOverrun { run_len: len, budget: 0 })?;
-        self.file
-            .flush()
-            .map_err(|_| ParquetError::RunOverrun { run_len: len, budget: 0 })?;
+            .map_err(|_| ParquetError::RunOverrun {
+                run_len: len,
+                budget: 0,
+            })?;
+        self.file.flush().map_err(|_| ParquetError::RunOverrun {
+            run_len: len,
+            budget: 0,
+        })?;
         Ok(())
     }
 }
@@ -198,8 +202,12 @@ fn chain_stages(
 ) -> usize {
     let rows = lane0.len() as u32;
     let mut w = StaticPageWriter::new(buf);
-    w.write_slab(&SlabView { lanes: &[lane0, lane1], rows, bits: 8 })
-        .expect("write_slab");
+    w.write_slab(&SlabView {
+        lanes: &[lane0, lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("write_slab");
     let sealed = w.seal(Some(att)).expect("seal");
     let block_len = sealed.bytes().len();
     sealed.flush_to(RamSink { mem }).expect("flush");
@@ -234,7 +242,10 @@ fn chain_ram<const ROWS: usize>(b: Bencher) {
     let mut out = vec![0u32; ROWS];
     let block_len = chain_stages(&mut buf, &mut mem, &lane0, &lane1, &att, &mut out);
     assert_eq!(out[..ROWS], lane0[..], "RAM chain lane0 identity");
-    assert!(block_len < BLOCK_CAP, "window must exceed block (W8-F1 form)");
+    assert!(
+        block_len < BLOCK_CAP,
+        "window must exceed block (W8-F1 form)"
+    );
     let want = fnv_u32(&out);
 
     let state = Mutex::new(RamChain { buf, mem, out });
@@ -267,6 +278,241 @@ fn encode_arm<const ROWS: usize>(b: Bencher) {
 }
 
 // ---------------------------------------------------------------------------
+// (2b) SEAL arm: write_slab + seal + flush over the borrowed RAM sink —
+//      the write path minus the standalone encode leg (the slab writer
+//      calls the same hybrid codec internally, so this leg isolates
+//      slab framing + footer + attestation + flush copy).
+// ---------------------------------------------------------------------------
+
+struct SealArm {
+    buf: Box<[u8]>,
+    mem: Box<[u8]>,
+}
+
+#[divan::bench(consts = [65536, 1048576])]
+fn seal_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let lane1 = make_lane(ROWS, 0x0002);
+    let att = make_attestation();
+    let rows = ROWS as u32;
+
+    let mut buf = vec![0u8; BLOCK_CAP].into_boxed_slice();
+    let mut mem = vec![0u8; BLOCK_CAP].into_boxed_slice();
+    let mut w = StaticPageWriter::new(&mut buf);
+    w.write_slab(&SlabView {
+        lanes: &[&lane0, &lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("setup write_slab");
+    let sealed = w.seal(Some(&att)).expect("setup seal");
+    let block_len = sealed.bytes().len();
+    sealed
+        .flush_to(RamSink { mem: &mut mem })
+        .expect("setup flush");
+
+    let state = Mutex::new(SealArm { buf, mem });
+    b.bench(|| {
+        let mut g = state.lock().unwrap();
+        let SealArm { buf, mem } = &mut *g;
+        let mut w = StaticPageWriter::new(buf);
+        w.write_slab(&SlabView {
+            lanes: &[&lane0, &lane1],
+            rows,
+            bits: 8,
+        })
+        .expect("write_slab");
+        let sealed = w.seal(Some(&att)).expect("seal");
+        let n = sealed.bytes().len();
+        assert_eq!(n, block_len, "sealed block length drifted");
+        sealed.flush_to(RamSink { mem }).expect("flush");
+        black_box(n);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// (2c) VERIFY arm: verify_seal alone over the committed block — the digest
+//      recompute + header/footer parse without any write or decode work.
+// ---------------------------------------------------------------------------
+
+#[divan::bench(consts = [65536, 1048576])]
+fn verify_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let lane1 = make_lane(ROWS, 0x0002);
+    let att = make_attestation();
+    let rows = ROWS as u32;
+
+    let mut buf = vec![0u8; BLOCK_CAP].into_boxed_slice();
+    let mut w = StaticPageWriter::new(&mut buf);
+    w.write_slab(&SlabView {
+        lanes: &[&lane0, &lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("setup write_slab");
+    let sealed = w.seal(Some(&att)).expect("setup seal");
+    let block_len = sealed.bytes().len();
+    let digest = *sealed.digest();
+    let block: Box<[u8]> = buf[..block_len].to_vec().into_boxed_slice();
+
+    // Setup gate: the committed block verifies with the expected row count.
+    let verified = verify_seal(&block, &digest).expect("setup verify_seal");
+    assert_eq!(verified.rows, u64::from(rows), "setup row count");
+
+    let state = Mutex::new(vec![0u32; ROWS]);
+    b.bench(|| {
+        let verified = verify_seal(black_box(&block), black_box(&digest)).expect("verify_seal");
+        assert_eq!(verified.rows, u64::from(rows), "row count drifted");
+        // Span 0's page must still decode (ties the leg to real wire bytes).
+        let page = &block[..verified.spans[0] as usize];
+        let mut out = state.lock().unwrap();
+        let n = decode_page_into(page, &mut out).expect("leg-tie decode");
+        assert_eq!(n, ROWS, "leg-tie decode length");
+        black_box(verified);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// (2d) DECODE arm: decode_page_into alone over lane 0's committed page —
+//      the read-back path minus seal verification.
+// ---------------------------------------------------------------------------
+
+#[divan::bench(consts = [65536, 1048576])]
+fn decode_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let page: Box<[u8]> = write_data_page_v2(&lane0, 8, ROWS as u32).into_boxed_slice();
+    // Setup gate: identity + length before the timed loop.
+    let mut out = vec![0u32; ROWS];
+    let n = decode_page_into(&page, &mut out).expect("setup decode");
+    assert_eq!(n, ROWS, "setup decode length");
+    assert_eq!(out[..ROWS], lane0[..], "setup lane0 identity");
+    let want = fnv_u32(&out);
+    drop(out);
+
+    let state = Mutex::new(vec![0u32; ROWS]);
+    b.bench(|| {
+        let mut out = state.lock().unwrap();
+        let n = decode_page_into(black_box(&page), &mut out).expect("decode");
+        assert_eq!(n, ROWS, "decode length drifted");
+        black_box(n);
+    });
+
+    assert_eq!(
+        fnv_u32(&state.into_inner().unwrap()),
+        want,
+        "decode checksum drifted"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// (2e) DIGEST arm: the seal-side digest work alone — fnv1a64 checksum +
+//      block_digest over one ~2 MB sealed block, no write/copy/decode.
+//      P2 attribution leg: seal_arm minus this minus encode splits the
+//      write path into encode vs digest vs copy shares.
+// ---------------------------------------------------------------------------
+
+#[divan::bench(consts = [65536, 1048576])]
+fn digest_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let lane1 = make_lane(ROWS, 0x0002);
+    let att = make_attestation();
+    let rows = ROWS as u32;
+
+    let mut buf = vec![0u8; BLOCK_CAP].into_boxed_slice();
+    let mut w = StaticPageWriter::new(&mut buf);
+    w.write_slab(&SlabView {
+        lanes: &[&lane0, &lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("setup write_slab");
+    let sealed = w.seal(Some(&att)).expect("setup seal");
+    let block_len = sealed.bytes().len();
+    let digest = *sealed.digest();
+    let block: Box<[u8]> = sealed.bytes().to_vec().into_boxed_slice();
+    drop(sealed);
+
+    b.bench(|| {
+        let checksum = cgap_parquet::footer::fnv1a64(black_box(&block));
+        let d = cgap_parquet::footer::block_digest(black_box(&block));
+        black_box((checksum, d));
+    });
+}
+
+// ---------------------------------------------------------------------------
+// (2f) FLUSH arm: the sink copy alone — flush_to over the committed block
+//      into the borrowed RAM window (memcpy + commit, no digest/encode).
+// ---------------------------------------------------------------------------
+
+struct FlushArm {
+    block: Box<[u8]>,
+    mem: Box<[u8]>,
+}
+
+#[divan::bench(consts = [65536, 1048576])]
+fn flush_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let lane1 = make_lane(ROWS, 0x0002);
+    let att = make_attestation();
+    let rows = ROWS as u32;
+
+    let mut buf = vec![0u8; BLOCK_CAP].into_boxed_slice();
+    let mut w = StaticPageWriter::new(&mut buf);
+    w.write_slab(&SlabView {
+        lanes: &[&lane0, &lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("setup write_slab");
+    let sealed = w.seal(Some(&att)).expect("setup seal");
+    let block_len = sealed.bytes().len();
+    let block: Box<[u8]> = sealed.bytes().to_vec().into_boxed_slice();
+    drop(sealed);
+    let mem = vec![0u8; BLOCK_CAP].into_boxed_slice();
+
+    // Setup gate: one flush commits block_len bytes into the window.
+    {
+        let mut mem_probe = vec![0u8; BLOCK_CAP].into_boxed_slice();
+        SealedCopy(&block)
+            .flush_to(RamSink {
+                mem: &mut mem_probe,
+            })
+            .expect("setup flush");
+        assert_eq!(&mem_probe[..block_len], &block[..], "setup flush copy");
+    }
+
+    let state = Mutex::new(FlushArm { block, mem });
+    b.bench(|| {
+        let mut g = state.lock().unwrap();
+        let FlushArm { block, mem } = &mut *g;
+        SealedCopy(block).flush_to(RamSink { mem }).expect("flush");
+    });
+}
+
+/// Minimal real SealedBlock stand-in for the flush leg: NOT a mock of
+/// behavior — it is a borrowed byte window exercising the real
+/// `flush_to`/`RamSink` copy path (same bytes the chain commits).
+struct SealedCopy<'a>(&'a [u8]);
+
+impl SealedCopy<'_> {
+    fn flush_to<S: cgap_parquet::mmap_writer::BlockSink>(
+        &self,
+        mut sink: S,
+    ) -> Result<(), ParquetError> {
+        let n = self.0.len();
+        let window = sink.window(n);
+        if window.len() < n {
+            return Err(ParquetError::RunOverrun {
+                run_len: n,
+                budget: window.len(),
+            });
+        }
+        window[..n].copy_from_slice(self.0);
+        sink.commit(n)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // (3) FULL CHAIN, FileSink (Tier H hosted): flush commits to a real file;
 //     read-back reads the FILE bytes before verify + decode.
 // ---------------------------------------------------------------------------
@@ -287,8 +533,7 @@ fn chain_file<const ROWS: usize>(b: Bencher) {
     let rows = ROWS as u32;
 
     // Setup: real temp file; owned-scratch FileSink witness commit.
-    let path =
-        std::env::temp_dir().join(format!("cgap-chains-parquet-{}.bin", std::process::id()));
+    let path = std::env::temp_dir().join(format!("cgap-chains-parquet-{}.bin", std::process::id()));
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -298,8 +543,12 @@ fn chain_file<const ROWS: usize>(b: Bencher) {
         .expect("open chain file");
     let mut buf = vec![0u8; BLOCK_CAP].into_boxed_slice();
     let mut w = StaticPageWriter::new(&mut buf);
-    w.write_slab(&SlabView { lanes: &[&lane0, &lane1], rows, bits: 8 })
-        .expect("file witness write_slab");
+    w.write_slab(&SlabView {
+        lanes: &[&lane0, &lane1],
+        rows,
+        bits: 8,
+    })
+    .expect("file witness write_slab");
     let sealed = w.seal(Some(&att)).expect("file witness seal");
     let block_len = sealed.bytes().len();
     let scratch = vec![0u8; BLOCK_CAP].into_boxed_slice();
@@ -313,7 +562,8 @@ fn chain_file<const ROWS: usize>(b: Bencher) {
     // Read the FILE back: witness verdict is byte-exact wire equality.
     let mut readback = vec![0u8; BLOCK_CAP].into_boxed_slice();
     file.seek(SeekFrom::Start(0)).expect("seek");
-    file.read_exact(&mut readback[..block_len]).expect("file read-back");
+    file.read_exact(&mut readback[..block_len])
+        .expect("file read-back");
     assert_eq!(
         &readback[..block_len],
         sealed.bytes(),
@@ -328,27 +578,41 @@ fn chain_file<const ROWS: usize>(b: Bencher) {
     assert_eq!(out[..ROWS], lane0[..], "FILE chain lane0 identity");
     let want = fnv_u32(&out);
 
-    let state = Mutex::new(FileChain { buf, file, scratch, readback, out });
+    let state = Mutex::new(FileChain {
+        buf,
+        file,
+        scratch,
+        readback,
+        out,
+    });
     b.bench(|| {
         let mut g = state.lock().unwrap();
-        let FileChain { buf, file, scratch, readback, out } = &mut *g;
+        let FileChain {
+            buf,
+            file,
+            scratch,
+            readback,
+            out,
+        } = &mut *g;
         let mut w = StaticPageWriter::new(buf);
-        w.write_slab(&SlabView { lanes: &[&lane0, &lane1], rows, bits: 8 })
-            .expect("write_slab");
+        w.write_slab(&SlabView {
+            lanes: &[&lane0, &lane1],
+            rows,
+            bits: 8,
+        })
+        .expect("write_slab");
         let sealed = w.seal(Some(&att)).expect("seal");
         file.seek(SeekFrom::Start(0)).expect("seek");
         sealed
             .flush_to(BorrowedFileSink { file, scratch })
             .expect("file flush");
         file.seek(SeekFrom::Start(0)).expect("seek");
-        file.read_exact(&mut readback[..block_len]).expect("read-back");
+        file.read_exact(&mut readback[..block_len])
+            .expect("read-back");
         let verified =
             verify_seal(black_box(&readback[..block_len]), sealed.digest()).expect("verify_seal");
-        let n = decode_page_into(
-            black_box(&readback[..verified.spans[0] as usize]),
-            out,
-        )
-        .expect("read-back decode");
+        let n = decode_page_into(black_box(&readback[..verified.spans[0] as usize]), out)
+            .expect("read-back decode");
         assert_eq!(n, ROWS, "decode lane length");
         black_box((block_len, n));
     });

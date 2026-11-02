@@ -707,3 +707,37 @@ mod tests {
         assert!(oids.is_empty());
     }
 }
+
+#[cfg(test)]
+mod nostd_hygiene_court {
+    //! W4-MW2 std-strip court (extends the cgap-bn3 builtins.rs must-kill
+    //! pattern): the module body — everything before the first
+    //! `#[cfg(test)]`, comments stripped — carries no `std::` path.
+    //! Anti-vacuity mutation (must-kill): reintroduce any `std::` path in
+    //! the body (e.g. `impl std::error::Error`) — this court MUST flip.
+
+    use std::string::String;
+
+    fn module_body_stripped() -> String {
+        let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/pack_write.rs"));
+        let body = src
+            .split("#[cfg(test)]")
+            .next()
+            .expect("module body precedes the hygiene court");
+        body.lines()
+            .map(|line| match line.find("//") {
+                Some(i) => &line[..i],
+                None => line,
+            })
+            .collect::<String>()
+    }
+
+    #[test]
+    fn nostd_hygiene_module_body_has_no_std_paths() {
+        let body = module_body_stripped();
+        assert!(
+            !body.contains("std::"),
+            "module body carries a `std::` path; crate direction is no_std (core/alloc only)"
+        );
+    }
+}

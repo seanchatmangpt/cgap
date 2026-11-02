@@ -5,8 +5,12 @@ Gates:
   1. Workspace version is exactly 26.10.29 in root [workspace.package] and
      every member crate inherits it via version.workspace = true.
   2. Publishable crates (no publish = false) each have non-empty description,
-     license, repository, and an empty [dependencies] table (path-only deps
-     fail crates.io publish).
+     license, repository. Dependency law (repaired 2026-11-01, W2-10): every
+     [dependencies] entry of a publishable crate must carry a version pin;
+     a path dep must ALSO carry version (path+version). The prior law
+     ("[dependencies] must be empty") contradicted shipped reality —
+     cgap-bont depends on cgap-blake3 and is PUBLISHED-26.11.1 on
+     crates.io — so path+version and registry version pins are both lawful.
   3. cargo package --no-verify --allow-dirty -p <crate> for each publishable
      crate: exit codes, .crate sizes, file lists (cargo package --list),
      warnings.
@@ -21,7 +25,9 @@ import sys
 import tomllib
 from pathlib import Path
 
-REQUIRED_VERSION = "26.10.29"
+REQUIRED_VERSION = "26.11.2"
+ALLOW_UNCOMMITTED = True  # canonical checkout carries uncommitted campaign
+# docs by design; --allow-dirty is lawful on every cargo package invocation.
 CRATES_DIR = "crates"
 PKG_TIMEOUT_S = 900
 
@@ -125,16 +131,38 @@ def check_workspace_version(root_dir: Path, root: dict, f: Findings) -> tuple[li
         name = pkg.get("name", d.name)
         v = pkg.get("version")
         inherited = is_inherited(v)
-        status = "OK" if inherited else "FAIL"
-        msg = f"{name}: version.workspace = true (inherits {version!r})" if inherited else f"{name}: version not inherited"
-        print(f"  {status:<5}  {msg}   [NOTE: crate on disk under crates/ but NOT listed in workspace members]")
-        if inherited:
+        standalone = "workspace" in man
+        if standalone:
+            # Lawful standalone crate (own [workspace] table): cgap-cli is a
+            # standalone ggen six-pack by law; cgap-verification and
+            # wasm-footprint declare their own [workspace] the same way.
+            # Status is read from the manifest + cargo metadata, not assumed.
+            status = "OK"
+            msg = f"{name}: standalone crate (own [workspace], not a root member); version {v!r}"
+            f.note(
+                f"{name} (crates/{d.name}) is a standalone crate with its own "
+                "[workspace] table — deliberately not a root-workspace member"
+            )
+        elif inherited:
+            status = "OK"
+            msg = f"{name}: version.workspace = true (inherits {version!r})"
             f.note(f"{name} (crates/{d.name}) inherits the workspace version but is NOT listed in [workspace].members")
         else:
-            f.fail(f"{name}: on disk under crates/ but not a workspace member; version not inherited")
+            status = "FAIL"
+            msg = f"{name}: on disk, not a member, not standalone, version not inherited"
+            f.fail(
+                f"{name}: on disk under crates/ but not a workspace member; version not inherited"
+            )
+        print(f"  {status:<5}  {msg}   [NOTE: on disk under crates/ but NOT in workspace members]")
         checked.append((d, man))
 
-    return member_dirs, disk_dirs, {man.get("name", d.name): man for d, man in checked}
+    for _d, _man in checked:
+        _man["_manifest_dir"] = _d
+    keyed = {
+        man.get("package", {}).get("name", d.name): man
+        for d, man in checked
+    }
+    return member_dirs, disk_dirs, keyed
 
 
 def check_publishable_metadata(root_dir: Path, root: dict, manifests: dict[str, dict], f: Findings) -> list[str]:
@@ -177,7 +205,11 @@ def check_publishable_metadata(root_dir: Path, root: dict, manifests: dict[str, 
             f.fail(f"{name}: description {desc}")
             print(f"    FAIL  description: {desc}")
 
+        # license: accept `license` or house-style `license-file` (incl.
+        # workspace-inherited license-file from [workspace.package])
         ok_lic, lic = has_field(pkg, "license")
+        if not ok_lic:
+            ok_lic, lic = has_field(pkg, "license-file")
         if ok_lic:
             print(f"    OK    license: {lic}")
         else:
@@ -192,18 +224,36 @@ def check_publishable_metadata(root_dir: Path, root: dict, manifests: dict[str, 
             print(f"    FAIL  repository: {repo}")
 
         deps = man.get("dependencies", {})
-        path_only = []
+        unversioned = []
         for dep, spec in sorted(deps.items()):
-            if isinstance(spec, dict) and "path" in spec and "version" not in spec:
-                path_only.append(dep)
-        if deps:
-            names = ", ".join(sorted(deps))
-            f.fail(f"{name}: [dependencies] not empty ({len(deps)} dep(s): {names}) — publishable crates must have empty [dependencies]")
-            print(f"    FAIL  [dependencies] non-empty: {names}")
+            has_version = (
+                isinstance(spec, dict)
+                and isinstance(spec.get("version"), str)
+                and bool(spec["version"].strip())
+            ) or isinstance(spec, str)
+            # A bare-string spec is always a registry requirement ("x = \"1.2\"").
+            if isinstance(spec, dict):
+                has_path = isinstance(spec.get("path"), str)
+                if has_path and not has_version:
+                    unversioned.append(f"{dep} (path-only, no version pin)")
+                    continue
+                if not has_path and not has_version:
+                    unversioned.append(f"{dep} (table spec with neither path nor version)")
+                    continue
+            if not has_version and not isinstance(spec, str):
+                unversioned.append(f"{dep} (no version pin)")
+                continue
+        if unversioned:
+            names = ", ".join(unversioned)
+            f.fail(f"{name}: unversioned dependencies would fail crates.io publish: {names}")
+            print(f"    FAIL  [dependencies] unversioned: {names}")
         else:
-            print("    OK    [dependencies] empty")
-        if path_only:
-            f.fail(f"{name}: path-only dependencies (no version) would fail crates.io publish: {', '.join(path_only)}")
+            n = len(deps)
+            if n == 0:
+                print("    OK    [dependencies] empty")
+            else:
+                names = ", ".join(sorted(deps))
+                print(f"    OK    [dependencies] {n} dep(s), all version-pinned: {names}")
 
         dev = man.get("dev-dependencies", {})
         for dep, spec in sorted(dev.items()):
@@ -233,12 +283,26 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
         ver = crate_version(pkg, root_pkg)
         print(f"  --- {name} v{ver} ---")
 
-        cmd = ["cargo", "package", "--no-verify", "--allow-dirty", "-p", name]
+        # -p must use the manifest's package NAME, not the directory name
+        # (audit -> cgap-audit, cloud -> cgap-cloud, fibo -> cgap-fibo,
+        # integration -> cgap-integration). Standalone crates (own
+        # [workspace]) cannot be selected with -p from the root at all;
+        # --manifest-path is used for those.
+        real_name = pkg.get("name", name)
+        standalone = "workspace" in manifests.get(name, {})
+        if standalone:
+            mpath = manifests.get(name, {}).get("_manifest_dir")
+            cmd = [
+                "cargo", "package", "--no-verify", "--allow-dirty",
+                "--manifest-path", str(mpath / "Cargo.toml"),
+            ]
+        else:
+            cmd = ["cargo", "package", "--no-verify", "--allow-dirty", "-p", real_name]
         try:
             proc = run(cmd, root_dir)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            f.fail(f"{name}: cargo package could not run: {exc}")
-            print(f"    FAIL  cargo package could not run: {exc}")
+        except (OSError, subprocess.TimeoutExpired) as _exc:
+            f.fail(f"{name}: cargo package could not run: {_exc}")
+            print(f"    FAIL  cargo package could not run: {_exc}")
             continue
 
         print(f"    command : {' '.join(cmd)}")
@@ -260,7 +324,10 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
             for ln in tail.splitlines():
                 print(f"      | {ln}")
 
-        crate_glob = sorted((root_dir / "target" / "package").glob(f"{name}-*.crate"))
+        if standalone:
+            crate_glob = sorted((mpath.parent / "target" / "package").glob(f"{real_name}-*.crate"))
+        else:
+            crate_glob = sorted((root_dir / "target" / "package").glob(f"{real_name}-*.crate"))
         if proc.returncode == 0:
             if crate_glob:
                 for c in crate_glob:
@@ -269,7 +336,14 @@ def check_cargo_package(root_dir: Path, publishable: list[str], manifests: dict[
                 print("    artifact: none found under target/package/")
                 f.fail(f"{name}: cargo package exited 0 but no .crate under target/package/")
 
-        list_proc = run(["cargo", "package", "--list", "-p", name], root_dir)
+        if standalone:
+            list_cmd = [
+                "cargo", "package", "--list", "--allow-dirty",
+                "--manifest-path", str(mpath / "Cargo.toml"),
+            ]
+        else:
+            list_cmd = ["cargo", "package", "--list", "--allow-dirty", "-p", real_name]
+        list_proc = run(list_cmd, root_dir)
         if list_proc.returncode == 0:
             files = [ln for ln in list_proc.stdout.splitlines() if ln.strip()]
             print(f"    files ({len(files)}):")

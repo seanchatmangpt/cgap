@@ -29,6 +29,7 @@ members = [
     "crates/cgap-gate",
     "crates/cgap-crypto",
     "crates/cgap-p28",
+    # v26.11.2 starDF MW4: semi-naive Datalog closure kernel (lane W3-R4).
     "crates/cgap-court",
     "ontologies/fibo",
     "ontologies/cloud",
@@ -36,7 +37,8 @@ members = [
 
 
 [workspace.package]
-version = "26.11.1"
+license-file = "LICENSE.md"
+version = "26.11.2"
 edition = "2021"
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]

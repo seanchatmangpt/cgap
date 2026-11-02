@@ -24,7 +24,10 @@ pub fn bont_slot_lookup(_inputs: Map<String, Value>) -> Result<Value> {
     let slot = cgap_bont::primitives::slot_id(lexeme);
     let rederived = cgap_bont::primitives::truncate64(&cgap_bont::primitives::lex_hash(lexeme));
     if slot != rederived {
-        return fail("bont slot-lookup", format!("slot drift {slot:?} vs {rederived:?}"));
+        return fail(
+            "bont slot-lookup",
+            format!("slot drift {slot:?} vs {rederived:?}"),
+        );
     }
     // Independent path: BLAKE3 over BONT_NS_V1 ++ lexeme, first 8 bytes LE.
     let mut buf = Vec::with_capacity(cgap_bont::primitives::BONT_NS_V1.len() + lexeme.len());
@@ -43,7 +46,10 @@ pub fn bont_slot_lookup(_inputs: Map<String, Value>) -> Result<Value> {
     det.insert(lexeme)
         .map_err(|e| NounVerbError::execution_error(format!("collision insert refused: {e:?}")))?;
     if det.len() != 1 {
-        return fail("bont slot-lookup", format!("detector len {} != 1", det.len()));
+        return fail(
+            "bont slot-lookup",
+            format!("detector len {} != 1", det.len()),
+        );
     }
     Ok(json!({
         "lexeme": String::from_utf8_lossy(lexeme),
@@ -58,10 +64,19 @@ pub fn bont_slot_lookup(_inputs: Map<String, Value>) -> Result<Value> {
 /// asserted byte-equal, or refuse typed.
 pub fn bont_pack_verify(_inputs: Map<String, Value>) -> Result<Value> {
     let lexemes: [&[u8]; 8] = [
-        b"cgap-cli:pack:a", b"cgap-cli:pack:b", b"cgap-cli:pack:c", b"cgap-cli:pack:d",
-        b"cgap-cli:pack:e", b"cgap-cli:pack:f", b"cgap-cli:pack:g", b"cgap-cli:pack:h",
+        b"cgap-cli:pack:a",
+        b"cgap-cli:pack:b",
+        b"cgap-cli:pack:c",
+        b"cgap-cli:pack:d",
+        b"cgap-cli:pack:e",
+        b"cgap-cli:pack:f",
+        b"cgap-cli:pack:g",
+        b"cgap-cli:pack:h",
     ];
-    let slots: Vec<u64> = lexemes.iter().map(|l| cgap_bont::primitives::slot_id(l).0).collect();
+    let slots: Vec<u64> = lexemes
+        .iter()
+        .map(|l| cgap_bont::primitives::slot_id(l).0)
+        .collect();
     for (lexeme, slot) in lexemes.iter().zip(&slots) {
         let mut buf = Vec::with_capacity(5 + lexeme.len());
         buf.extend_from_slice(cgap_bont::primitives::BONT_NS_V1);
@@ -71,7 +86,12 @@ pub fn bont_pack_verify(_inputs: Map<String, Value>) -> Result<Value> {
         if raw != *slot {
             return fail(
                 "bont pack-verify",
-                format!("slot drift for {}: {:#x} vs {:#x}", String::from_utf8_lossy(lexeme), raw, slot),
+                format!(
+                    "slot drift for {}: {:#x} vs {:#x}",
+                    String::from_utf8_lossy(lexeme),
+                    raw,
+                    slot
+                ),
             );
         }
     }
@@ -83,7 +103,10 @@ pub fn bont_pack_verify(_inputs: Map<String, Value>) -> Result<Value> {
     let d1 = cgap_blake3::hash(&chain);
     let d2 = cgap_blake3::hash(&chain);
     if d1 != d2 {
-        return fail("bont pack-verify", "chain digest nondeterministic".to_owned());
+        return fail(
+            "bont pack-verify",
+            "chain digest nondeterministic".to_owned(),
+        );
     }
     Ok(json!({
         "pack_len": slots.len(),
@@ -122,7 +145,10 @@ pub fn parquet_pack_emit(_inputs: Map<String, Value>) -> Result<Value> {
     if verified.body_len != 128 || verified.rows != 3 {
         return fail(
             "parquet pack-emit",
-            format!("verified shape body={} rows={}", verified.body_len, verified.rows),
+            format!(
+                "verified shape body={} rows={}",
+                verified.body_len, verified.rows
+            ),
         );
     }
     Ok(json!({
@@ -148,7 +174,10 @@ pub fn parquet_pack_check(_inputs: Map<String, Value>) -> Result<Value> {
     let mut tampered = bytes.clone();
     tampered[0] ^= 0xff;
     if cgap_parquet::footer::verify_seal(&tampered, &digest).is_ok() {
-        return fail("parquet pack-check", "tampered block verified — vacuous gate".to_owned());
+        return fail(
+            "parquet pack-check",
+            "tampered block verified — vacuous gate".to_owned(),
+        );
     }
     Ok(json!({
         "bytes_len": bytes.len(),
@@ -214,7 +243,10 @@ pub fn git_dag_verify(_inputs: Map<String, Value>) -> Result<Value> {
     // Anti-vacuity: a wrong parent MUST be a typed refusal.
     let wrong_parent: cgap_git::Oid = [2u8; 20];
     if cgap_git::dag::verify_lineage(&commit.root, &proof, &wrong_parent).is_ok() {
-        return fail("git dag-verify", "wrong parent verified — vacuous".to_owned());
+        return fail(
+            "git dag-verify",
+            "wrong parent verified — vacuous".to_owned(),
+        );
     }
     Ok(json!({
         "blocks": blocks.len(),
@@ -222,5 +254,71 @@ pub fn git_dag_verify(_inputs: Map<String, Value>) -> Result<Value> {
         "root": hex(&commit.root),
         "proof_siblings": proof.siblings.len(),
         "wrong_parent_refused": true,
+    }))
+}
+
+/// `blake3 x2-court` — the p1-blake3 court as a CLI verb: the fixed x2 NEON
+/// kernel must equal two independent 4-way kernels (both groups, two base
+/// counters), the dispatch paths must agree at full-hash level, and a
+/// tampered segment must change the digest (else the court is vacuous and
+/// the handler refuses typed).
+pub fn blake_3_x_2_court(_inputs: Map<String, Value>) -> Result<Value> {
+    use cgap_blake3::multi_chunk::{compress_chunks_4way, compress_chunks_4way_x2};
+
+    // Real 8192-byte corpus, deterministic i%251 pattern (court corpus shape).
+    let data: Vec<u8> = (0..8192usize).map(|i| (i % 251) as u8).collect();
+    let x2 = compress_chunks_4way_x2(&data, 0);
+    let a = compress_chunks_4way(&data[..4096], 0);
+    let b = compress_chunks_4way(&data[4096..], 4);
+    if x2[0] != a || x2[1] != b {
+        return fail(
+            "blake3 x2-court",
+            "x2 kernel diverged from two 4-way kernels".to_owned(),
+        );
+    }
+    // Second base counter: both groups advance together.
+    let x2b = compress_chunks_4way_x2(&data, 100);
+    let ab = compress_chunks_4way(&data[..4096], 100);
+    let bb = compress_chunks_4way(&data[4096..], 104);
+    if x2b[0] != ab || x2b[1] != bb {
+        return fail(
+            "blake3 x2-court",
+            "x2 base=100 counters diverged".to_owned(),
+        );
+    }
+    // Full-hash level: SIMD dispatch paths must agree with scalar hash.
+    let root_x2 = cgap_blake3::hash_many_simd_x2(&data);
+    let root_many = cgap_blake3::hash_many_simd(&data);
+    let root_scalar = cgap_blake3::hash(&data);
+    if root_x2 != root_many || root_x2 != root_scalar {
+        return fail(
+            "blake3 x2-court",
+            "SIMD/scalar root digest drift".to_owned(),
+        );
+    }
+    // Tamper control (flip witness): flipping one corpus byte MUST change
+    // the kernel output; an unchanged output is a vacuous court.
+    let mut tampered = data.clone();
+    tampered[0] ^= 0x01;
+    let x2t = compress_chunks_4way_x2(&tampered, 0);
+    if x2t[0] == x2[0] {
+        return fail(
+            "blake3 x2-court",
+            "tampered segment not detected — vacuous".to_owned(),
+        );
+    }
+    if cgap_blake3::hash_many_simd_x2(&tampered) == root_x2 {
+        return fail(
+            "blake3 x2-court",
+            "tampered root not detected — vacuous".to_owned(),
+        );
+    }
+    Ok(json!({
+        "corpus_len": data.len(),
+        "groups_equal_two_4way": true,
+        "base100_counters_advance": true,
+        "simd_scalar_root_agree": true,
+        "tamper_refused": true,
+        "root_digest": hex(&root_x2),
     }))
 }

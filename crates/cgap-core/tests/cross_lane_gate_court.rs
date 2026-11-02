@@ -125,7 +125,7 @@ fn cross_lane_gate_admits_a04_frames_with_tier_identity_per_size() {
         );
 
         // -- gate tier (A14 dam over A04 frames, wire bytes) ----------------
-        let mut view = cgap_gate::penstock::FrameView { payload: &[] };
+        let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
         let st = ingress(&wire, wire.len(), Some(&mut view));
         assert_eq!(st, CGAP_OK, "dam must admit a valid frame, size={size}");
         // Identity: the admitted view is EXACTLY the frame payload region —
@@ -136,7 +136,7 @@ fn cross_lane_gate_admits_a04_frames_with_tier_identity_per_size() {
         assert_eq!(view.payload.len(), size, "admitted length is exact, size={size}");
 
         // -- gate tier over the memory projection ---------------------------
-        let mut view_m = cgap_gate::penstock::FrameView { payload: &[] };
+        let mut view_m = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
         let st_m = ingress(&mem, mem.len(), Some(&mut view_m));
         assert_eq!(
             st_m, CGAP_OK,
@@ -336,7 +336,7 @@ fn pinned_divergence_gate_admits_reserved_flag_bits_core_refuses() {
     patch(&mut frame, 5, |b| b[0] |= 0x10); // flags bit 4
 
     // gate side: ADMITTED (A14 row 6, recorded divergence).
-    let mut view = cgap_gate::penstock::FrameView { payload: &[] };
+    let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
     assert_eq!(
         ingress(&frame, frame.len(), Some(&mut view)),
         CGAP_OK,

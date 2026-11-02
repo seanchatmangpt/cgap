@@ -41,9 +41,9 @@ use std::sync::OnceLock;
 
 use cgap_bn3::sigil::{encode_term, Sigil, PAYLOAD_MASK};
 use cgap_core::frame::{
-    CgapFrameHeader, P28LicenseAttestation as CoreP28, FLAG_ARROW, FRAME_HEADER_LEN,
-    FRAME_MAGIC, FRAME_VERSION, LICENSE_FLAG_ROOT as CORE_FLAG_ROOT,
-    LICENSE_MAGIC as CORE_LICENSE_MAGIC, SAFE_HARBOR_CEILING_CENTS_MAX,
+    CgapFrameHeader, P28LicenseAttestation as CoreP28, FLAG_ARROW, FRAME_HEADER_LEN, FRAME_MAGIC,
+    FRAME_VERSION, LICENSE_FLAG_ROOT as CORE_FLAG_ROOT, LICENSE_MAGIC as CORE_LICENSE_MAGIC,
+    SAFE_HARBOR_CEILING_CENTS_MAX,
 };
 use cgap_ffi::sovereign::{
     cgap_admit_frame, cgap_commit_parquet, cgap_eval_bn3, cgap_verify_p28, CgapAdmitFrameFn,
@@ -51,10 +51,34 @@ use cgap_ffi::sovereign::{
     CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
 };
 use cgap_p28::attestation::{
-    instrument_header_span, origin_authority_digest, FLAG_ROOT, LICENSE_MAGIC,
-    P28LicenseAttestation as P28Rec, ATTESTATION_LEN, SAFE_HARBOR_CEILING_MAX_CENTS,
+    instrument_header_span, origin_authority_digest, P28LicenseAttestation as P28Rec,
+    ATTESTATION_LEN, FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
 };
 use divan::{black_box, Bencher};
+
+/// W3-L4: the pre-leased ring sink under bench (steady + spill legs).
+use cgap_parquet::mmap_writer::{RingSink, SlabView, StaticPageBuffer};
+
+/// Alloc-column activation (divan law: allocs are counted only through its
+/// AllocProfiler global allocator — this bench binary now reports the
+/// alloc/bytes columns for every leg in this file; binary-scoped, changes
+/// no measured code).
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
+
+/// divan's bench closure bound is Fn + Send + Sync; the leased sink rides a
+/// RefCell which is !Sync — the same disclosed-soundness newtype pattern the
+/// file already uses for `AdmittedViews` in stage_eval_bn3: divan executes
+/// the closure on the calling thread only, so cross-thread access never
+/// happens (shared reads of the guard are the only cross-thread touch).
+struct LeaseSink(std::cell::RefCell<(StaticPageBuffer<65_536>, RingSink)>);
+unsafe impl Sync for LeaseSink {}
+impl LeaseSink {
+    fn with<R>(&self, f: impl FnOnce(&mut StaticPageBuffer<65_536>, &mut RingSink) -> R) -> R {
+        let (b, r) = &mut *self.0.borrow_mut();
+        f(b, r)
+    }
+}
 
 /// Canonical SplitMix64 master seed (charter, verbatim).
 const CORPUS_SEED: u64 = 0xBF58_476D_1CE4_E5B9;
@@ -120,13 +144,15 @@ fn var_word(idx: u64) -> u64 {
 /// One rule: (var0, K:100, var1) => (K:7, K:100, var1).
 fn chain_rodata() -> Vec<u8> {
     let words: [u64; 9] = [
-        1, // rule_count
-        0xBEEF, // rule_id
-        const_word(7), // head_s
+        1,                          // rule_count
+        0xBEEF,                     // rule_id
+        const_word(7),              // head_s
         const_word(RULE_PREDICATE), // head_p
-        var_word(1), // head_o: lane[i] = bound var1 = the matched o word
-        1, // body_len
-        var_word(0), const_word(RULE_PREDICATE), var_word(1), // body atom
+        var_word(1),                // head_o: lane[i] = bound var1 = the matched o word
+        1,                          // body_len
+        var_word(0),
+        const_word(RULE_PREDICATE),
+        var_word(1), // body atom
     ];
     words.iter().flat_map(|w| w.to_le_bytes()).collect()
 }
@@ -170,7 +196,11 @@ fn pinned_instrument() -> (Vec<u8>, P28Rec) {
     // The A19 sovereign embeds this span as a 413-byte const with a
     // compile-time pin; the file-derived span must stay in parity or the
     // sovereign and this bench would validate DIFFERENT instruments.
-    assert_eq!(span.len(), 413, "pinned instrument span drifted from the A19 413-byte pin");
+    assert_eq!(
+        span.len(),
+        413,
+        "pinned instrument span drifted from the A19 413-byte pin"
+    );
     let rec = P28Rec {
         license_magic: LICENSE_MAGIC,
         version: cgap_p28::attestation::ATTESTATION_VERSION,
@@ -245,27 +275,54 @@ fn chain_corpus(n: usize) -> ChainCorpus {
     // Setup-time warm check: the corpus frame MUST admit through the REAL
     // sovereign admit before any timing happens (a fixture that refused
     // would make every assert below vacuously green).
-    let mut probe_view = CgapFrameView { payload: std::ptr::null(), payload_len: 0, schema_id: 0, rule_count: 0 };
+    let mut probe_view = CgapFrameView {
+        payload: std::ptr::null(),
+        payload_len: 0,
+        schema_id: 0,
+        rule_count: 0,
+    };
     let probe_frame = chain_frame(0, &att);
     let st = unsafe { cgap_admit_frame(probe_frame.0.as_ptr(), FRAME_STRIDE, &mut probe_view) };
-    assert_eq!(st, CGAP_OK, "corpus frame must admit through cgap_admit_frame (status 0x{st:08X})");
-    assert_eq!(probe_view.payload_len, PAYLOAD_LEN, "admitted view borrows the payload");
+    assert_eq!(
+        st, CGAP_OK,
+        "corpus frame must admit through cgap_admit_frame (status 0x{st:08X})"
+    );
+    assert_eq!(
+        probe_view.payload_len, PAYLOAD_LEN,
+        "admitted view borrows the payload"
+    );
     let mut probe_lanes = [0i32; ROWS_PER_FRAME];
     let mut probe_count = 0usize;
     let probe_rodata = chain_rodata();
     let st = unsafe {
-        cgap_eval_bn3(&probe_view, probe_rodata.as_ptr(), probe_rodata.len(),
-                      probe_lanes.as_mut_ptr(), ROWS_PER_FRAME, &mut probe_count)
+        cgap_eval_bn3(
+            &probe_view,
+            probe_rodata.as_ptr(),
+            probe_rodata.len(),
+            probe_lanes.as_mut_ptr(),
+            ROWS_PER_FRAME,
+            &mut probe_count,
+        )
     };
-    assert_eq!(st, CGAP_OK, "corpus rule network must eval (status 0x{st:08X})");
+    assert_eq!(
+        st, CGAP_OK,
+        "corpus rule network must eval (status 0x{st:08X})"
+    );
     assert_eq!(probe_count, ROWS_PER_FRAME);
     for r in 0..ROWS_PER_FRAME {
-        assert_eq!(probe_lanes[r] as u64, lane_payload(0, r), "lane[{r}] vs oracle");
+        assert_eq!(
+            probe_lanes[r] as u64,
+            lane_payload(0, r),
+            "lane[{r}] vs oracle"
+        );
     }
     let evidence = rec.to_bytes();
     let mut probe_digest = 0u64;
     let st = unsafe { cgap_verify_p28(evidence.as_ptr(), ATTESTATION_LEN, &mut probe_digest) };
-    assert_eq!(st, CGAP_OK, "corpus evidence must verify through cgap_verify_p28 (status 0x{st:08X})");
+    assert_eq!(
+        st, CGAP_OK,
+        "corpus evidence must verify through cgap_verify_p28 (status 0x{st:08X})"
+    );
     // Commit liveness: one real commit through the sink (File::create is
     // truncating; the timed loops overwrite it). A failed first commit here
     // means the sink path is unusable and every timed commit below would be
@@ -278,9 +335,16 @@ fn chain_corpus(n: usize) -> ChainCorpus {
             commit_path().as_ptr(),
         )
     };
-    assert_eq!(st, CGAP_OK, "commit sink must accept a real batch (status 0x{st:08X})");
+    assert_eq!(
+        st, CGAP_OK,
+        "commit sink must accept a real batch (status 0x{st:08X})"
+    );
     let frames = (0..n).map(|t| chain_frame(t, &att)).collect();
-    ChainCorpus { frames, rodata: chain_rodata(), evidence }
+    ChainCorpus {
+        frames,
+        rodata: chain_rodata(),
+        evidence,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +357,9 @@ fn chain_corpus(n: usize) -> ChainCorpus {
 static COMMIT_PATH: OnceLock<CString> = OnceLock::new();
 
 fn commit_path() -> &'static CString {
-    COMMIT_PATH.get().expect("COMMIT_PATH set by main() before divan::main()")
+    COMMIT_PATH
+        .get()
+        .expect("COMMIT_PATH set by main() before divan::main()")
 }
 
 struct TempDirGuard(PathBuf);
@@ -317,7 +383,10 @@ fn lease_boundary_probe() -> (u32, CgapStatus) {
         unsafe { cgap_commit_parquet(lanes.as_ptr(), k as usize, commit_path().as_ptr()) }
     };
     let st_lo = ok(lo);
-    assert_eq!(st_lo, CGAP_OK, "1-lane batch must commit (status 0x{st_lo:08X})");
+    assert_eq!(
+        st_lo, CGAP_OK,
+        "1-lane batch must commit (status 0x{st_lo:08X})"
+    );
     let st_hi = ok(hi);
     assert_eq!(
         st_hi, CGAP_ERR_LEASE_EXHAUSTED,
@@ -343,10 +412,12 @@ fn main() {
     //    setup-time probe in chain_corpus(): every entrypoint is invoked for
     //    real and must return CGAP_OK before any timing happens.
     let _ = sovereign_symbols_exported();
-    eprintln!("[FFI] dlsym(RTLD_DEFAULT) is not authoritative for statically \
+    eprintln!(
+        "[FFI] dlsym(RTLD_DEFAULT) is not authoritative for statically \
                linked rlib symbols on Mach-O; BENCH-5 liveness = real \
                invocation: chain_corpus() asserts CGAP_OK through all four \
-               sovereign entrypoints before any timing");
+               sovereign entrypoints before any timing"
+    );
     let _guard = TempDirGuard(setup_commit_dir());
     let (boundary, first_refusal) = lease_boundary_probe();
     eprintln!(
@@ -372,7 +443,9 @@ fn setup_commit_dir() -> PathBuf {
     std::fs::create_dir_all(&dir).expect("commit sink dir");
     let file = dir.join("chain.pq");
     let cpath = CString::new(file.to_str().expect("utf-8 temp path")).expect("nul-free path");
-    COMMIT_PATH.set(cpath).expect("COMMIT_PATH set exactly once");
+    COMMIT_PATH
+        .set(cpath)
+        .expect("COMMIT_PATH set exactly once");
     dir
 }
 
@@ -458,9 +531,8 @@ fn chain_full_transaction<const N: usize>(b: Bencher) {
             ok += (st_commit == CGAP_OK) as u64;
             let mut digest = 0u64;
             // SAFETY: evidence is the corpus record; digest sink is live.
-            let st_verify = unsafe {
-                verify(corpus.evidence.as_ptr(), ATTESTATION_LEN, &mut digest)
-            };
+            let st_verify =
+                unsafe { verify(corpus.evidence.as_ptr(), ATTESTATION_LEN, &mut digest) };
             checksum = checksum.rotate_left(1) ^ st_verify as u64;
             ok += (st_verify == CGAP_OK) as u64;
             checksum = checksum.rotate_left(1) ^ digest;
@@ -607,7 +679,10 @@ fn stage_commit_parquet<const N: usize>(b: Bencher) {
             let st = unsafe { commit(batch.as_ptr(), ROWS_PER_FRAME, commit_path().as_ptr()) };
             ok += (st == CGAP_OK) as u64;
         }
-        assert_eq!(ok, N as u64, "stage_commit: every batch must commit CGAP_OK");
+        assert_eq!(
+            ok, N as u64,
+            "stage_commit: every batch must commit CGAP_OK"
+        );
         black_box(ok);
     });
 }
@@ -645,7 +720,143 @@ fn stage_verify_p28<const N: usize>(b: Bencher) {
             ok += (st == CGAP_OK) as u64;
             checksum = checksum.rotate_left(1) ^ digest;
         }
-        assert_eq!(ok, N as u64, "stage_verify: every record must verify CGAP_OK");
+        assert_eq!(
+            ok, N as u64,
+            "stage_verify: every record must verify CGAP_OK"
+        );
         black_box(checksum);
     });
+}
+
+// ---------------------------------------------------------------------------
+// (6) RING-SINK LEGS (W3-L4 lever) — the pre-leased commit backend vs the
+// FileSink baseline measured by stage_commit_parquet. Steady-state per-tx
+// = memcpy into the ring window + writer.seal (NO per-call File::create,
+// NO heap alloc — the Divan alloc column must read 0); the spill leg forces
+// ring rotations through the pre-opened handle. lease_boundary_probe above
+// is kept VERBATIM (unchanged) — the LEASE_EXHAUSTED boundary is pinned.
+// Mutation class that must flip: a dropped slab write or a refused rotation
+// breaks the Ok/rotation asserts below (same class as (4) commit).
+// ---------------------------------------------------------------------------
+
+/// Sealed-block size for a fixed-width lane slab (setup helper): drives the
+/// spill leg's rotation cadence.
+fn ring_lane_bank<const N: usize>() -> Vec<[u32; ROWS_PER_FRAME]> {
+    (0..N)
+        .map(|t| {
+            let mut batch = [0u32; ROWS_PER_FRAME];
+            for r in 0..ROWS_PER_FRAME {
+                batch[r] = lane_payload(t, r) as u32;
+            }
+            batch
+        })
+        .collect()
+}
+
+/// Steady-state ring commit: write_slab -> seal -> flush_to(&mut ring) per
+/// transaction; every verdict Ok; head advances; ZERO heap allocs in the
+/// timed loop (divan alloc column == 0 is the steady-state claim).
+/// Const N=256 is the LARGEST tx count whose sealed blocks (~158 B each)
+/// fit the 64 KiB ring WITHOUT rotation — steady-state BY DEFINITION is the
+/// regime where no spill fires; the spill regime is ring_sink_spill's leg.
+#[divan::bench(consts = [256])]
+fn ring_sink_commit<const N: usize>(b: Bencher) {
+    let bank = ring_lane_bank::<N>();
+    // divan's bench closure is Fn (not FnMut) — the leased block+ring ride a
+    // disclosed-soundness RefCell newtype (LeaseSink, above); no heap alloc
+    // per tx (the RefCell borrow guard is stack-only).
+    let sink = LeaseSink(std::cell::RefCell::new((
+        StaticPageBuffer::<65_536>::new(),
+        RingSink::new(None),
+    )));
+    let head_start: usize = sink.0.borrow().1.head();
+    b.bench(|| {
+        let mut ok = 0u64;
+        sink.with(|block, ring| {
+            // Steady-state re-arm per run (RingSink::reset — head 0, no
+            // spill; the per-tx price below is unaffected).
+            ring.reset();
+            for batch in bank.iter().take(N) {
+                let slab = SlabView {
+                    lanes: &[&batch[..]],
+                    rows: ROWS_PER_FRAME as u32,
+                    bits: 8,
+                };
+                let mut writer = block.writer();
+                writer
+                    .write_slab(&slab)
+                    .expect("ring_sink_commit: slab fits the 64 KiB lease");
+                let sealed = writer.seal(None).expect("ring_sink_commit: seal admits");
+                sealed
+                    .flush_to(&mut *ring)
+                    .expect("ring_sink_commit: ring commit admits");
+                ok += 1;
+            }
+            assert_eq!(ok, N as u64, "ring_sink_commit: every tx must commit Ok");
+            assert!(
+                ring.head() != head_start,
+                "ring_sink_commit: ring head must advance (sink actually consumed)"
+            );
+            assert_eq!(
+                ring.wraps(),
+                0,
+                "ring_sink_commit: steady leg must NOT rotate (no-spill regime)"
+            );
+        });
+        black_box(ok);
+    });
+}
+
+/// Forced-rotation ring commit: fat slabs (2,048 lanes) wrap the 64 KiB
+/// ring repeatedly; every verdict Ok; the wrap counter MUST advance inside
+/// the timed loop and the spill file MUST be non-empty post-loop (real
+/// bytes through the pre-opened handle — Chicago final-state assert).
+#[divan::bench(consts = [256, 4096])]
+fn ring_sink_spill<const N: usize>(b: Bencher) {
+    let mut bank: Vec<Vec<u32>> = Vec::with_capacity(N);
+    for t in 0..N {
+        let batch: Vec<u32> = (0..2_048).map(|r| ((t * 31 + r) % 256) as u32).collect();
+        bank.push(batch);
+    }
+    let spill_path =
+        std::env::temp_dir().join(format!("cgap-bench-ring-spill-{}-{N}", std::process::id()));
+    let spill = std::fs::File::create(&spill_path).expect("spill file open");
+    let sink = LeaseSink(std::cell::RefCell::new((
+        StaticPageBuffer::<65_536>::new(),
+        RingSink::new(Some(spill)),
+    )));
+    let wraps_before: u64 = sink.0.borrow().1.wraps();
+    b.bench(|| {
+        let mut ok = 0u64;
+        sink.with(|block, ring| {
+            for batch in bank.iter().take(N) {
+                let slab = SlabView {
+                    lanes: &[&batch[..]],
+                    rows: 2_048,
+                    bits: 8,
+                };
+                let mut writer = block.writer();
+                writer
+                    .write_slab(&slab)
+                    .expect("ring_sink_spill: slab fits the 64 KiB lease");
+                let sealed = writer.seal(None).expect("ring_sink_spill: seal admits");
+                sealed
+                    .flush_to(&mut *ring)
+                    .expect("ring_sink_spill: ring commit admits");
+                ok += 1;
+            }
+            assert_eq!(ok, N as u64, "ring_sink_spill: every tx must commit Ok");
+            assert!(
+                ring.wraps() > wraps_before,
+                "ring_sink_spill: ring must have rotated through the spill handle"
+            );
+        });
+        black_box(ok);
+    });
+    let spilled = std::fs::read(&spill_path).expect("spill readable");
+    assert!(
+        !spilled.is_empty(),
+        "ring_sink_spill: spill file must hold drained ring bytes"
+    );
+    let _ = std::fs::remove_file(&spill_path);
 }

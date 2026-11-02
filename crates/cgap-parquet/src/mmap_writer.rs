@@ -542,7 +542,11 @@ fn write_page_header_into(
     put_i32(scratch, &mut pos, 0);
     scratch[pos] = i32_hdr;
     pos += 1;
-    put_i32(scratch, &mut pos, i32::try_from(num_rows).unwrap_or(i32::MAX));
+    put_i32(
+        scratch,
+        &mut pos,
+        i32::try_from(num_rows).unwrap_or(i32::MAX),
+    );
     scratch[pos] = i32_hdr;
     pos += 1;
     put_i32(scratch, &mut pos, crate::thrift::encoding::RLE);
@@ -691,12 +695,146 @@ impl BlockSink for FileSink {
                 run_len: len,
                 budget: 0,
             })?;
-        self.file
-            .flush()
-            .map_err(|_| ParquetError::RunOverrun {
+        self.file.flush().map_err(|_| ParquetError::RunOverrun {
+            run_len: len,
+            budget: 0,
+        })?;
+        Ok(())
+    }
+}
+
+/// W3-L4 (Pareto lever L4) — Tier H pre-leased ring sink: the steady-state
+/// commit backend for the sovereign commit leg. The ring is granted ONCE per
+/// lane slot (one heap allocation at lease grant); steady-state commit per
+/// transaction is memcpy (into the ring window) + the writer's own seal —
+/// NO per-call `File::create`, NO per-call scratch alloc. The pre-opened
+/// spill handle receives the committed region ONLY on rotation (ring wrap);
+/// a sealed block whose window cannot fit the remaining ring budget is
+/// refused typed (never silent truncation); IO failure on the spill handle
+/// maps to `RunOverrun { run_len: len, budget: 0 }` — the same documented
+/// zero-bytes-committed remap as [`FileSink`].
+///
+/// `BlockSink` is implemented on `&mut RingSink` (not `RingSink`) because
+/// the sink must survive `flush_to`'s by-value `commit` across many
+/// transactions — a lease, not a one-shot.
+#[cfg(feature = "std")]
+pub struct RingSink {
+    ring: alloc::boxed::Box<[u8; 65_536]>,
+    head: usize,
+    wraps: u64,
+    spill: Option<std::fs::File>,
+    io_failed: bool,
+}
+
+#[cfg(feature = "std")]
+impl RingSink {
+    /// Ring capacity — the documented 64 KiB A02 lease.
+    pub const CAP: usize = 65_536;
+
+    /// Lease grant. `spill` is the pre-opened rotation target (resolved at
+    /// grant time); `None` means rotation is a typed refusal (there is no
+    /// silent wrap-and-drop).
+    pub fn new(spill: Option<std::fs::File>) -> Self {
+        Self {
+            ring: alloc::boxed::Box::new([0u8; 65_536]),
+            head: 0,
+            wraps: 0,
+            spill,
+            io_failed: false,
+        }
+    }
+
+    /// Committed bytes resident in the ring.
+    pub fn head(&self) -> usize {
+        self.head
+    }
+
+    /// Ring rotations so far (a spill happened iff `wraps > 0 && !io_failed`).
+    pub fn wraps(&self) -> u64 {
+        self.wraps
+    }
+
+    /// True once a spill write has failed (the sink refuses further
+    /// commits — no silent data loss).
+    pub fn io_failed(&self) -> bool {
+        self.io_failed
+    }
+
+    /// Steady-state re-arm: restart the ring at head 0 WITHOUT rotation
+    /// (bench/credential harness use — the FFI lease path never calls this;
+    /// production rotation goes through the spill handle).
+    pub fn reset(&mut self) {
+        self.head = 0;
+    }
+
+    /// Rotation: drain the committed region `[0..head)` to the pre-opened
+    /// spill handle. On failure (including a `None` spill) the ring head is
+    /// untouched — the contents survive for retry, and the refusing block
+    /// gets a typed refusal via the empty-window path. `io_failed` clears
+    /// on a successful retry drain.
+    fn drain_to_spill(&mut self) -> Result<(), ParquetError> {
+        let n = self.head;
+        if n == 0 {
+            return Ok(());
+        }
+        let Some(file) = self.spill.as_mut() else {
+            self.io_failed = true;
+            return Err(ParquetError::RunOverrun {
+                run_len: n,
+                budget: 0,
+            });
+        };
+        use std::io::Write;
+        let wrote = file
+            .write_all(&self.ring[..n])
+            .and_then(|_| file.flush())
+            .is_ok();
+        self.io_failed = !wrote;
+        if !wrote {
+            return Err(ParquetError::RunOverrun {
+                run_len: n,
+                budget: 0,
+            });
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "std")]
+impl BlockSink for &mut RingSink {
+    fn window(&mut self, len: usize) -> &mut [u8] {
+        let sink: &mut RingSink = self;
+        if len > RingSink::CAP {
+            // Over the ring budget: the trait contract is "at least `len`",
+            // which this sink cannot grant — hand back an empty window and
+            // let `flush_to` refuse typed (RunOverrun), never truncate.
+            return &mut sink.ring[..0];
+        }
+        if sink.head + len > RingSink::CAP {
+            // Rotation. The committed region MUST reach the spill handle
+            // before any byte is overwritten — a failed drain (including a
+            // `None` spill) refuses THIS block typed (empty window ->
+            // RunOverrun downstream); head/wraps are untouched, so the ring
+            // contents survive for retry. Never a silent wrap-and-drop.
+            if sink.drain_to_spill().is_err() {
+                return &mut sink.ring[..0];
+            }
+            sink.head = 0;
+            sink.wraps += 1;
+        }
+        let head = sink.head;
+        &mut sink.ring[head..head + len]
+    }
+
+    fn commit(self, len: usize) -> Result<(), ParquetError> {
+        let sink: &mut RingSink = self;
+        if len > RingSink::CAP || sink.head + len > RingSink::CAP || sink.io_failed {
+            return Err(ParquetError::RunOverrun {
                 run_len: len,
                 budget: 0,
-            })?;
+            });
+        }
+        sink.head += len;
         Ok(())
     }
 }
@@ -704,7 +842,7 @@ impl BlockSink for FileSink {
 #[cfg(test)]
 mod courts {
     use super::*;
-    use crate::footer::{ShapeFault, SealError, CorruptRegion, verify_seal};
+    use crate::footer::{verify_seal, CorruptRegion, SealError, ShapeFault};
     use crate::page::{decode_page_into, write_data_page_v2};
     use crate::rle::rle_encode;
     use alloc::string::{String, ToString};
@@ -744,11 +882,7 @@ mod courts {
     }
 
     fn slab<'v>(lanes: &'v [&'v [u32]], rows: u32, bits: u8) -> SlabView<'v> {
-        SlabView {
-            lanes,
-            rows,
-            bits,
-        }
+        SlabView { lanes, rows, bits }
     }
 
     // ---- differential wire identity (guards the in-buffer encoders) ----
@@ -827,8 +961,7 @@ mod courts {
                 let mut w = b.writer();
                 w.write_slab(&slab(&[&masked], masked.len() as u32, bits))
                     .expect("slab");
-                let (_, header_len) =
-                    crate::thrift::read_page_header(w.body()).expect("header");
+                let (_, header_len) = crate::thrift::read_page_header(w.body()).expect("header");
                 assert_eq!(&w.body()[header_len..], &reference[..]);
                 assert_eq!(hybrid_len(&masked, bits), reference.len());
             }
@@ -979,8 +1112,7 @@ mod courts {
         let mut pos = 0usize;
         let mut prev: i16 = 0;
         loop {
-            let Ok(Some((fid, ty))) = crate::thrift::read_field_header(meta, &mut pos, prev)
-            else {
+            let Ok(Some((fid, ty))) = crate::thrift::read_field_header(meta, &mut pos, prev) else {
                 break;
             };
             prev = fid;
@@ -1028,13 +1160,7 @@ mod courts {
         let src = include_str!("mmap_writer.rs");
         let flush = flush_region(src);
         for banned in [
-            "Vec::",
-            "vec![",
-            "Box::",
-            "String::",
-            "to_vec()",
-            ".push(",
-            "alloc::",
+            "Vec::", "vec![", "Box::", "String::", "to_vec()", ".push(", "alloc::",
         ] {
             assert!(
                 !flush.contains(banned),
@@ -1362,8 +1488,8 @@ mod courts {
             let sealed = block.bytes().to_vec();
             let digest = *block.digest();
 
-            let path =
-                std::env::temp_dir().join(format!("a02_tier_h_roundtrip_{}.par2", std::process::id()));
+            let path = std::env::temp_dir()
+                .join(format!("a02_tier_h_roundtrip_{}.par2", std::process::id()));
             {
                 let f = std::fs::File::create(&path).expect("create");
                 let sink = FileSink::new(f, vec![0u8; sealed.len()].into_boxed_slice());
@@ -1445,10 +1571,8 @@ mod courts {
             // Unique-per-run temp file: two concurrent test-binary runs in a
             // shared checkout must not clobber each other's artifact
             // (fan-out hygiene; the C7 court's W6-F3 pattern).
-            let path = std::env::temp_dir().join(format!(
-                "a02_a05_sweep_{}.par2",
-                std::process::id()
-            ));
+            let path =
+                std::env::temp_dir().join(format!("a02_a05_sweep_{}.par2", std::process::id()));
             let mut refusals = 0usize;
             for fill in [0xFFu8, 0x00] {
                 for k in 0..=n {
@@ -1601,8 +1725,7 @@ mod courts {
             let rg2_start = spans[0] as usize;
             let (h2, hl2) = crate::thrift::read_page_header(&sealed[rg2_start..])
                 .expect("rg2 first page header");
-            let rg2_page =
-                &sealed[rg2_start..rg2_start + hl2 + h2.compressed_page_size as usize];
+            let rg2_page = &sealed[rg2_start..rg2_start + hl2 + h2.compressed_page_size as usize];
             let mut out = vec![0u32; ROWS_PER_RG];
             let ndec = decode_page_into(rg2_page, &mut out).expect("decode rg2 lane 1");
             assert_eq!(ndec, ROWS_PER_RG);

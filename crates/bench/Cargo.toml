@@ -1,4 +1,6 @@
 [package]
+repository.workspace = true
+license-file.workspace = true
 default-run = "bench"
 name = "bench"
 version.workspace = true
@@ -17,6 +19,7 @@ cgap-p28 = { path = "../cgap-p28" }
 cgap-crypto = { path = "../cgap-crypto" }
 cgap-ffi = { path = "../cgap-ffi" }
 cgap-git = { path = "../cgap-git" }
+cgap-storage = { path = "../cgap-storage" }
 
 [dev-dependencies]
 # Exact-at-authoring-time pin. `cargo search divan` 2026-11-01 -> 0.1.21
@@ -94,4 +97,25 @@ harness = false
 
 [[bench]]
 name = "chains-sovereign"
+harness = false
+
+# W3-R4 / starDF MW4: G3-MAT transitive-closure bench (semi-naive kernel,
+
+# W4-K1 / G4-DRED: 90% churn + entropy-sweep retraction bench over the
+# splitmix64-seeded fact corpus, with an oracle set-equality court and a
+# ratio fence against the full-recompute oracle arm (no absolute-ms-only
+# claims). Sandbox courts mutate /tmp copies of dred.rs / dred_churn.rs.
+[[bench]]
+name = "dred_churn"
+harness = false
+
+# p1-closure pairs/s bench (harness=false Instant method, see file doc).
+[[bench]]
+name = "closure"
+harness = false
+
+# p1-bgp: multi-hop BGP equi-join bench (Divan; joins/s via ItemsCount
+# over full-chain matches; court = cgap-bn3/tests/bgp_hop_courts.rs).
+[[bench]]
+name = "bgp"
 harness = false

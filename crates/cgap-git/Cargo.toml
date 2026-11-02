@@ -13,3 +13,11 @@ default = ["std"]
 std = []
 
 [dependencies]
+
+[dev-dependencies]
+# tests/lineage_workflow.rs (v26.11.2 lane p1-lineage): cross-kernel
+# workflow court over the real cgap-parquet sealer and the real
+# cgap-blake3 register. Workspace path deps; dev-only, adds no external
+# dependency to the published kernel ([dependencies] stays empty).
+cgap-blake3 = { path = "../cgap-blake3" }
+cgap-parquet = { path = "../cgap-parquet" }

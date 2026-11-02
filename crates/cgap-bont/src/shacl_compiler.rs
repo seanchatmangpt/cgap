@@ -299,7 +299,11 @@ struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     fn new(src: &'a str) -> Self {
-        Lexer { src: src.as_bytes(), pos: 0, line: 1 }
+        Lexer {
+            src: src.as_bytes(),
+            pos: 0,
+            line: 1,
+        }
     }
 
     fn bump(&mut self) -> Option<u8> {
@@ -393,10 +397,7 @@ impl<'a> Lexer<'a> {
                 Some(b'>') => return Ok(out),
                 Some(b) => {
                     if b <= 0x20
-                        || matches!(
-                            b,
-                            b'"' | b'<' | b'{' | b'}' | b'|' | b'^' | b'\\' | b'`'
-                        )
+                        || matches!(b, b'"' | b'<' | b'{' | b'}' | b'|' | b'^' | b'\\' | b'`')
                     {
                         return Err(ShaclParseError {
                             line: start_line,
@@ -591,7 +592,12 @@ fn parse_graph(ttl: &str) -> Result<Graph, ShaclParseError> {
     while let Some(t) = lex.next_token()? {
         toks.push(t);
     }
-    let mut p = Parser { toks, i: 0, prefixes: BTreeMap::new(), graph: BTreeMap::new() };
+    let mut p = Parser {
+        toks,
+        i: 0,
+        prefixes: BTreeMap::new(),
+        graph: BTreeMap::new(),
+    };
     p.parse_document()?;
     Ok(std::mem::take(&mut p.graph))
 }
@@ -633,7 +639,10 @@ impl Parser {
     }
 
     fn err(&self, message: impl Into<String>) -> ShaclParseError {
-        ShaclParseError { line: self.line(), message: message.into() }
+        ShaclParseError {
+            line: self.line(),
+            message: message.into(),
+        }
     }
 
     /// Expand a prefixed name to its full IRI.
@@ -668,7 +677,9 @@ impl Parser {
                             p
                         }
                         other => {
-                            return Err(self.err(format!("@prefix expects prefixed name, got {:?}", other)))
+                            return Err(
+                                self.err(format!("@prefix expects prefixed name, got {:?}", other))
+                            )
                         }
                     };
                     let ns_iri = match self.expect("@prefix IRI")? {
@@ -681,7 +692,9 @@ impl Parser {
                     match self.expect("'.' after @prefix")? {
                         Tok::Dot => {}
                         other => {
-                            return Err(self.err(format!("expected '.' after @prefix, got {:?}", other)))
+                            return Err(
+                                self.err(format!("expected '.' after @prefix, got {:?}", other))
+                            )
                         }
                     }
                 }
@@ -693,7 +706,9 @@ impl Parser {
                     match self.expect("'.' after triples")? {
                         Tok::Dot => {}
                         other => {
-                            return Err(self.err(format!("expected '.' after triples, got {:?}", other)))
+                            return Err(
+                                self.err(format!("expected '.' after triples, got {:?}", other))
+                            )
                         }
                     }
                     self.graph.entry(subj).or_default().extend(pairs);
@@ -706,7 +721,10 @@ impl Parser {
     }
 
     /// predicate objectList (`;` predicate objectList)* — until `.` or `]`.
-    fn parse_pred_obj_list(&mut self, out: &mut Vec<(String, Term)>) -> Result<(), ShaclParseError> {
+    fn parse_pred_obj_list(
+        &mut self,
+        out: &mut Vec<(String, Term)>,
+    ) -> Result<(), ShaclParseError> {
         loop {
             let pred_tok = self.expect("predicate")?;
             let pred = self.expand_tok(&pred_tok)?;
@@ -938,9 +956,9 @@ fn extract_shapes(graph: &Graph) -> Vec<NodeShapeIr> {
 fn exact_one_of_groups(graph: &Graph) -> BTreeSet<String> {
     let mut groups = BTreeSet::new();
     for (subj, pairs) in graph {
-        let is_group = pairs.iter().any(|(p, o)| {
-            local_name(p) == "exactlyOneOf" && o == &Term::Bool(true)
-        });
+        let is_group = pairs
+            .iter()
+            .any(|(p, o)| local_name(p) == "exactlyOneOf" && o == &Term::Bool(true));
         if is_group {
             groups.insert(subj.clone());
         }
@@ -1009,6 +1027,82 @@ const EXEMPT_SHAPE_LOCALS: &[&str] = &["closed", "property"];
 /// `TargetingOutOfScope` rows are the one advisory exception: targeting never
 /// affects the struct or mask (doc registry: "targeting at call site"), so
 /// the row is recorded and the shape is still accepted.
+/// Lane p1-shacl (v26.11.2): bridge from the TTL subset parser to the
+/// columnar mask-plan kernels in [`crate::shacl_mask`]. Parses the shapes
+/// graph, then compiles every `sh:NodeShape` into a
+/// [`crate::shacl_mask::ShapePlan`]: `sh:targetClass` becomes the scope
+/// selector (a shape without `sh:targetClass` refuses loudly — targeting is
+/// never guessed), `sh:minCount`/`sh:maxCount` become `Cardinality`,
+/// `sh:datatype` becomes `Membership` over the datatype slot. A shape that
+/// is not `sh:closed true`, or carries malformed/duplicate known locals,
+/// refuses as a typed [`ShaclParseError`] — never a silent drop.
+pub fn mask_plan_from_ttl(
+    shapes_ttl: &str,
+) -> Result<crate::shacl_mask::MaskPlan, ShaclParseError> {
+    let graph = parse_graph(shapes_ttl)?;
+    let target_pred = format!("{}targetClass", SHACL_NS);
+    let mut shapes_out = Vec::new();
+    for shape in extract_shapes(&graph) {
+        let pairs = graph.get(&shape.iri).ok_or_else(|| ShaclParseError {
+            line: 0,
+            message: format!("shape {} vanished from graph", shape.iri),
+        })?;
+        let malformed = !shape.props.iter().all(|p| p.malformed.is_empty());
+        if !shape.closed || shape.closed_occurrences > 1 || shape.closed_malformed || malformed {
+            return Err(ShaclParseError {
+                line: 0,
+                message: format!(
+                    "mask plan refuses shape {} (closed={}, occurrences={}, malformed-kernel)",
+                    shape.iri, shape.closed, shape.closed_occurrences
+                ),
+            });
+        }
+        let target_class = pairs
+            .iter()
+            .find(|(p, o)| *p == target_pred && matches!(o, Term::Iri(_)))
+            .and_then(|(_, o)| match o {
+                Term::Iri(iri) => Some(iri.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| ShaclParseError {
+                line: 0,
+                message: format!(
+                    "mask plan refuses shape {}: missing sh:targetClass",
+                    shape.iri
+                ),
+            })?;
+        let mut constraints = Vec::new();
+        for prop in &shape.props {
+            let path = prop.path.clone().ok_or_else(|| ShaclParseError {
+                line: 0,
+                message: format!(
+                    "mask plan refuses shape {}: property without sh:path",
+                    shape.iri
+                ),
+            })?;
+            let pred = crate::primitives::slot_id(path.as_bytes());
+            if prop.min_count > 0 || prop.max_count.is_some() {
+                constraints.push(crate::shacl_mask::Constraint::Cardinality {
+                    pred,
+                    min: prop.min_count,
+                    max: prop.max_count,
+                });
+            }
+            if let Some(dt) = &prop.datatype {
+                constraints.push(crate::shacl_mask::Constraint::Membership {
+                    pred,
+                    allowed: vec![crate::primitives::slot_id(dt.as_bytes())],
+                });
+            }
+        }
+        shapes_out.push(crate::shacl_mask::ShapePlan {
+            target_class: crate::primitives::slot_id(target_class.as_bytes()),
+            constraints,
+        });
+    }
+    Ok(crate::shacl_mask::MaskPlan::new(shapes_out))
+}
+
 pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError> {
     let graph = parse_graph(shapes_ttl)?;
     let groups = exact_one_of_groups(&graph);
@@ -1065,11 +1159,17 @@ pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError
                     continue;
                 }
                 if LOGICAL_CONSTRUCTS.contains(&local) {
-                    rows.push(row(&format!("sh:{}", local), ReasonCode::LogicalShapeUnsupported));
+                    rows.push(row(
+                        &format!("sh:{}", local),
+                        ReasonCode::LogicalShapeUnsupported,
+                    ));
                     blocking = true;
                 } else if TARGETING_CONSTRUCTS.contains(&local) {
                     // advisory: recorded, never blocks (targeting is call-site)
-                    rows.push(row(&format!("sh:{}", local), ReasonCode::TargetingOutOfScope));
+                    rows.push(row(
+                        &format!("sh:{}", local),
+                        ReasonCode::TargetingOutOfScope,
+                    ));
                 } else if !ANNOTATION_LOCALS.contains(&local) {
                     // Unclassified SHACL construct at shape level: no registry
                     // row, so accepting it would be a silent drop (disclosed
@@ -1119,16 +1219,28 @@ pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError
                     continue;
                 }
                 if VALUE_CONSTRUCTS.contains(&local.as_str()) {
-                    rows.push(row(&format!("sh:{}", local), ReasonCode::ValueConstraintOutOfMaskScope));
+                    rows.push(row(
+                        &format!("sh:{}", local),
+                        ReasonCode::ValueConstraintOutOfMaskScope,
+                    ));
                     blocking = true;
                 } else if local == "qualifiedValueShape" {
-                    rows.push(row("sh:qualifiedValueShape", ReasonCode::CardinalityUnsupported));
+                    rows.push(row(
+                        "sh:qualifiedValueShape",
+                        ReasonCode::CardinalityUnsupported,
+                    ));
                     blocking = true;
                 } else if LOGICAL_CONSTRUCTS.contains(&local.as_str()) {
-                    rows.push(row(&format!("sh:{}", local), ReasonCode::LogicalShapeUnsupported));
+                    rows.push(row(
+                        &format!("sh:{}", local),
+                        ReasonCode::LogicalShapeUnsupported,
+                    ));
                     blocking = true;
                 } else {
-                    rows.push(row(&format!("sh:{}", local), ReasonCode::ValueConstraintOutOfMaskScope));
+                    rows.push(row(
+                        &format!("sh:{}", local),
+                        ReasonCode::ValueConstraintOutOfMaskScope,
+                    ));
                     blocking = true;
                 }
             }
@@ -1150,9 +1262,10 @@ pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError
         }
         for (g, count) in &mandatory_per_group {
             if *count >= 2 {
-                rows.push(
-                    row(&format!("mandatory:sh:group<{}>", g), ReasonCode::MalformedShape),
-                );
+                rows.push(row(
+                    &format!("mandatory:sh:group<{}>", g),
+                    ReasonCode::MalformedShape,
+                ));
                 blocking = true;
             }
         }
@@ -1372,11 +1485,17 @@ pub fn parse_report(text: &str) -> Result<CompileReport, ReportParseError> {
                     .parse()
                     .map_err(|_| err("REFUSALS bad count".into()))?;
                 for _ in 0..n {
-                    let line = lines.next().ok_or_else(|| err("missing REFUSAL row".into()))?;
+                    let line = lines
+                        .next()
+                        .ok_or_else(|| err("missing REFUSAL row".into()))?;
                     let mut f = line.split(' ');
                     let name = f.next().ok_or_else(|| err("REFUSAL missing code".into()))?;
-                    let shape_iri = f.next().ok_or_else(|| err("REFUSAL missing shape_iri".into()))?;
-                    let construct = f.next().ok_or_else(|| err("REFUSAL missing construct".into()))?;
+                    let shape_iri = f
+                        .next()
+                        .ok_or_else(|| err("REFUSAL missing shape_iri".into()))?;
+                    let construct = f
+                        .next()
+                        .ok_or_else(|| err("REFUSAL missing construct".into()))?;
                     if f.next().is_some() {
                         return Err(err("REFUSAL has extra fields".into()));
                     }
@@ -1434,7 +1553,8 @@ fn parse_shape_block(
     };
     let mut mask_fields = masks.split(' ');
     let parse_mask = |f: Option<&str>| -> Result<u64, ReportParseError> {
-        f.and_then(|v| v.parse().ok()).ok_or_else(|| err("MASKS bad value"))
+        f.and_then(|v| v.parse().ok())
+            .ok_or_else(|| err("MASKS bad value"))
     };
     let m_mandatory = parse_mask(mask_fields.next())?;
     let m_legal = parse_mask(mask_fields.next())?;
@@ -1508,7 +1628,14 @@ fn parse_shape_block(
     if m_group & !m_legal != 0 {
         return Err(err("MASKS m_group has bits outside m_legal"));
     }
-    Ok(CompiledShape { shape_iri, mask_width, bits, m_mandatory, m_legal, m_group })
+    Ok(CompiledShape {
+        shape_iri,
+        mask_width,
+        bits,
+        m_mandatory,
+        m_legal,
+        m_group,
+    })
 }
 
 /// Persist the report (DoD-9) in the canonical format.
@@ -1639,7 +1766,10 @@ ex:PersonShape a sh:NodeShape ;
         // (a) present -> Ok
         assert_eq!(validate_presence(0b1011, shape), Ok(()));
         // (b) missing name -> Err(MissingMandatory)
-        assert_eq!(validate_presence(0b1001, shape), Err(MaskViolation::MissingMandatory));
+        assert_eq!(
+            validate_presence(0b1001, shape),
+            Err(MaskViolation::MissingMandatory)
+        );
 
         // Mutation M1a (compiler bug drops the name bit from M_mandatory):
         // the same input must flip Err -> Ok, else the bit was decorative.
@@ -1653,7 +1783,11 @@ ex:PersonShape a sh:NodeShape ;
         let mut m1b = shape.clone();
         m1b.m_mandatory |= 1u64 << 2;
         assert_eq!(m1b.m_mandatory, 0b0111);
-        assert_eq!(validate_presence(0b1011, &m1b), Err(MaskViolation::MissingMandatory), "M1b must flip");
+        assert_eq!(
+            validate_presence(0b1011, &m1b),
+            Err(MaskViolation::MissingMandatory),
+            "M1b must flip"
+        );
     }
 
     /// T3 XOR court: exactly-one-of group via one AND+popcnt+compare, plus
@@ -1695,9 +1829,15 @@ ex:ContactShape a sh:NodeShape ;
         // name+phone (exactly one of group) -> Ok
         assert_eq!(validate_presence(0b0110, shape), Ok(()));
         // name only (none of group) -> Err(GroupCardinality)
-        assert_eq!(validate_presence(0b0010, shape), Err(MaskViolation::GroupCardinality));
+        assert_eq!(
+            validate_presence(0b0010, shape),
+            Err(MaskViolation::GroupCardinality)
+        );
         // name+email+phone (both of group) -> Err(GroupCardinality)
-        assert_eq!(validate_presence(0b0111, shape), Err(MaskViolation::GroupCardinality));
+        assert_eq!(
+            validate_presence(0b0111, shape),
+            Err(MaskViolation::GroupCardinality)
+        );
 
         // Mutation M2 (compiler bug clears M_group): the both-set case must
         // flip Err -> Ok, else the group mask was decorative.
@@ -1714,7 +1854,10 @@ ex:ContactShape a sh:NodeShape ;
         let shape = &report.accepted[0];
 
         // Undeclared bit 6 set -> IllegalProperty
-        assert_eq!(validate_presence(1u64 << 6, shape), Err(MaskViolation::IllegalProperty));
+        assert_eq!(
+            validate_presence(1u64 << 6, shape),
+            Err(MaskViolation::IllegalProperty)
+        );
         // legal record + undeclared bit 6 -> still IllegalProperty
         assert_eq!(
             validate_presence(0b1111 | (1u64 << 6), shape),
@@ -1730,7 +1873,11 @@ ex:ContactShape a sh:NodeShape ;
         // closed-world guard.
         let mut m3 = shape.clone();
         m3.m_legal = u64::MAX;
-        assert_eq!(validate_presence(0b1111 | (1u64 << 6), &m3), Ok(()), "M3 must flip");
+        assert_eq!(
+            validate_presence(0b1111 | (1u64 << 6), &m3),
+            Ok(()),
+            "M3 must flip"
+        );
     }
 
     /// T5 asm witness: real `--emit asm` on a scratch crate calling
@@ -1819,7 +1966,13 @@ pub extern "C" fn t5_control(observed: MaskWord, s: &CompiledShape) -> u32 {
                 // Fallback recipe: RUSTFLAGS-based emission (works even where
                 // cargo's own --emit handling drops the .s files).
                 let out2 = std::process::Command::new("cargo")
-                    .args(["build", "--release", "--offline", "--manifest-path", manifest_str])
+                    .args([
+                        "build",
+                        "--release",
+                        "--offline",
+                        "--manifest-path",
+                        manifest_str,
+                    ])
                     .env_remove("CARGO_MAKEFLAGS")
                     .env("RUSTFLAGS", "--emit asm")
                     .env("CARGO_TARGET_DIR", &scratch_target)
@@ -1860,7 +2013,10 @@ pub extern "C" fn t5_control(observed: MaskWord, s: &CompiledShape) -> u32 {
                 // blocking fact (doc section 6 / T5). The scratch dir is kept
                 // on this path so the blocking fact stays diagnosable.
                 eprintln!("[SKIP] T5 asm witness: {}", blocking);
-                eprintln!("[SKIP] T5 scratch dir kept for diagnosis: {}", dir.display());
+                eprintln!(
+                    "[SKIP] T5 scratch dir kept for diagnosis: {}",
+                    dir.display()
+                );
                 return;
             }
         };
@@ -1932,25 +2088,41 @@ pub extern "C" fn t5_control(observed: MaskWord, s: &CompiledShape) -> u32 {
             m.starts_with("b.")
                 || matches!(
                     m,
-                    "cmp" | "cmpq" | "cmpl" | "cmpw" | "cmpb" | "tst" | "testb" | "testq"
-                        | "testl" | "subs" | "subsw" | "subsx" | "cbz" | "cbnz" | "tbz" | "tbnz"
+                    "cmp"
+                        | "cmpq"
+                        | "cmpl"
+                        | "cmpw"
+                        | "cmpb"
+                        | "tst"
+                        | "testb"
+                        | "testq"
+                        | "testl"
+                        | "subs"
+                        | "subsw"
+                        | "subsx"
+                        | "cbz"
+                        | "cbnz"
+                        | "tbz"
+                        | "tbnz"
                 )
         };
         let popcount_family = |m: &str| matches!(m, "popcnt" | "popcntb" | "cnt" | "cntb" | "cntw");
         let call_family = |m: &str| matches!(m, "call" | "callq" | "bl" | "blr");
 
-        let collect = |body: &str, pred: &dyn Fn(&str) -> bool| Vec::from_iter(
-            body.lines()
-                .map(mnemonic)
-                .filter(|m| pred(m))
-                .map(|m| m.to_string()),
-        );
+        let collect = |body: &str, pred: &dyn Fn(&str) -> bool| {
+            Vec::from_iter(
+                body.lines()
+                    .map(mnemonic)
+                    .filter(|m| pred(m))
+                    .map(|m| m.to_string()),
+            )
+        };
 
         // The witness body and the control body must both be present.
-        let witness_body = body_of("t5_validate")
-            .expect("t5_validate symbol missing from emitted asm");
-        let control_body = body_of("t5_control")
-            .expect("t5_control symbol missing from emitted asm");
+        let witness_body =
+            body_of("t5_validate").expect("t5_validate symbol missing from emitted asm");
+        let control_body =
+            body_of("t5_control").expect("t5_control symbol missing from emitted asm");
 
         // Single-mask-operation claim, bounded form: the inlined evaluator
         // body is and-family + a compare + (a popcount instruction OR the
@@ -2073,8 +2245,15 @@ ex:OpenShape a sh:NodeShape ;
 ";
         let p = write_fixture(&dir, "not_closed.ttl", not_closed);
         let report = compile_shapes(&std::fs::read_to_string(&p).expect("read")).expect("parse");
-        assert!(has_reason(&report, ReasonCode::NotClosedShape), "{:?}", report.refusals);
-        assert!(report.accepted.is_empty(), "refused shape must not be accepted");
+        assert!(
+            has_reason(&report, ReasonCode::NotClosedShape),
+            "{:?}",
+            report.refusals
+        );
+        assert!(
+            report.accepted.is_empty(),
+            "refused shape must not be accepted"
+        );
 
         // NotClosedShape: explicit sh:closed false.
         let closed_false = not_closed.replace(
@@ -2095,7 +2274,10 @@ ex:S a sh:NodeShape ;
 ";
         let p = write_fixture(&dir, "pattern.ttl", pattern);
         let report = compile_shapes(&std::fs::read_to_string(&p).expect("read")).expect("parse");
-        assert!(has_reason(&report, ReasonCode::ValueConstraintOutOfMaskScope));
+        assert!(has_reason(
+            &report,
+            ReasonCode::ValueConstraintOutOfMaskScope
+        ));
         assert!(report.accepted.is_empty());
         let row = report
             .refusals
@@ -2299,7 +2481,8 @@ ex:S a sh:NodeShape ;
         assert!(neg.accepted.is_empty());
 
         // wrong-typed: sh:path as a string literal (non-IRI path).
-        let str_path = compile_shapes(&ttl_with("sh:path \"name\" ; sh:minCount 1")).expect("parse");
+        let str_path =
+            compile_shapes(&ttl_with("sh:path \"name\" ; sh:minCount 1")).expect("parse");
         assert!(
             str_path
                 .refusals
@@ -2355,8 +2538,10 @@ ex:S a sh:NodeShape ;
         let row = bad
             .refusals
             .iter()
-            .find(|r| r.reason_code == ReasonCode::ValueConstraintOutOfMaskScope
-                && r.construct == "sh:lessThan")
+            .find(|r| {
+                r.reason_code == ReasonCode::ValueConstraintOutOfMaskScope
+                    && r.construct == "sh:lessThan"
+            })
             .expect("sh:lessThan row");
         assert_eq!(row.shape_iri, "http://example.org/S");
         assert!(bad.accepted.is_empty());
@@ -2385,7 +2570,10 @@ ex:S a sh:NodeShape ;
         ))
         .expect("parse");
         assert_eq!(annotated.accepted.len(), 1, "{:?}", annotated.refusals);
-        assert!(!has_reason(&annotated, ReasonCode::ValueConstraintOutOfMaskScope));
+        assert!(!has_reason(
+            &annotated,
+            ReasonCode::ValueConstraintOutOfMaskScope
+        ));
     }
 
     /// T7e unsatisfiable-mask court: two mandatory members of one
@@ -2429,14 +2617,24 @@ ex:S a sh:NodeShape ;
         // bits sorted by IRI: a=0, b=1
         assert_eq!(s.m_mandatory, 0b01, "only a is mandatory");
         assert_eq!(s.m_group, 0b11, "a and b are the XOR group");
-        assert_eq!(validate_presence(0b01, s), Ok(()), "a set: group count 1, mandatory met");
+        assert_eq!(
+            validate_presence(0b01, s),
+            Ok(()),
+            "a set: group count 1, mandatory met"
+        );
         assert_eq!(
             validate_presence(0b10, s),
             Err(MaskViolation::MissingMandatory),
             "b alone: group count 1 but mandatory a is absent"
         );
-        assert_eq!(validate_presence(0b00, s), Err(MaskViolation::MissingMandatory));
-        assert_eq!(validate_presence(0b11, s), Err(MaskViolation::GroupCardinality));
+        assert_eq!(
+            validate_presence(0b00, s),
+            Err(MaskViolation::MissingMandatory)
+        );
+        assert_eq!(
+            validate_presence(0b11, s),
+            Err(MaskViolation::GroupCardinality)
+        );
     }
 
     /// T8 parse-side invariants: a tampered or hand-mangled canonical report
@@ -2471,29 +2669,60 @@ ex:S a sh:NodeShape ;
         };
 
         // WIDTH beyond the ABI cap.
-        flip("width>cap", "WIDTH 4\n".to_string(), "WIDTH 65\n".to_string());
+        flip(
+            "width>cap",
+            "WIDTH 4\n".to_string(),
+            "WIDTH 65\n".to_string(),
+        );
         // WIDTH inconsistent with the BIT row count.
-        flip("width!=bits", "WIDTH 4\n".to_string(), "WIDTH 5\n".to_string());
+        flip(
+            "width!=bits",
+            "WIDTH 4\n".to_string(),
+            "WIDTH 5\n".to_string(),
+        );
         // m_legal inconsistent with WIDTH (the M3 open-world class).
         flip(
             "m_legal open-world",
-            format!("MASKS {} {} {}\n", shape.m_mandatory, shape.m_legal, shape.m_group),
-            format!("MASKS {} {} {}\n", shape.m_mandatory, u64::MAX, shape.m_group),
+            format!(
+                "MASKS {} {} {}\n",
+                shape.m_mandatory, shape.m_legal, shape.m_group
+            ),
+            format!(
+                "MASKS {} {} {}\n",
+                shape.m_mandatory,
+                u64::MAX,
+                shape.m_group
+            ),
         );
         // m_mandatory carrying bits outside m_legal.
         flip(
             "m_mandatory outside m_legal",
-            format!("MASKS {} {} {}\n", shape.m_mandatory, shape.m_legal, shape.m_group),
+            format!(
+                "MASKS {} {} {}\n",
+                shape.m_mandatory, shape.m_legal, shape.m_group
+            ),
             format!("MASKS {} {} {}\n", 1u64 << 6, shape.m_legal, shape.m_group),
         );
         // m_group carrying bits outside m_legal.
         flip(
             "m_group outside m_legal",
-            format!("MASKS {} {} {}\n", shape.m_mandatory, shape.m_legal, shape.m_group),
-            format!("MASKS {} {} {}\n", shape.m_mandatory, shape.m_legal, 1u64 << 6),
+            format!(
+                "MASKS {} {} {}\n",
+                shape.m_mandatory, shape.m_legal, shape.m_group
+            ),
+            format!(
+                "MASKS {} {} {}\n",
+                shape.m_mandatory,
+                shape.m_legal,
+                1u64 << 6
+            ),
         );
         // BIT index beyond WIDTH (non-consecutive from 0).
-        flip("bit index drift", "BIT 1 ".to_string(), "BIT 9 ".to_string());
+        flip(
+            "bit index drift",
+            "BIT 1 ".to_string(),
+            "BIT 9 ".to_string(),
+        );
         // BIT index duplicated (out of order).
         flip("bit index dup", "BIT 2 ".to_string(), "BIT 1 ".to_string());
         // duplicate property IRI across bits.
@@ -2510,12 +2739,8 @@ ex:S a sh:NodeShape ;
         // through the persisted artifact.
         flip(
             "bit rows unsorted",
-            format!(
-                "BIT 1 http://example.org/name\nBIT 2 http://example.org/nick"
-            ),
-            format!(
-                "BIT 1 http://example.org/nick\nBIT 2 http://example.org/name"
-            ),
+            format!("BIT 1 http://example.org/name\nBIT 2 http://example.org/nick"),
+            format!("BIT 1 http://example.org/nick\nBIT 2 http://example.org/name"),
         );
         // M14 (Wave-8): a space-bearing SHAPE IRI must refuse. The compiler
         // can never produce one (T9 lexer law), so acceptance would be a
@@ -2553,7 +2778,10 @@ ex:S a sh:NodeShape ;
         );
         for i in 0..64 {
             let terminator = if i == 63 { '.' } else { ';' };
-            ttl.push_str(&format!("    sh:property [ sh:path ex:p{:03} ] {}\n", i, terminator));
+            ttl.push_str(&format!(
+                "    sh:property [ sh:path ex:p{:03} ] {}\n",
+                i, terminator
+            ));
         }
         let report = compile_shapes(&ttl).expect("parse");
         assert_eq!(report.accepted.len(), 1, "{:?}", report.refusals);
@@ -2588,8 +2816,16 @@ ex:B a sh:NodeShape ;
 ";
         let report = compile_shapes(ttl).expect("parse");
         assert_eq!(report.accepted.len(), 2);
-        let a = report.accepted.iter().find(|s| s.shape_iri.ends_with('A')).expect("shape A");
-        let b = report.accepted.iter().find(|s| s.shape_iri.ends_with('B')).expect("shape B");
+        let a = report
+            .accepted
+            .iter()
+            .find(|s| s.shape_iri.ends_with('A'))
+            .expect("shape A");
+        let b = report
+            .accepted
+            .iter()
+            .find(|s| s.shape_iri.ends_with('B'))
+            .expect("shape B");
         let bit_of = |s: &CompiledShape, local: &str| -> u8 {
             s.bits
                 .iter()
@@ -2614,10 +2850,22 @@ ex:B a sh:NodeShape ;
         assert_eq!(err.line, 2);
         assert!(err.message.contains("undeclared prefix"));
 
-        assert_eq!(bont_field_type("http://www.w3.org/2001/XMLSchema#string"), Some(BontFieldType::Text));
-        assert_eq!(bont_field_type("http://www.w3.org/2001/XMLSchema#integer"), Some(BontFieldType::Integer));
-        assert_eq!(bont_field_type("http://www.w3.org/2001/XMLSchema#dateTime"), Some(BontFieldType::DateTime));
-        assert_eq!(bont_field_type("http://www.w3.org/2001/XMLSchema#nonexistent"), None);
+        assert_eq!(
+            bont_field_type("http://www.w3.org/2001/XMLSchema#string"),
+            Some(BontFieldType::Text)
+        );
+        assert_eq!(
+            bont_field_type("http://www.w3.org/2001/XMLSchema#integer"),
+            Some(BontFieldType::Integer)
+        );
+        assert_eq!(
+            bont_field_type("http://www.w3.org/2001/XMLSchema#dateTime"),
+            Some(BontFieldType::DateTime)
+        );
+        assert_eq!(
+            bont_field_type("http://www.w3.org/2001/XMLSchema#nonexistent"),
+            None
+        );
 
         // ReasonCode persisted names round-trip (canonical format law).
         for code in [
@@ -2662,14 +2910,22 @@ ex:B a sh:NodeShape ;
         // acceptance into a report the canonical parser cannot re-read.
         let err = compile_shapes(&ttl_with_subject("http://example.org/my shape"))
             .expect_err("space-bearing IRIREF must be a typed parse error");
-        assert!(err.message.contains("forbidden byte 0x20"), "{}", err.message);
+        assert!(
+            err.message.contains("forbidden byte 0x20"),
+            "{}",
+            err.message
+        );
         assert!(err.message.contains("IRIREF"), "{}", err.message);
         assert_eq!(err.line, 3, "error carries the IRIREF's source line");
 
         // (b) control byte inside an IRIREF: same law, same channel.
         let err = compile_shapes(&ttl_with_subject("http://example.org/a\u{01}b"))
             .expect_err("control byte in IRIREF must be a typed parse error");
-        assert!(err.message.contains("forbidden byte 0x01"), "{}", err.message);
+        assert!(
+            err.message.contains("forbidden byte 0x01"),
+            "{}",
+            err.message
+        );
 
         // (c) forbidden punctuation inside an IRIREF.
         for bad in ["http://example.org/a\"b", "http://example.org/a{b"] {
@@ -2688,7 +2944,11 @@ ex:S a sh:NodeShape ;
 ";
         let err = compile_shapes(path_space)
             .expect_err("space-bearing sh:path IRIREF must be a typed parse error");
-        assert!(err.message.contains("forbidden byte 0x20"), "{}", err.message);
+        assert!(
+            err.message.contains("forbidden byte 0x20"),
+            "{}",
+            err.message
+        );
 
         // (e) the clean equivalent compiles: the law is not over-broad
         // (M8-style flip baseline - removing the offending byte compiles).
@@ -2714,8 +2974,7 @@ ex:S a sh:NodeShape ;
             accepted: vec![hostile],
             refusals: vec![],
         });
-        let err = parse_report(&text)
-            .expect_err("space-bearing BIT IRI must not parse back");
+        let err = parse_report(&text).expect_err("space-bearing BIT IRI must not parse back");
         assert!(
             err.0.contains("extra fields"),
             "expected the space-split refusal, got: {}",
@@ -2810,8 +3069,7 @@ ex:S a sh:NodeShape ;
         };
         fn malformed_row(report: &CompileReport) -> Option<&ShaclRefusal> {
             report.refusals.iter().find(|r| {
-                r.reason_code == ReasonCode::MalformedShape
-                    && r.construct == "malformed:sh:closed"
+                r.reason_code == ReasonCode::MalformedShape && r.construct == "malformed:sh:closed"
             })
         }
 
@@ -2938,7 +3196,10 @@ ex:ContactShape a sh:NodeShape ;
         assert_eq!(ra, rb, "canonical render must be deterministic (T6 law)");
         let slot_a = slot_id(ra.as_bytes());
         let slot_b = slot_id(rb.as_bytes());
-        assert_eq!(slot_a, slot_b, "byte-equal reports must collide on identity");
+        assert_eq!(
+            slot_a, slot_b,
+            "byte-equal reports must collide on identity"
+        );
 
         // (b) distinguishing arm 1: mandatory-set difference moves identity.
         // Email drops minCount 1 -> m_mandatory loses bit 0 (doc section 5b).
@@ -3048,12 +3309,24 @@ ex:S2 a sh:NodeShape ;
         // the stress court's preamble).
         assert_eq!(validate_presence(0b0011, shape), Ok(()));
         assert_eq!(validate_presence(0b0110, shape), Ok(()));
-        assert_eq!(validate_presence(0b0010, shape), Err(MaskViolation::GroupCardinality));
-        assert_eq!(validate_presence(0b0111, shape), Err(MaskViolation::GroupCardinality));
-        assert_eq!(validate_presence(u64::MAX, shape), Err(MaskViolation::IllegalProperty));
+        assert_eq!(
+            validate_presence(0b0010, shape),
+            Err(MaskViolation::GroupCardinality)
+        );
+        assert_eq!(
+            validate_presence(0b0111, shape),
+            Err(MaskViolation::GroupCardinality)
+        );
+        assert_eq!(
+            validate_presence(u64::MAX, shape),
+            Err(MaskViolation::IllegalProperty)
+        );
         // All-zeros row: mandatory name bit absent -> MissingMandatory fires
         // first (doc section 5 step-5 precedence: closed-world, AND, XOR).
-        assert_eq!(validate_presence(0, shape), Err(MaskViolation::MissingMandatory));
+        assert_eq!(
+            validate_presence(0, shape),
+            Err(MaskViolation::MissingMandatory)
+        );
 
         // (2)+(3)+(4) 1M deterministic rows; the spec-law oracle uses the
         // doc-derived constants above with the doc's evaluation order.
@@ -3090,14 +3363,20 @@ ex:S2 a sh:NodeShape ;
         // Partition completeness + class reachability (final state).
         assert_eq!(oks + illegal + missing + group, ROWS as u64);
         for count in [oks, illegal, missing, group] {
-            assert!(count > 0, "class reachability: {oks}/{illegal}/{missing}/{group}");
+            assert!(
+                count > 0,
+                "class reachability: {oks}/{illegal}/{missing}/{group}"
+            );
         }
 
         // (3) identity stability at scale: an independent second compile
         // classifies all 1M rows identically.
         let report2 = compile_shapes(CONTACT_TTL).expect("second compile");
         let shape2 = &report2.accepted[0];
-        assert_ne!(shape as *const _, shape2 as *const _, "fixture: distinct instances");
+        assert_ne!(
+            shape as *const _, shape2 as *const _,
+            "fixture: distinct instances"
+        );
         let mut rng2 = XorShift64(0x9E37_79B9_7F4A_7C15);
         for (i, va) in verdicts_a.iter().enumerate() {
             let obs = stress_row(rng2.next());

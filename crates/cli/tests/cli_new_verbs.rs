@@ -35,6 +35,8 @@ const NEW_PAIRS: &[(&str, &str)] = &[
     ("gpu", "info"),
     ("beam", "info"),
     ("court", "verdict-run"),
+    ("blake3", "x2-court"),
+    ("bn3", "radix-join"),
 ];
 
 struct TestWorkspace {
@@ -335,4 +337,26 @@ fn court_verdict_run_reports_real_harness_counts() {
     assert_eq!(parsed["exit"].as_i64(), Some(0));
     assert!(parsed["passed"].as_u64().unwrap_or(0) > 0, "real court tests ran");
     assert_eq!(parsed["failed"].as_u64(), Some(0));
+}
+
+#[test]
+fn blake3_x2_court_matches_two_4way_kernels_and_refuses_tamper() {
+    let workspace = TestWorkspace::new("blake3-x2");
+    let (_, parsed) = workspace.json("blake3", "x2-court", &[]);
+    assert_eq!(parsed["groups_equal_two_4way"].as_bool(), Some(true));
+    assert_eq!(parsed["base100_counters_advance"].as_bool(), Some(true));
+    assert_eq!(parsed["simd_scalar_root_agree"].as_bool(), Some(true));
+    assert_eq!(parsed["tamper_refused"].as_bool(), Some(true));
+    assert_eq!(parsed["root_digest"].as_str().map(str::len), Some(64));
+}
+
+#[test]
+fn bn3_radix_join_differential_and_tamper_flip() {
+    let workspace = TestWorkspace::new("bn3-radix");
+    let (_, parsed) = workspace.json("bn3", "radix-join", &[]);
+    assert_eq!(parsed["match_for_match"].as_bool(), Some(true));
+    assert_eq!(parsed["matches"].as_u64(), Some(3));
+    assert_eq!(parsed["nested_matches"].as_u64(), Some(3));
+    assert_eq!(parsed["tamper_refused"].as_bool(), Some(true));
+    assert_eq!(parsed["tampered_matches"].as_u64(), Some(2));
 }

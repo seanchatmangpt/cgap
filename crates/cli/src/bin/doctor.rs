@@ -220,7 +220,12 @@ fn check_wasm_targets() -> Check {
                 } else {
                     have.join(", ")
                 };
-                Check::new("c02", "wasm-targets", St::Green, format!("installed: {shown}"))
+                Check::new(
+                    "c02",
+                    "wasm-targets",
+                    St::Green,
+                    format!("installed: {shown}"),
+                )
             } else {
                 Check::new(
                     "c02",
@@ -248,7 +253,8 @@ fn check_git() -> Check {
 fn check_b3sum() -> Check {
     match capture("b3sum", &["--version"]) {
         Some((0, out, _)) => Check::new("c04", "b3sum", St::Green, first_line(&out)),
-        _ => Check::new("c04", "b3sum", St::Yellow, "b3sum not on PATH").with_hint("brew install b3sum"),
+        _ => Check::new("c04", "b3sum", St::Yellow, "b3sum not on PATH")
+            .with_hint("brew install b3sum"),
     }
 }
 
@@ -308,10 +314,19 @@ fn check_workspace() -> Check {
                 .filter(|l| !l.trim().is_empty())
                 .take(3)
                 .collect();
-            let mut parts: Vec<String> = tail.into_iter().rev().map(|l| l.trim().to_string()).collect();
+            let mut parts: Vec<String> = tail
+                .into_iter()
+                .rev()
+                .map(|l| l.trim().to_string())
+                .collect();
             parts.dedup();
-            Check::new("c06", "workspace-check", St::Red, format!("exit {code}: {}", parts.join(" | ")))
-                .with_hint("cargo check --workspace 2>&1 | head -50")
+            Check::new(
+                "c06",
+                "workspace-check",
+                St::Red,
+                format!("exit {code}: {}", parts.join(" | ")),
+            )
+            .with_hint("cargo check --workspace 2>&1 | head -50")
         }
         None => Check::new("c06", "workspace-check", St::Red, "cargo not spawnable"),
     }
@@ -320,7 +335,7 @@ fn check_workspace() -> Check {
 /// c07: gate scripts present and executable. Missing -> YELLOW (dod.sh is
 /// expected to land via wave-10 lane 1); exists-but-not-executable -> RED.
 fn check_scripts(root: &Path) -> Check {
-    const SCRIPTS: [&str; 7] = [
+    const SCRIPTS: [&str; 10] = [
         "verify_v26.10.31.sh",
         "audit_branchless.sh",
         "cfg_homology.sh",
@@ -328,6 +343,9 @@ fn check_scripts(root: &Path) -> Check {
         "mint_receipt.sh",
         "perf_guard.sh",
         "dod.sh",
+        "zero_datafusion_gate.py",
+        "receipt_lint.py",
+        "registry_sweep.py",
     ];
     let mut missing: Vec<&str> = vec![];
     let mut notx: Vec<&str> = vec![];
@@ -344,7 +362,7 @@ fn check_scripts(root: &Path) -> Check {
         }
     }
     if missing.is_empty() && notx.is_empty() {
-        return Check::new("c07", "scripts", St::Green, "7/7 gate scripts executable");
+        return Check::new("c07", "scripts", St::Green, "10/10 gate scripts executable");
     }
     let mut detail = String::new();
     if !missing.is_empty() {
@@ -356,7 +374,11 @@ fn check_scripts(root: &Path) -> Check {
         }
         detail.push_str(&format!("not executable: {}", notx.join(", ")));
     }
-    let st = if !notx.is_empty() { St::Red } else { St::Yellow };
+    let st = if !notx.is_empty() {
+        St::Red
+    } else {
+        St::Yellow
+    };
     let hint = if !notx.is_empty() {
         format!("chmod +x scripts/{}", notx.join(" scripts/"))
     } else {
@@ -375,8 +397,13 @@ fn check_receipts(root: &Path) -> Check {
     let rd = match fs::read_dir(&dir) {
         Ok(rd) => rd,
         Err(e) => {
-            return Check::new("c08", "receipts", St::Red, format!("receipts dir unreadable: {e}"))
-                .with_hint("expected docs/jira/v26.10.31/receipts/")
+            return Check::new(
+                "c08",
+                "receipts",
+                St::Red,
+                format!("receipts dir unreadable: {e}"),
+            )
+            .with_hint("expected docs/jira/v26.10.31/receipts/")
         }
     };
     let mut count = 0usize;
@@ -398,7 +425,10 @@ fn check_receipts(root: &Path) -> Check {
         match (crates_newest, newest_receipt) {
             (Some(c), Some(r)) => {
                 if c > r {
-                    format!("newest crates/ mtime newer than newest receipt by {}s", c - r)
+                    format!(
+                        "newest crates/ mtime newer than newest receipt by {}s",
+                        c - r
+                    )
                 } else {
                     format!("receipts not stale (newest receipt newer by {}s)", r - c)
                 }
@@ -421,8 +451,13 @@ fn check_lsl(root: &Path) -> Check {
     let src = match fs::read_to_string(&p) {
         Ok(s) => s,
         Err(e) => {
-            return Check::new("c09", "lsl-ratified", St::Yellow, format!("ctq_report.rs unreadable: {e}"))
-                .with_hint("expected crates/bench/src/bin/ctq_report.rs")
+            return Check::new(
+                "c09",
+                "lsl-ratified",
+                St::Yellow,
+                format!("ctq_report.rs unreadable: {e}"),
+            )
+            .with_hint("expected crates/bench/src/bin/ctq_report.rs")
         }
     };
     let line = src
@@ -438,7 +473,12 @@ fn check_lsl(root: &Path) -> Check {
                 .trim_end_matches(';')
                 .trim();
             if rhs.starts_with("Some") {
-                Check::new("c09", "lsl-ratified", St::Green, format!("RATIFIED ({rhs})"))
+                Check::new(
+                    "c09",
+                    "lsl-ratified",
+                    St::Green,
+                    format!("RATIFIED ({rhs})"),
+                )
             } else {
                 Check::new(
                     "c09",
@@ -485,7 +525,12 @@ fn check_dirty_tree() -> Check {
 
 fn render_table(checks: &[Check], root: &Path) -> String {
     let id_w = checks.iter().map(|c| c.id.len()).max().unwrap_or(5).max(5);
-    let name_w = checks.iter().map(|c| c.name.len()).max().unwrap_or(4).max(4);
+    let name_w = checks
+        .iter()
+        .map(|c| c.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
     let st_w = 6; // "YELLOW"
     let mut out = String::new();
     out.push_str("cgap doctor — v26.10.31 workspace health check\n");

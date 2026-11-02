@@ -1,12 +1,18 @@
 # cgap-ffi
 
-Rewritten for the v26.11.1 sovereign C-ABI surface. The pre-moonshot
-Arrow C Data Interface README is archived byte-exact at
+Rewritten for the v26.11.2 reality wave. The v26.11.1 sovereign C-ABI
+README is archived byte-exact at
+`docs/jira/v26.11.1/readme-archive/cgap-ffi-pre-v26.11.2.md` (sha256
+`236b6d2ff880e1aadcde59d6355d0e73f4e10f01719bb4ace080b189d6b339e0`);
+the pre-moonshot Arrow C Data Interface README remains archived at
 `docs/jira/v26.11.1/readme-archive/cgap-ffi-pre-v26.11.1.md`.
 
-**Status: NOT-PUBLISHED** — verified against crates.io this session
-(no crate record). In-repo cdylib/staticlib membrane; consumers load the
-built artifact directly, there is no registry artifact.
+**Status: NOT-PUBLISHED** — as last witnessed (v26.11.1 wave; no crate
+record). In-repo cdylib/staticlib membrane; consumers load the built
+artifact directly, there is no registry artifact.
+
+- Crate version: **26.11.2** (`version.workspace = true`; workspace
+  26.11.2 — reality receipt drift-check MATCH).
 
 ## The four sovereign entrypoints
 
@@ -40,14 +46,16 @@ It lives at the REPO ROOT (`include/cgap.h`, 8,740 B), not inside
 it missing (that lane had looked only inside the crate dir). The file is
 tracked, on disk, and byte-stable.
 
-## Test receipt (run this session)
+## Test receipt (v26.11.2 reality wave)
 
 ```
 cargo test -p cgap-ffi   # exit 0
-  45 + 4 + 5 = 54 passed; 0 failed
-    (sovereign/lib units, alloc_courts, zero_copy)
+  45 (unit) + 4 (alloc_courts) + 2 (lever_courts) + 5 (zero_copy) = 56 passed; 0 failed
 ```
 
-Host: `cargo check -p cgap-ffi` and
-`cargo check -p cgap-ffi --target riscv32imc-unknown-none-elf` → 0 in the
-A19 receipt (`docs/jira/v26.11.1/waves/a19-finish-receipt.md`).
+C-ABI census: `nm -gU` over the release cdylib — 11 exported T symbols.
+Substance: 5,961 LOC total src. Host `cargo check -p cgap-ffi` and
+`cargo check -p cgap-ffi --target riscv32imc-unknown-none-elf` exits are
+in the reality receipt
+(`docs/jira/v26.11.2/waves/crate-reality/cgap-ffi.md`); A19 historical
+receipt `docs/jira/v26.11.1/waves/a19-finish-receipt.md`.

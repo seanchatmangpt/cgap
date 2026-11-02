@@ -16,9 +16,9 @@ fn fail<T>(what: &str, detail: String) -> Result<T> {
 /// real penstock ingress twice — admit + one corruption refusal.
 fn ingest_valid_frame() -> Result<(usize, u32, u32)> {
     use cgap_gate::penstock::{
-        ingress, MAGIC, OFF_ATTESTATION, OFF_FLAGS, OFF_MAGIC, OFF_OABI_DIGEST,
+        ingress, CGAP_OK, MAGIC, OFF_ATTESTATION, OFF_FLAGS, OFF_MAGIC, OFF_OABI_DIGEST,
         OFF_PAYLOAD_BYTE_LEN, OFF_VERSION, P28_FLAG_ROOT, P28_LICENSE_MAGIC,
-        P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION, CGAP_OK,
+        P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION,
     };
     let payload_len = 32usize;
     let mut frame = vec![0u8; 128 + payload_len];
@@ -37,14 +37,20 @@ fn ingest_valid_frame() -> Result<(usize, u32, u32)> {
     frame[a + 16..a + 48].copy_from_slice(&digest); // nonzero origin authority
     let status = ingress(&frame, frame.len(), None);
     if status != CGAP_OK {
-        return fail("gate dam-ingest", format!("valid frame refused: {status:#x}"));
+        return fail(
+            "gate dam-ingest",
+            format!("valid frame refused: {status:#x}"),
+        );
     }
     // Anti-vacuity: break the magic; ingress must refuse typed.
     let mut bad = frame.clone();
     bad[0] = b'X';
     let bad_status = ingress(&bad, bad.len(), None);
     if bad_status == CGAP_OK {
-        return fail("gate dam-ingest", "corrupt frame admitted — vacuous".to_owned());
+        return fail(
+            "gate dam-ingest",
+            "corrupt frame admitted — vacuous".to_owned(),
+        );
     }
     Ok((frame.len(), status, bad_status))
 }
@@ -66,8 +72,8 @@ pub fn gate_dam_ingest(_inputs: Map<String, Value>) -> Result<Value> {
 /// ceiling-overflow mutation (fail-closed witness).
 pub fn p_28_attest_verify(_inputs: Map<String, Value>) -> Result<Value> {
     use cgap_p28::attestation::{
-        P28LicenseAttestation, ATTESTATION_LEN, FLAG_LINEAGE_MASK, FLAG_RESERVED_MASK,
-        FLAG_ROOT, SAFE_HARBOR_CEILING_MAX_CENTS,
+        P28LicenseAttestation, ATTESTATION_LEN, FLAG_LINEAGE_MASK, FLAG_RESERVED_MASK, FLAG_ROOT,
+        SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     let att = P28LicenseAttestation {
         license_magic: *b"P28S",
@@ -99,7 +105,10 @@ pub fn p_28_attest_verify(_inputs: Map<String, Value>) -> Result<Value> {
     let mut corrupt = att;
     corrupt.safe_harbor_ceiling_cents = SAFE_HARBOR_CEILING_MAX_CENTS + 1;
     if corrupt.validate_intrinsic().is_ok() {
-        return fail("p28 attest-verify", "over-ceiling admitted — vacuous".to_owned());
+        return fail(
+            "p28 attest-verify",
+            "over-ceiling admitted — vacuous".to_owned(),
+        );
     }
     Ok(json!({
         "wire_len": bytes.len(),
@@ -136,7 +145,10 @@ pub fn crypto_seal(_inputs: Map<String, Value>) -> Result<Value> {
     use cgap_crypto::chatman::UNSEALED_RECEIPT_LEN;
     let (bytes, tick) = seal_one()?;
     if bytes.len() != UNSEALED_RECEIPT_LEN {
-        return fail("crypto seal", format!("wire len {} != {}", bytes.len(), UNSEALED_RECEIPT_LEN));
+        return fail(
+            "crypto seal",
+            format!("wire len {} != {}", bytes.len(), UNSEALED_RECEIPT_LEN),
+        );
     }
     Ok(json!({
         "receipt_len": bytes.len(),
@@ -150,10 +162,10 @@ pub fn crypto_seal(_inputs: Map<String, Value>) -> Result<Value> {
 pub fn crypto_receipt_verify(_inputs: Map<String, Value>) -> Result<Value> {
     use cgap_crypto::chatman::{verify_unsealed, UnsealedReceipt};
     let (bytes, _tick) = seal_one()?;
-    let arr: [u8; cgap_crypto::chatman::UNSEALED_RECEIPT_LEN] =
-        bytes.clone().try_into().map_err(|v: Vec<u8>| {
-            NounVerbError::execution_error(format!("len {}", v.len()))
-        })?;
+    let arr: [u8; cgap_crypto::chatman::UNSEALED_RECEIPT_LEN] = bytes
+        .clone()
+        .try_into()
+        .map_err(|v: Vec<u8>| NounVerbError::execution_error(format!("len {}", v.len())))?;
     let receipt = UnsealedReceipt::from_bytes(&arr)
         .map_err(|e| NounVerbError::execution_error(format!("decode refused: {e:?}")))?;
     verify_unsealed(&receipt)
@@ -164,7 +176,10 @@ pub fn crypto_receipt_verify(_inputs: Map<String, Value>) -> Result<Value> {
     if UnsealedReceipt::from_bytes(&tampered).is_ok()
         && verify_unsealed(&UnsealedReceipt::from_bytes(&tampered).unwrap()).is_ok()
     {
-        return fail("crypto receipt-verify", "tampered receipt verified — vacuous".to_owned());
+        return fail(
+            "crypto receipt-verify",
+            "tampered receipt verified — vacuous".to_owned(),
+        );
     }
     Ok(json!({
         "receipt_len": arr.len(),
@@ -279,7 +294,13 @@ fn run_crate_tests(what: &str, args: &[&str], label: &str) -> Result<Value> {
             "elapsed_s": started.elapsed().as_secs(),
         }))
     } else {
-        fail(what, format!("harness failing: exit {:?}, line: {result_line}", status.code()))
+        fail(
+            what,
+            format!(
+                "harness failing: exit {:?}, line: {result_line}",
+                status.code()
+            ),
+        )
     }
 }
 

@@ -3,12 +3,12 @@
 cnv:CgapCli a cnv:Cli ;
     cnv:crateName "cgap-cli" ;
     cnv:binaryName "cgap" ;
-    cnv:version "26.11.1" ;
+    cnv:version "26.11.2" ;
     cnv:edition "2021" ;
     cnv:rustVersion "1.85" ;
     cnv:about "cgap CLI over the cgap columnar kernels, generated from this graph by ggen." ;
     cnv:hasNoun cnv:SelfNoun, cnv:BenchNoun, cnv:AlignNoun,
-        cnv:BontNoun, cnv:Bn3Noun, cnv:GateNoun, cnv:ParquetNoun,
+        cnv:BontNoun, cnv:Bn3Noun, cnv:Blake3Noun, cnv:GateNoun, cnv:ParquetNoun,
         cnv:P28Noun, cnv:CryptoNoun, cnv:AuditNoun, cnv:GitNoun,
         cnv:ArrowNoun, cnv:GpuNoun, cnv:BeamNoun, cnv:CourtNoun .
 
@@ -83,7 +83,7 @@ cnv:BontPackVerifyBehavior a cnv:CustomBehavior .
 cnv:Bn3Noun a cnv:Noun ;
     cnv:name "bn3" ;
     cnv:about "Binary N3 reasoning surfaces." ;
-    cnv:hasCommand cnv:Bn3Unify, cnv:Bn3Eval .
+    cnv:hasCommand cnv:Bn3Unify, cnv:Bn3Eval, cnv:Bn3RadixJoin .
 
 cnv:Bn3Unify a cnv:Command ;
     cnv:name "unify" ;
@@ -100,6 +100,27 @@ cnv:Bn3Eval a cnv:Command ;
     cnv:hasBehavior cnv:Bn3EvalBehavior .
 
 cnv:Bn3EvalBehavior a cnv:CustomBehavior .
+
+cnv:Bn3RadixJoin a cnv:Command ;
+    cnv:name "radix-join" ;
+    cnv:about "L3 radix semi-join probe vs nested probe differential (match-for-match)." ;
+    cnv:belongsToNoun cnv:Bn3Noun ;
+    cnv:hasBehavior cnv:Bn3RadixJoinBehavior .
+
+cnv:Bn3RadixJoinBehavior a cnv:CustomBehavior .
+
+cnv:Blake3Noun a cnv:Noun ;
+    cnv:name "blake3" ;
+    cnv:about "BLAKE3 SIMD kernel surfaces." ;
+    cnv:hasCommand cnv:Blake3X2Court .
+
+cnv:Blake3X2Court a cnv:Command ;
+    cnv:name "x2-court" ;
+    cnv:about "x2 NEON kernel equals two 4-way kernels; tampered segment refuses typed." ;
+    cnv:belongsToNoun cnv:Blake3Noun ;
+    cnv:hasBehavior cnv:Blake3X2CourtBehavior .
+
+cnv:Blake3X2CourtBehavior a cnv:CustomBehavior .
 
 cnv:GateNoun a cnv:Noun ;
     cnv:name "gate" ;

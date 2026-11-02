@@ -153,30 +153,38 @@ fn stage2<'a>(slot: &'a [u8], len: usize, view: Option<&mut dam::FrameView<'a>>)
     dam::ingress(slot, len, view)
 }
 
-/// Stage 3 — the admitted path's digest fold: BLAKE3 over the view's
-/// payload, first 8 LE bytes folded to the checksum code space.
+/// Stage 3 — the ADMITTED path's fold, now two-stage (v26.11.2 lever L1):
+/// escalated frames pay full BLAKE3 over the view's payload (first 8 LE
+/// bytes folded); non-escalated frames fold the dam-minted prefilter mix —
+/// no crypto paid on the clean subset.
 #[inline]
-fn stage3(view: &dam::FrameView) -> u64 {
-    let d = cgap_blake3::hash(view.payload);
-    u64::from_le_bytes(d[..8].try_into().expect("32-byte digest"))
+fn stage3_escalated(view: &dam::FrameView) -> u64 {
+    if view.escalate {
+        let d = cgap_blake3::hash(view.payload);
+        u64::from_le_bytes(d[..8].try_into().expect("32-byte digest"))
+    } else {
+        view.prefilter
+    }
 }
 
 /// The CHAIN — one frame through all three stages. `slot` is a 512 B
 /// 64-aligned DMA slot; `len` is the declared frame length. Returns the
 /// frame's folded score: stage-1 code + stage-2 code + (admitted path
-/// only) the stage-3 digest fold. Admit law: chain-admitted iff BOTH
-/// stage 1 and stage 2 admit; only then is stage 3 paid.
+/// only) the two-stage fold — escalated frames pay the BLAKE3 digest,
+/// clean frames fold the dam-minted prefilter (lever L1). Admit law:
+/// chain-admitted iff BOTH stage 1 and stage 2 admit; only then is the
+/// fold paid.
 #[inline]
 fn chain_frame(slot: &[u8], len: usize) -> u64 {
     let a04 = stage1(slot, len);
-    let mut view = dam::FrameView { payload: &[] };
+    let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
     let st = stage2(slot, len, Some(&mut view));
-    let digest: u64 = if a04 == EC_OK && st == dam::CGAP_OK {
-        stage3(&view)
+    let fold = if a04 == EC_OK && st == dam::CGAP_OK {
+        stage3_escalated(&view)
     } else {
         0
     };
-    a04.wrapping_add(u64::from(st)).wrapping_add(digest)
+    a04.wrapping_add(u64::from(st)).wrapping_add(fold)
 }
 
 /// FrameError folded to a stable small code for the stage-1 checksum
@@ -397,10 +405,20 @@ struct Pool {
     chain_fold: u64,
     a04_fold: u64,
     dam_fold: u64,
+    /// L1 escalated-subset fold: BLAKE3 digests summed over chain-admitted
+    /// AND escalated frames only (lever L1; may legitimately be zero when
+    /// the corpus holds no escalated+admitted frame — receipt-recorded).
     digest_fold: u64,
-    /// Admitted frames only: (payload byte offset into `slots`, payload
-    /// length) — the zero-copy payload windows stage 3 is paid for.
+    /// Chain-admitted, NON-escalated frames' prefilter mix fold (lever L1).
+    prefilter_fold: u64,
+    /// Chain-admitted windows (cross-check basis; not iterated by a leg).
+    #[allow(dead_code)]
     admitted: Vec<(u32, u32)>,
+    /// L1 escalated subset (chain-admitted AND escalate): stage-3 digest
+    /// bench windows. May be empty on this corpus (receipt-recorded).
+    escalated: Vec<(u32, u32)>,
+    /// L1 clean subset (chain-admitted, NOT escalate): prefilter bench.
+    clean: Vec<(u32, u32)>,
 }
 
 /// Build + preflight the pool. Preflight per frame: stage-2 verdict must
@@ -418,7 +436,10 @@ fn build_pool(seed: u64, n: usize) -> Pool {
     let mut a04_fold: u64 = 0;
     let mut dam_fold: u64 = 0;
     let mut digest_fold: u64 = 0;
+    let mut prefilter_fold: u64 = 0;
     let mut admitted: Vec<(u32, u32)> = Vec::with_capacity(n / 4 + 16);
+    let mut escalated: Vec<(u32, u32)> = Vec::with_capacity(16);
+    let mut clean: Vec<(u32, u32)> = Vec::with_capacity(n / 4 + 16);
     for i in 0..n {
         let (len, expect) = gen_frame(seed, i as u64, &mut scratch);
         assert!(len <= SLOT_CAP, "frame {i} exceeds its DMA slot");
@@ -428,7 +449,7 @@ fn build_pool(seed: u64, n: usize) -> Pool {
 
         let slot: &[u8] = &slots.bytes()[base..base + SLOT_CAP];
         let a04 = stage1(slot, len);
-        let mut view = dam::FrameView { payload: &[] };
+        let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
         let st = stage2(slot, len, Some(&mut view));
         match expect {
             DamExpect::Code(code) => assert_eq!(
@@ -465,15 +486,21 @@ fn build_pool(seed: u64, n: usize) -> Pool {
             );
         }
         let digest = if chain_admitted {
-            let f = stage3(&view);
+            if view.escalate {
+                let d = cgap_blake3::hash(view.payload);
+                u64::from_le_bytes(d[..8].try_into().expect("32-byte digest"))
+            } else {
+                view.prefilter
+            }
+        } else {
+            0
+        };
+        if chain_admitted {
             admitted.push((
                 (base + FRAME_HEADER_LEN) as u32,
                 view.payload.len() as u32,
             ));
-            f
-        } else {
-            0
-        };
+        }
         // Cross-check: the inline preflight fold and the real chain must
         // agree frame-for-frame — the timed checksum's basis is the chain.
         assert_eq!(
@@ -481,10 +508,34 @@ fn build_pool(seed: u64, n: usize) -> Pool {
             a04.wrapping_add(u64::from(st)).wrapping_add(digest),
             "frame {i}: preflight/chain fold drift"
         );
+        // L1 law: the prefilter is minted on ADMIT only; a reject frame's
+        // view must carry the zero default.
+        if st == dam::CGAP_OK {
+            assert_eq!(
+                dam::prefilter8(&slot[..8]),
+                view.prefilter,
+                "frame {i}: dam-minted prefilter drift"
+            );
+        } else {
+            assert_eq!(view.prefilter, 0, "frame {i}: reject view prefilter");
+            assert!(!view.escalate, "frame {i}: reject view escalate bit");
+        }
+        if chain_admitted && view.escalate {
+            digest_fold = digest_fold.wrapping_add(digest);
+            escalated.push((
+                (base + FRAME_HEADER_LEN) as u32,
+                view.payload.len() as u32,
+            ));
+        } else if chain_admitted {
+            prefilter_fold = prefilter_fold.wrapping_add(view.prefilter);
+            clean.push((
+                (base + FRAME_HEADER_LEN) as u32,
+                view.payload.len() as u32,
+            ));
+        }
         chain_fold = chain_fold.wrapping_add(a04.wrapping_add(u64::from(st)).wrapping_add(digest));
         a04_fold = a04_fold.wrapping_add(a04);
         dam_fold = dam_fold.wrapping_add(u64::from(st));
-        digest_fold = digest_fold.wrapping_add(digest);
     }
     assert!(
         !admitted.is_empty(),
@@ -497,7 +548,10 @@ fn build_pool(seed: u64, n: usize) -> Pool {
         a04_fold,
         dam_fold,
         digest_fold,
+        prefilter_fold,
         admitted,
+        escalated,
+        clean,
     }
 }
 
@@ -572,7 +626,7 @@ fn stage_penstock_admission<const FRAMES: usize>(b: Bencher) {
         for i in 0..FRAMES {
             let j = i & (POOL - 1);
             let slot = &bytes[j * SLOT_CAP..(j + 1) * SLOT_CAP];
-            let mut view = dam::FrameView { payload: &[] };
+            let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
             let st = stage2(slot, pool.lens[j] as usize, Some(&mut view));
             black_box(view.payload.as_ptr());
             acc = acc.wrapping_add(u64::from(st));
@@ -585,8 +639,13 @@ fn stage_penstock_admission<const FRAMES: usize>(b: Bencher) {
     });
 }
 
-/// Stage 3 alone — BLAKE3 digest fold over the chain-admitted subset
-/// (exactly the payload windows the chain's admitted path hashes).
+/// Stage 3 alone — BLAKE3 digest fold over the L1 ESCALATED subset
+/// (chain-admitted AND escalate — exactly the frames the chain pays the
+/// full digest for). On the frozen corpus this subset may be EMPTY (the
+/// flag-only escalation policy admits no reserved-flag frame into the
+/// chain: stage 1 refuses reserved header flags) — the bench then proves
+/// the chain pays zero digest work, which is the lever's own claim; the
+/// empty-subset receipt row is recorded, not rounded up.
 #[divan::bench(consts = [65_536, 1_048_576])]
 fn stage_digest_fold<const FRAMES: usize>(b: Bencher) {
     let pool = build_pool(CHAIN_SEED, POOL);
@@ -597,7 +656,7 @@ fn stage_digest_fold<const FRAMES: usize>(b: Bencher) {
         let bytes = pool.slots.bytes();
         let mut acc: u64 = 0;
         for _ in 0..laps {
-            for &(off, plen) in &pool.admitted {
+            for &(off, plen) in &pool.escalated {
                 let d = cgap_blake3::hash(&bytes[off as usize..off as usize + plen as usize]);
                 acc = acc.wrapping_add(u64::from_le_bytes(d[..8].try_into().expect("digest u64")));
             }
@@ -605,9 +664,33 @@ fn stage_digest_fold<const FRAMES: usize>(b: Bencher) {
         black_box(acc);
         assert_eq!(
             acc, expect,
-            "stage-3 pass checksum drifted from preflight fold"
+            "stage-3 escalated-subset checksum drifted from preflight fold"
         );
     });
+}
+
+/// L1 new leg — the clean subset's cheap prefilter fold (no crypto). This
+/// is what every chain-admitted frame pays INSTEAD of BLAKE3 under the
+/// two-stage policy.
+#[divan::bench(consts = [65_536, 1_048_576])]
+fn stage_prefilter_fold<const FRAMES: usize>(b: Bencher) {
+    let pool = build_pool(CHAIN_SEED, POOL);
+    let laps = (FRAMES / POOL) as u64;
+    assert_eq!(FRAMES % POOL, 0, "FRAMES must be a pool multiple");
+    let expect = pool.prefilter_fold.wrapping_mul(laps);
+    b.counter(ItemsCount::new(FRAMES as u64)).bench(|| {
+        let bytes = pool.slots.bytes();
+        let mut acc: u64 = 0;
+        for _ in 0..laps {
+            for &(off, _plen) in &pool.clean {
+                acc = acc.wrapping_add(dam::prefilter8(&bytes[off as usize - FRAME_HEADER_LEN..]));
+            }
+        }
+            black_box(acc);
+        assert_eq!(
+            acc, expect,
+            "stage-prefilter pass checksum drifted from preflight fold"
+        );    });
 }
 
 fn main() {

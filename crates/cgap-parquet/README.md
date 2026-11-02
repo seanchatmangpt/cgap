@@ -7,10 +7,11 @@ Vec, then a word-bounded direct decode stage.
 
 ## Status
 
-PUBLISHED-26.11.1 — on crates.io (see
-`docs/jira/v26.11.1/waves/p3-api-verify-all.md`: all five kernel crates
-PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
-26.11.1 absent before the publish legs landed).
+WORKING-26.11.2 — kernel source at workspace version
+26.11.2 (publish law: one attempt per crate, sequenced; prior
+PUBLISHED-26.11.1 record archived under readme-archive/). Census: see
+`docs/jira/v26.11.2/waves/crate-reality/cgap-parquet.md`: full suite
+exit 0 this session at 26.11.2.
 
 ## Evidence (cited receipts)
 
@@ -19,18 +20,18 @@ PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
   `waves/bench-chains-parquet.md` (divan + AllocProfiler).
 - Direct-vs-staged: staged overhead vs direct ~+27% (fastest 63.28 vs
   49.95 µs) — `waves/bench-parquet-receipt.md`.
-- Suite: 216 tests 0 failed (default) and 236 tests 0 failed
-  (`--features std`) — `waves/a02-finish-receipt.md`.
+- Suite: 222 tests 0 failed (1 loud ignored perf court) at 26.11.2 —
+  `docs/jira/v26.11.2/waves/crate-reality/cgap-parquet.md`.
 - `rle_decode_direct` 46.45 µs — `waves/bench-chains-parquet.md`.
 
 ## Install
 
 ```bash
-cargo add cgap-parquet@26.11.1
+cargo add cgap-parquet@26.11.2
 ```
 
 ## Lane receipt
 
-`docs/jira/v26.11.1/waves/a02-finish-receipt.md` (lane A02) and
-`waves/bench-parquet-receipt.md`; registry witness
-`waves/p3-api-verify-all.md`.
+`docs/jira/v26.11.2/waves/crate-reality/cgap-parquet.md` (26.11.2
+census); historical: `docs/jira/v26.11.1/waves/a02-finish-receipt.md`,
+`waves/bench-parquet-receipt.md`, `waves/p3-api-verify-all.md`.

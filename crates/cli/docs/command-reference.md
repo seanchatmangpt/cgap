@@ -46,9 +46,21 @@ Literal-page w=4 RLE encode comparison, min-of-5.
 
 This command takes no arguments.
 
+## `cgap blake3 x2-court`
+
+x2 NEON kernel equals two 4-way kernels; tampered segment refuses typed.
+
+This command takes no arguments.
+
 ## `cgap bn3 eval`
 
 Evaluate a closed BN3 program to its result term.
+
+This command takes no arguments.
+
+## `cgap bn3 radix-join`
+
+L3 radix semi-join probe vs nested probe differential (match-for-match).
 
 This command takes no arguments.
 

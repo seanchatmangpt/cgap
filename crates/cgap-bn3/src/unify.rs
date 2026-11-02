@@ -241,8 +241,7 @@ impl TermSlot {
     }
 }
 
-const TERM_SLOTS: [TermSlot; 3] =
-    [TermSlot::Subject, TermSlot::Predicate, TermSlot::Object];
+const TERM_SLOTS: [TermSlot; 3] = [TermSlot::Subject, TermSlot::Predicate, TermSlot::Object];
 
 /// A body atom: three raw A11 term words (subject, predicate, object).
 /// Words are decoded and register-assigned at compile time; laws (p-slot
@@ -517,14 +516,11 @@ impl Interner {
             }
             let vp = payload as u8;
             let next = self.vars.len();
-            let idx = *self
-                .var_index
-                .entry(vp)
-                .or_insert_with(|| {
-                    self.vars.push(vp);
-                    self.var_first.push((atom_idx, slot.index()));
-                    next as u8
-                });
+            let idx = *self.var_index.entry(vp).or_insert_with(|| {
+                self.vars.push(vp);
+                self.var_first.push((atom_idx, slot.index()));
+                next as u8
+            });
             return Ok(CompiledTerm::Var(idx));
         }
         if sig == Sigil::FormulaRef as u8 && slot == TermSlot::Predicate {
@@ -532,13 +528,10 @@ impl Interner {
         }
         if sig == Sigil::SlotConst as u8 || sig == Sigil::FormulaRef as u8 {
             let next = self.const_pool.len();
-            let reg = *self
-                .const_index
-                .entry(word)
-                .or_insert_with(|| {
-                    self.const_pool.push(word);
-                    next as u8
-                });
+            let reg = *self.const_index.entry(word).or_insert_with(|| {
+                self.const_pool.push(word);
+                next as u8
+            });
             return Ok(CompiledTerm::Const(reg));
         }
         Err(UnifyError::UnsupportedTermSigil(sig))
@@ -547,6 +540,19 @@ impl Interner {
 
 /// All-ones lane mask: the "match" element of the mask algebra.
 const MASK_ALL: u64 = u64::MAX;
+
+/// First slot of `atom` holding a variable term (the emit_join_masks
+/// key lane; an all-const atom returns 0).
+fn first_var_slot(atom: &[CompiledTerm; 3]) -> usize {
+    (0..3)
+        .find(|&si| matches!(atom[si], CompiledTerm::Var(_)))
+        .unwrap_or(0)
+}
+
+/// Semi-join prefilter key-set cap: the mask arm pays one column pass
+/// per distinct key, so it runs only when the distinct bound-key set is
+/// at most this wide (otherwise the radix bucketing alone prunes).
+const KEY_PREFILTER_MAX: usize = 4;
 
 /// Branch-free u64-lane equality mask (the constant-time comparator arm;
 /// spec ADR 3.3's honest scoping, doe-4 Section 2 "u64-lane arm"): all-ones
@@ -601,6 +607,229 @@ pub struct EvalScratch {
     /// matter which role a column is serving.
     hw_rows: Vec<usize>,
     hw_vars: Vec<usize>,
+}
+
+/// L3 (W3 lever): caller-leased semi-join probe scratch. Every heap
+/// buffer the radix probe touches, owned once and reused across chunks,
+/// fixpoint rounds, and court runs — the same discipline as
+/// [`EvalScratch`]. `Default` is empty buffers with `radix: true`
+/// (the L3 fast path is the default; `radix: false` selects the retired
+/// nested-loop probe, the M-L3-1 differential arm).
+///
+/// High-water marks mirror `EvalScratch::hw_rows`/`hw_vars`: the peak
+/// bucket-table occupancy and mask width are recorded per chunk so a
+/// caller can prewarm/reserve off the hot path.
+#[derive(Debug, Default)]
+pub struct JoinProbeScratch {
+    /// Radix probe enabled (default). `false` = nested-loop probe
+    /// (the pre-L3 micro-architecture, kept as the M-L3-1 arm).
+    pub radix: bool,
+    /// Semi-join candidate survival mask, one bit per store row
+    /// (populated only when the prefilter arm runs).
+    pub mask_s: Vec<u64>,
+    /// Per-bucket chain heads into the candidate list; exactly
+    /// [`RADIX_BUCKETS`] (4096) entries, `u32::MAX` = empty bucket. The
+    /// L1-resident scratchpad of the L3 design contract
+    /// (13-arrow-star-schema.md): 4096 x 4 B = 16 KiB.
+    pub bucket_head: Vec<u32>,
+    /// Singly-linked chain over candidate-list positions: `next_chain[c]`
+    /// is the next candidate position in bucket `radix_bucket(key[c])`.
+    /// Chains are built candidate-ascending (build walks positions in
+    /// reverse, pushing each onto its bucket head), so emission order per
+    /// bucket — and therefore match order — is identical to the nested
+    /// loop.
+    pub next_chain: Vec<u32>,
+    /// Distinct bound-key words (sorted, deduped) for the semi-join
+    /// prefilter arm.
+    pub key_set: Vec<u64>,
+    /// High-water mark: peak `next_chain` occupancy (mirrors
+    /// `EvalScratch::hw_rows`).
+    pub hw_bucket_rows: usize,
+    /// High-water mark: peak `mask_s` word count.
+    pub hw_mask_words: usize,
+    /// Candidate-list cache (L3, W3 lever): the join-atom candidate list
+    /// over the full store is CHUNK-INDEPENDENT (candidates come from the
+    /// whole store, local constraints only), so within one
+    /// [`unify_batch_probe`] call it is built once per join atom and
+    /// reused across every chunk. The cache is invalidated at the start of
+    /// every `unify_batch_probe` call (store contents may have changed
+    /// between calls — the fixpoint driver appends rows each round), so
+    /// soundness does not depend on the caller noticing store mutation.
+    pub cand_rows_cache: Vec<u32>,
+    pub cand_spans_cache: Vec<(usize, usize)>,
+    pub cand_binds_cache: Vec<(usize, u64)>,
+    /// Cache validity tag: atom/rule/store-length key (see
+    /// `probe_cache_key`). `u64::MAX` = invalidated.
+    pub cache_key: u64,
+    pub cache_len: usize,
+    /// Set by the caller to force the per-chunk candidate rebuild (the
+    /// pre-L3 micro-architecture) even on the radix path — the M-L3-1
+    /// differential/measurement arm.
+    pub rebuild_per_chunk: bool,
+    /// L3 receipt counters: candidate-cache hits (chunk/atom visits
+    /// served from the cache) and misses (per-batch rebuilds) since
+    /// lease.
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+}
+
+/// Radix bucket count: 2^12 = 4096 buckets — the L1-resident scratchpad
+/// of the L3 design contract (`docs/jira/v26.11.2/13-arrow-star-schema.md`):
+/// 4096 x 4 B bucket heads = 16 KiB, hash `h = (y ^ y >> 16) & 0x0FFF`
+/// on the 56-bit payload window of the joined key word.
+pub const RADIX_BUCKETS: usize = 4096;
+
+/// Payload window of the point-range mask scan: the 56-bit term-word
+/// payload (A11 transport width; `sigil::PAYLOAD_MASK`).
+const PAYLOAD_WINDOW_MASK: u64 = 0x00FF_FFFF_FFFF_FFFF;
+
+/// Low-4-payload-bit bucket of a key word (the radix hash of L3 point
+/// 3). Payload-only so a sigil-bit difference can never mis-bucket a
+/// row out of its bucket — the inner probe still compares full words.
+#[inline(always)]
+fn radix_bucket(word: u64) -> usize {
+    let y = word & PAYLOAD_WINDOW_MASK;
+    ((y ^ (y >> 16)) & 0x0FFF) as usize
+}
+
+/// L3 cache key: FNV-1a over (rule identity, atom index, atom terms,
+/// store length). The cache is invalidated at every
+/// [`unify_batch_probe`] entry, so the key only has to be unique within
+/// one batch evaluation — rule identity fields + atom index + store
+/// length are sufficient there.
+fn probe_cache_key(rule: &CompiledRule, ai: usize, n: usize) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut mix = |x: u64| {
+        h ^= x;
+        h = h.wrapping_mul(0x0000_0100_0000_01B3);
+    };
+    mix(rule.rule_id as u64);
+    mix(rule.atoms.len() as u64);
+    mix(rule.var_count as u64);
+    mix(ai as u64);
+    mix(n as u64);
+    for term in &rule.atoms[ai] {
+        let v = match *term {
+            CompiledTerm::Const(c) => 0x8000_0000 | c as u64,
+            CompiledTerm::Var(v) => 0x4000_0000 | v as u64,
+        };
+        mix(v);
+    }
+    h
+}
+
+/// Build the per-bucket singly-linked chains over the candidate list
+/// `rows` (the L3 design-contract shape: `bucket_head` +
+/// `next_chain`). Walking candidate positions in REVERSE and pushing each
+/// onto its bucket head makes every chain ascending in candidate
+/// position, so emission order per bucket — and therefore match order —
+/// is identical to the nested loop.
+fn bucket_candidates(
+    head: &mut Vec<u32>,
+    next: &mut Vec<u32>,
+    key_col: &[u64],
+    rows: &[u32],
+) {
+    head.clear();
+    head.resize(RADIX_BUCKETS, u32::MAX);
+    next.clear();
+    next.resize(rows.len(), 0);
+    for c in (0..rows.len()).rev() {
+        let b = radix_bucket(key_col[rows[c] as usize]);
+        next[c] = head[b];
+        head[b] = c as u32;
+    }
+}
+
+/// Mask-AND semi-join composition over per-row-group validity masks —
+/// VENDORED from `crates/cgap-parquet/src/bitslice.rs:348`
+/// (`semi_join_masks`, verbatim algebra) so cgap-bn3 carries no
+/// cgap-parquet dependency (levers L3 point 2). Bit `t` of `out[g]` is
+/// set iff row `64*g + t` qualified on BOTH mask arms. Returns the
+/// qualifying-row popcount so callers assert final state.
+fn semi_join_masks(a: &[u64], b: &[u64], out: &mut [u64]) -> u64 {
+    assert!(
+        a.len() == b.len(),
+        "semi_join_masks: mask length mismatch {} vs {}",
+        a.len(),
+        b.len()
+    );
+    assert!(
+        out.len() >= a.len(),
+        "semi_join_masks: out.len()={} < {}",
+        out.len(),
+        a.len()
+    );
+    let mut rows = 0u64;
+    for g in 0..a.len() {
+        let m = a[g] & b[g];
+        out[g] = m;
+        rows += m.count_ones() as u64;
+    }
+    rows
+}
+
+/// Point-range bit-slice semi-join mask emission (levers L3 point 2):
+/// for each 64-row group, bit `t` of `out_masks[g]` has row `64*g + t`
+/// set iff the row survives BOTH mask arms — (a) the join key lane's
+/// 56-bit payload equals one of the distinct `bound_keys` (a point
+/// range `lo == hi == key`, the degenerate case of the
+/// `scan_range_vertical` bit-slice scan semantics, w = 56 payload
+/// window), AND (b) every `Const` slot of `join_atom` matches the row
+/// exactly (full word). The two arms compose through the vendored
+/// semi_join_masks AND-algebra. Returns the qualifying-row popcount.
+///
+/// Contract: `out_masks.len() >= ceil(cols.len()/64)` (loud assert).
+/// Superset prefilter: the inner probe still compares full words, so
+/// the differential courts pin identical match sets with and without
+/// the mask arm.
+pub fn emit_join_masks(
+    cols: &StatementColumns<'_>,
+    join_atom: &[CompiledTerm; 3],
+    const_pool: &[u64],
+    bound_keys: &[u64],
+    out_masks: &mut [u64],
+) -> u64 {
+    let n = cols.len();
+    let groups = n.div_ceil(64);
+    assert!(
+        out_masks.len() >= groups,
+        "emit_join_masks: out_masks.len()={} < groups={groups}",
+        out_masks.len()
+    );
+    let const_slots: Vec<usize> = (0..3)
+        .filter(|&si| matches!(join_atom[si], CompiledTerm::Const(_)))
+        .collect();
+    let first_var_slot = (0..3)
+        .find(|&si| matches!(join_atom[si], CompiledTerm::Var(_)))
+        .unwrap_or(0);
+    let key_col = cols.col(first_var_slot);
+    let mut rows = 0u64;
+    for g in 0..groups {
+        let lo = g * 64;
+        let hi = (lo + 64).min(n);
+        let mut m_key = 0u64;
+        let mut m_const = 0u64;
+        for t in lo..hi {
+            let w = key_col[t] & PAYLOAD_WINDOW_MASK;
+            let mut hit = false;
+            for &k in bound_keys {
+                hit |= lane_eq_mask(w, k & PAYLOAD_WINDOW_MASK) != 0;
+            }
+            m_key |= (hit as u64) << (t - lo);
+            let mut mc = MASK_ALL;
+            for &si in &const_slots {
+                if let CompiledTerm::Const(creg) = join_atom[si] {
+                    mc &= lane_eq_mask(cols.col(si)[t], const_pool[creg as usize]);
+                }
+            }
+            m_const |= ((mc == MASK_ALL) as u64) << (t - lo);
+        }
+        let mut semi_out = [0u64; 1];
+        rows += semi_join_masks(&[m_key], &[m_const], &mut semi_out);
+        out_masks[g] = semi_out[0];
+    }
+    rows
 }
 
 /// Per-atom local constraints over one candidate row: constant equality
@@ -671,19 +900,42 @@ pub fn unify_batch(
 ) -> Result<MatchSet, UnifyError> {
     let mut scratch = EvalScratch::default();
     let mut out = MatchSet::default();
-    unify_batch_into(rule, cols, chunk_size, &mut scratch, &mut out)?;
+    let mut probe = JoinProbeScratch::default();
+    unify_batch_probe(rule, cols, chunk_size, &mut scratch, &mut out, &mut probe)?;
     Ok(out)
 }
 
 /// [`unify_batch`] over caller-owned buffers (Wave 4, spec 7.4): reuses
 /// `scratch` across chunks and appends into `out` (cleared first,
 /// capacity retained) — the zero-allocation hot path's entry point.
+///
+/// L3 (W3): the join probe runs on a fresh default [`JoinProbeScratch`]
+/// (radix semi-join). The leased form is [`unify_batch_probe`]; this
+/// signature is preserved verbatim so the Wave-4 zero-alloc callers
+/// (benches, courts) are API-stable.
 pub fn unify_batch_into(
     rule: &CompiledRule,
     cols: &StatementColumns<'_>,
     chunk_size: usize,
     scratch: &mut EvalScratch,
     out: &mut MatchSet,
+) -> Result<(), UnifyError> {
+    let mut probe = JoinProbeScratch::default();
+    unify_batch_probe(rule, cols, chunk_size, scratch, out, &mut probe)
+}
+
+/// [`unify_batch_into`] over a caller-leased [`JoinProbeScratch`] (L3,
+/// levers spec): the radix bucket tables + semi-join mask buffers are
+/// owned once and reused across chunks/rounds/court runs, mirroring the
+/// [`EvalScratch`] allocation discipline. `probe.radix == false`
+/// selects the retired nested-loop probe — the M-L3-1 differential arm.
+pub fn unify_batch_probe(
+    rule: &CompiledRule,
+    cols: &StatementColumns<'_>,
+    chunk_size: usize,
+    scratch: &mut EvalScratch,
+    out: &mut MatchSet,
+    probe: &mut JoinProbeScratch,
 ) -> Result<(), UnifyError> {
     if chunk_size == 0 {
         return Err(UnifyError::InvalidChunkSize);
@@ -697,6 +949,11 @@ pub fn unify_batch_into(
         out.var_values.resize(rule.var_count, Vec::new());
     }
     out.len = 0;
+    // L3 cache invalidation: store contents may have changed since the
+    // last call over this lease (the fixpoint driver appends every
+    // round), so the candidate cache never survives a batch boundary.
+    probe.cache_key = u64::MAX;
+    probe.cache_len = 0;
     for col in out.atom_rows.iter_mut() {
         col.clear();
     }
@@ -707,7 +964,7 @@ pub fn unify_batch_into(
     let mut start = 0usize;
     while start < n {
         let end = (start + chunk_size).min(n);
-        eval_chunk_into(rule, cols, start, end, scratch, out);
+        eval_chunk_into(rule, cols, start, end, scratch, out, probe);
         start = end;
     }
     debug_assert!(out
@@ -729,6 +986,7 @@ fn eval_chunk_into(
     end: usize,
     sc: &mut EvalScratch,
     out: &mut MatchSet,
+    probe: &mut JoinProbeScratch,
 ) {
     // Chunk-local match state, REBUILT per atom expansion: every accepted
     // join pair pushes exactly one entry into every variable column (the
@@ -790,7 +1048,7 @@ fn eval_chunk_into(
         }
     }
 
-    // Atoms 1..: nested-loop join (spec 3.2 v1). Candidates come from the
+    // Atoms 1..: semi-join expansion (spec 3.2). Candidates come from the
     // full store; bound variables constrain each candidate against the
     // match's bindings; fresh variables bind from the candidate row.
     for (ai, atom) in rule.atoms.iter().enumerate().skip(1) {
@@ -806,34 +1064,75 @@ fn eval_chunk_into(
                 sc.bound_vars.push(idx);
             }
         }
-        // Candidates: local constraints only; the bound-variable probe
-        // runs per (match, candidate) below. Flattened into three
-        // parallel buffers (rows, per-candidate bind spans, binds) so no
-        // per-candidate allocation exists.
-        sc.cand_rows.clear();
-        sc.cand_spans.clear();
-        sc.cand_binds.clear();
-        for j in 0..cols.len() {
-            if atom_local_match_into(
-                &rule.const_pool,
-                atom,
-                cols,
-                j,
-                &sc.bound_flags,
-                &mut sc.binds,
-                &mut sc.seen,
-            ) {
-                sc.cand_spans.push((sc.cand_binds.len(), sc.binds.len()));
-                sc.cand_binds.extend_from_slice(&sc.binds);
-                sc.cand_rows.push(j as u32);
-            }
-        }
-        // Bound slots: (slot, var index) pairs the join probe checks.
+        // Bound slots: (slot, var index) pairs the join probe checks —
+        // computed before the candidate build because the L3 cache gate
+        // reads it. An atom with NO pre-bound variable carries no join
+        // semantics to fast-path: it falls to the nested arm, which owns
+        // `sc.cand_*`.
         sc.bound_slots.clear();
         for (si, term) in atom.iter().enumerate() {
             if let CompiledTerm::Var(idx) = *term {
                 if sc.bound_flags[idx as usize] {
                     sc.bound_slots.push((si, idx as usize));
+                }
+            }
+        }
+        // L3 candidate cache: the candidate list over the FULL store is
+        // chunk-independent (candidates are local constraints only), so
+        // on the cached arm it is built once per atom per batch into the
+        // probe's cache fields and reused across every chunk — the
+        // pre-L3 code rebuilt it per chunk (a 262144-chunk batch over
+        // 1M rows paid 256 full-column scans per batch). The nested arm
+        // (`radix == false`) and the `rebuild_per_chunk` arm keep the
+        // per-chunk rebuild in `sc.cand_*` (the M-L3-1 measurement arm).
+        let use_cache = probe.radix && !probe.rebuild_per_chunk && !sc.bound_slots.is_empty();
+        let ck = probe_cache_key(rule, ai, cols.len());
+        let mut rebuilt_cache = false;
+        if use_cache && probe.cache_key != ck {
+            probe.cand_rows_cache.clear();
+            probe.cand_spans_cache.clear();
+            probe.cand_binds_cache.clear();
+            for j in 0..cols.len() {
+                if atom_local_match_into(
+                    &rule.const_pool,
+                    atom,
+                    cols,
+                    j,
+                    &sc.bound_flags,
+                    &mut sc.binds,
+                    &mut sc.seen,
+                ) {
+                    probe
+                        .cand_spans_cache
+                        .push((probe.cand_binds_cache.len(), sc.binds.len()));
+                    probe.cand_binds_cache.extend_from_slice(&sc.binds);
+                    probe.cand_rows_cache.push(j as u32);
+                }
+            }
+            probe.cache_key = ck;
+            probe.cache_len = probe.cand_rows_cache.len();
+            probe.cache_misses += 1;
+            rebuilt_cache = true;
+        } else if use_cache {
+            probe.cache_hits += 1;
+        }
+        if !use_cache {
+            sc.cand_rows.clear();
+            sc.cand_spans.clear();
+            sc.cand_binds.clear();
+            for j in 0..cols.len() {
+                if atom_local_match_into(
+                    &rule.const_pool,
+                    atom,
+                    cols,
+                    j,
+                    &sc.bound_flags,
+                    &mut sc.binds,
+                    &mut sc.seen,
+                ) {
+                    sc.cand_spans.push((sc.cand_binds.len(), sc.binds.len()));
+                    sc.cand_binds.extend_from_slice(&sc.binds);
+                    sc.cand_rows.push(j as u32);
                 }
             }
         }
@@ -847,34 +1146,136 @@ fn eval_chunk_into(
         for col in sc.nxt_vars.iter_mut() {
             col.clear();
         }
-        for m in 0..cur {
-            for (c, &j) in sc.cand_rows.iter().enumerate() {
-                let (b0, blen) = sc.cand_spans[c];
-                // Bound-slot probe, constant-time comparator arm (doe-4
-                // INV-1): every bound slot compares the match's bound VALUE
-                // (register-dereferenced) against the candidate lane — never
-                // the variable's register index or slot position — masks
-                // ANDed with no early exit; one branch on the final mask.
-                let mut ok = MASK_ALL;
-                for &(si, vidx) in &sc.bound_slots {
-                    ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
+        if probe.radix && !sc.bound_slots.is_empty() {
+            // L3 radix semi-join probe (levers L3 point 3): bucket the
+            // candidate list once per atom by the low 4 payload bits of
+            // the FIRST bound slot's candidate word, then each match
+            // probes only its own bucket. Bucketing is a superset
+            // filter (full-word equality implies payload-equality), so
+            // the surviving candidate set per match — and the emission
+            // order (candidates visited in ascending index order within
+            // each bucket) — is identical to the nested loop.
+            let key_slot = sc.bound_slots[0].0;
+            let key_col = cols.col(key_slot);
+            // Optional semi-join prefilter arm (levers L3 point 2): a
+            // single-bound-slot join whose distinct bound-key set is
+            // tiny (<= [`KEY_PREFILTER_MAX`]) pre-masks the candidate
+            // scan before bucketing via [`emit_join_masks`] (the
+            // per-row survival mask over the point-range key set).
+            let single =
+                sc.bound_slots.len() == 1 && sc.bound_slots[0].0 == first_var_slot(&rule.atoms[ai]);
+            probe.key_set.clear();
+            let vidx0 = sc.bound_slots[0].1;
+            let cur_col = &sc.cur_vars[vidx0];
+            for &v in cur_col.iter().take(cur) {
+                probe.key_set.push(v);
+            }
+            probe.key_set.sort_unstable();
+            probe.key_set.dedup();
+            let prefilter = single && probe.key_set.len() <= KEY_PREFILTER_MAX;
+            probe.mask_s.clear();
+            if prefilter {
+                probe.mask_s.resize(cols.len().div_ceil(64), 0);
+                let _ = emit_join_masks(
+                    cols,
+                    &rule.atoms[ai],
+                    &rule.const_pool,
+                    &probe.key_set,
+                    &mut probe.mask_s,
+                );
+            }
+            // Bucket build: stable partition of the candidate list by
+            // low-4-payload-bit bucket; counts precomputed, then one
+            // prefix-sum pass gives (start, end) group ranges. L3: the
+            // bucket partition is chunk-independent (candidates and the
+            // key column are chunk-independent), so on the cached arm it
+            // rides the cache rebuild; the rebuild arm re-buckets the
+            // per-chunk list every chunk.
+            if rebuilt_cache {
+                bucket_candidates(
+                    &mut probe.bucket_head,
+                    &mut probe.next_chain,
+                    key_col,
+                    &probe.cand_rows_cache,
+                );
+            } else if !use_cache {
+                bucket_candidates(
+                    &mut probe.bucket_head,
+                    &mut probe.next_chain,
+                    key_col,
+                    &sc.cand_rows,
+                );
+            }
+            probe.hw_bucket_rows = probe.hw_bucket_rows.max(probe.next_chain.len());
+            // Candidate sources for the probe loop: the cached list
+            // (L3 fast path) or the per-chunk rebuilt list.
+            let (cand_rows, cand_spans, cand_binds) = if use_cache {
+                (
+                    &probe.cand_rows_cache,
+                    &probe.cand_spans_cache,
+                    &probe.cand_binds_cache,
+                )
+            } else {
+                (&sc.cand_rows, &sc.cand_spans, &sc.cand_binds)
+            };
+            // Probe loop: O(cur + cand + hits). Per match, visit only
+            // the match's key bucket (emission order preserved: within
+            // a bucket, candidate indices are ascending).
+            for m in 0..cur {
+                let kv = sc.cur_vars[sc.bound_slots[0].1][m];
+                let b = radix_bucket(kv);
+                let mut c = probe.bucket_head[b];
+                while c != u32::MAX {
+                    let j = cand_rows[c as usize];
+                    if prefilter && probe.mask_s[j as usize / 64] >> (j % 64) & 1 == 0 {
+                        c = probe.next_chain[c as usize];
+                        continue;
+                    }
+                    let (b0, blen) = cand_spans[c as usize];
+                    let mut ok = MASK_ALL;
+                    for &(si, vidx) in &sc.bound_slots {
+                        ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
+                    }
+                    if ok != MASK_ALL {
+                        c = probe.next_chain[c as usize];
+                        continue;
+                    }
+                    for a in 0..ai {
+                        sc.nxt_rows[a].push(sc.cur_rows[a][m]);
+                    }
+                    sc.nxt_rows[ai].push(j);
+                    for &vidx in &sc.bound_vars {
+                        let v = sc.cur_vars[vidx][m];
+                        sc.nxt_vars[vidx].push(v);
+                    }
+                    for &(idx, val) in &cand_binds[b0..b0 + blen] {
+                        sc.nxt_vars[idx].push(val);
+                    }
+                    c = probe.next_chain[c as usize];
                 }
-                if ok != MASK_ALL {
-                    continue;
-                }
-                for a in 0..ai {
-                    sc.nxt_rows[a].push(sc.cur_rows[a][m]);
-                }
-                sc.nxt_rows[ai].push(j);
-                // Expansion: every variable bound for the parent match
-                // carries its value into the new match; then this atom's
-                // fresh bindings take the candidate's values.
-                for &vidx in &sc.bound_vars {
-                    let v = sc.cur_vars[vidx][m];
-                    sc.nxt_vars[vidx].push(v);
-                }
-                for &(idx, val) in &sc.cand_binds[b0..b0 + blen] {
-                    sc.nxt_vars[idx].push(val);
+            }
+        } else {
+            for m in 0..cur {
+                for (c, &j) in sc.cand_rows.iter().enumerate() {
+                    let (b0, blen) = sc.cand_spans[c];
+                    let mut ok = MASK_ALL;
+                    for &(si, vidx) in &sc.bound_slots {
+                        ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
+                    }
+                    if ok != MASK_ALL {
+                        continue;
+                    }
+                    for a in 0..ai {
+                        sc.nxt_rows[a].push(sc.cur_rows[a][m]);
+                    }
+                    sc.nxt_rows[ai].push(j);
+                    for &vidx in &sc.bound_vars {
+                        let v = sc.cur_vars[vidx][m];
+                        sc.nxt_vars[vidx].push(v);
+                    }
+                    for &(idx, val) in &sc.cand_binds[b0..b0 + blen] {
+                        sc.nxt_vars[idx].push(val);
+                    }
                 }
             }
         }
@@ -1282,9 +1683,23 @@ pub(crate) mod tests {
         // var 10 -> idx 0 (R64), var 11 -> idx 1 (R65); provenance both
         // from atom 0 (slots 0 and 2).
         assert_eq!(c.var_first, vec![(0, 0), (0, 2)]);
-        assert_eq!(c.atoms[0], [CompiledTerm::Var(0), CompiledTerm::Const(0), CompiledTerm::Var(1)]);
+        assert_eq!(
+            c.atoms[0],
+            [
+                CompiledTerm::Var(0),
+                CompiledTerm::Const(0),
+                CompiledTerm::Var(1)
+            ]
+        );
         // Head shares the body's registers: Var(1), Const(1), Var(0).
-        assert_eq!(c.head, [CompiledTerm::Var(1), CompiledTerm::Const(1), CompiledTerm::Var(0)]);
+        assert_eq!(
+            c.head,
+            [
+                CompiledTerm::Var(1),
+                CompiledTerm::Const(1),
+                CompiledTerm::Var(0)
+            ]
+        );
     }
 
     /// RegisterOverflow court (spec 4.2): a rule with 129 distinct
@@ -1302,7 +1717,10 @@ pub(crate) mod tests {
             body,
             head: [vw(0), cw(100), vw(0)],
         };
-        assert_eq!(RuleCompiler::compile(&rule), Err(UnifyError::RegisterOverflow));
+        assert_eq!(
+            RuleCompiler::compile(&rule),
+            Err(UnifyError::RegisterOverflow)
+        );
     }
 
     /// ConstantPoolOverflow court (band law, spec 4.2): 65 distinct
@@ -1320,7 +1738,10 @@ pub(crate) mod tests {
             body,
             head: [cw(1000), cw(100), cw(2000)],
         };
-        assert_eq!(RuleCompiler::compile(&rule), Err(UnifyError::ConstantPoolOverflow));
+        assert_eq!(
+            RuleCompiler::compile(&rule),
+            Err(UnifyError::ConstantPoolOverflow)
+        );
     }
 
     /// Predicate-slot court (A12 law, A11 sigil.rs note): FormulaRef in
@@ -1335,7 +1756,10 @@ pub(crate) mod tests {
             body: vec![BodyAtom::new(vw(10), fref, vw(11))],
             head: [vw(10), cw(100), vw(11)],
         };
-        assert_eq!(RuleCompiler::compile(&bad), Err(UnifyError::FormulaRefInPredicate));
+        assert_eq!(
+            RuleCompiler::compile(&bad),
+            Err(UnifyError::FormulaRefInPredicate)
+        );
         let ok = Rule {
             rule_id: 1,
             body: vec![BodyAtom::new(fref, cw(100), vw(11))],
@@ -1374,7 +1798,10 @@ pub(crate) mod tests {
             body: vec![BodyAtom::new(vw(10), cw(100), (0x01u64 << 56) | 300)],
             head: [vw(10), cw(100), vw(10)],
         };
-        assert_eq!(RuleCompiler::compile(&rule), Err(UnifyError::RegisterOutOfRange(300)));
+        assert_eq!(
+            RuleCompiler::compile(&rule),
+            Err(UnifyError::RegisterOutOfRange(300))
+        );
     }
 
     /// Head-binding court: a head variable no body atom binds is refused.
@@ -1387,7 +1814,10 @@ pub(crate) mod tests {
             body: vec![BodyAtom::new(vw(10), cw(100), vw(11))],
             head: [vw(12), cw(100), vw(10)],
         };
-        assert_eq!(RuleCompiler::compile(&rule), Err(UnifyError::UnboundHeadVariable));
+        assert_eq!(
+            RuleCompiler::compile(&rule),
+            Err(UnifyError::UnboundHeadVariable)
+        );
     }
 
     /// Empty-body court.
@@ -1410,15 +1840,21 @@ pub(crate) mod tests {
         let mut rf = RegisterFile::zeroed();
         assert_eq!(
             rf.load_const(CONST_POOL_REGS, 1),
-            Err(UnifyError::RegisterBandViolation { reg: CONST_POOL_REGS })
+            Err(UnifyError::RegisterBandViolation {
+                reg: CONST_POOL_REGS
+            })
         );
         assert_eq!(
             rf.bind_var(VAR_REGS, 1),
-            Err(UnifyError::RegisterBandViolation { reg: SCRATCH_BAND_FIRST })
+            Err(UnifyError::RegisterBandViolation {
+                reg: SCRATCH_BAND_FIRST
+            })
         );
         assert_eq!(
             rf.load(REGISTER_COUNT),
-            Err(UnifyError::RegisterBandViolation { reg: REGISTER_COUNT })
+            Err(UnifyError::RegisterBandViolation {
+                reg: REGISTER_COUNT
+            })
         );
         // Lawful accesses round-trip.
         rf.load_const(0, 42).unwrap();
@@ -1533,7 +1969,15 @@ pub(crate) mod tests {
         // 0: (A,P1,B)  1: (B,P2,C)  2: (A,P1,D)  3: (D,P2,E)
         // 4: (B,P1,C)  5: (C,P2,F)  6: (A,P1,A)  <- y=A has no P2 out
         let s = [cw(1), cw(2), cw(1), cw(4), cw(2), cw(3), cw(1)];
-        let p = [cw(100), cw(200), cw(100), cw(200), cw(100), cw(200), cw(100)];
+        let p = [
+            cw(100),
+            cw(200),
+            cw(100),
+            cw(200),
+            cw(100),
+            cw(200),
+            cw(100),
+        ];
         let o = [cw(2), cw(3), cw(4), cw(5), cw(3), cw(6), cw(1)];
         let rule = Rule {
             rule_id: 1,
@@ -1550,11 +1994,7 @@ pub(crate) mod tests {
         // (x=A,y=B,z=C) (x=A,y=D,z=E) (x=B,y=C,z=F)
         assert_eq!(m.atom_rows[0], vec![0, 2, 4], "atom-0 anchors");
         assert_eq!(m.atom_rows[1], vec![1, 3, 5], "joined rows");
-        assert_eq!(
-            m.var_values[2],
-            vec![cw(3), cw(5), cw(6)],
-            "?z bindings"
-        );
+        assert_eq!(m.var_values[2], vec![cw(3), cw(5), cw(6)], "?z bindings");
     }
 
     /// Binding-consistency court (doe-4 Section 7 INV-1): one variable
@@ -1822,10 +2262,9 @@ pub(crate) mod tests {
                 }
                 match &reference {
                     None => reference = Some(shape),
-                    Some(r) => assert_eq!(
-                        r, &shape,
-                        "seed {seed} chunk {chunk}: batch bytes diverged"
-                    ),
+                    Some(r) => {
+                        assert_eq!(r, &shape, "seed {seed} chunk {chunk}: batch bytes diverged")
+                    }
                 }
             }
         }
@@ -2020,7 +2459,9 @@ pub(crate) mod tests {
         for _pass in 0..2 {
             for c in &compiled {
                 unify_batch_into(c, &cols, DEFAULT_CHUNK_ROWS, &mut scratch, &mut out).unwrap();
-                let (d, _) = projector.emit_into(c, 1, &out, &mut rows, &mut canon).unwrap();
+                let (d, _) = projector
+                    .emit_into(c, 1, &out, &mut rows, &mut canon)
+                    .unwrap();
                 if _pass == 0 {
                     reference.push((d, (0..rows.len()).map(|i| rows.row(i)).collect()));
                 }
@@ -2046,7 +2487,9 @@ pub(crate) mod tests {
             scan_delta += current_allocs() - before;
 
             let before = current_allocs();
-            let (d, _) = projector.emit_into(c, 1, &out, &mut rows, &mut canon).unwrap();
+            let (d, _) = projector
+                .emit_into(c, 1, &out, &mut rows, &mut canon)
+                .unwrap();
             project_delta += current_allocs() - before;
 
             let before = current_allocs();
@@ -2144,13 +2587,15 @@ pub(crate) mod tests {
         let p: Vec<u64> = (0..ROWS)
             .map(|i| if i % 5 == 0 { P2 } else { P1 })
             .collect();
-        let o: Vec<u64> = (0..ROWS).map(|i| {
-            if i % 5 == 0 {
-                cw(1 + i % 7)
-            } else {
-                cw(1 + (i * 3) % 11)
-            }
-        }).collect();
+        let o: Vec<u64> = (0..ROWS)
+            .map(|i| {
+                if i % 5 == 0 {
+                    cw(1 + i % 7)
+                } else {
+                    cw(1 + (i * 3) % 11)
+                }
+            })
+            .collect();
         let cols = StatementColumns::new(&s, &p, &o).unwrap();
 
         let rules = vec![
@@ -2195,7 +2640,10 @@ pub(crate) mod tests {
             }
         }
         assert!(n_p1 > 500_000, "model selectivity sanity: n_p1={n_p1}");
-        assert!(n_self == 200_000, "model selectivity sanity: n_self={n_self}");
+        assert!(
+            n_self == 200_000,
+            "model selectivity sanity: n_self={n_self}"
+        );
         assert!(n_r2 > 50_000, "model selectivity sanity: n_r2={n_r2}");
 
         let mut reference: Option<Vec<(u32, u64, [u8; 32], u32)>> = None;

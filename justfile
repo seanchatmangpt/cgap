@@ -15,9 +15,23 @@
 default:
     @just --list
 
-# Toolchain/env health probe (bin owned by wave-10 lane 2; fails until landed)
+# Toolchain/env health probe + W2 gate chain (W2-14).
+# Exit classes: gate 0 -> GREEN, 1 -> RED (chain aborts), 2/3 -> YELLOW loud [SKIP].
+# Chain exit: 0 all-GREEN / 1 any-YELLOW / 2 any-RED (doctor.rs model).
 doctor:
-    cargo run -q --manifest-path crates/cli/Cargo.toml --bin doctor
+    @rc_total=0; \
+    cargo run -q --manifest-path crates/cli/Cargo.toml --bin doctor; rc=$?; \
+    if [ $rc -ge 2 ]; then exit 2; fi; \
+    if [ $rc -eq 1 ]; then rc_total=1; fi; \
+    for g in zero_datafusion_gate receipt_lint registry_sweep; do \
+      python3 scripts/$g.py --root . >/tmp/w2-14-$g.out 2>&1; rc=$?; \
+      case $rc in \
+        0) echo "$g: GREEN" ;; \
+        1) echo "$g: RED (gate refuse)"; cat /tmp/w2-14-$g.out >&2; exit 2 ;; \
+        2|3) echo "$g: YELLOW [SKIP] rc=$rc"; cat /tmp/w2-14-$g.out >&2; rc_total=1 ;; \
+        *) echo "$g: RED (unexpected rc=$rc)"; exit 2 ;; \
+      esac; \
+    done; exit $rc_total
 
 # Full v26.10.31 verification ladder
 verify:

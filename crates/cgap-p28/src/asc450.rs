@@ -116,10 +116,9 @@ impl core::fmt::Display for Asc450Error {
                 "asc450: meter genesis refused; attestation failed intrinsic \
                  validation (§4.4-1 fail-closed)",
             ),
-            Asc450Error::MalformedProof(why) => write!(
-                f,
-                "asc450: proof record structurally invalid: {why} (§5)"
-            ),
+            Asc450Error::MalformedProof(why) => {
+                write!(f, "asc450: proof record structurally invalid: {why} (§5)")
+            }
             Asc450Error::SealVerifyFailed => f.write_str(
                 "asc450: epoch seal verification failed over bytes 0..104 \
                  (§5, court C2)",
@@ -132,7 +131,7 @@ impl core::fmt::Display for Asc450Error {
     }
 }
 
-impl std::error::Error for Asc450Error {}
+impl core::error::Error for Asc450Error {}
 
 // ===========================================================================
 // Wave 3 — sealed meter state (§4.4 countermeasure 3; layout divergence D4)
@@ -212,21 +211,13 @@ const _: () = assert!(core::mem::offset_of!(SealedMeterState, magic) == 0);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, version) == 4);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, reserved) == 6);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, ceiling_cents) == 8);
-const _: () = assert!(
-    core::mem::offset_of!(SealedMeterState, accumulated_cents) == 16
-);
+const _: () = assert!(core::mem::offset_of!(SealedMeterState, accumulated_cents) == 16);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, event_count) == 24);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, last_seq) == 32);
 const _: () = assert!(core::mem::offset_of!(SealedMeterState, latched) == 40);
-const _: () = assert!(
-    core::mem::offset_of!(SealedMeterState, attestation_digest) == 41
-);
-const _: () = assert!(
-    core::mem::offset_of!(SealedMeterState, prev_proof_digest) == 73
-);
-const _: () = assert!(
-    core::mem::offset_of!(SealedMeterState, signature) == STATE_SIGNED_SPAN
-);
+const _: () = assert!(core::mem::offset_of!(SealedMeterState, attestation_digest) == 41);
+const _: () = assert!(core::mem::offset_of!(SealedMeterState, prev_proof_digest) == 73);
+const _: () = assert!(core::mem::offset_of!(SealedMeterState, signature) == STATE_SIGNED_SPAN);
 const _: () = assert!(
     4 + 2 + 2 + 8 + 8 + 8 + 8 + 1 + 32 + 32 + 64 == STATE_LEN,
     "sealed-state fields must fully occupy the record (no padding holes)"
@@ -303,18 +294,12 @@ impl SealedMeterState {
             magic,
             version: u16::from_le_bytes([bytes[4], bytes[5]]),
             reserved: u16::from_le_bytes([bytes[6], bytes[7]]),
-            ceiling_cents: u64::from_le_bytes(
-                bytes[8..16].try_into().expect("8..16 is 8 bytes"),
-            ),
+            ceiling_cents: u64::from_le_bytes(bytes[8..16].try_into().expect("8..16 is 8 bytes")),
             accumulated_cents: u64::from_le_bytes(
                 bytes[16..24].try_into().expect("16..24 is 8 bytes"),
             ),
-            event_count: u64::from_le_bytes(
-                bytes[24..32].try_into().expect("24..32 is 8 bytes"),
-            ),
-            last_seq: u64::from_le_bytes(
-                bytes[32..40].try_into().expect("32..40 is 8 bytes"),
-            ),
+            event_count: u64::from_le_bytes(bytes[24..32].try_into().expect("24..32 is 8 bytes")),
+            last_seq: u64::from_le_bytes(bytes[32..40].try_into().expect("32..40 is 8 bytes")),
             latched,
             attestation_digest: bytes[41..73].try_into().expect("41..73 is 32 B"),
             prev_proof_digest: bytes[73..105].try_into().expect("73..105 is 32 B"),
@@ -363,11 +348,7 @@ pub trait ProofSealer {
     /// Seal the 105-B signed span of a [`SealedMeterState`].
     fn seal_state(&mut self, signed: &[u8; STATE_SIGNED_SPAN]) -> [u8; 64];
     /// Pure verification of a state seal (no authority consumed).
-    fn verify_state(
-        &self,
-        signed: &[u8; STATE_SIGNED_SPAN],
-        signature: &[u8; 64],
-    ) -> bool;
+    fn verify_state(&self, signed: &[u8; STATE_SIGNED_SPAN], signature: &[u8; 64]) -> bool;
 }
 
 /// The real A16-bound sealer (divergence D3): keyed BLAKE3 under the lease
@@ -392,11 +373,7 @@ impl LeaseEpochSealer {
 
     /// The 64-B epoch binding over a byte string: two domain-separated keyed
     /// BLAKE3 digests. Shared by all four trait methods.
-    fn epoch_binding(
-        &self,
-        domain: &[u8; 20],
-        signed: &[u8],
-    ) -> [u8; 64] {
+    fn epoch_binding(&self, domain: &[u8; 20], signed: &[u8]) -> [u8; 64] {
         let key = *self.lease.issued_root();
         let mut buf = [0u8; 20 + 256];
         buf[0..20].copy_from_slice(domain);
@@ -427,7 +404,11 @@ impl ProofSealer for LeaseEpochSealer {
     fn verify(&self, signed: &[u8; SIGNED_SPAN], signature: &[u8; 64]) -> bool {
         let expected = self.epoch_binding(&SEAL_DOMAIN_PROOF, signed);
         // Constant-shape compare: fold every byte difference.
-        expected.iter().zip(signature.iter()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
+        expected
+            .iter()
+            .zip(signature.iter())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
     }
 
     fn seal_state(&mut self, signed: &[u8; STATE_SIGNED_SPAN]) -> [u8; 64] {
@@ -435,13 +416,13 @@ impl ProofSealer for LeaseEpochSealer {
         self.epoch_binding(&SEAL_DOMAIN_STATE, signed)
     }
 
-    fn verify_state(
-        &self,
-        signed: &[u8; STATE_SIGNED_SPAN],
-        signature: &[u8; 64],
-    ) -> bool {
+    fn verify_state(&self, signed: &[u8; STATE_SIGNED_SPAN], signature: &[u8; 64]) -> bool {
         let expected = self.epoch_binding(&SEAL_DOMAIN_STATE, signed);
-        expected.iter().zip(signature.iter()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
+        expected
+            .iter()
+            .zip(signature.iter())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
     }
 }
 
@@ -507,9 +488,7 @@ const _: () = assert!(core::mem::offset_of!(SignedProof, signature) == 104);
 // Sealed-span pin: the signature field starts exactly where the sealed span
 // ends, so "seal bytes 0..104" and the layout table cannot drift apart.
 const _: () = assert!(SIGNED_SPAN == 104);
-const _: () = assert!(
-    core::mem::offset_of!(SignedProof, signature) == SIGNED_SPAN,
-);
+const _: () = assert!(core::mem::offset_of!(SignedProof, signature) == SIGNED_SPAN,);
 
 // Field-width pins: the digest spans (40..72, 72..104) must stay exactly
 // 32 bytes each and the signature span (104..168) exactly 64, or the §5
@@ -524,15 +503,12 @@ const _: () = assert!(
 
 // Fully-occupied check: the §5 field lengths sum to the record size with
 // zero padding — the packing claim of §5, asserted arithmetically.
-const _: () = assert!(
-    4 + 2 + 2 + 8 + 8 + 8 + 8 + 32 + 32 + 64 == PROOF_LEN,
-);
+const _: () = assert!(4 + 2 + 2 + 8 + 8 + 8 + 8 + 32 + 32 + 64 == PROOF_LEN,);
 
 // Cross-lane ceiling pin: A18's default equals A17's frozen maximum, so the
 // two Wave-1 ABI freezes in this crate cannot drift apart silently.
 const _: () = assert!(
-    DEFAULT_SAFE_HARBOR_CEILING_CENTS
-        == crate::attestation::SAFE_HARBOR_CEILING_MAX_CENTS,
+    DEFAULT_SAFE_HARBOR_CEILING_CENTS == crate::attestation::SAFE_HARBOR_CEILING_MAX_CENTS,
 );
 
 // Const-value freeze (§5): the record shape is version 1 with a zero
@@ -558,18 +534,7 @@ impl SignedProof {
     /// Canonical 168-byte encoding (§5 offset table, LE fields, no choices).
     /// Packed-struct reads are by-value copies only.
     pub fn to_bytes(&self) -> [u8; PROOF_LEN] {
-        let (
-            magic,
-            version,
-            reserved,
-            ceiling,
-            total,
-            seq,
-            tick,
-            att,
-            prev,
-            sig,
-        ) = (
+        let (magic, version, reserved, ceiling, total, seq, tick, att, prev, sig) = (
             self.magic,
             self.record_version,
             self.reserved,
@@ -618,18 +583,12 @@ impl SignedProof {
             magic,
             record_version: version,
             reserved: u16::from_le_bytes([bytes[6], bytes[7]]),
-            ceiling_cents: u64::from_le_bytes(
-                bytes[8..16].try_into().expect("8..16 is 8 bytes"),
-            ),
+            ceiling_cents: u64::from_le_bytes(bytes[8..16].try_into().expect("8..16 is 8 bytes")),
             crossing_total_cents: u64::from_le_bytes(
                 bytes[16..24].try_into().expect("16..24 is 8 bytes"),
             ),
-            crossing_seq: u64::from_le_bytes(
-                bytes[24..32].try_into().expect("24..32 is 8 bytes"),
-            ),
-            crossing_tick: u64::from_le_bytes(
-                bytes[32..40].try_into().expect("32..40 is 8 bytes"),
-            ),
+            crossing_seq: u64::from_le_bytes(bytes[24..32].try_into().expect("24..32 is 8 bytes")),
+            crossing_tick: u64::from_le_bytes(bytes[32..40].try_into().expect("32..40 is 8 bytes")),
             attestation_digest: bytes[40..72].try_into().expect("40..72 is 32 B"),
             prev_proof_digest: bytes[72..104].try_into().expect("72..104 is 32 B"),
             signature: bytes[104..168].try_into().expect("104..168 is 64 B"),
@@ -760,11 +719,7 @@ impl<S: ProofSealer> Asc450Meter<S> {
     /// Divergence D2: the doc shows `()` return; the §4.3 reject law needs
     /// the typed error channel — a silent drop is the exact silence this
     /// module exists to prevent.
-    pub fn record_licensed(
-        &mut self,
-        amount_cents: u64,
-        tick: u64,
-    ) -> Result<(), Asc450Error> {
+    pub fn record_licensed(&mut self, amount_cents: u64, tick: u64) -> Result<(), Asc450Error> {
         // Licensed events never emit, so no crossing_tick is ever recorded.
         let _ = tick;
         self.accept_event(amount_cents).map(|_| ())
@@ -894,7 +849,12 @@ impl<S: ProofSealer> Asc450Meter<S> {
     /// §4.2/§5 emission: builds the sealed span, mints the seal, latches the
     /// chain (`prev_proof_digest` = BLAKE3 of the full new record), and seals
     /// the meter state (§4.4-3: a sealed state exists on every emission).
-    fn emit_proof(&mut self, crossing_total: u64, crossing_seq: u64, crossing_tick: u64) -> SignedProof {
+    fn emit_proof(
+        &mut self,
+        crossing_total: u64,
+        crossing_seq: u64,
+        crossing_tick: u64,
+    ) -> SignedProof {
         let mut span = [0u8; SIGNED_SPAN];
         span[0..4].copy_from_slice(&ASC450_MAGIC);
         span[4..6].copy_from_slice(&RECORD_VERSION.to_le_bytes());
@@ -967,13 +927,75 @@ impl<S: ProofSealer> Asc450Meter<S> {
     }
 }
 
+// ===========================================================================
+// v26.11.2 lever L5 — fused ASC450-into-P28 row fold
+// ===========================================================================
+
+/// One fused governance row (v26.11.2 lever L5): everything the seal chain
+/// needs from the meter stage in a single fixed-layout bundle — the §5
+/// attestation anchor digest, the crossing proof if one was emitted (§4.2),
+/// and the sealed meter state (§4.4-3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FusedOutcome {
+    /// BLAKE3 of the row's §5-validated 80 B attestation wire — the chain
+    /// anchor (§5 `attestation_digest`).
+    pub attestation_digest: [u8; 32],
+    /// The crossing proof, emitted iff the row crossed the safe-harbor
+    /// ceiling (§4.2 boundary-exact semantics preserved verbatim).
+    pub proof: Option<SignedProof>,
+    /// Sealed meter state minted for this row (§4.4-3).
+    pub sealed: SealedMeterState,
+}
+
+/// v26.11.2 lever L5 — the fused row fold: one call advances the meter
+/// (counter accumulation folded into the caller's loop body alongside the
+/// receipt `from_root` chaining) and mints the row's sealed state, with the
+/// §5-validated row digest fed through the same fail-closed anchor match
+/// [`Asc450Meter::recover`] uses for its ceiling/digest check (§4.4-3): a
+/// row whose attestation digest is not the meter's genesis anchor REFUSES
+/// with [`Asc450Error::SealedStateInvalid`] — the §5↔§4 anchor can never be
+/// silently swapped mid-lineage.
+///
+/// `tick` is an event argument (§4.3: the meter never reads time); the
+/// caller hoists it out of any lock scope once per row.
+///
+/// The meter's per-row entity semantics (one-shot latch, monotone seq,
+/// checked all-or-nothing adds) are the unfused path's semantics verbatim:
+/// `fused_row(m, rec, a, c, t)` is byte-for-byte
+/// `{ m.record_unlicensed/record_licensed(a, t); m.seal_state() }` plus the
+/// anchor match.
+pub fn fused_row<S: ProofSealer>(
+    meter: &mut Asc450Meter<S>,
+    rec: &crate::attestation::P28LicenseAttestation,
+    amount_cents: u64,
+    crossing: bool,
+    tick: u64,
+) -> Result<FusedOutcome, Asc450Error> {
+    let attestation_digest = cgap_blake3::hash(&rec.to_bytes());
+    if attestation_digest != meter.attestation_digest() {
+        // §4.4-3 fail-closed: refuse, meter byte-unchanged.
+        return Err(Asc450Error::SealedStateInvalid);
+    }
+    let proof = if crossing {
+        meter.record_unlicensed(amount_cents, tick)?
+    } else {
+        meter.record_licensed(amount_cents, tick)?;
+        None
+    };
+    let sealed = meter.seal_state();
+    Ok(FusedOutcome {
+        attestation_digest,
+        proof,
+        sealed,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::attestation::{
-        instrument_header_span, origin_authority_digest, ATTESTATION_LEN,
-        ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC,
-        SAFE_HARBOR_CEILING_MAX_CENTS, P28LicenseAttestation,
+        instrument_header_span, origin_authority_digest, P28LicenseAttestation, ATTESTATION_LEN,
+        ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     use cgap_crypto::lease::Lease;
 
@@ -986,8 +1008,7 @@ mod tests {
             "/../../LICENSE-P28-SIL.md"
         ))
         .expect("pinned instrument LICENSE-P28-SIL.md is readable from the repo root");
-        let span = instrument_header_span(&file)
-            .expect("canonical instrument has a `---` line");
+        let span = instrument_header_span(&file).expect("canonical instrument has a `---` line");
         P28LicenseAttestation {
             license_magic: LICENSE_MAGIC,
             version: ATTESTATION_VERSION,
@@ -1039,20 +1060,11 @@ mod tests {
         assert_eq!(core::mem::offset_of!(SignedProof, record_version), 4);
         assert_eq!(core::mem::offset_of!(SignedProof, reserved), 6);
         assert_eq!(core::mem::offset_of!(SignedProof, ceiling_cents), 8);
-        assert_eq!(
-            core::mem::offset_of!(SignedProof, crossing_total_cents),
-            16
-        );
+        assert_eq!(core::mem::offset_of!(SignedProof, crossing_total_cents), 16);
         assert_eq!(core::mem::offset_of!(SignedProof, crossing_seq), 24);
         assert_eq!(core::mem::offset_of!(SignedProof, crossing_tick), 32);
-        assert_eq!(
-            core::mem::offset_of!(SignedProof, attestation_digest),
-            40
-        );
-        assert_eq!(
-            core::mem::offset_of!(SignedProof, prev_proof_digest),
-            72
-        );
+        assert_eq!(core::mem::offset_of!(SignedProof, attestation_digest), 40);
+        assert_eq!(core::mem::offset_of!(SignedProof, prev_proof_digest), 72);
         assert_eq!(core::mem::offset_of!(SignedProof, signature), 104);
         // Signed span (§5): signature covers 0..104, i.e. everything before
         // the signature field itself.
@@ -1239,7 +1251,9 @@ mod tests {
         //    (0xF2), holding no consumed authority, recomputes the seal from
         //    the emitted span alone and it MATCHES.
         let fresh = fresh_sealer(0xF2);
-        reparsed.verify(&fresh).expect("self-attestation recomputes");
+        reparsed
+            .verify(&fresh)
+            .expect("self-attestation recomputes");
 
         // 3. Emitted-state recompute: chain head and anchor match the meter.
         assert_eq!(
@@ -1290,7 +1304,9 @@ mod tests {
         let good = proof.to_bytes();
 
         // Positive control: the unmutated proof verifies.
-        proof.verify(&fresh_sealer(0xC2)).expect("untampered proof verifies");
+        proof
+            .verify(&fresh_sealer(0xC2))
+            .expect("untampered proof verifies");
 
         // 168 bytes x 8 bits = 1344 single-bit mutations: EVERY flip anywhere
         // in 0..168 must fail verification (§5 tamper-evidence law).
@@ -1423,8 +1439,8 @@ mod tests {
         // of S2's sealed span and recovery must not admit it.
         let mut forged = s2.to_bytes();
         forged[16] ^= 0x01; // accumulated_cents bit flip
-        let forged_state = SealedMeterState::from_bytes(&forged)
-            .expect("structural fields still parse");
+        let forged_state =
+            SealedMeterState::from_bytes(&forged).expect("structural fields still parse");
         assert!(
             matches!(
                 Asc450Meter::recover(ceiling, &att, fresh_sealer(0xCB), &forged_state, 0),
@@ -1620,11 +1636,12 @@ mod tests {
         assert!(m.last_sealed_state().is_none());
 
         // Licensed overflow rejects identically.
+        assert_eq!(m.record_licensed(u64::MAX, 3), Err(Asc450Error::Overflow),);
         assert_eq!(
-            m.record_licensed(u64::MAX, 3),
-            Err(Asc450Error::Overflow),
+            m.accumulated_cents(),
+            50,
+            "licensed overflow leaves no trace"
         );
-        assert_eq!(m.accumulated_cents(), 50, "licensed overflow leaves no trace");
 
         // The overflow boundary is real: prev=1, amount=u64::MAX-1 is the
         // LAST acceptable pair; MAX is not. (ceiling=100 keeps the crossing
@@ -1720,10 +1737,7 @@ mod tests {
         assert_eq!(sb[40], STATE_LATCHED_SET);
         let state_sig = s.signature;
         assert_eq!(&sb[105..169], &state_sig[..]);
-        assert_eq!(
-            SealedMeterState::from_bytes(&sb).expect("169 B parse"),
-            s
-        );
+        assert_eq!(SealedMeterState::from_bytes(&sb).expect("169 B parse"), s);
         assert!(s.verify(&fresh_sealer(0xCC)));
     }
 
@@ -1743,10 +1757,7 @@ mod tests {
     #[test]
     fn c7_no_wall_clock_textual_gate() {
         // The gate reads THIS file's real bytes (compile-time include).
-        const SOURCE: &str = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/asc450.rs"
-        ));
+        const SOURCE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/asc450.rs"));
         assert!(
             SOURCE.len() > 1_000,
             "the gate must read the real module source, not an empty file"
@@ -1774,9 +1785,7 @@ mod tests {
     }
 
     fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
-        haystack
-            .windows(needle.len())
-            .any(|w| w == needle)
+        haystack.windows(needle.len()).any(|w| w == needle)
     }
 
     /// C7 determinism law (§6): identical tick sequences in, byte-identical
@@ -1803,10 +1812,7 @@ mod tests {
             p1, p2,
             "identical inputs must produce byte-identical proofs (§4.3/§6 C7)"
         );
-        assert_eq!(
-            s1, s2,
-            "sealed states are deterministic too (§4.4-3)"
-        );
+        assert_eq!(s1, s2, "sealed states are deterministic too (§4.4-3)");
         // ...and a different epoch key produces different bytes (the seal is
         // key-bound, not a content hash).
         let (p3, _) = run(0xE2);
@@ -1886,8 +1892,8 @@ mod tests {
         );
 
         // A04 identity law: parse → re-encode is the byte-identity round trip.
-        let reparsed = P28LicenseAttestation::from_bytes(&canon)
-            .expect("canonical 80-B record parses");
+        let reparsed =
+            P28LicenseAttestation::from_bytes(&canon).expect("canonical 80-B record parses");
         assert_eq!(reparsed.to_bytes(), canon, "parse/encode identity");
 
         // The canonical crossing proof, for the distinct-proof comparison.
@@ -1899,8 +1905,8 @@ mod tests {
         let canon_proof_digest = Asc450Meter::<LeaseEpochSealer>::proof_digest(&canon_proof);
         assert!(canon_proof.verify(&fresh_sealer(0xA42)).is_ok());
         let canon_proof_bytes = canon_proof.to_bytes();
-        let proof_reparsed = SignedProof::from_bytes(&canon_proof_bytes)
-            .expect("168-B proof parses");
+        let proof_reparsed =
+            SignedProof::from_bytes(&canon_proof_bytes).expect("168-B proof parses");
         assert_eq!(proof_reparsed.to_bytes(), canon_proof_bytes);
 
         // ALL 80x8 = 640 single-bit flips of the anchor record: every flip
@@ -2150,17 +2156,16 @@ mod tests {
             for j in 0..8u8 {
                 let mut torn = s_bytes;
                 torn[i] ^= 1 << j;
-                let verdict = SealedMeterState::from_bytes(&torn)
-                    .and_then(|parsed| {
-                        Asc450Meter::recover(
-                            CEILING,
-                            &att,
-                            fresh_sealer(0xA50),
-                            &parsed,
-                            parsed.accumulated_cents,
-                        )
-                        .map(|_| ())
-                    });
+                let verdict = SealedMeterState::from_bytes(&torn).and_then(|parsed| {
+                    Asc450Meter::recover(
+                        CEILING,
+                        &att,
+                        fresh_sealer(0xA50),
+                        &parsed,
+                        parsed.accumulated_cents,
+                    )
+                    .map(|_| ())
+                });
                 assert!(
                     verdict.is_err(),
                     "torn sealed state (byte {i} bit {j}) must refuse recovery \
@@ -2240,5 +2245,119 @@ mod tests {
         assert_eq!(s_seq, EVENTS);
         assert_eq!(s_latched, STATE_LATCHED_SET);
         assert!(s.verify(&fresh_sealer(0xA20)));
+    }
+
+    // -- v26.11.2 lever L5: fused row fold courts ----------------------------
+
+    /// One lawful shared anchor (real pinned instrument bytes, §5-valid) for
+    /// a single meter lineage. Per §4.4-3 the anchor cannot change
+    /// mid-lineage, so the mixed corpus below pins the lineage ceiling.
+    fn fused_anchor() -> P28LicenseAttestation {
+        real_attestation()
+    }
+
+    /// L5 court: fused_row is a byte-exact composition of the unfused
+    /// per-row path (record_* + seal_state) on a mixed corpus (licensed +
+    /// unlicensed rows) over one lineage, AND the §5↔§4 anchor match is
+    /// fail-closed. Anti-vacuity (must flip): a row carrying a foreign
+    /// attestation digest refuses with SealedStateInvalid and leaves the
+    /// meter byte-unchanged — remove the anchor match and this court fires.
+    #[test]
+    fn w3l5_fused_row_byte_equality_and_anchor_court() {
+        const CEIL: u64 = 1_000_000;
+        let att = fused_anchor();
+        // Mixed corpus: (amount, crossing). Row 1 crosses (prev=100 <= CEIL,
+        // next=CEIL+1 > CEIL); later crossing rows hit the one-shot latch —
+        // identical behavior on both paths, which is the point: the fused
+        // path must reproduce the unfused state machine exactly.
+        let corpus: [(u64, bool); 6] = [
+            (100, false),
+            (CEIL + 1, true),
+            (200, false),
+            (CEIL + 1, true),
+            (300, false),
+            (700, false),
+        ];
+        let mut fused_meter =
+            Asc450Meter::new(CEIL, &att, fresh_sealer(0x1_5F00)).expect("genesis");
+        let mut plain_meter =
+            Asc450Meter::new(CEIL, &att, fresh_sealer(0x1_5F00)).expect("genesis");
+        for (i, &(amount, crossing)) in corpus.iter().enumerate() {
+            let tick = i as u64 + 1;
+            let out = fused_row(&mut fused_meter, &att, amount, crossing, tick)
+                .expect("lawful lineage row: anchor matches by construction");
+            // Unfused composition on the twin meter.
+            let plain_proof = if crossing {
+                plain_meter.record_unlicensed(amount, tick).expect("accept")
+            } else {
+                plain_meter.record_licensed(amount, tick).expect("accept");
+                None
+            };
+            let plain_sealed = plain_meter.seal_state();
+            // Byte equality (Chicago: assert final artifact bytes).
+            assert_eq!(out.attestation_digest, plain_meter.attestation_digest());
+            assert_eq!(
+                out.proof.map(|p| p.to_bytes()),
+                plain_proof.map(|p| p.to_bytes())
+            );
+            assert_eq!(out.sealed.to_bytes(), plain_sealed.to_bytes());
+        }
+        // Lineage law: the fused batch's terminal sealed state recovers
+        // fail-closed (recover's ceiling/digest match, §4.4-3), and a
+        // foreign anchor refuses recovery.
+        let terminal = fused_meter.last_sealed_state().expect("terminal seal");
+        let _ = Asc450Meter::recover(
+            CEIL,
+            &att,
+            fresh_sealer(0x1_5F00),
+            &terminal,
+            terminal.accumulated_cents,
+        )
+        .expect("terminal fused sealed state must recover");
+        let foreign = P28LicenseAttestation {
+            safe_harbor_ceiling_cents: CEIL,
+            ..fused_anchor()
+        };
+        let foreign_digest = cgap_blake3::hash(&foreign.to_bytes());
+        assert_ne!(foreign_digest, cgap_blake3::hash(&att.to_bytes()));
+        assert_eq!(
+            fused_row(&mut fused_meter, &foreign, 1, false, 9)
+                .expect_err("foreign anchor must refuse"),
+            Asc450Error::SealedStateInvalid,
+        );
+    }
+}
+
+#[cfg(test)]
+mod nostd_hygiene_court {
+    //! W4-MW2 std-strip court (extends the cgap-bn3 builtins.rs must-kill
+    //! pattern): the module body — everything before the first
+    //! `#[cfg(test)]`, comments stripped — carries no `std::` path.
+    //! Anti-vacuity mutation (must-kill): reintroduce any `std::` path in
+    //! the body (e.g. `impl std::error::Error`) — this court MUST flip.
+
+    use std::string::String;
+
+    fn module_body_stripped() -> String {
+        let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/asc450.rs"));
+        let body = src
+            .split("#[cfg(test)]")
+            .next()
+            .expect("module body precedes the hygiene court");
+        body.lines()
+            .map(|line| match line.find("//") {
+                Some(i) => &line[..i],
+                None => line,
+            })
+            .collect::<String>()
+    }
+
+    #[test]
+    fn nostd_hygiene_module_body_has_no_std_paths() {
+        let body = module_body_stripped();
+        assert!(
+            !body.contains("std::"),
+            "module body carries a `std::` path; crate direction is no_std (core/alloc only)"
+        );
     }
 }

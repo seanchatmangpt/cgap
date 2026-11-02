@@ -1,6 +1,6 @@
 [package]
 name = "wasm-footprint"
-version = "26.11.1"
+version = "26.11.2"
 edition = "2021"
 description = "no_std cdylib wrapper supplying the wasm link glue (panic handler + global allocator) around the cgap-arrow / cgap-parquet kernels; the wasm32-wasip1 footprint subject measured by scripts/footprint.sh"
 repository = "https://github.com/seanchatmangpt/cgap"
@@ -12,11 +12,11 @@ license-file = "../../LICENSE.md"
 crate-type = ["cdylib"]
 
 [dependencies]
-cgap-arrow = "26.11.1"
-cgap-parquet = "26.11.1"
+cgap-arrow = "26.11.2"
+cgap-parquet = "26.11.2"
 
 [dev-dependencies]
-cgap-blake3 = "26.11.1"
+cgap-blake3 = "26.11.2"
 
 [profile.release]
 lto = "thin"

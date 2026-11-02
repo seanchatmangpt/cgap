@@ -488,10 +488,8 @@ impl<const CAP: usize> ArrowRecordSlab<CAP> {
         }
         let len = u32::from_le_bytes([bytes[0x0C], bytes[0x0D], bytes[0x0E], bytes[0x0F]]);
         let seq = u32::from_le_bytes([bytes[0x10], bytes[0x11], bytes[0x12], bytes[0x13]]);
-        let presence_len =
-            u32::from_le_bytes([bytes[0x14], bytes[0x15], bytes[0x16], bytes[0x17]]);
-        let reserved0 =
-            u32::from_le_bytes([bytes[0x18], bytes[0x19], bytes[0x1A], bytes[0x1B]]);
+        let presence_len = u32::from_le_bytes([bytes[0x14], bytes[0x15], bytes[0x16], bytes[0x17]]);
+        let reserved0 = u32::from_le_bytes([bytes[0x18], bytes[0x19], bytes[0x1A], bytes[0x1B]]);
         let slots_window = &bytes[HEADER_SIZE..];
         let mut slots = [SlabSlot::ZERO; CAP];
         let mut i = 0;
@@ -765,18 +763,12 @@ mod wave2_tests {
         // Header field in the digest span (cap, 0x08) → HeaderDigestMismatch.
         m = image.clone();
         m[0x08] ^= 0x01;
-        assert_eq!(
-            Slab64::from_bytes(&m),
-            Err(SlabError::HeaderDigestMismatch)
-        );
+        assert_eq!(Slab64::from_bytes(&m), Err(SlabError::HeaderDigestMismatch));
 
         // Stored header_digest field itself → HeaderDigestMismatch.
         m = image.clone();
         m[0x1C] ^= 0x01;
-        assert_eq!(
-            Slab64::from_bytes(&m),
-            Err(SlabError::HeaderDigestMismatch)
-        );
+        assert_eq!(Slab64::from_bytes(&m), Err(SlabError::HeaderDigestMismatch));
 
         // Stored payload digest field itself → DigestMismatch.
         m = image.clone();
@@ -828,7 +820,14 @@ mod wave2_tests {
         let (mut slab, mask) = seeded_slab(5);
         slab.seal_with_mask(&mask).unwrap();
         let mut be = slab.as_bytes().to_vec();
-        for (off, w) in [(0x00, 4usize), (0x08, 4), (0x0C, 4), (0x10, 4), (0x14, 4), (0x18, 4)] {
+        for (off, w) in [
+            (0x00, 4usize),
+            (0x08, 4),
+            (0x0C, 4),
+            (0x10, 4),
+            (0x14, 4),
+            (0x18, 4),
+        ] {
             be[off..off + w].reverse();
         }
         be[0x04..0x06].reverse();
@@ -871,10 +870,7 @@ mod wave2_tests {
     #[test]
     fn push_payload_length_law_and_zero_padding() {
         let mut slab = Slab64::new();
-        assert_eq!(
-            slab.push(&[0xAA; 61], true),
-            Err(SlabError::PayloadTooLong)
-        );
+        assert_eq!(slab.push(&[0xAA; 61], true), Err(SlabError::PayloadTooLong));
         assert_eq!(slab.len(), 0, "refused push must not advance len");
         assert_eq!(slab.push(&[0xBB; 60], true), Ok(()));
         assert_eq!(slab.push(&[0xCC; 3], true), Ok(()));
@@ -915,10 +911,7 @@ mod wave2_tests {
         // absent in the seeded pattern, so setting it diverges from the
         // shadow byte (which push stamped 0).
         mask.set(3).unwrap();
-        assert_eq!(
-            slab.seal_with_mask(&mask),
-            Err(SlabError::PresenceMismatch)
-        );
+        assert_eq!(slab.seal_with_mask(&mask), Err(SlabError::PresenceMismatch));
         assert!(!slab.is_sealed(), "refused seal must not stamp SEALED");
         // In-sync mask seals cleanly.
         assert_eq!(slab.seal_with_mask(&good), Ok(()));
@@ -1156,7 +1149,9 @@ mod wave8_tests {
         reheader(&mut w);
         assert_eq!(
             Slab64::from_bytes(&w),
-            Err(SlabError::NotSealed { got: FLAG_PRESENT_INLINE })
+            Err(SlabError::NotSealed {
+                got: FLAG_PRESENT_INLINE
+            })
         );
     }
 
@@ -1249,11 +1244,11 @@ mod wave8_tests {
         assert_eq!(round.len(), 64);
         // Every new law holds on the minted image.
         assert_eq!(round.header.layout_version, LAYOUT_VERSION);
-        assert_eq!(round.header.presence_len, crate::bitmask::mask_bytes(64) as u32);
         assert_eq!(
-            round.header.flags,
-            FLAG_PRESENT_INLINE | FLAG_SEALED
+            round.header.presence_len,
+            crate::bitmask::mask_bytes(64) as u32
         );
+        assert_eq!(round.header.flags, FLAG_PRESENT_INLINE | FLAG_SEALED);
         for slot in &round.slots {
             assert_eq!(slot.padding, [0; 3]);
         }
@@ -1277,12 +1272,12 @@ mod wave9_tests {
         FRAME_MAGIC, FRAME_VERSION, LICENSE_FLAG_ROOT, LICENSE_MAGIC,
     };
     use cgap_gate::penstock::{
-        ingress, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
-        FrameView,
+        ingress, FrameView, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH,
+        CGAP_ERR_P28_SPOLIATION, CGAP_OK,
     };
     use cgap_storage::atomic_commit::{
         begin_txn, recover, tear_class_for_offset, write_record_cut, FlashMedium, JournalWriter,
-        NewRootDescriptor, RecoveryReport, SlotVerdict, TearClass, FLAG_DUAL_WRITE, FIRST_SEQ,
+        NewRootDescriptor, RecoveryReport, SlotVerdict, TearClass, FIRST_SEQ, FLAG_DUAL_WRITE,
         OFF_PARQUET_ROOT, PAYLOAD_SIZE, RECORD_SIZE,
     };
 
@@ -1424,7 +1419,10 @@ mod wave9_tests {
     fn w9_c1_a04_identity_court() {
         let slab = seeded_slab64(64);
         let frame = frame_slab(&slab);
-        assert_eq!(slab.header.digest, crate::blake3::hash(&slab.as_bytes()[64..]));
+        assert_eq!(
+            slab.header.digest,
+            crate::blake3::hash(&slab.as_bytes()[64..])
+        );
 
         // Positive control: pristine chain closes on identity.
         let hdr = CgapFrameHeader::decode(&frame).unwrap();
@@ -1502,7 +1500,11 @@ mod wave9_tests {
         let n = frame.len();
 
         // Positive control: ADMIT, and the out-view IS the slab window.
-        let mut view = FrameView { payload: &[] };
+        let mut view = FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         assert_eq!(ingress(&frame, n, Some(&mut view)), CGAP_OK);
         assert_eq!(view.payload, slab.as_bytes());
 
@@ -1590,7 +1592,11 @@ mod wave9_tests {
             let cut = &frame[..k];
             if k == n {
                 // C4: the complete cut is the commit; the full chain closes.
-                let mut view = FrameView { payload: &[] };
+                let mut view = FrameView {
+                    payload: &[],
+                    prefilter: 0,
+                    escalate: false,
+                };
                 assert_eq!(ingress(cut, k, Some(&mut view)), CGAP_OK);
                 assert_eq!(view.payload, slab.as_bytes());
                 let hdr = CgapFrameHeader::decode(cut).unwrap();
@@ -1660,7 +1666,10 @@ mod wave9_tests {
         assert_eq!(tear_class_for_offset(1), TearClass::TornHeader);
         assert_eq!(tear_class_for_offset(48), TearClass::TornPayload);
         assert_eq!(tear_class_for_offset(96), TearClass::TornTrailer);
-        assert_eq!(tear_class_for_offset(RECORD_SIZE), TearClass::CompleteRecord);
+        assert_eq!(
+            tear_class_for_offset(RECORD_SIZE),
+            TearClass::CompleteRecord
+        );
 
         // Positive path: the complete commit is durable; recovery returns
         // the checkpoint; the manifest matches the sealed slab digest; the
@@ -1680,7 +1689,11 @@ mod wave9_tests {
         // through the public wire codec, never by field reference.
         let wire = out.root.to_bytes();
         assert_eq!(
-            u64::from_le_bytes(wire[OFF_PARQUET_ROOT..OFF_PARQUET_ROOT + 8].try_into().unwrap()),
+            u64::from_le_bytes(
+                wire[OFF_PARQUET_ROOT..OFF_PARQUET_ROOT + 8]
+                    .try_into()
+                    .unwrap()
+            ),
             manifest
         );
         assert_eq!(wire.len(), PAYLOAD_SIZE);
@@ -1709,7 +1722,10 @@ mod wave9_tests {
                         assert_eq!(out.report, RecoveryReport::Clean);
                     }
                     TearClass::TornHeader | TearClass::TornPayload | TearClass::TornTrailer => {
-                        assert_eq!(out.slot_verdicts, [SlotVerdict::Damaged, SlotVerdict::Empty]);
+                        assert_eq!(
+                            out.slot_verdicts,
+                            [SlotVerdict::Damaged, SlotVerdict::Empty]
+                        );
                         assert_eq!(out.report, RecoveryReport::RecoveryDegraded);
                     }
                     TearClass::CompleteRecord => unreachable!("k={k} handled above"),
@@ -1764,7 +1780,8 @@ mod wave9_tests {
             assert_eq!(round, slab);
             // Cache-line size law holds at scale.
             assert_eq!(slab.as_bytes().len() % 64, 0);
-            folded = crate::blake3::hash(&[folded.as_slice(), round.header.digest.as_slice()].concat());
+            folded =
+                crate::blake3::hash(&[folded.as_slice(), round.header.digest.as_slice()].concat());
             totals.rows += round.len() as usize;
             totals.slabs += 1;
             totals.present += mask.count();
@@ -1795,7 +1812,11 @@ mod wave9_tests {
         // Cross-lane chain on the deterministic first slab.
         let (first, _) = sealed_slab_for_range(0);
         let frame = frame_slab(&first);
-        let mut view = FrameView { payload: &[] };
+        let mut view = FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         assert_eq!(ingress(&frame, frame.len(), Some(&mut view)), CGAP_OK);
         assert_eq!(view.payload, first.as_bytes());
         let hdr = CgapFrameHeader::decode(&frame).unwrap();

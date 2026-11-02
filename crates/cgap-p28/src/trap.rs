@@ -64,7 +64,25 @@ pub static STAGED_DISCRIMINATOR: AtomicU32 = AtomicU32::new(0);
 /// Never returns.
 pub fn spoliation_halt() -> ! {
     STAGED_DISCRIMINATOR.store(ERR_P28_SPOLIATION, Ordering::SeqCst);
-    std::process::abort()
+    #[cfg(target_family = "wasm")]
+    {
+        // W4-MW2: no_std strip. On wasm32 the std abort lowering was
+        // witnessed (2026-11-01, trap.rs module doc) to be exactly
+        // `unreachable`, so the trap edge is byte-equivalent without std.
+        core::arch::wasm32::unreachable()
+    }
+    #[cfg(all(not(target_family = "wasm"), not(target_os = "none")))]
+    {
+        // Hosted (std linked per lib.rs): the exact §6.2 SIGABRT edge.
+        std::process::abort()
+    }
+    #[cfg(target_os = "none")]
+    {
+        // Bare-metal no_std divergence (W4-MW2 receipt): SIGABRT is a
+        // hosted-target process concept; the fail-closed edge lowers to a
+        // panic trap. Still diverges (never returns, halt-first contract).
+        panic!("P28 spoliation halt (bare-metal: SIGABRT unavailable)")
+    }
 }
 
 /// §6.1 — check-then-halt C-ABI surface consumed by `cgap-ffi` (A19 owns the
@@ -97,6 +115,7 @@ pub unsafe extern "C" fn cgap_p28_invariant_check(att: *const u8) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use std::{string::String, vec::Vec};
     use super::*;
     use crate::attestation::test_support::*;
     use crate::attestation::{

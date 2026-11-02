@@ -11,11 +11,6 @@
 /// Returns the 16-word compression output of each chunk's final block,
 /// per lane — identical to calling [`crate::hash_chunk`] on each 1 KiB chunk
 /// with `is_root = false`.
-#[cfg(target_arch = "aarch64")]
-#[inline(always)]
-unsafe fn vst1q_one(out: &[u32; 4], v: core::arch::aarch64::uint32x4_t) {
-    unsafe { core::arch::aarch64::vst1q_u32(out.as_ptr() as *mut u32, v) }
-}
 
 pub fn compress_chunks_4way(data: &[u8], base_chunk_idx: u64) -> [[u32; 16]; 4] {
     debug_assert_eq!(data.len(), 4096);
@@ -476,10 +471,21 @@ unsafe fn compress_chunks_4way_x2_neon(data: &[u8], base_chunk_idx: u64) -> [[[u
                     let mut hib_arr = [0u32; 4];
                     vst1q_u32(hia_arr.as_mut_ptr(), sa[i + 8]);
                     vst1q_u32(hib_arr.as_mut_ptr(), sb[i + 8]);
-                    let cpre_a = [0u32; 4];
-                    let cpre_b = [0u32; 4];
-                    vst1q_one(&cpre_a, cv_pre_a[i]);
-                    vst1q_one(&cpre_b, cv_pre_b[i]);
+                    // Wave-9 lane p1-blake3 (P0 published-crate fix): these two
+                    // buffers were previously written through `vst1q_one`,
+                    // which took a *shared* reference `&[u32; 4]` and cast it
+                    // to `*mut` — writing through a pointer derived from a
+                    // shared reference is undefined behavior. At opt-level 0
+                    // the UB happened to produce the stored vector; at
+                    // opt-level >= 1 LLVM forwarded the visible `[0u32; 4]`
+                    // initializer to the element loads, so words 8..16 of the
+                    // x2 output silently dropped the `^ cv_pre` term. Mut
+                    // arrays + `as_mut_ptr()` match the (correct) 4-way
+                    // finalize shape.
+                    let mut cpre_a = [0u32; 4];
+                    let mut cpre_b = [0u32; 4];
+                    vst1q_u32(cpre_a.as_mut_ptr(), cv_pre_a[i]);
+                    vst1q_u32(cpre_b.as_mut_ptr(), cv_pre_b[i]);
                     for l in 0..4 {
                         out[0][l][i] = lanea[l];
                         out[0][l][i + 8] = hia_arr[l] ^ cpre_a[l];

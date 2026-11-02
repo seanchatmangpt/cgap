@@ -181,9 +181,17 @@ pub enum OabiError {
         derived_slot: u64,
     },
     /// Record class outside `[0, class_count)` (§6 header field meaning).
-    ClassOutOfRange { index: usize, class: u32, class_count: u32 },
+    ClassOutOfRange {
+        index: usize,
+        class: u32,
+        class_count: u32,
+    },
     /// Record enum outside `[0, enum_count)` (§6 header field meaning).
-    EnumOutOfRange { index: usize, enum_: u16, enum_count: u32 },
+    EnumOutOfRange {
+        index: usize,
+        enum_: u16,
+        enum_count: u32,
+    },
 }
 
 impl core::fmt::Display for OabiError {
@@ -307,22 +315,31 @@ impl OabiPackV1 {
     /// checks documented at [`OabiError`].
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, OabiError> {
         if bytes.len() < OABI_HEADER_LEN {
-            return Err(OabiError::BadLength { needed: OABI_HEADER_LEN, got: bytes.len() });
+            return Err(OabiError::BadLength {
+                needed: OABI_HEADER_LEN,
+                got: bytes.len(),
+            });
         }
         let mut magic = [0u8; 8];
         magic.copy_from_slice(&bytes[0..8]);
         if magic != OABI_MAGIC {
             return Err(OabiError::BadMagic);
         }
-        let u32le = |o: usize| u32::from_le_bytes(bytes[o..o + 4].try_into().expect("in-range header offsets"));
-        let u16le = |o: usize| u16::from_le_bytes(bytes[o..o + 2].try_into().expect("in-range header offsets"));
+        let u32le = |o: usize| {
+            u32::from_le_bytes(bytes[o..o + 4].try_into().expect("in-range header offsets"))
+        };
+        let u16le = |o: usize| {
+            u16::from_le_bytes(bytes[o..o + 2].try_into().expect("in-range header offsets"))
+        };
         let header_len = u32le(8);
         if header_len != OABI_HEADER_LEN as u32 {
             return Err(OabiError::HeaderLen { got: header_len });
         }
         let version_major = u16le(12);
         if version_major != OABI_VERSION_MAJOR {
-            return Err(OabiError::UnsupportedVersion { got_major: version_major });
+            return Err(OabiError::UnsupportedVersion {
+                got_major: version_major,
+            });
         }
         let flags = u32le(16);
         if flags & OABI_FLAG_LITTLE_ENDIAN == 0 {
@@ -349,10 +366,14 @@ impl OabiPackV1 {
             },
         };
         if let Some(off) = header.reserved.iter().position(|&b| b != 0) {
-            return Err(OabiError::ReservedNonZero { at_offset: 36 + off });
+            return Err(OabiError::ReservedNonZero {
+                at_offset: 36 + off,
+            });
         }
         if header.record_size != OABI_RECORD_SIZE as u32 {
-            return Err(OabiError::RecordSize { got: header.record_size });
+            return Err(OabiError::RecordSize {
+                got: header.record_size,
+            });
         }
         // Exact-equality length law (§6 "slot_count consistent with section
         // length"), computed in checked arithmetic: a hostile `slot_count`
@@ -363,19 +384,39 @@ impl OabiPackV1 {
         let needed = (header.slot_count as usize)
             .checked_mul(OABI_RECORD_SIZE)
             .and_then(|records_bytes| records_bytes.checked_add(OABI_HEADER_LEN))
-            .ok_or(OabiError::BadLength { needed: usize::MAX, got: bytes.len() })?;
+            .ok_or(OabiError::BadLength {
+                needed: usize::MAX,
+                got: bytes.len(),
+            })?;
         if bytes.len() != needed {
-            return Err(OabiError::BadLength { needed, got: bytes.len() });
+            return Err(OabiError::BadLength {
+                needed,
+                got: bytes.len(),
+            });
         }
         let mut records = Vec::with_capacity(header.slot_count as usize);
         for i in 0..header.slot_count as usize {
             let base = OABI_HEADER_LEN + i * OABI_RECORD_SIZE;
             let rec = OabiRecordV1 {
-                slot: SlotId(u64::from_le_bytes(bytes[base..base + 8].try_into().expect("record window"))),
-                class: ClassId(u32::from_le_bytes(bytes[base + 8..base + 12].try_into().expect("record window"))),
-                enum_: EnumId(u16::from_le_bytes(bytes[base + 12..base + 14].try_into().expect("record window"))),
+                slot: SlotId(u64::from_le_bytes(
+                    bytes[base..base + 8].try_into().expect("record window"),
+                )),
+                class: ClassId(u32::from_le_bytes(
+                    bytes[base + 8..base + 12]
+                        .try_into()
+                        .expect("record window"),
+                )),
+                enum_: EnumId(u16::from_le_bytes(
+                    bytes[base + 12..base + 14]
+                        .try_into()
+                        .expect("record window"),
+                )),
                 _pad: [bytes[base + 14], bytes[base + 15]],
-                lex: LexHash(bytes[base + 16..base + 48].try_into().expect("record window")),
+                lex: LexHash(
+                    bytes[base + 16..base + 48]
+                        .try_into()
+                        .expect("record window"),
+                ),
             };
             if rec.class.0 >= header.class_count {
                 return Err(OabiError::ClassOutOfRange {
@@ -394,7 +435,11 @@ impl OabiPackV1 {
             // §6 per-record obligation (defense in depth against producer
             // truncation-window drift — §10): re-derive from the LexHash.
             if let Err((record_slot, derived_slot)) = rec.verify_slot_derivation() {
-                return Err(OabiError::SlotDerivationMismatch { index: i, record_slot, derived_slot });
+                return Err(OabiError::SlotDerivationMismatch {
+                    index: i,
+                    record_slot,
+                    derived_slot,
+                });
             }
             records.push(rec);
         }
@@ -464,7 +509,11 @@ mod tests {
         let rec = golden_record();
         let addr = core::ptr::addr_of!(rec) as *const u8;
         let mem = unsafe { core::slice::from_raw_parts(addr, 48) };
-        assert_eq!(mem, &golden_blob(), "OabiRecordV1 memory layout drifted from the golden blob");
+        assert_eq!(
+            mem,
+            &golden_blob(),
+            "OabiRecordV1 memory layout drifted from the golden blob"
+        );
     }
 
     /// T2b — wire round-trip: a derivation-valid record (slot re-derivable
@@ -481,7 +530,10 @@ mod tests {
             lex: lex_hash(lex),
         };
         let header = OabiHeaderV1::new(8, 10, 1);
-        let pack = OabiPackV1 { header, records: vec![rec] };
+        let pack = OabiPackV1 {
+            header,
+            records: vec![rec],
+        };
         let bytes = pack.to_bytes();
         assert_eq!(bytes.len(), OABI_HEADER_LEN + 48);
         let parsed = OabiPackV1::from_bytes(&bytes).expect("round-trip must load");
@@ -527,22 +579,35 @@ mod tests {
         // (a) bad magic
         let mut bytes = valid_pack();
         bytes[3] ^= 0xFF;
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::BadMagic);
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::BadMagic
+        );
 
         // (b) header_len != 64
         let mut bytes = valid_pack();
         bytes[8..12].copy_from_slice(&32u32.to_le_bytes());
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::HeaderLen { got: 32 });
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::HeaderLen { got: 32 }
+        );
 
         // (c) record_size != 48
         let mut bytes = valid_pack();
         bytes[32..36].copy_from_slice(&24u32.to_le_bytes());
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::RecordSize { got: 24 });
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::RecordSize { got: 24 }
+        );
 
         // (d) one record's SlotId != truncate64(LexHash): flip a slot byte.
         let mut bytes = valid_pack();
         bytes[OABI_HEADER_LEN] ^= 0x01;
-        let bad_slot = u64::from_le_bytes(bytes[OABI_HEADER_LEN..OABI_HEADER_LEN + 8].try_into().unwrap());
+        let bad_slot = u64::from_le_bytes(
+            bytes[OABI_HEADER_LEN..OABI_HEADER_LEN + 8]
+                .try_into()
+                .unwrap(),
+        );
         let good_slot = slot_id(b"bont://court/alpha").0;
         assert_ne!(bad_slot, good_slot);
         assert_eq!(
@@ -557,19 +622,28 @@ mod tests {
         // (e) nonzero reserved byte
         let mut bytes = valid_pack();
         bytes[40] = 0x7F;
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::ReservedNonZero { at_offset: 40 });
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::ReservedNonZero { at_offset: 40 }
+        );
 
         // Additive checks (documented at OabiError): version_major bump
         let mut bytes = valid_pack();
         bytes[12..14].copy_from_slice(&2u16.to_le_bytes());
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::UnsupportedVersion { got_major: 2 });
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::UnsupportedVersion { got_major: 2 }
+        );
 
         // Additive: LE flag cleared
         let mut bytes = valid_pack();
         bytes[16] &= !0x01;
         let le_masked = u32::from_le_bytes(bytes[16..20].try_into().unwrap());
         assert_eq!(le_masked & 0x1, 0);
-        assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::NotLittleEndian);
+        assert_eq!(
+            OabiPackV1::from_bytes(&bytes).unwrap_err(),
+            OabiError::NotLittleEndian
+        );
 
         // Additive: unknown flag bit set
         let mut bytes = valid_pack();
@@ -586,7 +660,10 @@ mod tests {
         let short = &bytes[..32];
         assert_eq!(
             OabiPackV1::from_bytes(short).unwrap_err(),
-            OabiError::BadLength { needed: OABI_HEADER_LEN, got: 32 }
+            OabiError::BadLength {
+                needed: OABI_HEADER_LEN,
+                got: 32
+            }
         );
 
         // (g) length: slot_count overstates the record section (the header
@@ -596,7 +673,10 @@ mod tests {
         let needed3 = OABI_HEADER_LEN + 3 * OABI_RECORD_SIZE;
         assert_eq!(
             OabiPackV1::from_bytes(&bytes).unwrap_err(),
-            OabiError::BadLength { needed: needed3, got: bytes.len() }
+            OabiError::BadLength {
+                needed: needed3,
+                got: bytes.len()
+            }
         );
 
         // (g2) length: buffer overstates the record section (one trailing
@@ -607,7 +687,10 @@ mod tests {
         let needed2 = OABI_HEADER_LEN + 2 * OABI_RECORD_SIZE;
         assert_eq!(
             OabiPackV1::from_bytes(&bytes).unwrap_err(),
-            OabiError::BadLength { needed: needed2, got: bytes.len() }
+            OabiError::BadLength {
+                needed: needed2,
+                got: bytes.len()
+            }
         );
 
         // (h) hostile slot_count = u32::MAX on a 2-record buffer: on a
@@ -628,7 +711,11 @@ mod tests {
         bytes[OABI_HEADER_LEN + 8..OABI_HEADER_LEN + 12].copy_from_slice(&7u32.to_le_bytes());
         assert_eq!(
             OabiPackV1::from_bytes(&bytes).unwrap_err(),
-            OabiError::ClassOutOfRange { index: 0, class: 7, class_count: 1 }
+            OabiError::ClassOutOfRange {
+                index: 0,
+                class: 7,
+                class_count: 1
+            }
         );
 
         // (j) enum range: record 0 enum 5 >= enum_count 2
@@ -636,7 +723,11 @@ mod tests {
         bytes[OABI_HEADER_LEN + 12..OABI_HEADER_LEN + 14].copy_from_slice(&5u16.to_le_bytes());
         assert_eq!(
             OabiPackV1::from_bytes(&bytes).unwrap_err(),
-            OabiError::EnumOutOfRange { index: 0, enum_: 5, enum_count: 2 }
+            OabiError::EnumOutOfRange {
+                index: 0,
+                enum_: 5,
+                enum_count: 2
+            }
         );
     }
 
@@ -684,11 +775,19 @@ mod tests {
     #[cfg(test)]
     fn load_producer_pack(rel: &str) -> (Vec<u8>, OabiPackV1) {
         let path = producer_pack_path(rel);
-        let bytes = std::fs::read(&path)
-            .unwrap_or_else(|e| panic!("committed producer pack {} must be readable: {e}", path.display()));
-        let pack = OabiPackV1::from_bytes(&bytes)
-            .unwrap_or_else(|e| panic!("committed producer pack {rel} must load under the §6 law: {e}"));
-        assert!(pack.records().len() > 0, "{rel}: an empty pack is not a corpus");
+        let bytes = std::fs::read(&path).unwrap_or_else(|e| {
+            panic!(
+                "committed producer pack {} must be readable: {e}",
+                path.display()
+            )
+        });
+        let pack = OabiPackV1::from_bytes(&bytes).unwrap_or_else(|e| {
+            panic!("committed producer pack {rel} must load under the §6 law: {e}")
+        });
+        assert!(
+            pack.records().len() > 0,
+            "{rel}: an empty pack is not a corpus"
+        );
         assert_eq!(
             pack.header().slot_count as usize,
             pack.records().len(),

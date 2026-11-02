@@ -11,15 +11,16 @@ zero-alloc court.
 
 ## Status
 
-PUBLISHED-26.11.1 — on crates.io (see
-`docs/jira/v26.11.1/waves/p3-api-verify-all.md`: all five kernel crates
-PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
-26.11.1 absent before the publish legs landed).
+WORKING-26.11.2 — kernel source at workspace version
+26.11.2 (publish law: one attempt per crate, sequenced; prior
+PUBLISHED-26.11.1 record archived under readme-archive/). Census: see
+`docs/jira/v26.11.2/waves/crate-reality/cgap-blake3.md`: full suite
+exit 0 this session at 26.11.2.
 
 ## Evidence (cited receipts)
 
 - Suite green 27/0: `cargo test -p cgap-blake3` exit 0
-  (`waves/r12-bench-tmp.md`).
+  (`docs/jira/v26.11.2/waves/crate-reality/cgap-blake3.md`).
 - KAT corpus: `tests/official_vectors.rs` follows the canonical
   BLAKE3-team `test_vectors.json` recipe; `multi_chunk_vectors.rs`,
   `small_batch_vectors.rs`, `thread_differential.rs`, `zero_alloc.rs`.
@@ -29,11 +30,11 @@ PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
 ## Install
 
 ```bash
-cargo add cgap-blake3@26.11.1
+cargo add cgap-blake3@26.11.2
 ```
 
 ## Lane receipt
 
-`docs/jira/v26.11.1/waves/r12-bench-tmp.md` (suite census + purge receipt);
-publish legs `waves/f3-09-pub-blake3.md`; registry witness
-`waves/p3-api-verify-all.md`.
+`docs/jira/v26.11.2/waves/crate-reality/cgap-blake3.md` (26.11.2 census);
+historical: `docs/jira/v26.11.1/waves/r12-bench-tmp.md`,
+`waves/f3-09-pub-blake3.md`, `waves/p3-api-verify-all.md`.

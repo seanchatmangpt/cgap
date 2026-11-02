@@ -23,6 +23,7 @@
 
 #![allow(dead_code)] // Wave-1 ML-DSA-shape consts wait on the Wave-3 PQC gate.
 
+use alloc::vec::Vec;
 use crate::lease::{Lease, PhiLease, PHI_LEASE_LEN};
 use cgap_blake3::{compress_scalar, hash, CHUNK_END, CHUNK_START, ROOT};
 
@@ -185,7 +186,7 @@ impl core::fmt::Display for DigestError {
     }
 }
 
-impl std::error::Error for DigestError {}
+impl core::error::Error for DigestError {}
 
 /// Keyed BLAKE3 over a single chunk (1..=16 blocks of 64 B), keyed mode per
 /// the BLAKE3 spec: the FIRST chunk's chaining value starts at the key words,
@@ -328,7 +329,7 @@ impl core::fmt::Display for DeltaError {
     }
 }
 
-impl std::error::Error for DeltaError {}
+impl core::error::Error for DeltaError {}
 
 /// `algorithm_id` for the §4 UNSUPPORTED-clause unsealed tier — PROVISIONAL
 /// registry value pinned by this lane (doc names none; divergence D2 in the
@@ -540,7 +541,7 @@ impl core::fmt::Display for VerifyError {
     }
 }
 
-impl std::error::Error for VerifyError {}
+impl core::error::Error for VerifyError {}
 
 /// §6 `seal`, unsealed tier: the ONLY tick consumer. Produces the 229-byte
 /// receipt over `delta` under `lease`, consuming exactly one tick (which
@@ -638,4 +639,38 @@ pub fn admissions_root(encoded_receipts: &[&[u8]]) -> [u8; ROOT_LEN] {
         level = next;
     }
     level[0]
+}
+
+#[cfg(test)]
+mod nostd_hygiene_court {
+    //! W4-MW2 std-strip court (extends the cgap-bn3 builtins.rs must-kill
+    //! pattern): the module body — everything before the first
+    //! `#[cfg(test)]`, comments stripped — carries no `std::` path.
+    //! Anti-vacuity mutation (must-kill): reintroduce any `std::` path in
+    //! the body (e.g. `impl std::error::Error`) — this court MUST flip.
+
+    use std::string::String;
+
+    fn module_body_stripped() -> String {
+        let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/chatman.rs"));
+        let body = src
+            .split("#[cfg(test)]")
+            .next()
+            .expect("module body precedes the hygiene court");
+        body.lines()
+            .map(|line| match line.find("//") {
+                Some(i) => &line[..i],
+                None => line,
+            })
+            .collect::<String>()
+    }
+
+    #[test]
+    fn nostd_hygiene_module_body_has_no_std_paths() {
+        let body = module_body_stripped();
+        assert!(
+            !body.contains("std::"),
+            "module body carries a `std::` path; crate direction is no_std (core/alloc only)"
+        );
+    }
 }

@@ -331,6 +331,11 @@ mod digest_ffi {
 // v26.11.1 moonshot lanes (coordinator-scaffolded, additive only):
 pub mod sovereign;
 
+/// Lane p2-receipts — ring-commit receipt chaining witness
+/// (per-transition BLAKE3 Merkle receipts bound to the P28 license
+/// verify; host surface only).
+pub mod receipt_chain;
+
 pub mod oabi_lookup; // F2-6 SEAM-OABI: typed UNSUPPORTED(scope) + surface-freeze court (A19 §2)
 
 /// W2-10 (Wave R2 item 10, OABI-PROD-BYTES): the production `.oabi`/`.bn3`

@@ -284,39 +284,67 @@ DEFAULT_MAX_MUTANTS = 24
 #   killed ALL 24 sampled mutants (21 KilledByBuild + 3 KilledByTest, 0
 #   survivors), so the refreshed register is the EMPTY set — removal per the
 #   fail-closed law, never a widening: no survivor existed to triage.
+#   W3-R1 refresh (this session, drift repair): the court file grew again
+#   and the check refused all 5 prior keys as stale (5 keys matched no
+#   survivor row vs 7 survivor sites). Refreshed from this session's run
+#   output exactly — 5 keys REMOVED, 7 keys triaged from the survivor
+#   lines themselves (property analysis per row below), never widened.
 EQUIVALENT_TRIAGE = {
-    "tests/court_verdict.rs:812:cmp-swap:0": (
-        "`zero > 0` -> `zero >= 0`: unsigned tautology. The zero-family "
-        "population law is carried by sibling pins — the corpus receipt "
-        "court's all-four-families assert (A20-finish repair, this "
-        "session) plus the sha256 corpus receipt itself — so the battery "
-        "conjunct is defense-in-depth and both polarities are "
-        "observation-identical over the receipt-pinned corpus."
+    "tests/court_verdict.rs:749:cmp-swap:0": (
+        "`== bn3::DUPLICATE_KEY` -> `!=`: provably redundant conjunct — "
+        "the sibling `zero > 0` pin guarantees NON-duplicate rows exist "
+        "(distinct class constants), so the != polarity's count is also "
+        "> 0 and the all-four-families assert is observation-identical."
     ),
-    "tests/court_verdict.rs:1379:int-bump-up:1": (
-        "FormulaRef-ban fixture body var `a12_var(1)` -> `a12_var(2)`: the "
-        "pinned law is the p-slot Sigil ban, which is var-agnostic; the "
-        "compile-refusal assert fires for any var pair, so the fixture's "
-        "variable identity is setup material with every pinned observation "
-        "identical."
+    "tests/court_verdict.rs:1271:int-bump-up:0": (
+        "Rule head `a12_var(0)` -> `a12_var(1)`: the pinned laws here are "
+        "var_count==3 (derived from the UNmutated body atoms) and the "
+        "rule_id==7 compile pin, both head-agnostic; head variable "
+        "identity is fixture setup material."
     ),
-    "tests/court_verdict.rs:1475:cmp-swap:0": (
-        "`op >= sp` -> `op > sp`: provably redundant conjunct — the second "
-        "conjunct `op - sp >= 2` implies strict inequality, so both "
-        "polarities are observation-identical whenever the assertion "
-        "evaluates at all. Logical implication, not corpus dependence."
+    # WEAK-GATE row (W3-R1): NOT proven equivalent. `ret-remove` on the
+    # seal_commit_parquet null-guard return survives because NO sampled
+    # observation exercises the null/empty-batch refusal path — the
+    # mutant is only observation-identical over the current sample. A
+    # pin for the null-batch INVALID_MAGIC overload (the row-1 penstock
+    # class named in the comment above the fn) would convert this to a
+    # kill. Registered fail-open under the register's own law so the
+    # drift stays visible, flagged here rather than passed silently.
+    "tests/court_verdict.rs:2286:ret-remove:0": (
+        "WEAK-GATE, not equivalence: removing the null-guard return is "
+        "only invisible because the current stride sample never calls "
+        "seal_commit_parquet with a null batch; the mutant would "
+        "diverge (UB path) under a null-batch pin, which the court "
+        "lacks. Registered to keep the gap loud."
     ),
-    "tests/court_verdict.rs:1666:int-bump-up:0": (
-        "Zero-alloc sweep template source `rows[7]` -> `rows[8]`: both rows "
-        "are non-degenerate, the template's only obligation is a valid "
-        "frame encoding, and the sweep's asserts (all 1M admitted, zero "
-        "allocs, per-row digest patching) are parametric in the template."
+    "tests/court_verdict.rs:1544:int-bump-up:0": (
+        "`prefilter: 0` -> `1` initializer: ingress MINTS the prefilter "
+        "on ADMIT and zeroes it on reject/no-view (penstock.rs struct "
+        "doc), so the initializer value is setup material — every "
+        "pinned observation overwrites it."
     ),
-    "tests/court_verdict.rs:2008:int-bump-up:0": (
-        "Mutation-witness fixture row `rows[0]` -> `rows[1]`: the pinned "
-        "law is value-independence of the identity detector (any payload "
-        "bit flip must flip the digest and Err), so the witness row's "
-        "identity is setup material; both rows flip the same byte offset."
+    "tests/court_verdict.rs:1768:int-bump-up:1": (
+        "Streaming-identity corpus modulus `251` -> `252`: the pinned "
+        "law is one-shot == byte-at-a-time SHA-256 self-equality, "
+        "content-agnostic; the byte-mix constant changes data bytes "
+        "only, never lengths or block-boundary structure."
+    ),
+    "tests/court_verdict.rs:2569:int-bump-down:0": (
+        "`SEAL_ROW_GROUPS - 1` -> `- 2`: the round-trip spot-check is a "
+        "redundant second observation — group 0 is independently "
+        "decode-pinned and every group is committed by the same "
+        "uniform writer path, so the tail index choice is setup "
+        "material for the pinned round-trip law."
+    ),
+    "tests/court_verdict.rs:2687:int-bump-up:0": (
+        "`digest_flipped[16]` -> `[17]`: the pinned law is any single "
+        "digest byte flip must refuse (sibling cases flip other "
+        "offsets); the offset is content-agnostic setup material."
+    ),
+    "tests/court_verdict.rs:3203:int-bump-up:0": (
+        "`digest_out: u64 = 0` -> `1` out-slot initializer: verify "
+        "overwrites the slot and the assert compares to expected_digest, "
+        "so the initial value never reaches a pinned observation."
     ),
 }
 
@@ -1089,8 +1117,12 @@ def covered_crate_dirs():
 
 def parse_runtime_deps(crate_dir):
     """Runtime-external count per §6.4/A07 method: a [dependencies] entry is
-    EXTERNAL iff it declares a registry `version`, a `git` source, or any
-    source other than path/workspace. Dev-dependencies are not runtime.
+    EXTERNAL iff it declares a `git` or `registry` source, a registry-only
+    `version` (no path), or a `path` that resolves OUTSIDE this repo. A
+    path+version dep resolving inside the repo is workspace-internal
+    (cargo's publish pattern; shipped reality: cgap-storage 26.11.1 /
+    cgap-p28 26.11.1 publish those deps as normal ^26.11.1 registry reqs
+    whose kernels are themselves zero-external). Dev-deps are not runtime.
     Returns (crate_name, external_deps, total_runtime_deps)."""
     manifest_path = os.path.join(REPO, crate_dir, "Cargo.toml")
     try:
@@ -1111,9 +1143,24 @@ def parse_runtime_deps(crate_dir):
             print("DEPS GATE: %s: dep %s: unparseable spec %r"
                   % (manifest_path, name, spec), file=sys.stderr)
             sys.exit(EXIT_REFUSE)
-        if "version" in spec or "git" in spec or "registry" in spec:
+        if "git" in spec or "registry" in spec:
             external.append(name)
-        elif "path" not in spec and "workspace" not in spec:
+        elif "path" in spec:
+            # Publish pattern: `{ path = "...", version = "x.y.z" }` is
+            # cargo's canonical way to ship a workspace-internal dep to
+            # crates.io (shipped reality: cgap-storage 26.11.1 and cgap-p28
+            # 26.11.1 publish cgap-blake3 / cgap-crypto as `^26.11.1`
+            # NORMAL registry reqs, and the published kernels themselves
+            # carry zero externals). EXTERNAL iff the path resolves OUTSIDE
+            # this repo; inside-repo paths are workspace-internal.
+            resolved = os.path.realpath(
+                os.path.join(REPO, crate_dir, spec["path"]))
+            if not resolved.startswith(os.path.realpath(REPO) + os.sep):
+                external.append(name)
+        elif "version" in spec:
+            # Registry-only version req: EXTERNAL.
+            external.append(name)
+        elif "workspace" not in spec:
             # No source at all: cargo would treat it as registry — external.
             external.append(name)
     name = manifest.get("package", {}).get("name", os.path.basename(crate_dir))

@@ -155,6 +155,9 @@ pub struct NaEngine {
     nxt_len: usize,
     /// Per-variable bound flags for the current atom expansion.
     bound: [bool; NA_MAX_VARS],
+    /// L3 radix probe table: bucketed store-row indices (fixed
+    /// capacity [`NA_MAX_ROWS`], never grown).
+    radix_rows: [u32; NA_MAX_ROWS],
 }
 
 impl NaEngine {
@@ -168,6 +171,7 @@ impl NaEngine {
             nxt_vars: [[0; NA_MAX_VARS]; NA_MAX_MATCHES],
             nxt_len: 0,
             bound: [false; NA_MAX_VARS],
+            radix_rows: [0; NA_MAX_ROWS],
         }
     }
 }
@@ -384,19 +388,68 @@ pub fn na_unify(
     engine: &mut NaEngine,
     out: &mut NaMatches,
 ) -> Result<(), NaError> {
+    na_unify_inner(rule, cols, engine, out, false)
+}
+
+/// Store-row capacity of the radix probe tables (fixed, never grown):
+/// a store wider than this refuses LOUDLY with
+/// [`NaError::MatchCapacity`] — never a silent truncation.
+pub const NA_MAX_ROWS: usize = 8192;
+
+/// Low-4-payload-bit bucket of a key word (mirror of
+/// `crate::unify::radix_bucket`; the ALLOC arm is the semantics
+/// authority).
+fn na_radix_bucket(word: u64) -> usize {
+    ((word & crate::sigil::PAYLOAD_MASK) & 0xF) as usize
+}
+
+/// [`na_unify`] with the L3 radix semi-join probe (W3-L3 noalloc
+/// mirror of `crate::unify::unify_batch_probe` with `radix: true`).
+/// Fixed-capacity radix tables live in the [`NaEngine`]; a store wider
+/// than [`NA_MAX_ROWS`] refuses with [`NaError::MatchCapacity`] before
+/// any table is written.
+///
+/// Match order is identical to [`na_unify`]: per match, the bucket's
+/// rows are visited in ascending row order (stable bucket partition),
+/// so the differential courts pin match-for-match identity against the
+/// alloc arm.
+pub fn na_unify_radix(
+    rule: &NaRule,
+    cols: &StatementColumns<'_>,
+    engine: &mut NaEngine,
+    out: &mut NaMatches,
+) -> Result<(), NaError> {
+    if cols.len() > NA_MAX_ROWS {
+        return Err(NaError::MatchCapacity);
+    }
+    na_unify_inner(rule, cols, engine, out, true)
+}
+
+/// Shared body of [`na_unify`] / [`na_unify_radix`]: the nested-loop
+/// arm (`radix == false`) is the pre-L3 micro-architecture; the radix
+/// arm buckets the store rows by the low 4 payload bits of the first
+/// bound slot's word once per join atom, then each match probes only
+/// its own bucket (superset filter; inner probe compares full words).
+fn na_unify_inner(
+    rule: &NaRule,
+    cols: &StatementColumns<'_>,
+    engine: &mut NaEngine,
+    out: &mut NaMatches,
+    radix: bool,
+) -> Result<(), NaError> {
     if rule.atom_count == 0 {
         return Err(NaError::EmptyRuleBody);
     }
     engine.cur_len = 0;
     engine.nxt_len = 0;
     out.len = 0;
-    // Variable bound-flags: an earlier atom binds it for every match.
     engine.bound = [false; NA_MAX_VARS];
 
     let mut fresh = [(0u8, 0u64); 3];
     let mut n_fresh = 0usize;
 
-    // Atom 0: scan the store; nothing is bound yet.
+    // Atom 0: scan the store; nothing is bound yet (identical to the
+    // nested arm — the radix probe only re-shapes the join loop).
     for i in 0..cols.len() {
         if atom_local_match(
             rule,
@@ -408,30 +461,16 @@ pub fn na_unify(
             &mut n_fresh,
         ) {
             push_match(
-                &mut engine.cur_rows,
-                &mut engine.cur_vars,
-                &mut engine.cur_len,
-                // Atom 0 has no parent; nxt is quiescent here and serves
-                // as the (unused) parent borrow target.
-                &engine.nxt_rows,
-                &engine.nxt_vars,
-                rule.atom_count,
-                rule.var_count,
-                usize::MAX,
-                i as u32,
-                usize::MAX,
-                &fresh,
-                n_fresh,
+                &mut engine.cur_rows, &mut engine.cur_vars, &mut engine.cur_len,
+                &engine.nxt_rows, &engine.nxt_vars,
+                rule.atom_count, rule.var_count, usize::MAX,
+                i as u32, usize::MAX, &fresh, n_fresh,
             )?;
         }
     }
 
-    // Atoms 1..: nested-loop join. Candidates from the full store; the
-    // bound-slot probe compares the match's bound VALUE (never the
-    // register number — the alias-comparator sandbox flip names this).
+    // Atoms 1..: join loop (nested or radix by `radix`).
     for ai in 1..rule.atom_count {
-        // Variables bound by atoms BEFORE this one probe the join;
-        // variables first bound here are fresh for every match.
         for idx in 0..rule.var_count {
             let (fa, _) = rule.var_first[idx];
             engine.bound[idx] = (fa as usize) < ai;
@@ -447,51 +486,84 @@ pub fn na_unify(
             }
         }
         engine.nxt_len = 0;
-        for m in 0..engine.cur_len {
+        if radix && bound_slots_n > 0 {
+            // L3 radix arm: bucket ALL store rows once per join atom.
+            let key_slot = bound_slots[0].0 as usize;
+            let key_col = col(cols, key_slot);
+            let mut counts = [0u32; 16];
             for j in 0..cols.len() {
-                if !atom_local_match(
-                    rule,
-                    &rule.atoms[ai],
-                    cols,
-                    j,
-                    &engine.bound,
-                    &mut fresh,
-                    &mut n_fresh,
-                ) {
-                    continue;
+                counts[na_radix_bucket(key_col[j])] += 1;
+            }
+            let mut starts = [0u32; 16];
+            let mut off = 0u32;
+            for b in 0..16 {
+                starts[b] = off;
+                off += counts[b];
+            }
+            let mut fill = starts;
+            for j in 0..cols.len() {
+                let b = na_radix_bucket(key_col[j]);
+                engine.radix_rows[fill[b] as usize] = j as u32;
+                fill[b] += 1;
+            }
+            // Probe: per match, scan only the match's key bucket.
+            for m in 0..engine.cur_len {
+                let kv = engine.cur_vars[m][bound_slots[0].1 as usize];
+                let b = na_radix_bucket(kv);
+                for k in starts[b]..fill[b] {
+                    let j = engine.radix_rows[k as usize] as usize;
+                    if !atom_local_match(
+                        rule, &rule.atoms[ai], cols, j,
+                        &engine.bound, &mut fresh, &mut n_fresh,
+                    ) {
+                        continue;
+                    }
+                    let mut ok = MASK_ALL;
+                    for &(si, vidx) in &bound_slots[..bound_slots_n] {
+                        ok &= lane_eq_mask(col(cols, si as usize)[j], engine.cur_vars[m][vidx as usize]);
+                    }
+                    if ok != MASK_ALL {
+                        continue;
+                    }
+                    push_match(
+                        &mut engine.nxt_rows, &mut engine.nxt_vars, &mut engine.nxt_len,
+                        &engine.cur_rows, &engine.cur_vars,
+                        rule.atom_count, rule.var_count, m,
+                        j as u32, ai, &fresh, n_fresh,
+                    )?;
                 }
-                let mut ok = MASK_ALL;
-                for &(si, vidx) in &bound_slots[..bound_slots_n] {
-                    ok &= lane_eq_mask(col(cols, si as usize)[j], engine.cur_vars[m][vidx as usize]);
+            }
+        } else {
+            for m in 0..engine.cur_len {
+                for j in 0..cols.len() {
+                    if !atom_local_match(
+                        rule, &rule.atoms[ai], cols, j,
+                        &engine.bound, &mut fresh, &mut n_fresh,
+                    ) {
+                        continue;
+                    }
+                    let mut ok = MASK_ALL;
+                    for &(si, vidx) in &bound_slots[..bound_slots_n] {
+                        ok &= lane_eq_mask(col(cols, si as usize)[j], engine.cur_vars[m][vidx as usize]);
+                    }
+                    if ok != MASK_ALL {
+                        continue;
+                    }
+                    push_match(
+                        &mut engine.nxt_rows, &mut engine.nxt_vars, &mut engine.nxt_len,                        &engine.cur_rows, &engine.cur_vars,
+                        rule.atom_count, rule.var_count, m,
+                        j as u32, ai, &fresh, n_fresh,
+                    )?;
                 }
-                if ok != MASK_ALL {
-                    continue;
-                }
-                push_match(
-                    &mut engine.nxt_rows,
-                    &mut engine.nxt_vars,
-                    &mut engine.nxt_len,
-                    &engine.cur_rows,
-                    &engine.cur_vars,
-                    rule.atom_count,
-                    rule.var_count,
-                    m,
-                    j as u32,
-                    ai,
-                    &fresh,
-                    n_fresh,
-                )?;
             }
         }
-        // Swap without touching the allocator (fixed buffers).
         core::mem::swap(&mut engine.cur_rows, &mut engine.nxt_rows);
         core::mem::swap(&mut engine.cur_vars, &mut engine.nxt_vars);
         engine.cur_len = engine.nxt_len;
     }
 
-    // Row-wise drain into the caller's output buffer (a whole-array
-    // assignment here materializes ~1 MiB debug-frame temporaries and
-    // overflows the 2 MiB test-thread stack — witnessed this session).
+    // Row-wise drain into the caller's output buffer (see na_unify's
+    // note on debug-frame temporaries and the 2 MiB test stack).
     for k in 0..NA_MAX_MATCHES {
         out.rows[k] = engine.cur_rows[k];
     }
@@ -501,7 +573,6 @@ pub fn na_unify(
     out.len = engine.cur_len;
     Ok(())
 }
-
 #[cfg(test)]
 mod courts {
     use super::*;

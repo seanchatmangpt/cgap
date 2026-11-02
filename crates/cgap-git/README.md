@@ -9,15 +9,17 @@ binding, and any one-byte mutation moves the encoded root address.
 
 ## Status
 
-PUBLISHED-26.11.1 — on crates.io (see
-`docs/jira/v26.11.1/waves/p3-api-verify-all.md`: all five kernel crates
-PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
-26.11.1 absent before the publish legs landed).
+WORKING-26.11.2 — kernel source at workspace version
+26.11.2 (publish law: one attempt per crate, sequenced; prior
+PUBLISHED-26.11.1 record archived under readme-archive/). Census: see
+`docs/jira/v26.11.2/waves/crate-reality/cgap-git.md`: full suite
+exit 0 this session at 26.11.2.
 
 ## Evidence (cited receipts)
 
-- Suite 88/0: `cargo test -p cgap-git` exit 0
-  (`waves/a03-finish-receipt.md`).
+- Suite 89/0 (61 inline + 28 integration, 2 loud ignored): `cargo test
+  -p cgap-git` exit 0 —
+  `docs/jira/v26.11.2/waves/crate-reality/cgap-git.md`.
 - Three mutation flips, all targeting real courts, sha256 byte-exact
   restores (`waves/a03-finish-receipt.md`): SHIM-OFFSET (d9 flipped + 3
   wire-leg collateral, 56/60), SHIM-STABILITY (d1 flipped, 56/60),
@@ -28,11 +30,11 @@ PASS at max_version 26.11.1, yanked=false; earlier f3-15 sweeps documented
 ## Install
 
 ```bash
-cargo add cgap-git@26.11.1
+cargo add cgap-git@26.11.2
 ```
 
 ## Lane receipt
 
-`docs/jira/v26.11.1/waves/a03-finish-receipt.md` (lane A03) and
-`waves/a03-wave5-audit-receipt.md`; registry witness
-`waves/p3-api-verify-all.md`.
+`docs/jira/v26.11.2/waves/crate-reality/cgap-git.md` (26.11.2 census);
+historical: `docs/jira/v26.11.1/waves/a03-finish-receipt.md`,
+`waves/a03-wave5-audit-receipt.md`, `waves/p3-api-verify-all.md`.

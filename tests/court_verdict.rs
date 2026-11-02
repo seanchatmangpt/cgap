@@ -1539,7 +1539,11 @@ fn a14_dam_ingress_court() {
     assert_eq!(frame.len(), FRAME_HEADER_LEN + payload.len());
 
     // Admit: exact status, zero-copy payload view into the caller's bytes.
-    let mut view = FrameView { payload: &[] };
+    let mut view = FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
     let status = ingress(&frame, frame.len(), Some(&mut view));
     assert_eq!(status, CGAP_OK, "structurally valid frame must admit");
     assert_eq!(view.payload, &payload[..], "view points into the frame");
@@ -1645,7 +1649,11 @@ fn a14_dam_ingress_court() {
     for payload_len in [0usize, 1024, 1 << 20] {
         let p = vec![0xA5u8; payload_len];
         let f = valid_frame(&p);
-        let mut v = FrameView { payload: &[] };
+        let mut v = FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
         assert_eq!(ingress(&f, f.len(), Some(&mut v)), CGAP_OK);
         assert_eq!(v.payload.len(), payload_len);
     }
@@ -1673,7 +1681,11 @@ fn a14_dam_ingress_court() {
             sweep_frame[16..24].copy_from_slice(&row.notional.to_le_bytes());
             sweep_frame[24..32].copy_from_slice(&row.instrument_id.to_le_bytes());
             sweep_frame[FRAME_HEADER_LEN..].copy_from_slice(&row_enc);
-            let mut view = FrameView { payload: &[] };
+            let mut view = FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
             if ingress(&sweep_frame, sweep_frame.len(), Some(&mut view)) == CGAP_OK
                 && view.payload.len() == ROW_ENCODING_BYTES
             {

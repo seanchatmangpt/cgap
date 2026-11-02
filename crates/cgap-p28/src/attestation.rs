@@ -127,7 +127,7 @@ impl core::fmt::Display for Spoliation {
     }
 }
 
-impl std::error::Error for Spoliation {}
+impl core::error::Error for Spoliation {}
 
 impl P28LicenseAttestation {
     /// §2.1 wire serialization — little-endian per the frozen offset table,
@@ -458,6 +458,7 @@ fn leb_u32(bytes: &[u8], pos: usize) -> Option<(u32, usize)> {
 /// real bytes on disk) is used in preference to fixtures (Chicago).
 #[cfg(test)]
 pub(crate) mod test_support {
+    use std::{string::{String, ToString}, vec::Vec};
     use std::path::Path;
 
     /// Canonical instrument bytes, read from the real pinned file on disk.
@@ -739,6 +740,7 @@ for i in range(sn):
 
 #[cfg(test)]
 mod tests {
+    use std::{string::String, vec::Vec};
     use super::test_support::*;
     use super::*;
     use std::process::Command;

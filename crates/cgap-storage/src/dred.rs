@@ -77,7 +77,11 @@ pub fn keep_mask(
         // compaction emits exactly the real surviving set.
         let lo = w * 64;
         if lo + 64 > facts {
-            let valid = if facts >= lo { (1u64 << (facts - lo)) - 1 } else { 0 };
+            let valid = if facts >= lo {
+                (1u64 << (facts - lo)) - 1
+            } else {
+                0
+            };
             k &= valid;
         }
         keep[w] = k;
@@ -142,7 +146,45 @@ pub fn retract_unchecked(
         let mut k = !(derived_deps[w] & del_mask[w]);
         let lo = w * 64;
         if lo + 64 > facts {
-            let valid = if facts >= lo { (1u64 << (facts - lo)) - 1 } else { 0 };
+            let valid = if facts >= lo {
+                (1u64 << (facts - lo)) - 1
+            } else {
+                0
+            };
+            k &= valid;
+        }
+        scratch[w] = k;
+    }
+    compact_lanes(scratch, base, out)
+}
+
+/// MUTANT (court-only, doc-hidden): anti-vacuity witness (b). Identical to
+/// [`retract`] except the negative keep bitmask's polarity is INVERTED
+/// (`k = !suspect` instead of `k = !suspect | alt != 0`), dropping the
+/// alt term AND flipping: on an all-suspect corpus the surviving set goes
+/// EMPTY (every fact wrongly purged) — the oracle set-equality fires.
+#[doc(hidden)]
+pub fn retract_inverted(
+    derived_deps: &[u64],
+    del_mask: &[u64],
+    alt_support: &[u32],
+    facts: usize,
+    scratch: &mut [u64],
+    base: u32,
+    out: &mut [u32],
+) -> u32 {
+    let _ = alt_support; // the flipped term: inverted mask ignores alt
+    let words = derived_deps.len();
+    for w in 0..words {
+        let s = derived_deps[w] & del_mask[w];
+        let mut k = !s; // the flip: polarity inverted, no alt rescue
+        let lo = w * 64;
+        if lo + 64 > facts {
+            let valid = if facts >= lo {
+                (1u64 << (facts - lo)) - 1
+            } else {
+                0
+            };
             k &= valid;
         }
         scratch[w] = k;
@@ -250,10 +292,61 @@ mod courts {
         let mut out_m = [0u32; 65];
         let g = retract(&d, &x, &a, 2, &mut scratch, 0, &mut out_g);
         let m = retract_unchecked(&d, &x, &a, 2, &mut scratch, 0, &mut out_m);
-        assert_eq!(&out_g[..g as usize], &[0u32][..], "guarded: alt-derived fact survives");
+        assert_eq!(
+            &out_g[..g as usize],
+            &[0u32][..],
+            "guarded: alt-derived fact survives"
+        );
         // Flip witness: WITHOUT the check BOTH deleted+derived facts purge
         // (the alt-supported one is the wrongly-purged collateral).
-        assert_eq!(&out_m[..m as usize], &[] as &[u32], "mutant: alt fact wrongly purged");
+        assert_eq!(
+            &out_m[..m as usize],
+            &[] as &[u32],
+            "mutant: alt fact wrongly purged"
+        );
+    }
+
+    /// COURT 2b (anti-vacuity flip, mutation (b)): INVERTING the negative
+    /// keep bitmask (`k = suspect` instead of `k = !suspect | alt`) purges
+    /// ALL facts when every fact is suspect — the oracle set-equality
+    /// assert fires. A court that cannot distinguish guarded from inverted
+    /// is FAIL.
+    #[test]
+    fn court_antivacuity_inverted_bitmask() {
+        // All 3 facts derived+deleted, two carry alt proofs: guarded keeps
+        // the alt-supported pair; inverted purges ALL 3 (flip witness).
+        let d = [0b0111u64];
+        let x = [0b0111u64];
+        let a = [0u32, 4, 2];
+        let mut scratch = [0u64; 1];
+        let mut out_g = [0u32; 65];
+        let mut out_m = [0u32; 65];
+        let g = retract(&d, &x, &a, 3, &mut scratch, 0, &mut out_g);
+        let m = retract_inverted(&d, &x, &a, 3, &mut scratch, 0, &mut out_m);
+        assert_eq!(
+            &out_g[..g as usize],
+            &[1u32, 2][..],
+            "guarded: alt facts survive"
+        );
+        assert_eq!(&out_m[..m as usize], &[] as &[u32], "inverted: ALL purged");
+        // Corpus-level: inversion must break oracle set-equality.
+        for facts in [64usize, 1000, 4096] {
+            let (d, x, a) = corpus(facts, 100, CORPUS_SEED ^ (facts as u64));
+            let m = run_retract_mutant_b(&d, &x, &a, facts);
+            assert_ne!(
+                m,
+                oracle_surviving(&d, &x, &a, facts),
+                "inverted mask matched oracle at facts {facts}: court VACUOUS"
+            );
+        }
+    }
+
+    fn run_retract_mutant_b(derived: &[u64], del: &[u64], alt: &[u32], facts: usize) -> Vec<u32> {
+        let words = derived.len();
+        let mut scratch = vec![0u64; words];
+        let mut out = vec![0u32; words * 64 + 1];
+        let n = retract_inverted(derived, del, alt, facts, &mut scratch, 0, &mut out);
+        out[..n as usize].to_vec()
     }
 
     /// COURT 3 (entropy-flatness measurement, PARETO table source): ns per

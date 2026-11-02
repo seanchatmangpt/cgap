@@ -21,12 +21,12 @@
 
 use cgap_bn3::arena::Slab;
 use cgap_bn3::project::{ConsequentProjector, DeltaRows};
-use cgap_bn3::sigil::{encode_term, BN3_STATEMENT_SIZE, BN3Statement, PAYLOAD_MASK, Sigil};
+use cgap_bn3::sigil::{encode_term, BN3Statement, Sigil, BN3_STATEMENT_SIZE, PAYLOAD_MASK};
 use cgap_bn3::unify::{
-    unify_batch_into, BodyAtom, CompiledRule, DEFAULT_CHUNK_ROWS, EvalScratch, MatchSet, Rule,
-    RuleCompiler, StatementColumns,
+    unify_batch_into, unify_batch_probe, BodyAtom, CompiledRule, EvalScratch, JoinProbeScratch,
+    MatchSet, Rule, RuleCompiler, StatementColumns, DEFAULT_CHUNK_ROWS,
 };
-use divan::counter::BytesCount;
+use divan::counter::{BytesCount, ItemsCount};
 use divan::{black_box, Bencher};
 
 /// Canonical corpus seed (charter Method discipline, verbatim).
@@ -189,12 +189,21 @@ fn build_corpus(n: usize) -> ChainCorpus {
         expected_sel > 0 && expected_join > 0,
         "oracle empty at N={n}: bench would be vacuous"
     );
-    assert!(pairs > 0, "pair count empty at N={n}: bench would be vacuous");
+    assert!(
+        pairs > 0,
+        "pair count empty at N={n}: bench would be vacuous"
+    );
     eprintln!(
         "[chains-bn3] corpus N={n} parents={a_rows} cands={b_rows} pairs={pairs} \
          expected_sel={expected_sel} expected_join={expected_join}"
     );
-    ChainCorpus { n, slab, rules: rule_set(), expected_sel, expected_join }
+    ChainCorpus {
+        n,
+        slab,
+        rules: rule_set(),
+        expected_sel,
+        expected_join,
+    }
 }
 
 /// Warm workspace: the production zero-alloc hot-path shape — columns,
@@ -207,6 +216,7 @@ struct Workspace {
     col_p: Vec<u64>,
     col_o: Vec<u64>,
     scratch: EvalScratch,
+    probe: JoinProbeScratch,
     out_sel: MatchSet,
     out_join: MatchSet,
     rows_sel: DeltaRows,
@@ -223,6 +233,7 @@ impl Workspace {
             col_p: Vec::with_capacity(corpus.n),
             col_o: Vec::with_capacity(corpus.n),
             scratch: EvalScratch::default(),
+            probe: JoinProbeScratch::default(),
             out_sel: MatchSet::default(),
             out_join: MatchSet::default(),
             rows_sel: DeltaRows::default(),
@@ -257,7 +268,10 @@ fn scan_stage(corpus: &ChainCorpus, ws: &mut Workspace) -> usize {
         ws.col_o.push(st.o);
         count += 1;
     }
-    assert_eq!(count, corpus.n, "scan closure count (skipped-row mutation flips this)");
+    assert_eq!(
+        count, corpus.n,
+        "scan closure count (skipped-row mutation flips this)"
+    );
     count
 }
 
@@ -278,17 +292,38 @@ fn compile_stage(corpus: &ChainCorpus) -> (CompiledRule, CompiledRule) {
 /// (warm scratch + match sets). Mutation classes: the binding-alias
 /// comparator (doe-4 SHIM-DOE4 class) or a skipped join probe diverge
 /// from the raw-word oracle and flip the count asserts.
-fn unify_stage(corpus: &ChainCorpus, ws: &mut Workspace, c_sel: &CompiledRule, c_join: &CompiledRule) {
+fn unify_stage(
+    corpus: &ChainCorpus,
+    ws: &mut Workspace,
+    c_sel: &CompiledRule,
+    c_join: &CompiledRule,
+) {
     let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
-    assert_eq!(cols.len(), corpus.n, "scanned column width (stale-scan mutation flips this)");
-    unify_batch_into(c_sel, &cols, DEFAULT_CHUNK_ROWS, &mut ws.scratch, &mut ws.out_sel)
-        .expect("unify selector");
+    assert_eq!(
+        cols.len(),
+        corpus.n,
+        "scanned column width (stale-scan mutation flips this)"
+    );
+    unify_batch_into(
+        c_sel,
+        &cols,
+        DEFAULT_CHUNK_ROWS,
+        &mut ws.scratch,
+        &mut ws.out_sel,
+    )
+    .expect("unify selector");
     assert_eq!(
         ws.out_sel.len, corpus.expected_sel,
         "selector match count vs raw-word oracle"
     );
-    unify_batch_into(c_join, &cols, DEFAULT_CHUNK_ROWS, &mut ws.scratch, &mut ws.out_join)
-        .expect("unify join");
+    unify_batch_into(
+        c_join,
+        &cols,
+        DEFAULT_CHUNK_ROWS,
+        &mut ws.scratch,
+        &mut ws.out_join,
+    )
+    .expect("unify join");
     assert_eq!(
         ws.out_join.len, corpus.expected_join,
         "join match count vs raw-word oracle"
@@ -327,17 +362,43 @@ fn project_stage(
 ) -> (u64, u64) {
     let (d_sel, pop_sel) = ws
         .projector
-        .emit_into(c_sel, CHAIN_EPOCH, &ws.out_sel, &mut ws.rows_sel, &mut ws.canon_sel)
+        .emit_into(
+            c_sel,
+            CHAIN_EPOCH,
+            &ws.out_sel,
+            &mut ws.rows_sel,
+            &mut ws.canon_sel,
+        )
         .expect("project selector");
-    assert_eq!(ws.rows_sel.len(), corpus.expected_sel, "projected selector rows == matches");
-    assert_eq!(pop_sel as usize, corpus.expected_sel, "M12-7 popcount (selector)");
+    assert_eq!(
+        ws.rows_sel.len(),
+        corpus.expected_sel,
+        "projected selector rows == matches"
+    );
+    assert_eq!(
+        pop_sel as usize, corpus.expected_sel,
+        "M12-7 popcount (selector)"
+    );
     let ck_sel = digest_fold(&d_sel);
     let (d_join, pop_join) = ws
         .projector
-        .emit_into(c_join, CHAIN_EPOCH, &ws.out_join, &mut ws.rows_join, &mut ws.canon_join)
+        .emit_into(
+            c_join,
+            CHAIN_EPOCH,
+            &ws.out_join,
+            &mut ws.rows_join,
+            &mut ws.canon_join,
+        )
         .expect("project join");
-    assert_eq!(ws.rows_join.len(), corpus.expected_join, "projected join rows == matches");
-    assert_eq!(pop_join as usize, corpus.expected_join, "M12-7 popcount (join)");
+    assert_eq!(
+        ws.rows_join.len(),
+        corpus.expected_join,
+        "projected join rows == matches"
+    );
+    assert_eq!(
+        pop_join as usize, corpus.expected_join,
+        "M12-7 popcount (join)"
+    );
     let ck_join = digest_fold(&d_join);
     black_box((ck_sel, ck_join))
 }
@@ -368,8 +429,14 @@ fn deduction_chain<const N: usize>(b: Bencher) {
         let (c_sel, c_join) = compile_stage(&corpus);
         unify_stage(&corpus, &mut ws, &c_sel, &c_join);
         let (ck2_sel, ck2_join) = project_stage(&corpus, &mut ws, &c_sel, &c_join);
-        assert_eq!(ck2_sel, ck_sel, "selector digest checksum drifted (determinism)");
-        assert_eq!(ck2_join, ck_join, "join digest checksum drifted (determinism)");
+        assert_eq!(
+            ck2_sel, ck_sel,
+            "selector digest checksum drifted (determinism)"
+        );
+        assert_eq!(
+            ck2_join, ck_join,
+            "join digest checksum drifted (determinism)"
+        );
         black_box((
             ws.out_sel.len,
             ws.out_join.len,
@@ -399,20 +466,56 @@ fn stage_compile_rules<const N: usize>(b: Bencher) {
     let corpus = build_corpus(N);
     b.bench_local(|| {
         let (c_sel, c_join) = compile_stage(&corpus);
-        black_box((c_sel.rule_id, c_join.rule_id, c_sel.var_count, c_join.var_count));
+        black_box((
+            c_sel.rule_id,
+            c_join.rule_id,
+            c_sel.var_count,
+            c_join.var_count,
+        ));
     });
 }
 
 /// Stage probe — UNIFY only (compile is setup; columns from the prewarm
-/// scan). Mutation class: binding-alias comparator / skipped join probe
-/// -> raw-word oracle asserts flip.
+/// scan). This is the M-L3-1 BASELINE leg: the pre-L3 nested-loop join
+/// probe (`radix: false`, per-chunk candidate rebuild — the
+/// micro-architecture the L3 lever replaces). Mutation class:
+/// binding-alias comparator / skipped join probe -> raw-word oracle
+/// asserts flip.
 #[divan::bench(consts = [65_536, 1_048_576])]
 fn stage_unify_join<const N: usize>(b: Bencher) {
     let corpus = build_corpus(N);
     let mut ws = Workspace::new(&corpus);
     let (c_sel, c_join) = compile_stage(&corpus);
+    // M-L3-1 baseline: the retired nested-loop probe, leased warm.
+    let mut probe_nested = JoinProbeScratch {
+        radix: false,
+        ..Default::default()
+    };
     b.bench_local(|| {
-        unify_stage(&corpus, &mut ws, &c_sel, &c_join);
+        let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
+        unify_batch_probe(
+            &c_sel,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_sel,
+            &mut probe_nested,
+        )
+        .expect("unify selector (nested)");
+        assert_eq!(ws.out_sel.len, corpus.expected_sel, "selector oracle count");
+        unify_batch_probe(
+            &c_join,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_join,
+            &mut probe_nested,
+        )
+        .expect("unify join (nested)");
+        assert_eq!(
+            ws.out_join.len, corpus.expected_join,
+            "join oracle count (nested)"
+        );
         black_box((ws.out_sel.len, ws.out_join.len));
     });
 }
@@ -428,6 +531,302 @@ fn stage_project_consequents<const N: usize>(b: Bencher) {
     b.bench_local(|| {
         let (ck_sel, ck_join) = project_stage(&corpus, &mut ws, &c_sel, &c_join);
         black_box((ck_sel, ck_join));
+    });
+}
+
+/// Stage probe — UNIFY with the L3 radix semi-join probe (warm leased
+/// [`JoinProbeScratch`]). Mutation class (M-L3-1): dropping the radix
+/// probe (reverting the join to the full-candidate nested loop) moves
+/// this stage's ns by the probe share — the >=10x gate vs
+/// `stage_unify_join`. The oracle-count asserts ride along, so the
+/// alias comparator (M-L3-2) flips them too.
+#[divan::bench(consts = [65_536, 1_048_576])]
+fn stage_unify_join_radix<const N: usize>(b: Bencher) {
+    let corpus = build_corpus(N);
+    let mut ws = Workspace::new(&corpus);
+    let (c_sel, c_join) = compile_stage(&corpus);
+    b.bench_local(|| {
+        let cols = StatementColumns::new(&ws.col_s, &ws.col_p, &ws.col_o).expect("columns");
+        unify_batch_probe(
+            &c_sel,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_sel,
+            &mut ws.probe,
+        )
+        .expect("unify selector (radix)");
+        assert_eq!(ws.out_sel.len, corpus.expected_sel, "selector oracle count");
+        unify_batch_probe(
+            &c_join,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut ws.scratch,
+            &mut ws.out_join,
+            &mut ws.probe,
+        )
+        .expect("unify join (radix)");
+        assert_eq!(
+            ws.out_join.len, corpus.expected_join,
+            "join oracle count (radix)"
+        );
+        black_box((ws.out_sel.len, ws.out_join.len));
+    });
+}
+
+/// ---- W4-D8: recursive-closure leg (MW4 workload bridge) ----
+///
+/// Transitive-closure pattern over the unify API: chain corpus, one
+/// recursive rule `edge(?x ?y) & edge(?y ?z) -> edge(?x ?z)`, iterated
+/// unify+project+materialize passes to fixpoint, derived pairs counted.
+/// This is the bridge between cgap-bn3's statement-scan class and
+/// stardf-datalog's materialization class — the MW4 comparison's second
+/// measured point. Differential court: fixpoint derived-set equality vs
+/// a naive iterative oracle at N=65536 (setup assert, not timed).
+/// Anti-vacuity mutation class: dropping a closure iteration bound
+/// (CL_MAX_PASSES -> 1 in a /tmp sandbox) exits before fixpoint and the
+/// derived-count assert fires.
+///
+/// SEED LAW: corpus rides [`CANONICAL_SEED`] (0xBF58_476D_1CE4_E5B9)
+/// only; the corpus constant 0xA20C... is deliberately absent here.
+
+/// Edge predicate payload for the closure corpus (distinct from PA/B/C).
+const CL_EDGE_PAYLOAD: u64 = 0xED9;
+
+/// Chain length per chain; chains = N / CL_CHAIN_LEN. A chain of length
+/// L closes to L*(L-1)/2 derived pairs, so the closure is closed-form:
+/// at L=8, derived = 3.5N (fits a pre-sized fixed slab exactly).
+const CL_CHAIN_LEN: usize = 8;
+
+/// Closure pass bound (fixpoint needs CL_CHAIN_LEN - 1 = 7 passes).
+/// Mutation class above: 1 leaves the fixpoint unreachable.
+const CL_MAX_PASSES: usize = 64;
+
+/// Naive iterative oracle (pure std, zero cgap-bn3 code): relational
+/// join loop to fixpoint over the known edge set. Differential check —
+/// shares no code with the unify path.
+fn closure_oracle(seed: &[(u64, u64)]) -> std::collections::HashSet<(u64, u64)> {
+    let mut known: std::collections::HashSet<(u64, u64)> = seed.iter().copied().collect();
+    loop {
+        let mut new = Vec::new();
+        let snapshot: Vec<(u64, u64)> = known.iter().copied().collect();
+        for &(a, b) in &snapshot {
+            for &(c, d) in &snapshot {
+                if c == b && known.insert((a, d)) {
+                    new.push((a, d));
+                }
+            }
+        }
+        if new.is_empty() {
+            return known;
+        }
+    }
+}
+
+/// Closure corpus: seed chain edges + the recursive rule + the oracle
+/// expectation, all setup-computed.
+struct ClosureCorpus {
+    /// Seed facts only (the pre-closure state, never mutated).
+    seed_slab: Slab,
+    /// Fixed total capacity: seed + expected derived (closed-form closure).
+    cap: usize,
+    compiled: CompiledRule,
+    expected_seed: usize,
+    expected_derived: usize,
+}
+
+fn build_closure_corpus(n: usize) -> ClosureCorpus {
+    let chains = n / CL_CHAIN_LEN;
+    assert!(chains > 0, "N too small for one chain");
+    let edge = const_word(CL_EDGE_PAYLOAD);
+    let per_chain = CL_CHAIN_LEN * (CL_CHAIN_LEN - 1) / 2;
+    let expected_derived = chains * per_chain;
+    let cap = n + expected_derived;
+    let mut slab = Slab::fixed(cap as u64).expect("closure slab fixed");
+    for i in 0..n {
+        let s = const_word(i as u64);
+        let o = const_word(i as u64 + 1);
+        slab.push(BN3Statement::from_words(s, edge, o))
+            .expect("seed push");
+    }
+    let rule = Rule {
+        rule_id: 0xC0DE_0003,
+        body: vec![
+            BodyAtom::new(var_word(0), edge, var_word(1)),
+            BodyAtom::new(var_word(1), edge, var_word(2)),
+        ],
+        head: [var_word(0), edge, var_word(2)],
+    };
+    let compiled = RuleCompiler::compile(&rule).expect("closure rule compiles");
+    assert_eq!(compiled.atoms.len(), 2, "closure body has two atoms");
+    assert_eq!(compiled.var_count, 3, "closure binds three variables");
+    ClosureCorpus {
+        seed_slab: slab,
+        cap,
+        compiled,
+        expected_seed: n,
+        expected_derived,
+    }
+}
+
+/// Warm closure workspace: columns + scratch + match set + delta rows +
+/// canon buffer, reused across passes and iterations (zero-alloc hot path).
+struct ClosureWs {
+    col_s: Vec<u64>,
+    col_p: Vec<u64>,
+    col_o: Vec<u64>,
+    scratch: EvalScratch,
+    out: MatchSet,
+    rows: DeltaRows,
+    canon: Vec<u8>,
+    projector: ConsequentProjector,
+    /// Dedup set over (s, o) of known facts (p is constant).
+    known: std::collections::HashSet<(u64, u64)>,
+    /// Work slab rebuilt from the seed slab each iteration.
+    work: Slab,
+}
+
+impl ClosureWs {
+    fn new(corpus: &ClosureCorpus) -> Self {
+        ClosureWs {
+            col_s: Vec::with_capacity(corpus.cap),
+            col_p: Vec::with_capacity(corpus.cap),
+            col_o: Vec::with_capacity(corpus.cap),
+            scratch: EvalScratch::default(),
+            out: MatchSet::default(),
+            rows: DeltaRows::default(),
+            canon: Vec::new(),
+            projector: ConsequentProjector::new(),
+            known: std::collections::HashSet::new(),
+            work: Slab::fixed(corpus.cap as u64).expect("work slab"),
+        }
+    }
+
+    /// Reset to the pre-closure seed state (per timed iteration).
+    fn reset(&mut self, corpus: &ClosureCorpus) {
+        self.work = Slab::fixed(corpus.cap as u64).expect("work slab");
+        for &st in corpus.seed_slab.statements() {
+            self.work.push(st).expect("work push");
+        }
+        self.known.clear();
+        for st in self.work.statements() {
+            self.known.insert((st.s, st.o));
+        }
+        assert_eq!(self.known.len(), corpus.expected_seed, "seed set size");
+    }
+
+    /// One closure pass: scan -> unify -> project -> materialize (push
+    /// only NEW facts). Returns new-fact count.
+    fn pass(&mut self, corpus: &ClosureCorpus) -> usize {
+        self.col_s.clear();
+        self.col_p.clear();
+        self.col_o.clear();
+        for st in self.work.statements() {
+            self.col_s.push(st.s);
+            self.col_p.push(st.p);
+            self.col_o.push(st.o);
+        }
+        assert_eq!(self.col_s.len(), self.work.len(), "pass scan width");
+        let cols = StatementColumns::new(&self.col_s, &self.col_p, &self.col_o).expect("columns");
+        unify_batch_into(
+            &corpus.compiled,
+            &cols,
+            DEFAULT_CHUNK_ROWS,
+            &mut self.scratch,
+            &mut self.out,
+        )
+        .expect("closure unify");
+        let (_digest, pop) = self
+            .projector
+            .emit_into(
+                &corpus.compiled,
+                CHAIN_EPOCH,
+                &self.out,
+                &mut self.rows,
+                &mut self.canon,
+            )
+            .expect("closure project");
+        assert_eq!(self.rows.len(), self.out.len, "projected rows == matches");
+        assert_eq!(pop as usize, self.out.len, "M12-7 popcount (closure)");
+        let mut new = 0usize;
+        for i in 0..self.rows.len() {
+            let (s, p, o, _) = self.rows.row(i);
+            if self.known.contains(&(s, o)) {
+                continue;
+            }
+            self.work
+                .push(BN3Statement::from_words(s, p, o))
+                .expect("derived push");
+            new += 1;
+        }
+        new
+    }
+
+    /// Full fixpoint run: passes until no new facts. Asserts the final
+    /// state (Chicago): derived count vs the closed-form oracle count.
+    /// Mutation class: CL_MAX_PASSES drop -> this assert fires.
+    fn run_to_fixpoint(&mut self, corpus: &ClosureCorpus) -> usize {
+        self.reset(corpus);
+        let mut passes = 0usize;
+        loop {
+            let new = self.pass(corpus);
+            passes += 1;
+            if new == 0 {
+                break;
+            }
+            assert!(passes <= CL_MAX_PASSES, "closure pass bound blown");
+        }
+        let total = self.work.len() - corpus.expected_seed;
+        assert_eq!(
+            total, corpus.expected_derived,
+            "closure fixpoint derived count vs closed-form oracle \
+             (iteration-bound mutation flips this)"
+        );
+        assert_eq!(
+            self.known.len(),
+            corpus.expected_seed + corpus.expected_derived,
+            "set size at fixpoint"
+        );
+        total
+    }
+}
+
+/// THE LADDER — closure to fixpoint per timed iteration, counter =
+/// derived pairs (pairs/s at fixpoint). Mutation class: see
+/// [`ClosureWs::run_to_fixpoint`].
+#[divan::bench(consts = [65_536, 262_144, 1_048_576])]
+fn closure_ladder<const N: usize>(b: Bencher) {
+    let corpus = build_closure_corpus(N);
+    let mut ws = ClosureWs::new(&corpus);
+    // Setup: one fixpoint run + the differential court at the smallest
+    // N (naive oracle equality; NOT timed).
+    let derived = ws.run_to_fixpoint(&corpus);
+    if N == 65_536 {
+        let seed: Vec<(u64, u64)> = corpus
+            .seed_slab
+            .statements()
+            .iter()
+            .map(|st| (st.s, st.o))
+            .collect();
+        let oracle = closure_oracle(&seed);
+        let bench_set: std::collections::HashSet<(u64, u64)> = ws.known.iter().copied().collect();
+        assert_eq!(
+            bench_set, oracle,
+            "differential court: fixpoint derived-set equality vs naive oracle"
+        );
+        assert!(
+            oracle.len() > corpus.expected_seed,
+            "oracle adds facts (non-vacuous)"
+        );
+    }
+    eprintln!(
+        "[chains-bn3] closure N={N} derived={derived} cap={}",
+        corpus.cap
+    );
+    b.counter(ItemsCount::new(derived)).bench_local(|| {
+        let d = ws.run_to_fixpoint(&corpus);
+        assert_eq!(d, derived, "derived count drifted (determinism)");
+        black_box((d, ws.work.len()));
     });
 }
 

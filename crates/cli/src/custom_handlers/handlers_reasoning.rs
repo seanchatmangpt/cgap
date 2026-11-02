@@ -13,7 +13,7 @@ fn fail<T>(what: &str, detail: String) -> Result<T> {
 /// handler refuses typed.
 pub fn bn_3_unify(_inputs: Map<String, Value>) -> Result<Value> {
     use cgap_bn3::sigil::{encode_term, Sigil};
-    use cgap_bn3::unify::{Rule, RuleCompiler, StatementColumns, BodyAtom};
+    use cgap_bn3::unify::{BodyAtom, Rule, RuleCompiler, StatementColumns};
     let sc = |p: u64| encode_term(Sigil::SlotConst, p).expect("payload < 2^56");
     let var0 = encode_term(Sigil::VarUni, 0).expect("reg < 256");
     // Data: (x, 1, 9) for x in 10..13, plus one non-matching row.
@@ -67,20 +67,38 @@ pub fn bn_3_eval(_inputs: Map<String, Value>) -> Result<Value> {
     regs[2] = 7;
     let slab: [u8; 8] = [0; 8];
     let mut ctx = BuiltinContext::default();
-    let r0 = dispatch(BuiltinPayload::new(OP_MATH_SUM, 0, 1, 2), &mut regs, &slab, &mut ctx)
-        .map_err(|e| NounVerbError::execution_error(format!("sum refused: {e:?}")))?;
+    let r0 = dispatch(
+        BuiltinPayload::new(OP_MATH_SUM, 0, 1, 2),
+        &mut regs,
+        &slab,
+        &mut ctx,
+    )
+    .map_err(|e| NounVerbError::execution_error(format!("sum refused: {e:?}")))?;
     if r0 != 12 || regs[0] != 12 {
         return fail("bn3 eval", format!("sum landed {r0}/R0={}", regs[0]));
     }
-    let rt = dispatch(BuiltinPayload::new(OP_LOG_TRACE, 0, 0, 0), &mut regs, &slab, &mut ctx)
-        .map_err(|e| NounVerbError::execution_error(format!("trace refused: {e:?}")))?;
+    let rt = dispatch(
+        BuiltinPayload::new(OP_LOG_TRACE, 0, 0, 0),
+        &mut regs,
+        &slab,
+        &mut ctx,
+    )
+    .map_err(|e| NounVerbError::execution_error(format!("trace refused: {e:?}")))?;
     if ctx.trace.len() != 1 || ctx.trace[0] != rt || rt != 12 {
         return fail("bn3 eval", format!("trace state {:?}", ctx.trace));
     }
-    let rc = dispatch(BuiltinPayload::new(OP_LOG_COUNTERS, 5, 0, 0), &mut regs, &slab, &mut ctx)
-        .map_err(|e| NounVerbError::execution_error(format!("counters refused: {e:?}")))?;
+    let rc = dispatch(
+        BuiltinPayload::new(OP_LOG_COUNTERS, 5, 0, 0),
+        &mut regs,
+        &slab,
+        &mut ctx,
+    )
+    .map_err(|e| NounVerbError::execution_error(format!("counters refused: {e:?}")))?;
     if rc != ctx.eval_count || regs[5] != 3 {
-        return fail("bn3 eval", format!("latched {rc} vs count {}", ctx.eval_count));
+        return fail(
+            "bn3 eval",
+            format!("latched {rc} vs count {}", ctx.eval_count),
+        );
     }
     Ok(json!({
         "sum": regs[0],
@@ -129,14 +147,10 @@ pub fn audit_powl_stats(_inputs: Map<String, Value>) -> Result<Value> {
     };
     let verdict = verify(&log, &model)
         .map_err(|e| NounVerbError::execution_error(format!("verify refused: {e:?}")))?;
-    let conf = verdict.map_err(|v| {
-        NounVerbError::execution_error(format!("conforming log violated: {v:?}"))
-    })?;
+    let conf = verdict
+        .map_err(|v| NounVerbError::execution_error(format!("conforming log violated: {v:?}")))?;
     if conf.constructs_checked == 0 || conf.bindings_checked == 0 {
-        return fail(
-            "audit powl-stats",
-            format!("empty verdict {conf:?}"),
-        );
+        return fail("audit powl-stats", format!("empty verdict {conf:?}"));
     }
     // Anti-vacuity: a log whose events run (2,1,3) breaks Sequence order
     // (activity 1 must occur before 2 in the binding).
@@ -162,7 +176,10 @@ pub fn audit_powl_stats(_inputs: Map<String, Value>) -> Result<Value> {
     let flipped = verify(&bad, &model);
     let flipped_to_violation = matches!(flipped, Ok(Err(_)));
     if !flipped_to_violation {
-        return fail("audit powl-stats", "violating log still conformed — vacuous".to_owned());
+        return fail(
+            "audit powl-stats",
+            "violating log still conformed — vacuous".to_owned(),
+        );
     }
     Ok(json!({
         "events": log.event_count(),
@@ -229,5 +246,91 @@ pub fn audit_ocel_stats(_inputs: Map<String, Value>) -> Result<Value> {
         "object_refs": total_object_refs,
         "monotonic_id_refused": refused_id,
         "reserved_activity_refused": refused_reserved,
+    }))
+}
+
+/// `bn3 radix-join` — the L3 radix semi-join landing as a CLI verb: the
+/// radix probe and the retired nested probe must agree match-for-match
+/// (bindings + rows), and a tampered fact column must flip the match count
+/// (else the differential is vacuous) — typed refusal on any drift.
+pub fn bn_3_radix_join(_inputs: Map<String, Value>) -> Result<Value> {
+    use cgap_bn3::sigil::{encode_term, Sigil};
+    use cgap_bn3::unify::{
+        unify_batch_probe, BodyAtom, CompiledRule, EvalScratch, JoinProbeScratch, MatchSet, Rule,
+        RuleCompiler, StatementColumns,
+    };
+    let sc = |p: u64| encode_term(Sigil::SlotConst, p).expect("payload < 2^56");
+    let var0 = encode_term(Sigil::VarUni, 0).expect("reg < 256");
+    // Data: (x,1,9) for x in 10..13 (3 matches) plus one non-matching row.
+    let s_col: Vec<u64> = [10u64, 11, 12, 13].iter().map(|&x| sc(x)).collect();
+    let p_col = vec![sc(1), sc(1), sc(1), sc(2)];
+    let o_col = vec![sc(9), sc(9), sc(9), sc(9)];
+    let cols = StatementColumns::new(&s_col, &p_col, &o_col)
+        .map_err(|e| NounVerbError::execution_error(format!("columns refused: {e:?}")))?;
+    let rule = Rule {
+        rule_id: 1,
+        body: vec![BodyAtom::new(var0, sc(1), sc(9))],
+        head: [var0, sc(2), var0],
+    };
+    let compiled: CompiledRule = RuleCompiler::compile(&rule)
+        .map_err(|e| NounVerbError::execution_error(format!("rule refused: {e:?}")))?;
+    let run = |cols: &StatementColumns<'_>, radix: bool| -> Result<MatchSet> {
+        let compiled_ref = &compiled;
+        let mut scratch = EvalScratch::default();
+        let mut out = MatchSet::default();
+        let mut probe = if radix {
+            JoinProbeScratch::default()
+        } else {
+            JoinProbeScratch {
+                radix: false,
+                ..Default::default()
+            }
+        };
+        unify_batch_probe(compiled_ref, cols, 2, &mut scratch, &mut out, &mut probe)
+            .map_err(|e| NounVerbError::execution_error(format!("probe refused: {e:?}")))?;
+        Ok(out)
+    };
+    let radix = run(&cols, true)?;
+    let nested = run(&cols, false)?;
+    // Differential court: match count, rows, and bindings must be identical.
+    if radix.len != nested.len {
+        return fail(
+            "bn3 radix-join",
+            format!("count drift radix={} nested={}", radix.len, nested.len),
+        );
+    }
+    for m in 0..radix.len {
+        if radix.atom_rows[0][m] != nested.atom_rows[0][m]
+            || radix.var_values[0][m] != nested.var_values[0][m]
+        {
+            return fail("bn3 radix-join", format!("match {m} row/binding drift"));
+        }
+    }
+    if radix.len != 3 || radix.var_values[0][0] != s_col[0] {
+        return fail(
+            "bn3 radix-join",
+            format!("expected 3 subject-bound matches, got {}", radix.len),
+        );
+    }
+    // Tamper control (flip witness): flipping one matching object MUST drop
+    // the match count; an unchanged count is a vacuous differential.
+    let mut o_bad = o_col.clone();
+    o_bad[0] = sc(7);
+    let cols_bad = StatementColumns::new(&s_col, &p_col, &o_bad)
+        .map_err(|e| NounVerbError::execution_error(format!("tampered columns refused: {e:?}")))?;
+    let bad = run(&cols_bad, true)?;
+    if bad.len != radix.len - 1 {
+        return fail(
+            "bn3 radix-join",
+            format!("tamper did not flip: {} -> {}", radix.len, bad.len),
+        );
+    }
+    Ok(json!({
+        "rows": cols.len(),
+        "matches": radix.len,
+        "nested_matches": nested.len,
+        "match_for_match": true,
+        "tamper_refused": true,
+        "tampered_matches": bad.len,
     }))
 }

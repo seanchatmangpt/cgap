@@ -1,9 +1,12 @@
 # cgap-gate
 
-**Status: NOT-PUBLISHED** — verified against crates.io this session
-(API returned no crate record). Workspace-local moonshot crate; consumed
-in-tree by `cgap-court`, `cgap-ffi`, and the wave receipts under
-`docs/jira/v26.11.1/waves/`.
+**Status: BROKEN-MID-EDIT (v26.11.2 reality wave, 2026-11-01)** —
+`cargo test -p cgap-gate` aborts at compile: 22 errors in the lib-test
+target (`Vec`/`String`/`ToString`/unsafe-impl class), 0 tests executed.
+Per census law, compile-abort is not a failure count. Workspace-local
+moonshot crate; consumed in-tree by `cgap-court`, `cgap-ffi`, and the
+wave receipts under `docs/jira/v26.11.1/waves/`. Reality receipt:
+`docs/jira/v26.11.2/waves/crate-reality/cgap-gate.md`.
 
 ## What it is
 
@@ -14,7 +17,14 @@ memory is touched. The dam analogy is load-bearing, not decorative —
 penstock = the single ingress pipe, dam = the wall of static asserts and
 courts that must hold before a frame passes.
 
-## Test receipt (run this session)
+## Substance census (v26.11.2 reality wave)
+
+`penstock.rs` 1,869 LOC + `lib.rs` 13 LOC = 1,882 LOC; 2 pub fns in
+`penstock.rs` (plus the unsafe `GlobalAlloc` impl surface); 12 `#[test]`
+in `penstock.rs`, all blocked at compile. Manifest drift-check: NO DRIFT
+(crateName/crateVersion 26.11.2/description/publish all match).
+
+## Test receipt (historical, v26.11.1 wave — as-of-date, not current)
 
 ```
 cargo test -p cgap-gate   # exit 0
@@ -44,4 +54,5 @@ Receipt of record: `docs/jira/v26.11.1/waves/a14-finish-receipt.md`
 - `src/lib.rs` — crate root, `#![no_std]`.
 - `src/penstock.rs` — the gate: struct/const definitions with size/align
   static asserts (§6), byte-offset table (§6.1), flags (§6.3), SplitMix64
-  corpus (§8.1), and the 11-court unit battery.
+  corpus (§8.1), and the unit battery (12 `#[test]` at the 26.11.2
+  census).

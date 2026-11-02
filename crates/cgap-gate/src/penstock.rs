@@ -205,6 +205,8 @@
 //! point the status codes below become re-exports of A19's register
 //! (DoD 10).
 
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 /// Total frame header length in bytes — A04 §6/§6.1: 128 B total, align 64.
 pub const HEADER_LEN: usize = 128;
 
@@ -253,6 +255,20 @@ pub const FLAG_GITPACK: u8 = 0x08;
 /// bits 4-7 reserved, must be zero — A04 §6.3 (taxonomy row 6 is an A19
 /// amendment candidate; no code minted — lane doc §5.2).
 pub const FLAGS_RESERVED_MASK: u8 = 0xF0;
+
+/// L1 escalation mask (v26.11.2 lever L1): the row-6 reserved-flag family
+/// (A04 §6.3 header flags bits 4-7), widened to u16 for the [`FrameView`]
+/// policy bit. Divergence recorded (not silent): a row-6 frame stays
+/// ADMITTED with `CGAP_OK` — A04 §6.3 reads bits 4-7 as "ignored on read"
+/// and no A19 code exists for it (lane doc §5.2 amendment candidate) — but
+/// it is now MARKED for two-stage escalation: downstream folds the cheap
+/// [`prefilter8`] mix normally and pays full BLAKE3 only on escalated
+/// frames. This is a policy signal, never a status change; the A19
+/// register is untouched (the status-purity court still pins exactly four
+/// codes). Rows 4/5 attestation reserved bits remain hard spoliation
+/// (row 5 law unchanged; the L1 court flips CGAP_OK -> SPOLIATION on an
+/// attestation byte flip — `lever_courts.rs`).
+pub const ESCALATE_MASK: u16 = 0x00F0;
 
 // ---------------------------------------------------------------------------
 // P28 attestation constants (A17 §2/§2.1/§2.2; instrument identity from
@@ -373,10 +389,8 @@ const _: () = assert!(core::mem::offset_of!(CgapFrameHeaderAbi, flags) == OFF_FL
 const _: () = assert!(core::mem::offset_of!(CgapFrameHeaderAbi, reserved) == OFF_RESERVED);
 const _: () =
     assert!(core::mem::offset_of!(CgapFrameHeaderAbi, payload_byte_len) == OFF_PAYLOAD_BYTE_LEN);
-const _: () =
-    assert!(core::mem::offset_of!(CgapFrameHeaderAbi, oabi_digest) == OFF_OABI_DIGEST);
-const _: () =
-    assert!(core::mem::offset_of!(CgapFrameHeaderAbi, attestation) == OFF_ATTESTATION);
+const _: () = assert!(core::mem::offset_of!(CgapFrameHeaderAbi, oabi_digest) == OFF_OABI_DIGEST);
+const _: () = assert!(core::mem::offset_of!(CgapFrameHeaderAbi, attestation) == OFF_ATTESTATION);
 
 // A17 §2.1 offset table, machine-checked (stable `offset_of!`, rustc 1.77+).
 const _: () = assert!(core::mem::offset_of!(P28LicenseAttestationAbi, license_magic) == 0);
@@ -420,10 +434,8 @@ const _: () = assert!(P28_LICENSE_URN.len() == 41);
 const _: () = assert!(P28_SAFE_HARBOR_CEILING_CENTS == 5_000_000_000);
 // A17 §2.2 lineage bits occupy exactly bits 0-2; the reserved mask is the
 // exact complement within the u16 bitfield.
-const _: () = assert!(
-    P28_LINEAGE_MASK == 0x0007
-        && P28_ATTESTATION_FLAGS_RESERVED_MASK == !P28_LINEAGE_MASK
-);
+const _: () =
+    assert!(P28_LINEAGE_MASK == 0x0007 && P28_ATTESTATION_FLAGS_RESERVED_MASK == !P28_LINEAGE_MASK);
 
 // P28 attestation struct fits exactly inside its header window.
 const _: () =
@@ -454,6 +466,18 @@ const P28_RECEIPT_LEN: usize = 32;
 pub struct FrameView<'bytes> {
     /// Zero-copy payload view INTO the caller's bytes (A19 §"cgap_frame_view").
     pub payload: &'bytes [u8],
+    /// L1 two-stage escalation prefilter (v26.11.2 lever L1,
+    /// `docs/jira/v26.11.2/plans/levers-L1-L5.md` §L1): a cheap non-crypto
+    /// 8-byte wrap-mul mix over the frame's first 8 header bytes,
+    /// minted by [`ingress`] on ADMIT only (`prefilter8`). Zero on
+    /// reject/no-view. Not a digest — never substitute for BLAKE3.
+    pub prefilter: u64,
+    /// L1 escalation policy bit: true iff the frame was ADMITTED and the
+    /// row-6 reserved-flag family ([`ESCALATE_MASK`]) is set — the frame
+    /// must pay the full BLAKE3 digest downstream instead of the prefilter.
+    /// Flag-only policy (no state table; first-seen-flow is the next stage,
+    /// out of scope this lever). The gate stays side-effect-free.
+    pub escalate: bool,
 }
 
 /// The ingress boundary (boundary invariant 4, lane doc §2): the first code
@@ -581,6 +605,14 @@ pub fn ingress<'bytes>(
     // value-preserving on every supported target (32-bit included).
     if let Some(view) = out {
         view.payload = &bytes[HEADER_LEN..HEADER_LEN + declared as usize];
+        // L1 two-stage escalation (v26.11.2 lever L1): the admit path mints
+        // the cheap prefilter mix and the escalation policy bit. No new
+        // reads: prefilter8 touches bytes 0..8 (already proven in-bounds by
+        // the row-2 magic compare), and the escalation bit reads the same
+        // flags byte row 2's compare already touched. Signature unchanged;
+        // the gate stays side-effect-free and zero-alloc.
+        view.prefilter = prefilter8(bytes);
+        view.escalate = u16::from(bytes[OFF_FLAGS]) & ESCALATE_MASK != 0;
     }
     CGAP_OK
 }
@@ -625,6 +657,32 @@ fn is_zero_at(bytes: &[u8], off: usize, len: usize) -> bool {
         i += 1;
     }
     true
+}
+
+/// L1 two-stage escalation prefilter (v26.11.2 lever L1): one unaligned
+/// little-endian u64 load of the frame's first 8 header bytes (magic,
+/// version, flags, reserved — all already proven in-bounds by the row-2
+/// magic compare before this runs), XOR-folded and mixed with one
+/// wrapping multiply. Cheap, deterministic, allocation-free; NOT a digest
+/// (collision resistance is not claimed — collision resistance is the
+/// escalated stage's job).
+///
+/// Seed hygiene: the mix constants here are NOT the frozen seeds
+/// (SplitMix64 multiplier `0xBF58_476D_1CE4_E5B9` / corpus constant
+/// `0xA20C_0FFE_E5A7_E000`) and never will be — a conflation would break
+/// byte-identical replay. Callers must prove `bytes.len() >= 8` (inside
+/// `ingress` that proof is the row-2 magic compare); the function itself
+/// reads nothing past byte 8.
+#[inline]
+pub fn prefilter8(bytes: &[u8]) -> u64 {
+    let mut v = [0u8; 8];
+    let mut i = 0;
+    while i < 8 {
+        v[i] = bytes[i];
+        i += 1;
+    }
+    let w = u64::from_le_bytes(v);
+    (w ^ (w >> 7)).wrapping_mul(0x2544_5491_4F6C_DD1D)
 }
 
 // ===========================================================================
@@ -739,7 +797,13 @@ mod courts {
 
     impl TrackGuard {
         fn enter() -> Self {
-            TRACKING.with(|t| t.set(Tracking { active: true, allocs: 0, bytes: 0 }));
+            TRACKING.with(|t| {
+                t.set(Tracking {
+                    active: true,
+                    allocs: 0,
+                    bytes: 0,
+                })
+            });
             TrackGuard
         }
         fn counts(&self) -> (usize, usize) {
@@ -844,8 +908,7 @@ mod courts {
             *b = rng.next() as u8;
         }
         buf[OFF_ATTESTATION..OFF_ATTESTATION + 4].copy_from_slice(&P28_LICENSE_MAGIC);
-        buf[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6]
-            .copy_from_slice(&P28_VERSION.to_le_bytes());
+        buf[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6].copy_from_slice(&P28_VERSION.to_le_bytes());
         // Exactly one lineage bit; ROOT carries the zero receipt, others a
         // nonzero one (A17 §2.2 receipt law).
         let lineage = match rng.next() % 3 {
@@ -860,7 +923,8 @@ mod courts {
         buf[OFF_ATTESTATION + 16..OFF_ATTESTATION + 48].copy_from_slice(&origin);
         if lineage != P28_FLAG_ROOT {
             let receipt: [u8; 32] = core::array::from_fn(|_| rng.next() as u8);
-            buf[OFF_ATTESTATION + P28_RECEIPT_AT..OFF_ATTESTATION + P28_RECEIPT_AT + P28_RECEIPT_LEN]
+            buf[OFF_ATTESTATION + P28_RECEIPT_AT
+                ..OFF_ATTESTATION + P28_RECEIPT_AT + P28_RECEIPT_LEN]
                 .copy_from_slice(&receipt);
         }
         let frame_len = HEADER_LEN + payload_len;
@@ -922,8 +986,7 @@ mod courts {
                             0 => 0u16,
                             _ => {
                                 let base_bit = lineage.trailing_zeros();
-                                lineage
-                                    | (1u16 << ((base_bit + 1 + (rng.next() % 2) as u32) % 3))
+                                lineage | (1u16 << ((base_bit + 1 + (rng.next() % 2) as u32) % 3))
                             }
                         };
                         buf[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8]
@@ -970,9 +1033,9 @@ mod courts {
                 buf[OFF_FLAGS] = combo;
                 (frame_len, Expected::Code(CGAP_OK))
             }
-            wheel_residue => unreachable!(
-                "mutation wheel residue {wheel_residue} outside 0..={MC_V_COMBOS}"
-            ),
+            wheel_residue => {
+                unreachable!("mutation wheel residue {wheel_residue} outside 0..={MC_V_COMBOS}")
+            }
         }
     }
 
@@ -982,8 +1045,16 @@ mod courts {
         let mut buf = vec![0u8; 4096]; // scratch, built OUTSIDE tracked scopes
         for i in 0..n {
             let (frame_len, expected) = gen_frame(seed, i, &mut buf);
-            let mut view = FrameView { payload: &[] };
-            let guard = if track { Some(TrackGuard::enter()) } else { None };
+            let mut view = FrameView {
+                payload: &[],
+                prefilter: 0,
+                escalate: false,
+            };
+            let guard = if track {
+                Some(TrackGuard::enter())
+            } else {
+                None
+            };
             let st = ingress(&buf, frame_len, Some(&mut view));
             if let Some(g) = guard.as_ref() {
                 let (allocs, bytes) = g.counts();
@@ -1010,7 +1081,11 @@ mod courts {
                         .try_into()
                         .unwrap(),
                 );
-                assert_eq!(view.payload.len() as u64, declared, "frame {i}: view geometry");
+                assert_eq!(
+                    view.payload.len() as u64,
+                    declared,
+                    "frame {i}: view geometry"
+                );
                 assert_eq!(
                     view.payload.as_ptr(),
                     buf[HEADER_LEN..].as_ptr(),
@@ -1049,7 +1124,8 @@ mod courts {
             f[OFF_OABI_DIGEST] = 0xA5; // nonzero digest field (coherence only)
             f[OFF_ATTESTATION..OFF_ATTESTATION + 4].copy_from_slice(&P28_LICENSE_MAGIC);
             f[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6].copy_from_slice(&P28_VERSION.to_le_bytes());
-            f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
+            f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8]
+                .copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
             f[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
                 .copy_from_slice(&P28_SAFE_HARBOR_CEILING_CENTS.to_le_bytes());
         };
@@ -1057,22 +1133,38 @@ mod courts {
         // Row 1: truncated (127, 64, 0-byte buffers).
         for n in [0usize, 64, HEADER_LEN - 1] {
             valid(&mut f);
-            assert_eq!(ingress(&f[..n], n, None), CGAP_ERR_INVALID_MAGIC, "row 1, len {n}");
+            assert_eq!(
+                ingress(&f[..n], n, None),
+                CGAP_ERR_INVALID_MAGIC,
+                "row 1, len {n}"
+            );
         }
         // Row 1 class: declared len exceeds the slice (lying caller) —
         // fail-closed, reads nothing.
         valid(&mut f);
-        assert_eq!(ingress(&f[..200], 500, None), CGAP_ERR_INVALID_MAGIC, "row 1 geometry");
+        assert_eq!(
+            ingress(&f[..200], 500, None),
+            CGAP_ERR_INVALID_MAGIC,
+            "row 1 geometry"
+        );
 
         // Row 2: magic families (§8.1 MC-1) + version.
         for m in [*b"XGAP", *b"cgap", [0u8; 4]] {
             valid(&mut f);
             f[OFF_MAGIC..OFF_MAGIC + 4].copy_from_slice(&m);
-            assert_eq!(ingress(&f, f.len(), None), CGAP_ERR_INVALID_MAGIC, "row 2 magic {m:?}");
+            assert_eq!(
+                ingress(&f, f.len(), None),
+                CGAP_ERR_INVALID_MAGIC,
+                "row 2 magic {m:?}"
+            );
         }
         valid(&mut f);
         f[OFF_VERSION] = 2;
-        assert_eq!(ingress(&f, f.len(), None), CGAP_ERR_INVALID_MAGIC, "row 2 version");
+        assert_eq!(
+            ingress(&f, f.len(), None),
+            CGAP_ERR_INVALID_MAGIC,
+            "row 2 version"
+        );
 
         // Row 3a: all-zero digest.
         valid(&mut f);
@@ -1113,7 +1205,11 @@ mod courts {
 
         // Row 5: A17 §2.2/§6 field laws.
         let expect_spoil = |f: &Vec<u8>, why: &str| {
-            assert_eq!(ingress(f, f.len(), None), CGAP_ERR_P28_SPOLIATION, "row 5 {why}");
+            assert_eq!(
+                ingress(f, f.len(), None),
+                CGAP_ERR_P28_SPOLIATION,
+                "row 5 {why}"
+            );
         };
         valid(&mut f);
         f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&0x0008u16.to_le_bytes());
@@ -1142,15 +1238,22 @@ mod courts {
         // the recorded divergence (A04 §6.3 "ignored on read").
         valid(&mut f);
         f[OFF_FLAGS] = FLAG_ARROW | 0xF0;
-        assert_eq!(ingress(&f, f.len(), None), CGAP_OK, "row 6 divergence: admitted");
+        assert_eq!(
+            ingress(&f, f.len(), None),
+            CGAP_OK,
+            "row 6 divergence: admitted"
+        );
 
         // Valid frame admits and writes the zero-copy view (§2.3); the view
         // borrow is scoped so the buffer can be rebuilt for the next class.
         {
-            let mut view = FrameView { payload: &[] };
+            let mut view = FrameView {
+                payload: &[],
+                prefilter: 0,
+                escalate: false,
+            };
             valid(&mut f);
-            f[OFF_PAYLOAD_BYTE_LEN..OFF_PAYLOAD_BYTE_LEN + 8]
-                .copy_from_slice(&8u64.to_le_bytes());
+            f[OFF_PAYLOAD_BYTE_LEN..OFF_PAYLOAD_BYTE_LEN + 8].copy_from_slice(&8u64.to_le_bytes());
             assert_eq!(ingress(&f, f.len(), Some(&mut view)), CGAP_OK, "admit");
             assert_eq!(view.payload, &f[HEADER_LEN..HEADER_LEN + 8]);
         }
@@ -1175,7 +1278,8 @@ mod courts {
             f[OFF_OABI_DIGEST] = 0xA5;
             f[OFF_ATTESTATION..OFF_ATTESTATION + 4].copy_from_slice(&P28_LICENSE_MAGIC);
             f[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6].copy_from_slice(&P28_VERSION.to_le_bytes());
-            f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
+            f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8]
+                .copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
             f[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
                 .copy_from_slice(&P28_SAFE_HARBOR_CEILING_CENTS.to_le_bytes());
         };
@@ -1232,13 +1336,15 @@ mod courts {
         header[OFF_PAYLOAD_BYTE_LEN..OFF_PAYLOAD_BYTE_LEN + 8].copy_from_slice(&0u64.to_le_bytes());
         header[OFF_OABI_DIGEST] = 0x5A;
         header[OFF_ATTESTATION..OFF_ATTESTATION + 4].copy_from_slice(&P28_LICENSE_MAGIC);
-        header[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6].copy_from_slice(&P28_VERSION.to_le_bytes());
+        header[OFF_ATTESTATION + 4..OFF_ATTESTATION + 6]
+            .copy_from_slice(&P28_VERSION.to_le_bytes());
         header[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8]
             .copy_from_slice(&P28_FLAG_TRANSPILED.to_le_bytes());
         header[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
             .copy_from_slice(&P28_SAFE_HARBOR_CEILING_CENTS.to_le_bytes());
         // TRANSPILED carries a nonzero transpiler receipt.
-        header[OFF_ATTESTATION + P28_RECEIPT_AT..OFF_ATTESTATION + P28_RECEIPT_AT + P28_RECEIPT_LEN]
+        header
+            [OFF_ATTESTATION + P28_RECEIPT_AT..OFF_ATTESTATION + P28_RECEIPT_AT + P28_RECEIPT_LEN]
             .copy_from_slice(&[0x11u8; 32]);
 
         // Same header; trailing buffers {empty, 1 KiB, 1 MiB} of varying
@@ -1254,10 +1360,17 @@ mod courts {
         for (case, extra) in slack.iter().enumerate() {
             let mut frame = header.clone();
             frame.extend_from_slice(extra);
-            let mut view = FrameView { payload: &[] };
+            let mut view = FrameView {
+                payload: &[],
+                prefilter: 0,
+                escalate: false,
+            };
             let st = ingress(&frame, frame.len(), Some(&mut view));
             assert_eq!(st, CGAP_OK, "case {case}: same header, different payload");
-            assert!(view.payload.is_empty(), "case {case}: declared payload is empty");
+            assert!(
+                view.payload.is_empty(),
+                "case {case}: declared payload is empty"
+            );
             first_status = Some(match first_status {
                 None => st,
                 Some(prev) => {
@@ -1301,7 +1414,10 @@ mod courts {
         sink.push(1u8);
         let (allocs, bytes) = guard.counts();
         drop(guard);
-        assert!(allocs >= 1, "tracked allocation not counted — court vacuous");
+        assert!(
+            allocs >= 1,
+            "tracked allocation not counted — court vacuous"
+        );
         assert!(bytes >= 64, "tracked bytes not counted — court vacuous");
         drop(sink);
     }
@@ -1322,7 +1438,11 @@ mod courts {
         f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
         f[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
             .copy_from_slice(&P28_SAFE_HARBOR_CEILING_CENTS.to_le_bytes());
-        let mut view = FrameView { payload: &[] };
+        let mut view = FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         // Declared len = 144 (128 hdr + 16 payload); slice holds 1024.
         assert_eq!(ingress(&f, HEADER_LEN + 16, Some(&mut view)), CGAP_OK);
         assert_eq!(view.payload.len(), 16);
@@ -1363,7 +1483,11 @@ mod courts {
         f[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&P28_FLAG_ROOT.to_le_bytes());
         f[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
             .copy_from_slice(&P28_SAFE_HARBOR_CEILING_CENTS.to_le_bytes());
-        let mut view = FrameView { payload: &[] };
+        let mut view = FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
 
         // ADMIT path: process-wide counters must not move.
         let a0 = THREAD_ALLOCS.with(|c| c.get());
@@ -1491,11 +1615,9 @@ mod courts {
     /// enforced at value level until the dependency can land.
     #[test]
     fn status_register_is_pure_a19_subset() {
-        let gate_src = std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/src/penstock.rs"
-        ))
-        .expect("penstock.rs must be readable at test time (repo-local file)");
+        let gate_src =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/penstock.rs"))
+                .expect("penstock.rs must be readable at test time (repo-local file)");
         let ffi_src = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../cgap-ffi/src/sovereign.rs"
@@ -1515,11 +1637,7 @@ mod courts {
                 let Some((_, val)) = ty.split_once('=') else {
                     continue;
                 };
-                let hex = val
-                    .trim()
-                    .trim_end_matches(';')
-                    .trim()
-                    .replace('_', "");
+                let hex = val.trim().trim_end_matches(';').trim().replace('_', "");
                 let Ok(v) = u32::from_str_radix(hex.trim_start_matches("0x"), 16) else {
                     continue;
                 };
@@ -1714,6 +1832,40 @@ mod courts {
             "§8.4 TARGET row: < 4 ns/frame = {} | <= 3x baseline = {} | measured {full_ns:.2} ns, {ratio:.2}x",
             if target_abs { "PASS" } else { "GAP" },
             if target_ratio { "PASS" } else { "GAP" },
+        );
+    }
+}
+
+#[cfg(test)]
+mod nostd_hygiene_court {
+    //! W4-MW2 std-strip court (extends the cgap-bn3 builtins.rs must-kill
+    //! pattern): the module body — everything before the first
+    //! `#[cfg(test)]`, comments stripped — carries no `std::` path.
+    //! Anti-vacuity mutation (must-kill): reintroduce any `std::` path in
+    //! the body (e.g. `impl std::error::Error`) — this court MUST flip.
+
+    use std::string::String;
+
+    fn module_body_stripped() -> String {
+        let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/penstock.rs"));
+        let body = src
+            .split("#[cfg(test)]")
+            .next()
+            .expect("module body precedes the hygiene court");
+        body.lines()
+            .map(|line| match line.find("//") {
+                Some(i) => &line[..i],
+                None => line,
+            })
+            .collect::<String>()
+    }
+
+    #[test]
+    fn nostd_hygiene_module_body_has_no_std_paths() {
+        let body = module_body_stripped();
+        assert!(
+            !body.contains("std::"),
+            "module body carries a `std::` path; crate direction is no_std (core/alloc only)"
         );
     }
 }

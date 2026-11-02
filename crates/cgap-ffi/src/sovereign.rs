@@ -161,11 +161,8 @@ const _: () = {
 /// which no callee could write through — the frozen header/Rust signature
 /// uses a non-const out-parameter, per the doc's own ownership table
 /// ("callee (pointer only)" fills `out_view.payload`).
-pub type CgapAdmitFrameFn = unsafe extern "C" fn(
-    bytes: *const u8,
-    len: usize,
-    out_view: *mut CgapFrameView,
-) -> CgapStatus;
+pub type CgapAdmitFrameFn =
+    unsafe extern "C" fn(bytes: *const u8, len: usize, out_view: *mut CgapFrameView) -> CgapStatus;
 
 /// `cgap_eval_bn3` — admitted bytes evaluate deterministically against a
 /// flash-resident `.bn3` network (A11 layout); zero copies of the input.
@@ -194,11 +191,8 @@ pub type CgapCommitParquetFn = unsafe extern "C" fn(
 /// `cgap_verify_p28` — P28 spoliation evidence verification; digest +
 /// license predicate over the embedded 80-byte `P28LicenseAttestation`
 /// (A17 §2); read-only, no allocation. `out_digest` MAY be NULL.
-pub type CgapVerifyP28Fn = unsafe extern "C" fn(
-    evidence: *const u8,
-    len: usize,
-    out_digest: *mut u64,
-) -> CgapStatus;
+pub type CgapVerifyP28Fn =
+    unsafe extern "C" fn(evidence: *const u8, len: usize, out_digest: *mut u64) -> CgapStatus;
 
 // ===========================================================================
 // Wave F2 item 5 — SEAM-CRYPTO-FFI: the `cgap_verify_p28` sovereign BODY,
@@ -423,7 +417,14 @@ pub unsafe extern "C" fn cgap_admit_frame(
     // live for the call duration, `len` bytes readable.
     let buf = unsafe { core::slice::from_raw_parts(bytes, len) };
     // Stage 1 — the A14 limiter over the caller's declared geometry.
-    let mut gate = cgap_gate::penstock::FrameView { payload: &[] };
+    let mut gate = cgap_gate::penstock::FrameView {
+        payload: &[],
+        // SLA unblock (W3-R2, disclose-in-both): pre-L1 zero-defaults —
+        // `prefilter` is minted by `ingress` on ADMIT only (zero on
+        // reject/no-view), `escalate` is ADMIT+reserved-flags only.
+        prefilter: 0,
+        escalate: false,
+    };
     let gate_status = cgap_gate::penstock::ingress(buf, len, Some(&mut gate));
     if gate_status != CGAP_OK {
         return gate_status;
@@ -432,9 +433,14 @@ pub unsafe extern "C" fn cgap_admit_frame(
     // Aligned callers get the true zero-copy §8.1 projection; unaligned C
     // buffers get `decode` (the same layout parse, alignment-free) — both
     // then run the SAME validate + payload + digest gates below.
-    let header = if buf.as_ptr() as usize % core::mem::align_of::<cgap_core::frame::CgapFrameHeader>() == 0 {
+    let header = if buf.as_ptr() as usize
+        % core::mem::align_of::<cgap_core::frame::CgapFrameHeader>()
+        == 0
+    {
         match cgap_core::frame::CgapFrameHeader::project(
-            buf[..cgap_core::frame::FRAME_HEADER_LEN].try_into().expect("128-byte header region staged by the A14 gate"),
+            buf[..cgap_core::frame::FRAME_HEADER_LEN]
+                .try_into()
+                .expect("128-byte header region staged by the A14 gate"),
         ) {
             Ok(h) => *h,
             Err(e) => return map_frame_error(e),
@@ -525,7 +531,7 @@ pub unsafe extern "C" fn cgap_eval_bn3(
     out_lanes: *mut i32,
     lanes_cap: usize,
     out_lane_count: *mut usize,
-    ) -> CgapStatus {
+) -> CgapStatus {
     // Shape gates first (typed, fail-closed): a live view, a live network,
     // and a writable count sink are the eval surface shape; NULL is not.
     if view.is_null() || bn3_rodata.is_null() || out_lane_count.is_null() {
@@ -607,9 +613,18 @@ pub unsafe extern "C" fn cgap_eval_bn3(
     let mut p_col = Vec::with_capacity(n);
     let mut o_col = Vec::with_capacity(n);
     for i in 0..n {
-        s_col.push(match read_le_word(payload, i * 8) { Ok(w) => w, Err(c) => return c });
-        p_col.push(match read_le_word(payload, 8 * n + i * 8) { Ok(w) => w, Err(c) => return c });
-        o_col.push(match read_le_word(payload, 16 * n + i * 8) { Ok(w) => w, Err(c) => return c });
+        s_col.push(match read_le_word(payload, i * 8) {
+            Ok(w) => w,
+            Err(c) => return c,
+        });
+        p_col.push(match read_le_word(payload, 8 * n + i * 8) {
+            Ok(w) => w,
+            Err(c) => return c,
+        });
+        o_col.push(match read_le_word(payload, 16 * n + i * 8) {
+            Ok(w) => w,
+            Err(c) => return c,
+        });
     }
     // ---- Real A12 compile + evaluate + project ------------------------------
     let cols = match cgap_bn3::unify::StatementColumns::new(&s_col, &p_col, &o_col) {
@@ -622,17 +637,19 @@ pub unsafe extern "C" fn cgap_eval_bn3(
             Ok(c) => c,
             Err(_) => return CGAP_ERR_OABI_MISMATCH,
         };
-        let matches =
-            match cgap_bn3::unify::unify_batch(&compiled, &cols, cgap_bn3::unify::DEFAULT_CHUNK_ROWS) {
-                Ok(m) => m,
-                Err(_) => return CGAP_ERR_OABI_MISMATCH,
-            };
-        let batch = match cgap_bn3::project::ConsequentProjector::new()
-            .project(&compiled, 0, &matches)
-        {
-            Ok(b) => b,
+        let matches = match cgap_bn3::unify::unify_batch(
+            &compiled,
+            &cols,
+            cgap_bn3::unify::DEFAULT_CHUNK_ROWS,
+        ) {
+            Ok(m) => m,
             Err(_) => return CGAP_ERR_OABI_MISMATCH,
         };
+        let batch =
+            match cgap_bn3::project::ConsequentProjector::new().project(&compiled, 0, &matches) {
+                Ok(b) => b,
+                Err(_) => return CGAP_ERR_OABI_MISMATCH,
+            };
         for row_i in 0..batch.rows.len() {
             let (_, _, o, _) = batch.rows.row(row_i);
             if lane_count >= lanes_cap {
@@ -700,38 +717,76 @@ pub unsafe extern "C" fn cgap_commit_parquet(
         Ok(p) if !p.is_empty() => p,
         _ => return CGAP_ERR_SHACL_VIOLATION,
     };
-    // A02 sealed-block commit: fixed 64 KiB static buffer (the documented
-    // lease), write_slab -> seal -> flush_to(FileSink) — the receipted A02
-    // Tier H handoff path.
-    let mut block = cgap_parquet::mmap_writer::StaticPageBuffer::<65_536>::new();
-    let lane_u32: Vec<u32> = vals.iter().map(|&v| v as u32).collect();
-    let slab = cgap_parquet::mmap_writer::SlabView {
-        lanes: &[&lane_u32],
-        rows: lane_count as u32,
-        bits: 8,
-    };
-    let mut writer = block.writer();
-    if let Err(_) = writer.write_slab(&slab) {
-        return CGAP_ERR_LEASE_EXHAUSTED;
-    }
-    let sealed = match writer.seal(None) {
-        Ok(s) => s,
-        Err(_) => return CGAP_ERR_LEASE_EXHAUSTED,
-    };
-    // Tier H handoff: the sealed block through the real BlockSink seam.
-    match std::fs::File::create(path) {
-        Ok(f) => {
-            let sink = cgap_parquet::mmap_writer::FileSink::new(
-                f,
-                vec![0u8; sealed.bytes().len()].into_boxed_slice(),
-            );
-            match sealed.flush_to(sink) {
-                Ok(()) => CGAP_OK,
+    // A02 sealed-block commit through the W3-L4 PRE-LEASED ring sink: the
+    // 64 KiB static buffer + 64 KiB ring are granted ONCE per lane slot
+    // (thread-local lease; spill handle pre-opened at grant, `path` is the
+    // rotation spill target). Steady-state per-tx = memcpy into the ring
+    // window + writer.seal — NO per-call File::create, NO per-call scratch
+    // or lane Vec alloc. New-ring refusal / spill IO failure map to
+    // CGAP_ERR_LEASE_EXHAUSTED (never silent truncation); the lane-value
+    // view is a zero-copy u32 reborrow (i32 values are domain-gated to
+    // [0, 255] above, so the bit patterns are identical).
+    COMMIT_LEASE.with(|lease| {
+        let slot = &mut *lease.borrow_mut();
+        // Lease grant (once per lane slot): pre-open the spill handle at
+        // `path` — the rotation spill target — and mint the ring. This is
+        // the ONLY File::create in the path; steady-state never touches it.
+        if slot.is_none() {
+            match std::fs::File::create(path) {
+                Ok(f) => {
+                    *slot = Some(CommitLease {
+                        block: cgap_parquet::mmap_writer::StaticPageBuffer::<65_536>::new(),
+                        ring: cgap_parquet::mmap_writer::RingSink::new(Some(f)),
+                    });
+                }
                 Err(_) => return CGAP_ERR_LEASE_EXHAUSTED,
             }
         }
-        Err(_) => return CGAP_ERR_LEASE_EXHAUSTED,
-    }
+        let lease = slot.as_mut().expect("lease granted above");
+        // Zero-copy lane view: i32 -> u32 reborrow, identical bit patterns
+        // for the domain-gated [0, 255] values (no per-call Vec).
+        // SAFETY: `vals` (validated above) lives for the call; i32/u32 have
+        // identical layout; values are in [0, 255] so the reinterpret is
+        // value-identity, not a cast.
+        let lanes_u32: &[u32] =
+            unsafe { core::slice::from_raw_parts(vals.as_ptr() as *const u32, vals.len()) };
+        let slab = cgap_parquet::mmap_writer::SlabView {
+            lanes: &[lanes_u32],
+            rows: lane_count as u32,
+            bits: 8,
+        };
+        let mut writer = lease.block.writer();
+        if writer.write_slab(&slab).is_err() {
+            return CGAP_ERR_LEASE_EXHAUSTED;
+        }
+        let sealed = match writer.seal(None) {
+            Ok(s) => s,
+            Err(_) => return CGAP_ERR_LEASE_EXHAUSTED,
+        };
+        // Tier H handoff: the sealed block through the ring sink seam.
+        // Rotation (ring wrap) drains to the pre-opened spill handle.
+        if sealed.flush_to(&mut lease.ring).is_err() {
+            return CGAP_ERR_LEASE_EXHAUSTED;
+        }
+        CGAP_OK
+    })
+}
+
+/// The per-lane-slot commit lease (W3-L4): the 64 KiB static block buffer
+/// plus the 64 KiB ring sink with its pre-opened spill handle. Granted once,
+/// reused for every transaction — the steady-state path allocates nothing.
+/// Host-surface gated exactly like the commit body (the XIP `target_os =
+/// "none"` build carries no allocator/std and links no cgap-parquet).
+#[cfg(not(target_os = "none"))]
+struct CommitLease {
+    block: cgap_parquet::mmap_writer::StaticPageBuffer<65_536>,
+    ring: cgap_parquet::mmap_writer::RingSink,
+}
+
+#[cfg(not(target_os = "none"))]
+thread_local! {
+    static COMMIT_LEASE: std::cell::RefCell<Option<CommitLease>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Typed UNSUPPORTED(scope) record — `_cgap_p28_invariant_check` stays
@@ -837,10 +892,9 @@ const _: () = assert!(P28_INVARIANT_CHECK_UNSUPPORTED.len() > 128);
 #[cfg(test)]
 mod wave3_courts {
     use super::{
-        CgapAdmitFrameFn, CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView,
-        CgapStatus, CgapVerifyP28Fn, CGAP_ABI_VERSION, CGAP_ERR_INVALID_MAGIC,
-        CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION,
-        CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
+        CgapAdmitFrameFn, CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView, CgapStatus,
+        CgapVerifyP28Fn, CGAP_ABI_VERSION, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED,
+        CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -895,7 +949,7 @@ mod wave3_courts {
                 if !in_ws {
                     out.push(' ');
                 }
-            in_ws = true;
+                in_ws = true;
             } else {
                 out.push(ch);
                 in_ws = false;
@@ -909,9 +963,7 @@ mod wave3_courts {
 
     fn parse_version(text: &str) -> Result<u32, String> {
         let needle = "#define CGAP_ABI_VERSION";
-        let i = text
-            .find(needle)
-            .ok_or("CGAP_ABI_VERSION define absent")?;
+        let i = text.find(needle).ok_or("CGAP_ABI_VERSION define absent")?;
         let rest = &text[i + needle.len()..];
         let tok = rest
             .split(|c: char| c.is_whitespace() || c == ';')
@@ -995,7 +1047,9 @@ mod wave3_courts {
             "cgap_verify_p28",
         ] {
             let needle = format!("{name}(");
-            let i = text.find(&needle).ok_or(format!("prototype {name} absent"))?;
+            let i = text
+                .find(&needle)
+                .ok_or(format!("prototype {name} absent"))?;
             let open = i + needle.len() - 1; // index of '('
             let close = text[open..]
                 .find(')')
@@ -1035,7 +1089,11 @@ mod wave3_courts {
     const MIRROR_PARAMS: &[(&str, &[&str])] = &[
         (
             "cgap_admit_frame",
-            &["const uint8_t* bytes", "size_t len", "cgap_frame_view* out_view"],
+            &[
+                "const uint8_t* bytes",
+                "size_t len",
+                "cgap_frame_view* out_view",
+            ],
         ),
         (
             "cgap_eval_bn3",
@@ -1050,11 +1108,19 @@ mod wave3_courts {
         ),
         (
             "cgap_commit_parquet",
-            &["const int32_t* lanes", "size_t lane_count", "const char* path"],
+            &[
+                "const int32_t* lanes",
+                "size_t lane_count",
+                "const char* path",
+            ],
         ),
         (
             "cgap_verify_p28",
-            &["const uint8_t* evidence", "size_t len", "uint64_t* out_digest"],
+            &[
+                "const uint8_t* evidence",
+                "size_t len",
+                "uint64_t* out_digest",
+            ],
         ),
     ];
 
@@ -1095,20 +1161,28 @@ mod wave3_courts {
         let norm = normalize(&strip_comments(text));
         let version = parse_version(&norm)?;
         if version != CGAP_ABI_VERSION {
-            return Err(format!("ABI version header={version} rust={CGAP_ABI_VERSION}"));
+            return Err(format!(
+                "ABI version header={version} rust={CGAP_ABI_VERSION}"
+            ));
         }
         parse_status_typedef(&norm)?;
         let got: BTreeMap<String, u32> = parse_enum(&norm)?.into_iter().collect();
-        let want: BTreeMap<String, u32> =
-            MIRROR_ENUM.iter().map(|(n, v)| (n.to_string(), *v)).collect();
+        let want: BTreeMap<String, u32> = MIRROR_ENUM
+            .iter()
+            .map(|(n, v)| (n.to_string(), *v))
+            .collect();
         if got != want {
             return Err(format!("status enum drift: header={got:?} rust={want:?}"));
         }
         let got_view = parse_view_fields(&norm)?;
-        let want_view: Vec<(String, String)> =
-            MIRROR_VIEW.iter().map(|(n, t)| (n.to_string(), t.to_string())).collect();
+        let want_view: Vec<(String, String)> = MIRROR_VIEW
+            .iter()
+            .map(|(n, t)| (n.to_string(), t.to_string()))
+            .collect();
         if got_view != want_view {
-            return Err(format!("view drift: header={got_view:?} rust={want_view:?}"));
+            return Err(format!(
+                "view drift: header={got_view:?} rust={want_view:?}"
+            ));
         }
         let protos = parse_prototypes(&norm)?;
         for (name, want_params) in MIRROR_PARAMS {
@@ -1143,19 +1217,79 @@ mod wave3_courts {
     // fails the court as a VACUOUS GATE; a flip on a collateral leg fails it
     // as unattributable.
     const MUTATIONS: &[(&str, &str, &str, &str)] = &[
-        ("M1 param-type flip (§6.1 literal)", "const uint8_t* bytes", "const uint32_t* bytes", "cgap_admit_frame params"),
-        ("M2 param drop (admit len)", "bytes, size_t len,", "bytes,", "cgap_admit_frame params"),
-        ("M3 return-type change (commit)", "CgapStatus cgap_commit_parquet", "int cgap_commit_parquet", "cgap_commit_parquet: return"),
-        ("M4 status value flip (P28)", "0x503238FFu", "0x503238FEu", "status enum drift"),
-        ("M5 ABI version bump", "#define CGAP_ABI_VERSION 1u", "#define CGAP_ABI_VERSION 2u", "ABI version"),
-        ("M6 out-param const flip (doc divergence note)", "cgap_frame_view* out_view", "const cgap_frame_view* out_view", "cgap_admit_frame params"),
-        ("M7 view field type (layout pin)", "size_t payload_len;", "uint32_t payload_len;", "view drift"),
-        ("M8 view field drop (rule_count)", "uint32_t rule_count;", "", "view drift"),
-        ("M9 symbol rename (verify)", "cgap_verify_p28", "cgap_verify_p2x", "prototype cgap_verify_p28 absent"),
-        ("M10 enum member rename (OK)", "CGAP_OK =", "CGAP_SUCCESS =", "status enum drift"),
+        (
+            "M1 param-type flip (§6.1 literal)",
+            "const uint8_t* bytes",
+            "const uint32_t* bytes",
+            "cgap_admit_frame params",
+        ),
+        (
+            "M2 param drop (admit len)",
+            "bytes, size_t len,",
+            "bytes,",
+            "cgap_admit_frame params",
+        ),
+        (
+            "M3 return-type change (commit)",
+            "CgapStatus cgap_commit_parquet",
+            "int cgap_commit_parquet",
+            "cgap_commit_parquet: return",
+        ),
+        (
+            "M4 status value flip (P28)",
+            "0x503238FFu",
+            "0x503238FEu",
+            "status enum drift",
+        ),
+        (
+            "M5 ABI version bump",
+            "#define CGAP_ABI_VERSION 1u",
+            "#define CGAP_ABI_VERSION 2u",
+            "ABI version",
+        ),
+        (
+            "M6 out-param const flip (doc divergence note)",
+            "cgap_frame_view* out_view",
+            "const cgap_frame_view* out_view",
+            "cgap_admit_frame params",
+        ),
+        (
+            "M7 view field type (layout pin)",
+            "size_t payload_len;",
+            "uint32_t payload_len;",
+            "view drift",
+        ),
+        (
+            "M8 view field drop (rule_count)",
+            "uint32_t rule_count;",
+            "",
+            "view drift",
+        ),
+        (
+            "M9 symbol rename (verify)",
+            "cgap_verify_p28",
+            "cgap_verify_p2x",
+            "prototype cgap_verify_p28 absent",
+        ),
+        (
+            "M10 enum member rename (OK)",
+            "CGAP_OK =",
+            "CGAP_SUCCESS =",
+            "status enum drift",
+        ),
         // Wave-4 additions:
-        ("M11 status typedef width flip", "typedef uint32_t CgapStatus;", "typedef uint16_t CgapStatus;", "CgapStatus typedef drift"),
-        ("M12 enum member drop (INVALID_MAGIC)", "CGAP_ERR_INVALID_MAGIC =", "", "status enum drift"),
+        (
+            "M11 status typedef width flip",
+            "typedef uint32_t CgapStatus;",
+            "typedef uint16_t CgapStatus;",
+            "CgapStatus typedef drift",
+        ),
+        (
+            "M12 enum member drop (INVALID_MAGIC)",
+            "CGAP_ERR_INVALID_MAGIC =",
+            "",
+            "status enum drift",
+        ),
     ];
 
     /// Fold through a view's payload IN PLACE — the house rotate-xor word
@@ -1164,8 +1298,7 @@ mod wave3_courts {
     /// order, odd tail zero-extended: platform-pinned, replayable.
     fn fold_view(view: &CgapFrameView) -> u64 {
         assert!(!view.payload.is_null(), "fold_view: null payload");
-        let bytes =
-            unsafe { core::slice::from_raw_parts(view.payload, view.payload_len) };
+        let bytes = unsafe { core::slice::from_raw_parts(view.payload, view.payload_len) };
         // Wave F2 item 5: the fold LAW has ONE implementation
         // (`super::fold_bytes`, the lib-side byte fold the sovereign verify
         // digest serves) — this court helper delegates instead of carrying a
@@ -1189,7 +1322,13 @@ mod wave3_courts {
         // public fn-pointer aliases: any drift in alias or guard fails to
         // COMPILE. Chain leg: aliases <-> guard literals (the mirror table
         // <-> header leg is the parity test below).
-        unsafe extern "C" fn sig_admit(_: *const u8, _: usize, _: *mut CgapFrameView) -> CgapStatus { 0 }
+        unsafe extern "C" fn sig_admit(
+            _: *const u8,
+            _: usize,
+            _: *mut CgapFrameView,
+        ) -> CgapStatus {
+            0
+        }
         unsafe extern "C" fn sig_eval(
             _: *const CgapFrameView,
             _: *const u8,
@@ -1197,9 +1336,19 @@ mod wave3_courts {
             _: *mut i32,
             _: usize,
             _: *mut usize,
-        ) -> CgapStatus { 0 }
-        unsafe extern "C" fn sig_commit(_: *const i32, _: usize, _: *const core::ffi::c_char) -> CgapStatus { 0 }
-        unsafe extern "C" fn sig_verify(_: *const u8, _: usize, _: *mut u64) -> CgapStatus { 0 }
+        ) -> CgapStatus {
+            0
+        }
+        unsafe extern "C" fn sig_commit(
+            _: *const i32,
+            _: usize,
+            _: *const core::ffi::c_char,
+        ) -> CgapStatus {
+            0
+        }
+        unsafe extern "C" fn sig_verify(_: *const u8, _: usize, _: *mut u64) -> CgapStatus {
+            0
+        }
         let _ = sig_admit as CgapAdmitFrameFn;
         let _ = sig_eval as CgapEvalBn3Fn;
         let _ = sig_commit as CgapCommitParquetFn;
@@ -1292,8 +1441,7 @@ mod wave3_courts {
             println!("[SKIP] cc absent — C11 compile leg unexecuted (parser legs still ran)");
             return;
         }
-        let dir =
-            std::env::temp_dir().join(format!("cgap-header-court-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("cgap-header-court-{}", std::process::id()));
         fs::create_dir_all(&dir).expect("temp dir");
         // Explicit-typed fn pointers: if a header prototype drifts, these
         // lines fail to type-match and the TU refuses to compile — a C-side
@@ -1342,7 +1490,10 @@ int main(void) {
             "C11 layout-mutation anchor not unique — compile leg vacuous"
         );
         let mutated = real.replacen(anchor, "uint32_t payload_len;", 1);
-        assert_ne!(mutated, real, "mutation anchor absent — compile leg vacuous");
+        assert_ne!(
+            mutated, real,
+            "mutation anchor absent — compile leg vacuous"
+        );
         fs::write(mut_inc.join("cgap.h"), mutated).expect("write mutated header");
         let bad = run(&mut_inc, "mutated.o");
         assert!(
@@ -1455,12 +1606,15 @@ int main() {
         if depth > 6 {
             return;
         }
-        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
         for e in rd.flatten() {
             let p = e.path();
             if p.is_dir() {
                 let is_build_root = skip_build_roots
-                    && p.file_name().map_or(false, |n| n.to_string_lossy().starts_with("target"));
+                    && p.file_name()
+                        .map_or(false, |n| n.to_string_lossy().starts_with("target"));
                 if !is_build_root {
                     walk_impl(&p, depth + 1, files, skip_build_roots);
                 }
@@ -1484,7 +1638,10 @@ int main() {
         ];
         for i in 0..vals.len() {
             for j in (i + 1)..vals.len() {
-                assert_ne!(vals[i], vals[j], "register values must be pairwise distinct");
+                assert_ne!(
+                    vals[i], vals[j],
+                    "register values must be pairwise distinct"
+                );
             }
         }
         // Exact pins (§2).
@@ -1504,17 +1661,27 @@ int main() {
             assert_eq!(v & 0xFFFF_0000, 0x4347_0000, "'CG' class");
             assert_ne!(v & 0x0000_FFFF, 0, "'CG' sequence nonzero");
         }
-        assert_eq!(CGAP_ERR_P28_SPOLIATION & 0xFFFF_FF00, 0x5032_3800, "'P28' class");
+        assert_eq!(
+            CGAP_ERR_P28_SPOLIATION & 0xFFFF_FF00,
+            0x5032_3800,
+            "'P28' class"
+        );
         assert_eq!(CGAP_ERR_P28_SPOLIATION & 0xFF, 0xFF, "'P28' tail FF");
         // Header enum parity, asserted independently of the §6.1 court so
         // the status court never depends on another test's passage.
         let norm = normalize(&strip_comments(&header_source()));
-        let got: BTreeMap<String, u32> =
-            parse_enum(&norm).expect("header enum parse").into_iter().collect();
+        let got: BTreeMap<String, u32> = parse_enum(&norm)
+            .expect("header enum parse")
+            .into_iter()
+            .collect();
         for (name, v) in MIRROR_ENUM {
             assert_eq!(got.get(*name), Some(v), "header enum value for {name}");
         }
-        assert_eq!(got.len(), 6, "header enum pins exactly the six register values");
+        assert_eq!(
+            got.len(),
+            6,
+            "header enum pins exactly the six register values"
+        );
     }
 
     #[test]
@@ -1600,7 +1767,9 @@ int main() {
             if f == &self_path {
                 continue;
             }
-            let Ok(text) = fs::read_to_string(f) else { continue };
+            let Ok(text) = fs::read_to_string(f) else {
+                continue;
+            };
             for n in names {
                 let c = text.matches(&format!("return {n}")).count();
                 if c > 0 {
@@ -1628,7 +1797,10 @@ int main() {
             let s = sites
                 .get(n)
                 .unwrap_or_else(|| panic!("ledger: {n} has NO landed producer"));
-            assert!(s.iter().any(|x| x.contains("penstock.rs")), "{n} must cite penstock.rs");
+            assert!(
+                s.iter().any(|x| x.contains("penstock.rs")),
+                "{n} must cite penstock.rs"
+            );
             println!("LANDED  {n}: {}", s.join(", "));
         }
         // Cross-lane frozen-copy parity (Wave-1 note): penstock pins the
@@ -1738,7 +1910,8 @@ int main() {
             rule_count: 1,
         };
         assert_eq!(
-            view.payload, buf.as_ptr(),
+            view.payload,
+            buf.as_ptr(),
             "view.payload must alias the caller buffer (zero-copy borrow, §2)"
         );
         assert_eq!(view.payload_len, LEN);
@@ -1756,7 +1929,10 @@ int main() {
         let d1 = fold_view(&view);
         let d1c = fold_view(&view_copy);
         assert_eq!(d1, d1c, "fold must be deterministic over equal bytes");
-        assert_ne!(d1, 0, "1 MiB+7 pseudorandom bytes folded to 0 — fold broken");
+        assert_ne!(
+            d1, 0,
+            "1 MiB+7 pseudorandom bytes folded to 0 — fold broken"
+        );
         for site in [LEN / 2, 0, LEN - 1] {
             // SAFETY: site < LEN, single-threaded test-local buffer;
             // volatile defeats elision of the mutation.
@@ -2011,10 +2187,8 @@ mod wave9_courts {
     fn lease_root() -> &'static PathBuf {
         static ROOT: OnceLock<PathBuf> = OnceLock::new();
         ROOT.get_or_init(|| {
-            let r = std::env::temp_dir().join(format!(
-                "cgap-a19-w9-nested-target-{}",
-                std::process::id()
-            ));
+            let r = std::env::temp_dir()
+                .join(format!("cgap-a19-w9-nested-target-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&r); // stale lease from a crashed prior run
             std::fs::create_dir_all(&r).expect("create nested build-root lease");
             r
@@ -2068,10 +2242,7 @@ mod wave9_courts {
 
     fn nested_cargo_envs() -> Vec<(&'static str, String)> {
         vec![
-            (
-                "CARGO_TARGET_DIR",
-                lease_root().display().to_string(),
-            ),
+            ("CARGO_TARGET_DIR", lease_root().display().to_string()),
             // Wave-receipt method (a20-wave5/a20-wave9): dev opt-level 2 so
             // the 1M-row stress and the BLAKE3 closures run at measurable
             // speed; dev opt-0 is not the receipted configuration.
@@ -2115,12 +2286,8 @@ mod wave9_courts {
             tail(&outcome.stdout),
             tail(&outcome.stderr)
         );
-        let (passed, failed) = require_summary(&outcome.stdout, min_passed).unwrap_or_else(|e| {
-            panic!(
-                "{label}: {e}; stdout tail:\n{}",
-                tail(&outcome.stdout)
-            )
-        });
+        let (passed, failed) = require_summary(&outcome.stdout, min_passed)
+            .unwrap_or_else(|e| panic!("{label}: {e}; stdout tail:\n{}", tail(&outcome.stdout)));
         println!(
             "WAVE9 INTEGRATION  {label}: cargo test -p {pkg} --test {test_target} exit=0 passed={passed} failed={failed} elapsed={elapsed:?} (lease {})",
             lease_root().display()
@@ -2189,9 +2356,18 @@ mod wave9_courts {
         let ok3 = "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out";
         assert_eq!(require_summary(ok3, 3).unwrap(), (3, 0));
         let refusals: Vec<(&str, &str)> = vec![
-            ("zero-executed", "test result: ok. 0 passed; 0 failed; 0 ignored"),
-            ("red suite", "test result: FAILED. 2 passed; 1 failed; 0 ignored"),
-            ("no summary (compile-abort)", "error: could not compile `cgap-x` (lib)"),
+            (
+                "zero-executed",
+                "test result: ok. 0 passed; 0 failed; 0 ignored",
+            ),
+            (
+                "red suite",
+                "test result: FAILED. 2 passed; 1 failed; 0 ignored",
+            ),
+            (
+                "no summary (compile-abort)",
+                "error: could not compile `cgap-x` (lib)",
+            ),
         ];
         for (label, fabricated) in refusals {
             assert!(
@@ -2210,10 +2386,14 @@ mod wave9_courts {
         // release must delete it. (Lease::drop routes through the same
         // factored law — if either leg breaks, the shared nested build
         // root either never disappears or vanishes under a live court.)
-        let scratch = std::env::temp_dir().join(format!("cgap-a19-w9-lease-court-{}", std::process::id()));
+        let scratch =
+            std::env::temp_dir().join(format!("cgap-a19-w9-lease-court-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&scratch);
         std::fs::create_dir_all(&scratch).expect("scratch lease");
-        assert!(scratch.exists(), "scratch lease root must exist before release");
+        assert!(
+            scratch.exists(),
+            "scratch lease root must exist before release"
+        );
         release_lease_if_last(&scratch, 1); // one holder remains
         assert!(
             scratch.exists(),
@@ -2321,15 +2501,17 @@ mod wave9_courts {
             tail(&outcome.stdout),
             tail(&outcome.stderr)
         );
-        let summary = parse_gate_summary(&outcome.stdout).unwrap_or_else(|e| {
-            panic!("A07 gate: {e}; stdout tail:\n{}", tail(&outcome.stdout))
-        });
+        let summary = parse_gate_summary(&outcome.stdout)
+            .unwrap_or_else(|e| panic!("A07 gate: {e}; stdout tail:\n{}", tail(&outcome.stdout)));
         // Leg 2: the gate's own anti-vacuity probe must pass — a gate that
         // cannot detect its poison fixture cannot vouch for hits=0 above.
         let probe = run_bounded("python3", &[script, "--self-check"], &[], GATE_DEADLINE)
             .unwrap_or_else(|e| panic!("A07 gate self-check: runner failed: {e}"));
         let probe_status = probe.status.unwrap_or_else(|| {
-            panic!("A07 gate self-check: deadline exceeded; stderr tail:\n{}", tail(&probe.stderr))
+            panic!(
+                "A07 gate self-check: deadline exceeded; stderr tail:\n{}",
+                tail(&probe.stderr)
+            )
         });
         assert!(
             probe_status.success(),
@@ -2378,10 +2560,14 @@ mod wave9_courts {
             return Err(format!("SUMMARY line unparsable: {line:?}"));
         };
         if scanned < 10 {
-            return Err(format!("scanned={scanned} < floor 10 — scan breadth gutted"));
+            return Err(format!(
+                "scanned={scanned} < floor 10 — scan breadth gutted"
+            ));
         }
         if crates < 20 {
-            return Err(format!("crates={crates} < floor 20 — not all built crates scanned"));
+            return Err(format!(
+                "crates={crates} < floor 20 — not all built crates scanned"
+            ));
         }
         Ok(GateSummary { scanned, crates })
     }
@@ -2404,10 +2590,22 @@ mod wave9_courts {
         let s = parse_gate_summary(good).expect("receipted summary must parse");
         assert_eq!((s.scanned, s.crates), (45, 22));
         let refusals = vec![
-            ("hit present", "SUMMARY scanned=45 crates=22 hits=1 adv_hits=0"),
-            ("advisory hit", "SUMMARY scanned=45 crates=22 hits=0 adv_hits=3"),
-            ("breadth gutted", "SUMMARY scanned=4 crates=22 hits=0 adv_hits=0"),
-            ("crate coverage gutted", "SUMMARY scanned=45 crates=2 hits=0 adv_hits=0"),
+            (
+                "hit present",
+                "SUMMARY scanned=45 crates=22 hits=1 adv_hits=0",
+            ),
+            (
+                "advisory hit",
+                "SUMMARY scanned=45 crates=22 hits=0 adv_hits=3",
+            ),
+            (
+                "breadth gutted",
+                "SUMMARY scanned=4 crates=22 hits=0 adv_hits=0",
+            ),
+            (
+                "crate coverage gutted",
+                "SUMMARY scanned=45 crates=2 hits=0 adv_hits=0",
+            ),
         ];
         for (label, fabricated) in refusals {
             assert!(
@@ -2557,10 +2755,7 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
             return false;
         }
         let sysroot = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim().to_string());
-        sysroot
-            .join("lib/rustlib")
-            .join(triple)
-            .is_dir()
+        sysroot.join("lib/rustlib").join(triple).is_dir()
     }
 
     fn fixture_root(name: &str) -> PathBuf {
@@ -2661,17 +2856,21 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         let envs = vec![("RUSTFLAGS", format!("-C link-arg=-T{}", script.display()))];
 
         // LEG 1 — sections present.
-        let (status, _out, err) = build_fixture(&dir, &envs, FIXTURE_MAIN_WITH_SECTIONS, XIP_BUILD_DEADLINE);
-        let status = status
-            .unwrap_or_else(|| panic!("xip court leg 1: deadline exceeded; stderr:\n{}", tail(&err)));
+        let (status, _out, err) =
+            build_fixture(&dir, &envs, FIXTURE_MAIN_WITH_SECTIONS, XIP_BUILD_DEADLINE);
+        let status = status.unwrap_or_else(|| {
+            panic!(
+                "xip court leg 1: deadline exceeded; stderr:\n{}",
+                tail(&err)
+            )
+        });
         assert!(
             status.success(),
             "fixture with .oabi/.bn3 sections failed to link against the checked-in xip.ld; stderr tail:\n{}",
             tail(&err)
         );
         let size = tools.join("llvm-size");
-        let elf = dir
-            .join("target/riscv32imc-unknown-none-elf/release/a19xip_link");
+        let elf = dir.join("target/riscv32imc-unknown-none-elf/release/a19xip_link");
         let size_out = std::process::Command::new(&size)
             .arg("-A")
             .arg(&elf)
@@ -2682,10 +2881,11 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
             "llvm-size -A on {elf:?} failed:\n{}",
             String::from_utf8_lossy(&size_out.stderr)
         );
-        let secs: BTreeMap<String, (u64, u64)> = parse_size_a(&String::from_utf8_lossy(&size_out.stdout))
-            .into_iter()
-            .map(|(n, s, a)| (n, (s, a)))
-            .collect();
+        let secs: BTreeMap<String, (u64, u64)> =
+            parse_size_a(&String::from_utf8_lossy(&size_out.stdout))
+                .into_iter()
+                .map(|(n, s, a)| (n, (s, a)))
+                .collect();
         for name in [".oabi", ".bn3"] {
             let Some(&(sz, addr)) = secs.get(name) else {
                 panic!("{name} absent from the linked ELF — XIP placement law broken (llvm-size output below):\n{}", String::from_utf8_lossy(&size_out.stdout));
@@ -2726,7 +2926,10 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         let (status, _out, err) =
             build_fixture(&dir, &envs, FIXTURE_MAIN_NO_SECTIONS, XIP_BUILD_DEADLINE);
         let status = status.unwrap_or_else(|| {
-            panic!("xip court leg 2: deadline exceeded; stderr:\n{}", tail(&err))
+            panic!(
+                "xip court leg 2: deadline exceeded; stderr:\n{}",
+                tail(&err)
+            )
         });
         assert!(
             !status.success(),
@@ -2776,7 +2979,10 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("src")).expect("sandbox src dir");
         let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-        for entry in std::fs::read_dir(&src_dir).expect("src dir readable").flatten() {
+        for entry in std::fs::read_dir(&src_dir)
+            .expect("src dir readable")
+            .flatten()
+        {
             let p = entry.path();
             if p.extension().map(|x| x == "rs").unwrap_or(false) {
                 let dst = dir.join("src").join(p.file_name().expect("file name"));
@@ -2857,7 +3063,10 @@ pub extern "C" fn cgap_xip_start() -> ! {
         )
         .unwrap_or_else(|e| panic!("T1 court: nested runner failed: {e}"));
         let status = outcome.status.unwrap_or_else(|| {
-            panic!("T1 court: deadline exceeded; stderr tail:\n{}", tail(&outcome.stderr))
+            panic!(
+                "T1 court: deadline exceeded; stderr tail:\n{}",
+                tail(&outcome.stderr)
+            )
         });
         // No sanctioned build-failure skip remains: the size gate is hard.
         assert!(
@@ -2960,12 +3169,11 @@ pub extern "C" fn cgap_xip_start() -> ! {
 #[cfg(test)]
 mod wave_f2_p28_courts {
     use super::{
-        fold_bytes, cgap_verify_p28, CgapStatus, CgapVerifyP28Fn, CGAP_ERR_P28_SPOLIATION,
-        CGAP_OK,
+        cgap_verify_p28, fold_bytes, CgapStatus, CgapVerifyP28Fn, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
     };
     use cgap_p28::attestation::{
-        instrument_header_span, origin_authority_digest, ATTESTATION_LEN, ATTESTATION_VERSION,
-        FLAG_ROOT, LICENSE_MAGIC, P28LicenseAttestation, SAFE_HARBOR_CEILING_MAX_CENTS,
+        instrument_header_span, origin_authority_digest, P28LicenseAttestation, ATTESTATION_LEN,
+        ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -3107,11 +3315,9 @@ mod wave_f2_p28_courts {
     #[test]
     fn verify_sandbox_bit_flip_corpus_typed_refusals() {
         let instrument = real_instrument_span();
-        let wire: [u8; ATTESTATION_LEN] = valid_root_record(&instrument)
-            .to_bytes();
+        let wire: [u8; ATTESTATION_LEN] = valid_root_record(&instrument).to_bytes();
 
-        let dir = std::env::temp_dir()
-            .join(format!("cgap-f2-p28-sandbox-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("cgap-f2-p28-sandbox-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("sandbox dir");
         let att_path = dir.join("attestation.bin");
@@ -3156,8 +3362,7 @@ mod wave_f2_p28_courts {
                 } else {
                     refusals += 1;
                     assert_eq!(
-                        st,
-                        CGAP_ERR_P28_SPOLIATION,
+                        st, CGAP_ERR_P28_SPOLIATION,
                         "mutation ({i},{j}) must refuse TYPED (got {st:#x})"
                     );
                 }
@@ -3168,7 +3373,11 @@ mod wave_f2_p28_courts {
             survivors, predicted,
             "survivors must be EXACTLY the D-A17-1 ceiling set-bit class"
         );
-        assert_eq!(refusals, 640 - predicted.len(), "all 640 mutations must run");
+        assert_eq!(
+            refusals,
+            640 - predicted.len(),
+            "all 640 mutations must run"
+        );
         // sha256-exact restore, fail-closed; byte-exact comparison always runs.
         let sha_after = shasum(&att_path);
         match (&sha_before, &sha_after) {
@@ -3251,8 +3460,7 @@ mod wave_f2_p28_courts {
     fn verify_cdylib_symbol_table_gains_verify_p28() {
         // NOTE: macOS BSD nm has no --version; the availability gate is the
         // real spawn (NotFound = absent -> loud [SKIP], never a fake pass).
-        let dir = std::env::temp_dir()
-            .join(format!("cgap-f2-p28-dylib-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("cgap-f2-p28-dylib-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("dylib court lease dir");
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
@@ -3271,7 +3479,10 @@ mod wave_f2_p28_courts {
         )
         .unwrap_or_else(|e| panic!("cdylib symbol court: nested runner failed: {e}"));
         let status = outcome.status.unwrap_or_else(|| {
-            panic!("cdylib symbol court: build deadline exceeded; stderr:\n{}", super::wave9_courts::tail(&outcome.stderr))
+            panic!(
+                "cdylib symbol court: build deadline exceeded; stderr:\n{}",
+                super::wave9_courts::tail(&outcome.stderr)
+            )
         });
         assert!(
             status.success(),
@@ -3351,9 +3562,9 @@ mod wave_f2_p28_courts {
 mod wave_gap1_courts {
     use super::{
         cgap_admit_frame, cgap_commit_parquet, cgap_eval_bn3, CgapAdmitFrameFn,
-        CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView, CgapStatus, EVAL_ENCODING_PIN,
-        CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_OABI_MISMATCH,
-        CGAP_ERR_P28_SPOLIATION, CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
+        CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView, CgapStatus, CGAP_ERR_INVALID_MAGIC,
+        CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION,
+        CGAP_ERR_SHACL_VIOLATION, CGAP_OK, EVAL_ENCODING_PIN,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -3470,11 +3681,15 @@ mod wave_gap1_courts {
     /// 0 and 1; every projection's object word is the bound ?x = 100.
     fn one_rule_network() -> Vec<u8> {
         let words: Vec<u64> = [
-            1u64,          // rule_count
-            42u64,         // rule_id
-            k(7), k(8), v(0), // head (7, 8, ?0)
-            1u64,          // body_len
-            v(0), k(2), k(100), // body atom (?0, 2, 100)
+            1u64,  // rule_count
+            42u64, // rule_id
+            k(7),
+            k(8),
+            v(0), // head (7, 8, ?0)
+            1u64, // body_len
+            v(0),
+            k(2),
+            k(100), // body atom (?0, 2, 100)
         ]
         .to_vec();
         let mut b = Vec::with_capacity(words.len() * 8);
@@ -3553,7 +3768,10 @@ mod wave_gap1_courts {
             rule_count: 0,
         };
         let st_u = call_admit(&mut unaligned, &mut uview);
-        assert_eq!(st_u, CGAP_OK, "unaligned twin must admit via the decode path");
+        assert_eq!(
+            st_u, CGAP_OK,
+            "unaligned twin must admit via the decode path"
+        );
         assert_eq!(uview.payload_len, 64);
         assert_eq!(uview.payload, unsafe { unaligned.as_ptr().add(128) });
         println!("ADMIT POSITIVE: aligned projection + unaligned decode both admit; view is the zero-copy payload borrow");
@@ -3583,11 +3801,36 @@ mod wave_gap1_courts {
         let cases: &[(usize, u8, CgapStatus, &str)] = &[
             (0, b'X', CGAP_ERR_INVALID_MAGIC, "magic flip (A14 row 2)"),
             (4, 2, CGAP_ERR_INVALID_MAGIC, "version flip (A14 row 2)"),
-            (5, 0x10, CGAP_ERR_SHACL_VIOLATION, "reserved flag bit (A14 row 6 admits; A04 shape leg)"),
-            (8, 0x01, CGAP_ERR_OABI_MISMATCH, "payload_byte_len +1 (A14 row 3b)"),
-            (16, 0xFF, CGAP_ERR_OABI_MISMATCH, "digest byte flip (A04 BLAKE3 re-derivation)"),
-            (48, b'X', CGAP_ERR_P28_SPOLIATION, "attestation magic flip (A14 row 4)"),
-            (128, 0xFF, CGAP_ERR_OABI_MISMATCH, "payload byte flip (A04 digest leg)"),
+            (
+                5,
+                0x10,
+                CGAP_ERR_SHACL_VIOLATION,
+                "reserved flag bit (A14 row 6 admits; A04 shape leg)",
+            ),
+            (
+                8,
+                0x01,
+                CGAP_ERR_OABI_MISMATCH,
+                "payload_byte_len +1 (A14 row 3b)",
+            ),
+            (
+                16,
+                0xFF,
+                CGAP_ERR_OABI_MISMATCH,
+                "digest byte flip (A04 BLAKE3 re-derivation)",
+            ),
+            (
+                48,
+                b'X',
+                CGAP_ERR_P28_SPOLIATION,
+                "attestation magic flip (A14 row 4)",
+            ),
+            (
+                128,
+                0xFF,
+                CGAP_ERR_OABI_MISMATCH,
+                "payload byte flip (A04 digest leg)",
+            ),
         ];
         for &(site, xor, want, name) in cases {
             let mut mutated = frame.clone();
@@ -3597,10 +3840,7 @@ mod wave_gap1_courts {
             let on_disk = fs::read(&mpath).expect("sandbox mutation read");
             assert_eq!(on_disk, mutated, "sandbox bytes must match the mutation");
             let st = call_admit(&on_disk, core::ptr::null_mut());
-            assert_eq!(
-                st, want,
-                "mutation at {site} ({name}) must refuse TYPED"
-            );
+            assert_eq!(st, want, "mutation at {site} ({name}) must refuse TYPED");
         }
         // sha256-exact restore, fail-closed; byte-exact always runs.
         let sha_after = shasum(&path);
@@ -3608,7 +3848,11 @@ mod wave_gap1_courts {
             (Some(b), Some(a)) => assert_eq!(a, b, "sandbox restore not sha256-exact"),
             _ => println!("[SKIP] shasum absent — sha256 restore leg unexecuted; byte-exact leg below still ran"),
         }
-        assert_eq!(fs::read(&path).expect("sandbox re-read"), frame, "sandbox original byte-exact after the corpus");
+        assert_eq!(
+            fs::read(&path).expect("sandbox re-read"),
+            frame,
+            "sandbox original byte-exact after the corpus"
+        );
         fs::remove_dir_all(&dir).expect("sandbox lease cleanup");
         println!("ADMIT CORPUS: 7 fault sites, 7 typed refusals, restore byte-exact");
     }
@@ -3639,7 +3883,10 @@ mod wave_gap1_courts {
         // Determinism: same input -> same output.
         let mut lanes2 = [0i32; 8];
         let mut count2 = 0usize;
-        assert_eq!(call_eval(&view, &net, lanes2.as_mut_ptr(), 8, &mut count2), CGAP_OK);
+        assert_eq!(
+            call_eval(&view, &net, lanes2.as_mut_ptr(), 8, &mut count2),
+            CGAP_OK
+        );
         assert_eq!((count2, &lanes2[..count2]), (count, &lanes[..count]));
 
         // Zero-copy witness: flip one payload o-column byte through the raw
@@ -3654,13 +3901,23 @@ mod wave_gap1_courts {
         payload_m[site] = !orig;
         let mut lanes3 = [0i32; 8];
         let mut count3 = 0usize;
-        assert_eq!(call_eval(&view_m, &net, lanes3.as_mut_ptr(), 8, &mut count3), CGAP_OK);
+        assert_eq!(
+            call_eval(&view_m, &net, lanes3.as_mut_ptr(), 8, &mut count3),
+            CGAP_OK
+        );
         assert_eq!(count3, 1, "mutated o_0 must drop row 0 from the match set");
         payload_m[site] = orig;
         let mut lanes4 = [0i32; 8];
         let mut count4 = 0usize;
-        assert_eq!(call_eval(&view_m, &net, lanes4.as_mut_ptr(), 8, &mut count4), CGAP_OK);
-        assert_eq!((count4, &lanes4[..count4]), (count, &lanes[..count]), "restore must return the original eval");
+        assert_eq!(
+            call_eval(&view_m, &net, lanes4.as_mut_ptr(), 8, &mut count4),
+            CGAP_OK
+        );
+        assert_eq!(
+            (count4, &lanes4[..count4]),
+            (count, &lanes[..count]),
+            "restore must return the original eval"
+        );
         println!("EVAL POSITIVE: 2 matches -> lanes [1, 5] (projected ?0); deterministic; eval-side zero-copy witness held");
     }
 
@@ -3737,7 +3994,10 @@ mod wave_gap1_courts {
         let w = 3_000_000_000u64; // > i32::MAX, SlotConst payload
         wide[4 * 8..5 * 8].copy_from_slice(&w.to_le_bytes()); // head_o word
         let st = call_eval(&view, &wide, lanes.as_mut_ptr(), 8, &mut count);
-        assert_eq!(st, CGAP_ERR_SHACL_VIOLATION, "out-of-domain lane must refuse SHACL-typed");
+        assert_eq!(
+            st, CGAP_ERR_SHACL_VIOLATION,
+            "out-of-domain lane must refuse SHACL-typed"
+        );
         // (f) exhausted lease: cap 1 < 2 matches -> fail-closed typed.
         assert_eq!(
             call_eval(&view, &net, lanes.as_mut_ptr(), 1, &mut count),
@@ -3749,7 +4009,11 @@ mod wave_gap1_courts {
             (Some(b), Some(a)) => assert_eq!(a, b, "sandbox restore not sha256-exact"),
             _ => println!("[SKIP] shasum absent — sha256 restore leg unexecuted; byte-exact leg below still ran"),
         }
-        assert_eq!(fs::read(&net_path).expect("re-read"), net, "sandbox network byte-exact");
+        assert_eq!(
+            fs::read(&net_path).expect("re-read"),
+            net,
+            "sandbox network byte-exact"
+        );
         fs::remove_dir_all(&dir).expect("sandbox lease cleanup");
         println!("EVAL CORPUS: sigil/framing/alias/null/domain/lease -> 6 typed refusals; restore byte-exact");
     }
@@ -3764,9 +4028,18 @@ mod wave_gap1_courts {
     #[test]
     fn eval_encoding_pin_parity_real_compiler_round_trip() {
         // The pin text must name its framing (gutted-pin flip).
-        assert!(EVAL_ENCODING_PIN.contains("LE u64"), "pin must name the word encoding");
-        assert!(EVAL_ENCODING_PIN.contains("rule_count"), "pin must name the rule framing");
-        assert!(EVAL_ENCODING_PIN.contains("s-col|p-col|o-col"), "pin must name the payload layout");
+        assert!(
+            EVAL_ENCODING_PIN.contains("LE u64"),
+            "pin must name the word encoding"
+        );
+        assert!(
+            EVAL_ENCODING_PIN.contains("rule_count"),
+            "pin must name the rule framing"
+        );
+        assert!(
+            EVAL_ENCODING_PIN.contains("s-col|p-col|o-col"),
+            "pin must name the payload layout"
+        );
         // Direct rule (owner API construction).
         let direct = cgap_bn3::unify::Rule {
             rule_id: 42,
@@ -3776,11 +4049,16 @@ mod wave_gap1_courts {
         let direct_c = cgap_bn3::unify::RuleCompiler::compile(&direct).expect("direct compiles");
         // Pinned-encoding rule (the same rule, encoded as the ABI framing
         // defines it — one_rule_network is the encoder under test).
-        assert_eq!(one_rule_network().len(), 9 * 8, "encoding shape pin: 9 words");
+        assert_eq!(
+            one_rule_network().len(),
+            9 * 8,
+            "encoding shape pin: 9 words"
+        );
         let (s, p, o) = store_columns();
         let _ = (s, p, o); // store shape pin lives in eval_positive_control
         let from_wire = decode_network_for_parity(&one_rule_network()).expect("pinned decode");
-        let from_wire_c = cgap_bn3::unify::RuleCompiler::compile(&from_wire).expect("wire compiles");
+        let from_wire_c =
+            cgap_bn3::unify::RuleCompiler::compile(&from_wire).expect("wire compiles");
         assert_eq!(
             direct_c, from_wire_c,
             "pinned-encoding round trip must compile to the owner-identical form"
@@ -3823,9 +4101,17 @@ mod wave_gap1_courts {
         let mut body = Vec::new();
         for a in 0..body_len {
             let base = 6 + a * 3;
-            body.push(cgap_bn3::unify::BodyAtom::new(word(base)?, word(base + 1)?, word(base + 2)?));
+            body.push(cgap_bn3::unify::BodyAtom::new(
+                word(base)?,
+                word(base + 1)?,
+                word(base + 2)?,
+            ));
         }
-        Some(cgap_bn3::unify::Rule { rule_id, head, body })
+        Some(cgap_bn3::unify::Rule {
+            rule_id,
+            head,
+            body,
+        })
     }
 
     // -- Commit court 1: positive control, byte-identical to the owner API ---
@@ -3837,38 +4123,90 @@ mod wave_gap1_courts {
     /// (two files identical). Anti-vacuity: flips the always-refuse stub.
     #[test]
     fn commit_positive_control_matches_owner_api_bytes() {
+        // W3-L4 unblock (disclose-in-both): the commit leg now feeds the
+        // PRE-LEASED ring sink — steady-state blocks land in the ring and
+        // the spill file receives the drained bytes ONLY on rotation. The
+        // byte-identity claim is preserved EXACTLY: the spill file must
+        // equal the CONCATENATION of owner-API sealed blocks over the same
+        // lane, in commit order.
         let lanes: Vec<i32> = (0..64).map(|i| (i % 251) as i32).collect();
         let dir = sandbox_dir("commit");
         let p1 = dir.join("out1.par2");
         let p2 = dir.join("out2.par2");
-        let st1 = call_commit(&lanes, std::ffi::CString::new(p1.as_os_str().as_encoded_bytes()).expect("cstr").as_c_str());
-        assert_eq!(st1, CGAP_OK, "commit must admit (status {st1:#x})");
-        let on_disk = fs::read(&p1).expect("committed file readable");
-        assert!(!on_disk.is_empty(), "committed file must be nonempty");
-        // Owner-API reference block over the SAME lane (the canon path).
+        let cstr1 = std::ffi::CString::new(p1.as_os_str().as_encoded_bytes()).expect("cstr");
+        // Loop commits until the ring wraps at least once (bounded): the
+        // spilled bytes are the drained ring blocks.
+        let mut on_disk: Vec<u8> = Vec::new();
+        for _ in 0..4096 {
+            let st1 = call_commit(&lanes, cstr1.as_c_str());
+            assert_eq!(st1, CGAP_OK, "commit must admit (status {st1:#x})");
+            on_disk = fs::read(&p1).expect("committed file readable");
+            if !on_disk.is_empty() {
+                break;
+            }
+            on_disk.clear();
+        }
+        assert!(
+            !on_disk.is_empty(),
+            "ring must rotate to the spill file within 4096 commits"
+        );
+        // Owner-API reference: the CONCATENATION of sealed blocks over the
+        // same lane (the canon path), same block count as the ring drained.
         let lane_u32: Vec<u32> = lanes.iter().map(|&v| v as u32).collect();
         let mut block = cgap_parquet::mmap_writer::StaticPageBuffer::<65_536>::new();
-        let slab = cgap_parquet::mmap_writer::SlabView {
-            lanes: &[&lane_u32],
-            rows: 64,
-            bits: 8,
-        };
-        let mut writer = block.writer();
-        writer.write_slab(&slab).expect("reference write_slab");
-        let sealed = writer.seal(None).expect("reference seal");
-        assert_eq!(
-            on_disk.as_slice(),
-            sealed.bytes(),
-            "sovereign commit must write byte-identical owner-API bytes"
+        let mut expected: Vec<u8> = Vec::new();
+        for _ in 0.. {
+            let slab = cgap_parquet::mmap_writer::SlabView {
+                lanes: &[&lane_u32],
+                rows: 64,
+                bits: 8,
+            };
+            let mut writer = block.writer();
+            writer.write_slab(&slab).expect("reference write_slab");
+            let sealed = writer.seal(None).expect("reference seal");
+            expected.extend_from_slice(sealed.bytes());
+            if expected.len() >= on_disk.len() {
+                break;
+            }
+        }
+        assert!(
+            *on_disk == *expected,
+            "sovereign spill bytes must be byte-identical owner-API blocks"
         );
-        // Determinism: a second commit is byte-identical.
-        assert_eq!(
-            call_commit(&lanes, std::ffi::CString::new(p2.as_os_str().as_encoded_bytes()).expect("cstr").as_c_str()),
-            CGAP_OK
-        );
-        assert_eq!(fs::read(&p2).expect("second file"), on_disk, "commit is deterministic");
+        // Determinism: a second commit stream is byte-identical. The lease
+        // is per lane slot (thread-local; spill path resolved at grant), so
+        // the second stream runs on a FRESH lane slot (its own thread = its
+        // own lease granting at p2).
+        let on_disk_ref = on_disk.clone();
+        let p2_ref = p2.clone();
+        let handle = std::thread::spawn(move || {
+            let cstr2 =
+                std::ffi::CString::new(p2_ref.as_os_str().as_encoded_bytes()).expect("cstr");
+            let mut second: Vec<u8> = Vec::new();
+            for _ in 0..4096 {
+                assert_eq!(
+                    call_commit(&lanes, cstr2.as_c_str()),
+                    CGAP_OK,
+                    "second commit stream must admit"
+                );
+                second = fs::read(&p2_ref).expect("second file");
+                if !second.is_empty() {
+                    break;
+                }
+                second.clear();
+            }
+            assert!(
+                !second.is_empty(),
+                "second stream must rotate within 4096 commits"
+            );
+            second
+        });
+        let on_disk2 = handle.join().expect("determinism thread");
+        assert_eq!(on_disk2, on_disk_ref, "commit is deterministic");
         fs::remove_dir_all(&dir).expect("sandbox lease cleanup");
-        println!("COMMIT POSITIVE: file bytes == owner-API sealed block; deterministic across commits");
+        println!(
+            "COMMIT POSITIVE: spill bytes == owner-API sealed blocks (concatenated, commit order); deterministic across lane slots"
+        );
     }
 
     // -- Commit court 2: the /tmp sandbox refusal corpus ---------------------
@@ -3946,23 +4284,33 @@ mod wave_gap1_courts {
     // input; the always-admit stubs must admit every corpus mutation.
 
     unsafe extern "C" fn stub_admit_refuse(
-        _b: *const u8, _l: usize, _o: *mut CgapFrameView,
+        _b: *const u8,
+        _l: usize,
+        _o: *mut CgapFrameView,
     ) -> CgapStatus {
         CGAP_ERR_INVALID_MAGIC
     }
     unsafe extern "C" fn stub_admit_ok(
-        _b: *const u8, _l: usize, _o: *mut CgapFrameView,
+        _b: *const u8,
+        _l: usize,
+        _o: *mut CgapFrameView,
     ) -> CgapStatus {
         CGAP_OK
     }
     unsafe extern "C" fn stub_eval_refuse(
-        _v: *const CgapFrameView, _n: *const u8, _nl: usize, _o: *mut i32,
-        _c: usize, _oc: *mut usize,
+        _v: *const CgapFrameView,
+        _n: *const u8,
+        _nl: usize,
+        _o: *mut i32,
+        _c: usize,
+        _oc: *mut usize,
     ) -> CgapStatus {
         CGAP_ERR_OABI_MISMATCH
     }
     unsafe extern "C" fn stub_commit_refuse(
-        _l: *const i32, _n: usize, _p: *const core::ffi::c_char,
+        _l: *const i32,
+        _n: usize,
+        _p: *const core::ffi::c_char,
     ) -> CgapStatus {
         CGAP_ERR_LEASE_EXHAUSTED
     }
@@ -3979,9 +4327,22 @@ mod wave_gap1_courts {
         let frame = wire_frame(&payload);
         let mut frame_m = frame.clone();
         frame_m[0] ^= b'X';
-        let mut view = CgapFrameView { payload: core::ptr::null(), payload_len: 0, schema_id: 0, rule_count: 0 };
-        assert_eq!(call_admit(&frame, &mut view), CGAP_OK, "premise: real body admits the valid frame");
-        assert_ne!(call_admit(&frame_m, core::ptr::null_mut()), CGAP_OK, "premise: real body refuses the magic flip");
+        let mut view = CgapFrameView {
+            payload: core::ptr::null(),
+            payload_len: 0,
+            schema_id: 0,
+            rule_count: 0,
+        };
+        assert_eq!(
+            call_admit(&frame, &mut view),
+            CGAP_OK,
+            "premise: real body admits the valid frame"
+        );
+        assert_ne!(
+            call_admit(&frame_m, core::ptr::null_mut()),
+            CGAP_OK,
+            "premise: real body refuses the magic flip"
+        );
         let refuse: CgapAdmitFrameFn = stub_admit_refuse;
         assert_ne!(
             unsafe { refuse(frame.as_ptr(), frame.len(), &mut view) },
@@ -4000,7 +4361,10 @@ mod wave_gap1_courts {
         let view_e = eval_view(&store);
         let mut lanes = [0i32; 8];
         let mut count = 0usize;
-        assert_eq!(call_eval(&view_e, &net, lanes.as_mut_ptr(), 8, &mut count), CGAP_OK);
+        assert_eq!(
+            call_eval(&view_e, &net, lanes.as_mut_ptr(), 8, &mut count),
+            CGAP_OK
+        );
         let mut net_m = net.clone();
         net_m[7 * 8 + 7] = 0x05; // reserved sigil (the corpus mutation)
         assert_ne!(
@@ -4010,7 +4374,16 @@ mod wave_gap1_courts {
         );
         let refuse_e: CgapEvalBn3Fn = stub_eval_refuse;
         assert_ne!(
-            unsafe { refuse_e(&view_e, net.as_ptr(), net.len(), lanes.as_mut_ptr(), 8, &mut count) },
+            unsafe {
+                refuse_e(
+                    &view_e,
+                    net.as_ptr(),
+                    net.len(),
+                    lanes.as_mut_ptr(),
+                    8,
+                    &mut count,
+                )
+            },
             CGAP_OK,
             "VACUOUS: the eval always-refuse stub ADMITTED — positive control cannot flip"
         );
@@ -4018,9 +4391,18 @@ mod wave_gap1_courts {
         let good = vec![1i32; 64];
         let big: Vec<i32> = (0..70_000).map(|i| (i % 251) as i32).collect();
         let dir = sandbox_dir("stub-commit");
-        let path = std::ffi::CString::new(dir.join("s.par2").as_os_str().as_encoded_bytes()).expect("cstr");
-        assert_eq!(call_commit(&good, &path), CGAP_OK, "premise: real commit admits the legal lane");
-        assert_ne!(call_commit(&big, &path), CGAP_OK, "premise: real commit refuses the oversized lease");
+        let path = std::ffi::CString::new(dir.join("s.par2").as_os_str().as_encoded_bytes())
+            .expect("cstr");
+        assert_eq!(
+            call_commit(&good, &path),
+            CGAP_OK,
+            "premise: real commit admits the legal lane"
+        );
+        assert_ne!(
+            call_commit(&big, &path),
+            CGAP_OK,
+            "premise: real commit refuses the oversized lease"
+        );
         let refuse_c: CgapCommitParquetFn = stub_commit_refuse;
         assert_ne!(
             unsafe { refuse_c(good.as_ptr(), good.len(), path.as_ptr()) },
@@ -4060,7 +4442,10 @@ mod wave_gap1_courts {
         )
         .unwrap_or_else(|e| panic!("gap1 symbol court: nested runner failed: {e}"));
         let status = outcome.status.unwrap_or_else(|| {
-            panic!("gap1 symbol court: build deadline exceeded; stderr:\n{}", super::wave9_courts::tail(&outcome.stderr))
+            panic!(
+                "gap1 symbol court: build deadline exceeded; stderr:\n{}",
+                super::wave9_courts::tail(&outcome.stderr)
+            )
         });
         assert!(
             status.success(),
@@ -4068,7 +4453,11 @@ mod wave_gap1_courts {
             super::wave9_courts::tail(&outcome.stderr)
         );
         let dylib = dir.join("target/debug/libcgap_ffi.dylib");
-        assert!(dylib.is_file(), "cdylib artifact missing at {} (macOS court)", dylib.display());
+        assert!(
+            dylib.is_file(),
+            "cdylib artifact missing at {} (macOS court)",
+            dylib.display()
+        );
         let nm = match Command::new("nm").args(["-gU"]).arg(&dylib).output() {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 println!("[SKIP] nm absent — gap1 symbol court unexecuted (loud skip, never a silent pass)");
@@ -4078,7 +4467,11 @@ mod wave_gap1_courts {
             Err(e) => panic!("nm -gU spawn failed: {e}"),
             Ok(o) => o,
         };
-        assert!(nm.status.success(), "nm -gU failed:\n{}", String::from_utf8_lossy(&nm.stderr));
+        assert!(
+            nm.status.success(),
+            "nm -gU failed:\n{}",
+            String::from_utf8_lossy(&nm.stderr)
+        );
         let exports = String::from_utf8_lossy(&nm.stdout);
         for sym in [
             "_cgap_admit_frame",

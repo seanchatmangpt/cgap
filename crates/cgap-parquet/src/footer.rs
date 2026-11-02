@@ -116,9 +116,39 @@ pub fn fnv1a64(data: &[u8]) -> u64 {
 }
 
 /// FNV-1a-64 over `data` with an explicit seed.
+///
+/// Word-wise (SWAR) form: byte-exact FNV-1a semantics, loop structure
+/// only — the frozen constants (basis `0xcbf2_9ce4_8422_2325`, prime
+/// `0x0000_0100_0000_01B3`) are untouched. Prologue runs byte-wise over
+/// `len % 8` bytes; the bulk body consumes one 8-byte LE word per
+/// iteration with the FNV step unrolled per lane (`h ^= b_k; h *= P`
+/// for k = 0..8, `b_k = (w >> 8k) & 0xFF`); the epilogue finishes the
+/// tail bytes. Equity is pinned by the L2 court
+/// (`tests/lever_courts.rs`) against an independent byte-wise oracle.
 pub fn fnv1a64_seeded(data: &[u8], seed: u64) -> u64 {
     let mut h = seed;
-    for &b in data {
+    let chunks = data.len() / 8;
+    let (bulk, tail) = data.split_at(chunks * 8);
+    for word_bytes in bulk.chunks_exact(8) {
+        let w = u64::from_le_bytes(word_bytes.try_into().expect("8-byte chunk"));
+        h ^= w & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 8) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 16) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 24) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 32) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 40) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= (w >> 48) & 0xFF;
+        h = h.wrapping_mul(FNV_PRIME);
+        h ^= w >> 56;
+        h = h.wrapping_mul(FNV_PRIME);
+    }
+    for &b in tail {
         h ^= u64::from(b);
         h = h.wrapping_mul(FNV_PRIME);
     }
@@ -127,14 +157,130 @@ pub fn fnv1a64_seeded(data: &[u8], seed: u64) -> u64 {
 
 /// The 32-byte content address: four FNV-1a-64 passes with fixed distinct
 /// seeds (documented choice; non-cryptographic — see module docs).
+///
+/// L4 lever (v26.11.2): the four passes run INTERLEAVED in one sweep over
+/// `data` — four independent hash states advance per step, so the one
+/// buffer read feeds all four lanes and the four multiply chains overlap
+/// instead of serializing. Byte-exact by construction: lane `i` carries
+/// seed `FNV_OFFSET_BASIS ^ i*GOLDEN` and performs the identical
+/// `h ^= b; h *= PRIME` step sequence `fnv1a64_seeded(data, seed_i)` does
+/// (word-wise bulk, byte prologue-free tail). Equity pinned by the
+/// `lever_courts` byte-wise oracle; the frozen constants are untouched.
 pub fn block_digest(data: &[u8]) -> [u8; 32] {
+    let mut h = [
+        FNV_OFFSET_BASIS,
+        FNV_OFFSET_BASIS ^ GOLDEN,
+        FNV_OFFSET_BASIS ^ (2u64.wrapping_mul(GOLDEN)),
+        FNV_OFFSET_BASIS ^ (3u64.wrapping_mul(GOLDEN)),
+    ];
+    let chunks = data.len() / 8;
+    let (bulk, tail) = data.split_at(chunks * 8);
+    for word_bytes in bulk.chunks_exact(8) {
+        let w = u64::from_le_bytes(word_bytes.try_into().expect("8-byte chunk"));
+        let mut b = w;
+        for _ in 0..8 {
+            let byte = b & 0xFF;
+            b >>= 8;
+            for lane in h.iter_mut() {
+                *lane ^= byte;
+                *lane = lane.wrapping_mul(FNV_PRIME);
+            }
+        }
+    }
+    for &byte in tail {
+        for lane in h.iter_mut() {
+            *lane ^= u64::from(byte);
+            *lane = lane.wrapping_mul(FNV_PRIME);
+        }
+    }
     let mut out = [0u8; 32];
-    for i in 0..4u64 {
-        let seed = FNV_OFFSET_BASIS ^ i.wrapping_mul(GOLDEN);
-        out[(i * 8) as usize..(i * 8 + 8) as usize]
-            .copy_from_slice(&fnv1a64_seeded(data, seed).to_le_bytes());
+    for (i, lane) in h.iter().enumerate() {
+        out[(i * 8)..(i * 8 + 8)].copy_from_slice(&lane.to_le_bytes());
     }
     out
+}
+
+/// Fused seal-digest sweep (v26.11.2 P2 lever, p2-pareto lane): ONE read
+/// pass over the body region feeds SIX FNV-1a-64 hash states — the §6.2
+/// field-5 body checksum, the §6.1 trailer checksum, and the four
+/// `block_digest` lanes — where `seal` previously made three separate
+/// passes (the body FNV inside `build_meta_block`, the full-length
+/// `fnv1a64` over `[0, B+M+80)`, and the 4-lane `block_digest` over
+/// `[0, B+M)`). Byte-exact by construction: every state advances with the
+/// identical `h ^= b; h *= PRIME` byte-step sequence its standalone form
+/// uses, from its identical seed; only loop structure changes (frozen
+/// constants untouched). Equity is pinned by the existing seal round-trip
+/// courts (`every_truncation_fails_closed`, the hostile corpus) plus the
+/// `lever_courts` byte-wise oracle.
+struct SealDigests {
+    /// Six independent states: [body, full, lane0..lane3].
+    states: [u64; 6],
+}
+
+impl SealDigests {
+    /// Seed and sweep the body region: states 0..6 advance over every
+    /// byte (word-wise bulk, byte tail — position-independent, as FNV).
+    fn over_body(body: &[u8]) -> Self {
+        let mut s = Self {
+            states: [
+                FNV_OFFSET_BASIS, // body checksum (meta field 5)
+                FNV_OFFSET_BASIS, // trailer checksum over [0, B+M+80)
+                FNV_OFFSET_BASIS,
+                FNV_OFFSET_BASIS ^ GOLDEN,
+                FNV_OFFSET_BASIS ^ (2u64.wrapping_mul(GOLDEN)),
+                FNV_OFFSET_BASIS ^ (3u64.wrapping_mul(GOLDEN)),
+            ],
+        };
+        s.absorb(body, 0);
+        s
+    }
+
+    /// Advance every state at or above `from` over `data` (byte-exact
+    /// FNV-1a step sequence per state; the body checksum (state 0) is
+    /// frozen once the meta block consumes it and never absorbs again).
+    fn absorb(&mut self, data: &[u8], from: usize) {
+        let states = &mut self.states[from..];
+        let chunks = data.len() / 8;
+        let (bulk, tail) = data.split_at(chunks * 8);
+        for word_bytes in bulk.chunks_exact(8) {
+            let w = u64::from_le_bytes(word_bytes.try_into().expect("8-byte chunk"));
+            let mut b = w;
+            for _ in 0..8 {
+                let byte = (b & 0xFF) as u64;
+                b >>= 8;
+                for lane in states.iter_mut() {
+                    *lane ^= byte;
+                    *lane = lane.wrapping_mul(FNV_PRIME);
+                }
+            }
+        }
+        for &byte in tail {
+            let byte = u64::from(byte);
+            for lane in states.iter_mut() {
+                *lane ^= byte;
+                *lane = lane.wrapping_mul(FNV_PRIME);
+            }
+        }
+    }
+
+    /// The §6.2 field-5 body digest (freeze before absorbing the tail).
+    fn body_digest(&self) -> u64 {
+        self.states[0]
+    }
+
+    /// The §6.1 trailer checksum over `[0, B+M+80)`.
+    fn checksum(&self) -> u64 {
+        self.states[1]
+    }
+
+    /// The 32-byte content digest: lanes 2..6, little-endian per lane.
+    fn content_digest(&self) -> [u8; 32] {
+        let mut out = [0u8; 32];
+        for (i, lane) in self.states[2..].iter().enumerate() {
+            out[(i * 8)..(i * 8 + 8)].copy_from_slice(&lane.to_le_bytes());
+        }
+        out
+    }
 }
 
 /// The row-group summary the writer hands the sealer (spans are copied in;
@@ -239,7 +385,10 @@ impl<'a> FooterSealer<'a> {
     /// Append the footer over the buffer's body and return the sealed
     /// block (bytes borrowed from the buffer + the content digest).
     pub fn seal(self) -> Result<SealedBlock<'a>, ParquetError> {
-        let meta = self.build_meta_block();
+        // One fused sweep over the body replaces three passes (the old
+        // build_meta body FNV, the full-length checksum, block_digest).
+        let mut digests = SealDigests::over_body(&self.buf[..self.body_len]);
+        let meta = self.build_meta_block(digests.body_digest());
         let m = meta.len();
         let body_len = self.body_len;
         // Checked end-to-end: a wrap in any intermediate sum would pass a
@@ -252,8 +401,9 @@ impl<'a> FooterSealer<'a> {
                 run_len: usize::MAX,
                 budget: self.buf.len(),
             })?;
-        let total =
-            content_end.checked_add(16).ok_or(ParquetError::RunOverrun {
+        let total = content_end
+            .checked_add(16)
+            .ok_or(ParquetError::RunOverrun {
                 // + checksum 8 + magic 4 + len 4
                 run_len: usize::MAX,
                 budget: self.buf.len(),
@@ -272,8 +422,11 @@ impl<'a> FooterSealer<'a> {
             None => self.buf[pos..pos + ATTESTATION_LEN].fill(0),
         }
         pos += ATTESTATION_LEN;
+        // The tail (meta + attestation) feeds the five live states; the
+        // body checksum (state 0) is frozen — it spans the body only.
+        digests.absorb(&self.buf[body_len..pos], 1);
         // Checksum spans [0, B+M+80).
-        let checksum = fnv1a64(&self.buf[..pos]);
+        let checksum = digests.checksum();
         self.buf[pos..pos + 8].copy_from_slice(&checksum.to_le_bytes());
         pos += 8;
         self.buf[pos..pos + 4].copy_from_slice(&MAGIC);
@@ -282,7 +435,7 @@ impl<'a> FooterSealer<'a> {
         self.buf[pos..pos + 4].copy_from_slice(&footer_len.to_le_bytes());
         pos += 4;
         debug_assert_eq!(pos, total);
-        let digest = block_digest(&self.buf[..content_end]);
+        let digest = digests.content_digest();
         Ok(SealedBlock {
             bytes: &self.buf[..total],
             digest,
@@ -291,7 +444,7 @@ impl<'a> FooterSealer<'a> {
 
     /// The §6.2 metadata block, framed with the crate's compact-protocol
     /// writer family (footer-local field ids; NOT parquet.thrift ids).
-    fn build_meta_block(&self) -> Vec<u8> {
+    fn build_meta_block(&self, body_digest: u64) -> Vec<u8> {
         let mut meta = Vec::new();
         // 1: format version (i16 zigzag) = 1.
         write_field_header(&mut meta, 1, 0, ctype::I16);
@@ -310,13 +463,10 @@ impl<'a> FooterSealer<'a> {
             crate::rle::write_varint(&mut meta, n as u64);
         }
         for span in &self.spans {
-            crate::rle::write_varint(
-                &mut meta,
-                u64::from(zigzag_encode_i32(*span as i32)),
-            );
+            crate::rle::write_varint(&mut meta, u64::from(zigzag_encode_i32(*span as i32)));
         }
-        // 5: body digest prefix (FNV-1a-64 of the body region, LE).
-        let body_digest = fnv1a64(&self.buf[..self.body_len]);
+        // 5: body digest prefix (FNV-1a-64 of the body region, LE;
+        // computed by the caller's fused SealDigests sweep).
         write_binary_field(&mut meta, 5, 4, &body_digest.to_le_bytes());
         // 6: flags — bit0: attestation present.
         let flags = if self.attestation.is_some() { 1 } else { 0 };
@@ -572,17 +722,11 @@ fn parse_meta(meta: &[u8]) -> Result<ParsedMeta, SealError> {
             (_, other) => skip_value(meta, &mut pos, other, 0).map_err(|_| malformed)?,
         }
     }
-    let (version, row_groups, rows, spans, body_digest, flags) = match (
-        version,
-        row_groups,
-        rows,
-        spans,
-        body_digest,
-        flags,
-    ) {
-        (Some(v), Some(rg), Some(r), Some(s), Some(d), Some(f)) => (v, rg, r, s, d, f),
-        _ => return Err(malformed),
-    };
+    let (version, row_groups, rows, spans, body_digest, flags) =
+        match (version, row_groups, rows, spans, body_digest, flags) {
+            (Some(v), Some(rg), Some(r), Some(s), Some(d), Some(f)) => (v, rg, r, s, d, f),
+            _ => return Err(malformed),
+        };
     if version != 1 {
         return Err(malformed);
     }
@@ -706,7 +850,10 @@ mod courts {
             },
             None,
         ) {
-            Err(ParquetError::RunOverrun { run_len: 0, budget: 1 }) => {}
+            Err(ParquetError::RunOverrun {
+                run_len: 0,
+                budget: 1,
+            }) => {}
             Err(other) => panic!("zero-RG seal: wrong error {other:?}"),
             Ok(_) => panic!("zero-RG seal must refuse"),
         }
@@ -731,7 +878,10 @@ mod courts {
             },
             None,
         ) {
-            Err(ParquetError::RunOverrun { run_len: 0, budget: 1 }) => {}
+            Err(ParquetError::RunOverrun {
+                run_len: 0,
+                budget: 1,
+            }) => {}
             Err(other) => panic!("zero-body seal: wrong error {other:?}"),
             Ok(_) => panic!("zero-body seal must refuse"),
         }
@@ -833,8 +983,7 @@ mod courts {
         // Reassemble body + hostile meta + attestation + freshly computed
         // checksum + magic + footer_len (the integrity layer then agrees;
         // any refusal is a parse-layer typed verdict).
-        let real_footer_len =
-            u32::from_le_bytes(clean[l - 4..l].try_into().unwrap()) as usize;
+        let real_footer_len = u32::from_le_bytes(clean[l - 4..l].try_into().unwrap()) as usize;
         let body = l - real_footer_len;
         let reassemble = |meta: &[u8]| -> (Vec<u8>, [u8; 32]) {
             let mut blk = Vec::new();
@@ -914,7 +1063,10 @@ mod courts {
         // Pinned member: negative span — u32::try_from fails, typed. (The
         // only fault is the span value; fields and flags are legal.)
         let neg_span = hostile_meta(&legal_tail(&[-1], 0));
-        assert_eq!(re_err(&neg_span), SealError::Shape(ShapeFault::MetaMalformed));
+        assert_eq!(
+            re_err(&neg_span),
+            SealError::Shape(ShapeFault::MetaMalformed)
+        );
 
         // Pinned member: forged flags on an otherwise legal block — the
         // span IS the body extent, so the flags value is the only fault and
@@ -1055,9 +1207,10 @@ mod courts {
         let rounded = n.div_ceil(4096) * 4096;
         let shared = Rc::new(RefCell::new(None));
         let sink = PageRoundingSink::new(rounded, 4096, Rc::clone(&shared));
-        block.flush_to(sink).expect("oversized window must flush typed Ok");
-        let (committed_len, committed_bytes) =
-            (*shared.borrow()).clone().expect("commit ran");
+        block
+            .flush_to(sink)
+            .expect("oversized window must flush typed Ok");
+        let (committed_len, committed_bytes) = (*shared.borrow()).clone().expect("commit ran");
         assert_eq!(committed_len, n, "commit must carry the BLOCK length");
         assert_eq!(committed_bytes, block.bytes(), "committed bytes byte-exact");
 
@@ -1258,7 +1411,11 @@ mod courts {
         frame.extend_from_slice(&(sealed.len() as u64).to_le_bytes()); // payload_byte_len @8..16 (frame.rs:189)
         frame.extend_from_slice(&digest); // oabi_digest @16..48 (frame.rs:191)
         frame.extend_from_slice(&p28_attest_fixture()); // attestation @48..128 (A17 §2.1)
-        assert_eq!(frame.len(), 128, "frame header is exactly 128 B (frame.rs:41,346)");
+        assert_eq!(
+            frame.len(),
+            128,
+            "frame header is exactly 128 B (frame.rs:41,346)"
+        );
         frame.extend_from_slice(&sealed);
 
         // Identity 1: payload view and its declared length (frame.rs:271-280,
@@ -1266,7 +1423,11 @@ mod courts {
         // must be exact).
         let declared = u64::from_le_bytes(frame[8..16].try_into().unwrap());
         assert_eq!(declared as usize, sealed.len(), "payload_byte_len exact");
-        assert_eq!(&frame[128..], &sealed[..], "payload view IS the sealed block");
+        assert_eq!(
+            &frame[128..],
+            &sealed[..],
+            "payload view IS the sealed block"
+        );
 
         // Identity 2: oabi_digest == injected digest over the payload view's
         // CONTENT region (frame.rs:291-303 verify_payload semantics,

@@ -472,7 +472,7 @@ fn build_dam_pool(seed: u64, pool: usize) -> (Vec<u8>, Vec<(u32, u32)>, u64) {
         let off = packed.len();
         packed.extend_from_slice(&scratch[..len]);
         table.push((off as u32, len as u32));
-        let mut view = dam::FrameView { payload: &[] };
+        let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
         let got = dam::ingress(&packed[off..off + len], len, Some(&mut view));
         match expected {
             DamExpect::Code(code) => assert_eq!(
@@ -526,7 +526,7 @@ fn a14_penstock_admission<const FRAMES: usize>(b: Bencher) {
             for i in 0..FRAMES {
                 let (off, len) = table[i & (POOL - 1)];
                 let frame = &packed[off as usize..off as usize + len as usize];
-                let mut view = dam::FrameView { payload: &[] };
+                let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
                 let st = dam::ingress(frame, len as usize, Some(&mut view));
                 acc = acc.wrapping_add(st as u64);
             }

@@ -59,11 +59,25 @@ fn bench_parquet() -> Result<Value> {
     crate::custom_handlers::bench_parquet(inputs)
 }
 
+#[doc = "x2 NEON kernel equals two 4-way kernels; tampered segment refuses typed."]
+#[verb("x2-court", "blake3")]
+fn blake_3_x_2_court() -> Result<Value> {
+    let inputs = Map::new();
+    crate::custom_handlers::blake_3_x_2_court(inputs)
+}
+
 #[doc = "Evaluate a closed BN3 program to its result term."]
 #[verb("eval", "bn3")]
 fn bn_3_eval() -> Result<Value> {
     let inputs = Map::new();
     crate::custom_handlers::bn_3_eval(inputs)
+}
+
+#[doc = "L3 radix semi-join probe vs nested probe differential (match-for-match)."]
+#[verb("radix-join", "bn3")]
+fn bn_3_radix_join() -> Result<Value> {
+    let inputs = Map::new();
+    crate::custom_handlers::bn_3_radix_join(inputs)
 }
 
 #[doc = "Binary N3 unification over the term arena."]
@@ -208,6 +222,16 @@ fn register_bench_noun() {
 }
 
 #[linkme::distributed_slice(::clap_noun_verb::cli::registry::__NOUN_REGISTRY)]
+static REGISTER_BLAKE_3_NOUN: fn() = register_blake_3_noun;
+
+fn register_blake_3_noun() {
+    ::clap_noun_verb::cli::registry::CommandRegistry::register_noun(
+        "blake3",
+        "BLAKE3 SIMD kernel surfaces.",
+    );
+}
+
+#[linkme::distributed_slice(::clap_noun_verb::cli::registry::__NOUN_REGISTRY)]
 static REGISTER_BN_3_NOUN: fn() = register_bn_3_noun;
 
 fn register_bn_3_noun() {
@@ -330,7 +354,7 @@ mod generated_route_proofs {
 
     #[test]
     fn every_admitted_command_became_one_registered_verb() {
-        assert_eq!(routes_only().matches("#[verb(").count(), 21);
+        assert_eq!(routes_only().matches("#[verb(").count(), 23);
     }
 
     #[test]
@@ -378,8 +402,16 @@ mod generated_route_proofs {
             "bench parquet must route to its own custom handler"
         );
         assert!(
+            routes_only().contains("custom_handlers::blake_3_x_2_court("),
+            "blake3 x2-court must route to its own custom handler"
+        );
+        assert!(
             routes_only().contains("custom_handlers::bn_3_eval("),
             "bn3 eval must route to its own custom handler"
+        );
+        assert!(
+            routes_only().contains("custom_handlers::bn_3_radix_join("),
+            "bn3 radix-join must route to its own custom handler"
         );
         assert!(
             routes_only().contains("custom_handlers::bn_3_unify("),

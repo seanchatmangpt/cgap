@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "cgap-bn3"
 version.workspace = true
 edition.workspace = true

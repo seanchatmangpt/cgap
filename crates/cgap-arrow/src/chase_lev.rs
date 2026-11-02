@@ -77,10 +77,7 @@ mod index_width {
 
 /// Compile-time capability predicate: `true` iff the target provides a CAS
 /// wide enough to run the Chase-Lev steal turnstile.
-pub const SUPPORTS_STEAL: bool = cfg!(any(
-    target_has_atomic = "64",
-    target_has_atomic = "32"
-));
+pub const SUPPORTS_STEAL: bool = cfg!(any(target_has_atomic = "64", target_has_atomic = "32"));
 
 use index_width::{AtomicIndex, Index, MASK, ZERO};
 
@@ -155,12 +152,7 @@ impl<T: Copy> WorkStealingDeque<T> {
                 {
                     if self
                         .top
-                        .compare_exchange(
-                            t,
-                            t.wrapping_add(1),
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        )
+                        .compare_exchange(t, t.wrapping_add(1), Ordering::SeqCst, Ordering::Relaxed)
                         .is_err()
                     {
                         self.bottom.store(t.wrapping_add(1), Ordering::Relaxed);
