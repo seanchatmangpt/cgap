@@ -4,6 +4,7 @@
 - **Repo**: `/Users/sac/cgap` (canonical checkout, no worktrees, no git commands)
 - **Status**: PROPOSED — the `cgap-core` crate does not exist on disk as of
   2026-10-31. Everything here is a specification, UNVERIFIED by definition.
+- Status update (2026-11-02): no dedicated lane doc exists for `cgap-blake3` or the `cgap` umbrella; both PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API: max_version 26.11.1; num_versions 2 each). This lane doc carries their nearest spec surface.
 - **Consumers of this doc**: A14 (DMA ring bench), A17 (Arrow adapter lane),
   A19 (Parquet adapter lane) — they reference the CgapFrameHeader spec in
   §6 byte-for-byte.
@@ -211,7 +212,7 @@ pub struct P28LicenseAttestation {
     version: u8,           // 1
     sil_level: u8,         // SIL level claimed (2 for v2.1.0)
     reserved: [u8; 2],
-    license_urn_hash: [u8; 32],  // BLAKE3 of "urn:cgap:license:p28-sil:v2.1.0-sovereign"
+    license_urn_hash: [u8; 32],  // BLAKE3 of "urn:avec:license:p28-sil:v2.1.0-sovereign"
     sig_or_id: [u8; 40],   // 40-byte signature or key id blob
 }
 ```

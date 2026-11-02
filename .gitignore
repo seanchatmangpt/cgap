@@ -25,3 +25,6 @@ target/
 **/target/
 target-*/
 **/target-*/
+.claude/settings.local.json
+.clap-noun-verb/
+

@@ -1,0 +1,662 @@
+{
+  "abi_version": 1,
+  "config": {
+    "court_args": [
+      "cargo",
+      "test",
+      "-p",
+      "cgap-court",
+      "--test",
+      "court_verdict"
+    ],
+    "env_override": {
+      "CARGO_PROFILE_DEV_OPT_LEVEL": "2"
+    },
+    "targets": [
+      "tests/court_verdict.rs"
+    ],
+    "kernel_target_candidates": [
+      "crates/cgap-storage/src/atomic_commit.rs",
+      "crates/cgap-bn3/src/unify.rs",
+      "crates/cgap-gate/src/penstock.rs",
+      "crates/cgap-core/src/frame.rs",
+      "crates/cgap-blake3/src/lib.rs"
+    ],
+    "operators": [
+      "hex-bump",
+      "int-bump-up",
+      "int-bump-down",
+      "cmp-swap",
+      "bool-flip",
+      "ret-remove",
+      "mask-corrupt"
+    ],
+    "operators_deferred": {},
+    "only_op": null,
+    "equivalent_triage_register": {
+      "tests/court_verdict.rs:812:cmp-swap:0": "`zero > 0` -> `zero >= 0`: unsigned tautology. The zero-family population law is carried by sibling pins \u2014 the corpus receipt court's all-four-families assert (A20-finish repair, this session) plus the sha256 corpus receipt itself \u2014 so the battery conjunct is defense-in-depth and both polarities are observation-identical over the receipt-pinned corpus.",
+      "tests/court_verdict.rs:1379:int-bump-up:1": "FormulaRef-ban fixture body var `a12_var(1)` -> `a12_var(2)`: the pinned law is the p-slot Sigil ban, which is var-agnostic; the compile-refusal assert fires for any var pair, so the fixture's variable identity is setup material with every pinned observation identical.",
+      "tests/court_verdict.rs:1475:cmp-swap:0": "`op >= sp` -> `op > sp`: provably redundant conjunct \u2014 the second conjunct `op - sp >= 2` implies strict inequality, so both polarities are observation-identical whenever the assertion evaluates at all. Logical implication, not corpus dependence.",
+      "tests/court_verdict.rs:1666:int-bump-up:0": "Zero-alloc sweep template source `rows[7]` -> `rows[8]`: both rows are non-degenerate, the template's only obligation is a valid frame encoding, and the sweep's asserts (all 1M admitted, zero allocs, per-row digest patching) are parametric in the template.",
+      "tests/court_verdict.rs:2008:int-bump-up:0": "Mutation-witness fixture row `rows[0]` -> `rows[1]`: the pinned law is value-independence of the identity detector (any payload bit flip must flip the digest and Err), so the witness row's identity is setup material; both rows flip the same byte offset."
+    },
+    "kill_rate_min": 0.98,
+    "interference_check": "Wave-8 interference verification: pre-write sha256 re-verification before every target write AND a pre-restore check that the disk still holds exactly the mutant bytes the gate wrote (a foreign write racing the restore window is otherwise silently clobbered \u2014 witnessed live), plus a readback-verified restore. A concurrent writer becomes a typed InterferenceRefusal (exit 1), never a silent mutate-over-foreign-content run",
+    "campaign_lock": "Wave-9 interference prevention (a20-wave9 audit D2): exclusive non-blocking flock on /Users/sac/cgap/target/.a20-campaign.lock held for the campaign process lifetime; a second concurrent campaign on this checkout refuses typed (CAMPAIGN LOCK HELD, exit 1). Kernel-released on process death \u2014 no stale wedge.",
+    "shim": {
+      "anchor": "wrapping_mul(0xBF58_476D_1CE4_E5B9)",
+      "marker": "0xBF58_476D_1CE4_E5B9",
+      "replacement": "0xBF58_476D_1CE4_E5BA",
+      "target": "tests/court_verdict.rs"
+    },
+    "baseline_sha256": {
+      "tests/court_verdict.rs": "7ec519fd8870e9e4eb20676701879adc6215f51d19313452113b4548134a5250"
+    },
+    "sampling": {
+      "total_generated": 1185,
+      "total_before_only_op": 1185,
+      "per_target_generated": {
+        "tests/court_verdict.rs": 1185
+      },
+      "selected": 24,
+      "stride": 50,
+      "disclosure": "\u00a78: stride-sampled above --max-mutants; recorded, never hidden"
+    }
+  },
+  "rows": [
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 0,
+        "operator": "baseline",
+        "index": 0
+      },
+      "verdict": "Baseline",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "7ec519fd8870e9e4eb20676701879adc6215f51d19313452113b4548134a5250",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 448,
+        "operator": "hex-bump",
+        "index": 0
+      },
+      "verdict": "ShimCourt",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "13f38706afb43cd5e77ef517fab750bd9b710d68657c93d8a5d869e46ddd3d6b",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 133,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByBuild",
+      "killed_by": "build",
+      "passing_courts": [],
+      "mutated_sha256": "16a4e9e7ee3bd4e4f8d42d16c47f3b811619db3ba353b4893f64c3f0c9cee77d",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 254,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByBuild",
+      "killed_by": "build",
+      "passing_courts": [],
+      "mutated_sha256": "8ac1399bb39fea300db6f9758acf5af303976328ca464d2cbd0db0968b6643d3",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 271,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByBuild",
+      "killed_by": "build",
+      "passing_courts": [],
+      "mutated_sha256": "d0f2ed8fd99e865269afef42011e70c231a6c897ab9de531809b70c76031730a",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 291,
+        "operator": "hex-bump",
+        "index": 1
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "edc633baa1240e539cc91fa7222c9c2df3793aa240ebfe1df68a8a73c4cbdf91",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 311,
+        "operator": "hex-bump",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "2f138449d57caed382aaeb60ade85a66a0b286271b1857ebaca59c15bf8d4565",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 330,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "wave1_abi_freeze_receipt",
+        "cross_lane_abi_pin",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "ee8fd34949722c334e743b6a80f37cedfed527d3a9f2557152ab26052e6434d6",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 365,
+        "operator": "int-bump-up",
+        "index": 1
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "ca235fc7e4f0eb5e62431f96aad32e7a02ad2beddffbd6277da9f9825a235848",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 407,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "e6508e8474cef40cd2dc03b54bb4859d6e43a490be47aacefe142c8635856979",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 545,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "448b64f1c08e2cca741d43a541b2a66a59f764234e94c573487ef78304abb023",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 707,
+        "operator": "int-bump-down",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "wave1_abi_freeze_receipt",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "e4873803eb9f00dc32009755dc6c7c031034443569bbd225f6ec47e0380010a7",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 812,
+        "operator": "cmp-swap",
+        "index": 0
+      },
+      "verdict": "Equivalent",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "a04_identity_court",
+        "alloc_verify_zero"
+      ],
+      "mutated_sha256": "e6e8ae2d929b69df6e7b6aa36577262d6c43eb4b4e95a5eaca2f0a9e94839c3a",
+      "kill_rate": 1.0,
+      "equivalent_justification": "`zero > 0` -> `zero >= 0`: unsigned tautology. The zero-family population law is carried by sibling pins \u2014 the corpus receipt court's all-four-families assert (A20-finish repair, this session) plus the sha256 corpus receipt itself \u2014 so the battery conjunct is defense-in-depth and both polarities are observation-identical over the receipt-pinned corpus."
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 928,
+        "operator": "int-bump-up",
+        "index": 1
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a05_interleave_engine",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "sha256_known_answers",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "704af21cbedfa39d9bfec413a6145080743df132acd0c268c6342d83e42ed227",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1053,
+        "operator": "int-bump-down",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a05_interleave_engine",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "bn3_closure_battery",
+        "alloc_admission_budget",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "cbfa8bc9ae86f8666a7282b35a4fa3edbd0a5aa5025134ad597f1b13517759f0",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1193,
+        "operator": "int-bump-down",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "cross_lane_abi_pin",
+      "passing_courts": [
+        "a12_unifier_fixpoint_court",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "1fee29875484c4c09cd2a77552645c911c087fa66aa0d83e70db57b23b8c6a11",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1266,
+        "operator": "int-bump-down",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a12_unifier_join_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "a04_identity_court",
+        "alloc_verify_zero"
+      ],
+      "mutated_sha256": "1e11289fed50f00915f56a7c0ebecef1e58a91eddc97eb954be0ea65d8db13c1",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1379,
+        "operator": "int-bump-up",
+        "index": 1
+      },
+      "verdict": "Equivalent",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "bn3_closure_battery",
+        "alloc_admission_budget",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "a12_unifier_join_court",
+        "corpus_determinism_receipt",
+        "a04_identity_court",
+        "alloc_verify_zero"
+      ],
+      "mutated_sha256": "affc5bdf228964f7bad5632804fb24fc608a4dc5fd7f515705402ad27a918a17",
+      "kill_rate": 1.0,
+      "equivalent_justification": "FormulaRef-ban fixture body var `a12_var(1)` -> `a12_var(2)`: the pinned law is the p-slot Sigil ban, which is var-agnostic; the compile-refusal assert fires for any var pair, so the fixture's variable identity is setup material with every pinned observation identical."
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1475,
+        "operator": "cmp-swap",
+        "index": 0
+      },
+      "verdict": "Equivalent",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "a12_unifier_join_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "8d7de14d6c8b4c7b32dee1ba8986d91813fc87a324ccab0e8286f272c48084b7",
+      "kill_rate": 1.0,
+      "equivalent_justification": "`op >= sp` -> `op > sp`: provably redundant conjunct \u2014 the second conjunct `op - sp >= 2` implies strict inequality, so both polarities are observation-identical whenever the assertion evaluates at all. Logical implication, not corpus dependence."
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1598,
+        "operator": "int-bump-down",
+        "index": 1
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a14_dam_ingress_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "a04_identity_court",
+        "alloc_verify_zero"
+      ],
+      "mutated_sha256": "3871389668b8bd3c02a8d92c389a0503f20576bd34966d8f92da639e5217c8f1",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1666,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "Equivalent",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a14_dam_ingress_court",
+        "a05_interleave_engine",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "24ded3f54d9fa1146c3ff233b3e4dd80f093349ee22cc930153a5725fba8c7d7",
+      "kill_rate": 1.0,
+      "equivalent_justification": "Zero-alloc sweep template source `rows[7]` -> `rows[8]`: both rows are non-degenerate, the template's only obligation is a valid frame encoding, and the sweep's asserts (all 1M admitted, zero allocs, per-row digest patching) are parametric in the template."
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 1791,
+        "operator": "int-bump-down",
+        "index": 1
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a04_identity_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "sha256_known_answers",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court"
+      ],
+      "mutated_sha256": "7206d72e18a78f5d40b11d52c558de40477cd465a279710b78dded2a5bb8ce3a",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 2008,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "Equivalent",
+      "killed_by": "",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "sha256_known_answers",
+        "wave1_abi_freeze_receipt",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "a19_seal::a19_seal_1m_ledger_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "a976144fcfeb943a3396bf7e81828e3378490980602d49ea4b6cffa3bdc6e365",
+      "kill_rate": 1.0,
+      "equivalent_justification": "Mutation-witness fixture row `rows[0]` -> `rows[1]`: the pinned law is value-independence of the identity detector (any payload bit flip must flip the digest and Err), so the witness row's identity is setup material; both rows flip the same byte offset."
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 2246,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByBuild",
+      "killed_by": "build",
+      "passing_courts": [],
+      "mutated_sha256": "6f12b33c8fcf7f69078388d36bfcb9b26dbdf4ba88ae8bf1d6b0502b1ec35b99",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 2468,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByTest",
+      "killed_by": "a19_seal::a19_seal_1m_ledger_court",
+      "passing_courts": [
+        "cross_lane_abi_pin",
+        "wave1_abi_freeze_receipt",
+        "sha256_known_answers",
+        "a12_unifier_fixpoint_court",
+        "alloc_admission_budget",
+        "bn3_closure_battery",
+        "a05_interleave_engine",
+        "a14_dam_ingress_court",
+        "a12_unifier_join_court",
+        "corpus_determinism_receipt",
+        "alloc_verify_zero",
+        "a04_identity_court"
+      ],
+      "mutated_sha256": "b717a978859934beaab6ff04c29fbd20043800b66296605544dc0856594e0a79",
+      "kill_rate": 1.0
+    },
+    {
+      "abi_version": 1,
+      "mutant_id": {
+        "file": "/Users/sac/cgap/tests/court_verdict.rs",
+        "line": 2635,
+        "operator": "int-bump-up",
+        "index": 0
+      },
+      "verdict": "KilledByBuild",
+      "killed_by": "build",
+      "passing_courts": [],
+      "mutated_sha256": "ef5e11203978eff41e85f498d729d36c32c5135a94b62dc79e00d546f78c9edc",
+      "kill_rate": 1.0
+    }
+  ],
+  "skips": [],
+  "non_vacuity": {
+    "row_index": 1,
+    "verdict": "ShimCourt",
+    "killed_by": "a04_identity_court"
+  },
+  "kill_rate": 1.0,
+  "summary": {
+    "total_generated": 1185,
+    "total_before_only_op": 1185,
+    "sampled": 24,
+    "killed": 19,
+    "equivalent": 5,
+    "survivor_defects": 0
+  }
+}

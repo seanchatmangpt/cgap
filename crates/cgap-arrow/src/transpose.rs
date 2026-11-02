@@ -1,10 +1,9 @@
 //! AoS -> SoA transpose for the 64-byte quad record
 //! (spec: docs/jira/v26.10.31/23-64b-quad-spec.md Sections 1-4).
 //!
-//! The interleaved record is a local `#[repr(C, align(64))]` type mirroring
-//! the spec'd 64-byte layout; a generated-layout quad type does not exist
-//! yet (layout.rs lane), so this module is self-contained by design and the
-//! type is the coordination point when the layout lane lands.
+//! The interleaved record is the canonical [`crate::layout::Quad64`] (one
+//! `#[repr(C, align(64))]` definition, layout.rs lane); this module re-exports
+//! it for path compatibility with pre-layout-lane consumers.
 //!
 //! Branchless-kernel discipline (doc 27 Sections 2-4): the transpose body
 //! allocates every output column at exact capacity up front and then writes
@@ -18,26 +17,11 @@
 use alloc::vec::Vec;
 use core::ptr;
 
-/// Interleaved 64-byte quad record: spec Section 1 field table as a
-/// `#[repr(C, align(64))]` type. Size 64 / align 64 are conformance
-/// assertions (spec Section 2, rule 1).
-#[repr(C, align(64))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Quad64 {
-    pub s_id: u32,
-    pub p_id: u32,
-    pub o_id: u32,
-    pub g_id: u32,
-    pub t_ns: u64,
-    pub vector_clock: u32,
-    pub policy_mask: u32,
-    pub inline_digest: [u8; 32],
-}
-
-const _: () = {
-    assert!(core::mem::size_of::<Quad64>() == 64);
-    assert!(core::mem::align_of::<Quad64>() == 64);
-};
+/// Interleaved 64-byte quad record — canonical definition lives in
+/// [`crate::layout`] (spec Section 1 field table, `#[repr(C, align(64))]`,
+/// size/align conformance asserted there, spec Section 2 rule 1). Re-exported
+/// here for pre-layout-lane path compatibility (`cgap_arrow::transpose::Quad64`).
+pub use crate::layout::Quad64;
 
 /// Columnar projection of a quad stream (spec Section 3), all non-nullable.
 #[derive(Clone, Debug, PartialEq, Eq)]

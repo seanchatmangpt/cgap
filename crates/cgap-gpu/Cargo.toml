@@ -2,11 +2,13 @@
 name = "cgap-gpu"
 version.workspace = true
 edition.workspace = true
+description = "GPU execution membrane for the cgap sovereign substrate: Metal Unified Memory zero-copy buffer bridging."
+license-file = "../../LICENSE.md"
 repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
 
 [build-dependencies]
 cc = "1.0"

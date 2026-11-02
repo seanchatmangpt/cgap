@@ -2,6 +2,9 @@
 name = "cgap-bosym"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "Binary ontology symbol slab (B-OSYM) interned-identifier slab for the cgap sovereign columnar substrate."
+repository.workspace = true
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): no guard line existed; A07 receipt ALIVE (docs/jira/v26.11.1/waves/a07-finish-receipt.md)
 
 [lib]

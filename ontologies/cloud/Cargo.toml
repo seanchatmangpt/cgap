@@ -2,7 +2,11 @@
 name = "cgap-cloud"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "Cloud ontology O-ABI pack for the cgap sovereign columnar substrate: build-time-emitted binary ontology pack, no_std const/types facade."
+license-file = "../../LICENSE.md"
+# P3-8 publish flip (2026-11-01): was `publish = false`; O-ABI packs are the
+# publish payload.
+publish = true
 
 # Lane A10 (docs/jira/v26.11.1/lanes/A10-cloud-oabi.md), build/runtime split
 # mirroring A09: the `#![no_std]` facade (src/lib.rs) itself uses NO
@@ -13,5 +17,5 @@ publish = false
 # its own output through A06's real loader before writing (Chicago: real
 # collaborators end to end).
 [dependencies]
-cgap-blake3 = { path = "../../crates/cgap-blake3" }
-cgap-bont = { path = "../../crates/cgap-bont" }
+cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.1" }
+cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.1" }

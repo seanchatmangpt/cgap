@@ -1,0 +1,16 @@
+[package]
+name = "cgap-verification"
+version = "26.11.1"
+edition = "2021"
+description = "Deterministic Verification Surface: extracted-triple ingestion (cgap-bont SlotId law), integrity rule evaluation, and tamper-evident sealing of the grounded context via the A16 cgap-crypto chatman keyed sealer."
+license-file = "../../LICENSE.md"
+publish = false
+
+# Standalone-build workspace pin (crates/cli pattern): lets the crate build
+# via --manifest-path before the coordinator adds it to the root members
+# list. Remove this table when root-membership lands (see lane receipt).
+[workspace]
+
+[dependencies]
+cgap-bont = { path = "../cgap-bont", version = "26.11.1" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.1" }

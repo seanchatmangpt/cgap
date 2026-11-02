@@ -2,18 +2,20 @@
 name = "cgap-p28"
 version.workspace = true
 edition.workspace = true
-publish = false
+publish = true
+description = "P28-SIL v2.1.0 sovereign compliance crate: license attestation (80-byte P28LicenseAttestation), ASC-450 control kernels, and sealed evidence for the cgap substrate."
+license-file = "../../LICENSE.md"
 
 # A17 Wave 2 minimal unblock (disclosed lane deviation): lane manifest is
 # coordinator-owned, but the A17 lane doc §3/§5.6/§5.7 mandate the in-repo
 # cgap-blake3 digest substrate — Wave 2 digest derivation cannot build without
 # it. Single path dependency, no features, matching sibling lanes.
 [dependencies]
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
 # A18 Wave 3 minimal unblock (disclosed lane deviation): A18's seal bridge
 # binds A16's landed sealer machinery — keyed BLAKE3 + the tick lease (lane
 # doc A18 §6: "the sealer from A16's crate as a workspace dependency").
 # Same disclosed-deviation precedent as the cgap-blake3 line above (A17).
-cgap-crypto = { path = "../cgap-crypto" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.1" }
 
 [lib]

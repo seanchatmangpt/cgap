@@ -378,5 +378,8 @@ anchoring, this lane's M12-6 court is the compatibility tripwire.
 
 ## Status
 
-PROPOSED / TARGET — nothing in this file is measured. Receipts land
-here as courts run.
+ALIVE (v26.11.1 wave F1; see `waves/a12-finish-receipt.md`) — unify.rs +
+project.rs: in-repo gate exit 0, 111 passed / 0 failed; SHIM-DOE4 sandbox
+flip exit 101 with byte-exact restore. The BM0 branch-mispredict perf gate
+remains TARGET/BLOCKED (no perf counter on this host); no perf number is
+measured.

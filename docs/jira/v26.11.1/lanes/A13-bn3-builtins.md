@@ -1,7 +1,9 @@
 # A13: BN3 Native Builtins — log:/math:/crypto: as `BUILTIN_OP` sigil dispatch
 
 - **Lane**: A13 of 20, Squadron 3, overnight-campaign doc fan-out, v26.11.1
-- **Status**: PROPOSED (design lane; `crates/cgap-bn3` does not exist yet)
+- **Status**: ALIVE (v26.11.1 wave F1; see `waves/a13-finish-receipt.md` —
+  `crates/cgap-bn3` exists and builds; `cargo test -p cgap-bn3` 102/102,
+  builtins surface 26/26, sandbox polarity flip exit 101)
 - **Files in scope (PROPOSED)**: `crates/cgap-bn3/src/builtins.rs`
 - **Coordinator owns**: workspace `Cargo.toml`, everything outside this lane.
 - **Read-only receipt basis**:

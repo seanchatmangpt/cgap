@@ -3,6 +3,7 @@
 Lane: A01 of 20 · Squadron 1 · milestone v26.11.1 ·
 status: PROPOSED (this document is the plan; zero lines of `slab.rs` /
 `bitmask.rs` exist today — UNVERIFIED until courts pass).
+status update (2026-11-02): `cgap-arrow` PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API, UA cgap-publish-receipt: max_version 26.11.1, num_versions 2).
 
 Owner files (disjoint lease):
 

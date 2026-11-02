@@ -36,7 +36,7 @@ members = [
 
 
 [workspace.package]
-version = "26.10.29"
+version = "26.11.1"
 edition = "2021"
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]

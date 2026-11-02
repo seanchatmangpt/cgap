@@ -541,8 +541,16 @@ pub fn build_archive(entries: &[BosymEntry]) -> Result<Vec<u8>, BosymError> {
 }
 
 /// Strict, fail-closed parse of a v0 archive. Any deviation from the frame
-/// is a typed error; no partial results.
+/// is a typed error; no partial results. The ingress limiter runs first:
+/// structurally non-conforming payloads are refused at the boundary,
+/// pre-allocation (the `Vec::with_capacity` below is only reached for
+/// payloads the limiter admitted).
 pub fn parse_archive(bytes: &[u8]) -> Result<Vec<BosymEntry>, BosymError> {
+    // Ingress boundary: fixed-size register, no heap allocation on Drop.
+    let reg = ingress_register(bytes);
+    if let IngressVerdict::Drop(class) = ingress_limit(bytes.len(), &reg) {
+        return Err(class.into());
+    }
     if bytes.len() < HEADER_SIZE + TRAILER_SIZE {
         return Err(BosymError::Truncated {
             offset: 0,
@@ -802,6 +810,102 @@ pub fn fibo_graph_export(fibo_lib_rs: &std::path::Path) -> Result<GraphExport, B
         })
         .collect();
     GraphExport::new(entries)
+}
+
+// ---------------------------------------------------------------------------
+// Ingress limiter: constant-work structural/schema admission at the DMA
+// boundary (lane A07 mission item 1). A payload is judged on a fixed-size
+// header register BEFORE any allocation: the verdict is an OR-reduction
+// over four structural checks, no early exit, no data-dependent loop
+// bounds, no heap use. Non-conforming payloads are dropped pre-allocation.
+// ---------------------------------------------------------------------------
+
+/// Bytes the limiter inspects: the v0 header, the payload's fixed-width
+/// schema declaration. The limiter touches nothing past this register.
+pub const INGRESS_REGISTER_LEN: usize = HEADER_SIZE;
+
+/// Minimal conforming frame: header + trailer (an empty v0 vocabulary).
+pub const MIN_FRAME_SIZE: usize = HEADER_SIZE + TRAILER_SIZE;
+
+/// Typed structural reason a payload failed admission. Diagnostic only:
+/// the Admit/Drop verdict itself is computed before this class is picked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IngressDropClass {
+    /// Fewer than [`MIN_FRAME_SIZE`] bytes on the wire.
+    TooShort { have: usize },
+    /// Leading magic bytes are not [`MAGIC`].
+    BadMagic,
+    /// Version field is not [`VERSION`].
+    BadVersion { version: u16 },
+    /// v0-forbidden flag bits set (`compressed`/`signed`).
+    ForbiddenFlags { flags: u16 },
+}
+
+/// Admission verdict at the ingress boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IngressVerdict {
+    /// Header conforms; the payload may proceed to the parser.
+    Admit,
+    /// Non-conforming: drop pre-allocation, with the structural class.
+    Drop(IngressDropClass),
+}
+
+/// Build the fixed-size ingress register from a payload slice: a zeroed
+/// stack array with the first `min(len, REGISTER)` bytes copied in. No
+/// heap allocation; when `bytes` is short, trailing register bytes stay
+/// zero and the `have` length check dominates the verdict.
+pub fn ingress_register(bytes: &[u8]) -> [u8; INGRESS_REGISTER_LEN] {
+    let mut reg = [0u8; INGRESS_REGISTER_LEN];
+    let n = bytes.len().min(INGRESS_REGISTER_LEN);
+    reg[..n].copy_from_slice(&bytes[..n]);
+    reg
+}
+
+/// Constant-work admission filter. All four structural checks evaluate
+/// unconditionally (no early exit on any payload); the Admit verdict is
+/// the OR-reduction of the check bits. Work is bounded by the fixed
+/// 16-byte register regardless of payload size or content, and the drop
+/// path performs zero heap allocations (court-pinned below).
+pub fn ingress_limit(have: usize, reg: &[u8; INGRESS_REGISTER_LEN]) -> IngressVerdict {
+    let short = have < MIN_FRAME_SIZE;
+    let magic_ok = reg[0..MAGIC_LEN] == MAGIC;
+    let version = u16::from_le_bytes([reg[8], reg[9]]);
+    let flags = u16::from_le_bytes([reg[10], reg[11]]);
+    let version_ok = version == VERSION;
+    let flags_ok = flags & FLAGS_V0_MASK == 0;
+    let admit = !short & magic_ok & version_ok & flags_ok;
+    if !admit {
+        // Fixed-priority diagnostic class (admission already decided
+        // branch-free above): length, magic, version, flags.
+        let class = if short {
+            IngressDropClass::TooShort { have }
+        } else if !magic_ok {
+            IngressDropClass::BadMagic
+        } else if !version_ok {
+            IngressDropClass::BadVersion { version }
+        } else {
+            IngressDropClass::ForbiddenFlags { flags }
+        };
+        return IngressVerdict::Drop(class);
+    }
+    IngressVerdict::Admit
+}
+
+impl From<IngressDropClass> for BosymError {
+    /// Wire the limiter into the typed error surface so the parser edge
+    /// and the limiter report the SAME refusal taxonomy (no second list).
+    fn from(c: IngressDropClass) -> Self {
+        match c {
+            IngressDropClass::TooShort { have } => BosymError::Truncated {
+                offset: 0,
+                have,
+                need: MIN_FRAME_SIZE,
+            },
+            IngressDropClass::BadMagic => BosymError::BadMagic,
+            IngressDropClass::BadVersion { version } => BosymError::UnsupportedVersion(version),
+            IngressDropClass::ForbiddenFlags { flags } => BosymError::UnsupportedFlags(flags),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1237,5 +1341,181 @@ mod tests {
         let read_back = parse_archive(&bytes).expect("parse back");
         assert_eq!(read_back.len(), export.len());
         eprintln!("EMITTED symbols.bosym entries={} bytes={}", export.len(), bytes.len());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ingress courts (lane A07 mission item 1). Real collaborators: a real
+// counting global allocator (System passthrough) proves the drop path
+// performs ZERO heap allocations; payloads are real archive bytes, singly
+// mutated per class. No mocks. The anti-vacuity mutation (weaken the flags
+// predicate) is run in a /tmp sandbox by the lane receipt; a court that
+// cannot flip is FAIL.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod ingress_courts {
+    use super::*;
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+
+    thread_local! {
+        /// Per-thread allocation count: the allocator hook runs on the
+        /// CALLING thread, so each test thread counts only its own
+        /// allocations and parallel test execution cannot pollute a
+        /// court's measurement window.
+        static INGRESS_ALLOCS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// Counting passthrough allocator: forwards to the real System
+    /// allocator, counts the calling thread's successful allocations.
+    /// Test-build only. `try_with` absorbs the TLS-teardown window where
+    /// thread-local access is unavailable.
+    struct CountingAllocator;
+
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            let p = System.alloc(layout);
+            if !p.is_null() {
+                let _ = INGRESS_ALLOCS.try_with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            System.dealloc(ptr, layout)
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            let p = System.realloc(ptr, layout, new_size);
+            if !p.is_null() {
+                let _ = INGRESS_ALLOCS.try_with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            let p = System.alloc_zeroed(layout);
+            if !p.is_null() {
+                let _ = INGRESS_ALLOCS.try_with(|c| c.set(c.get() + 1));
+            }
+            p
+        }
+    }
+
+    #[global_allocator]
+    static A: CountingAllocator = CountingAllocator;
+
+    fn alloc_delta() -> usize {
+        INGRESS_ALLOCS.with(|c| c.get())
+    }
+
+    /// Real conforming archive bytes (empty vocabulary = minimal frame).
+    fn conforming_frame() -> Vec<u8> {
+        build_archive(&[]).expect("build empty archive")
+    }
+
+    /// The four structural mutation classes, each a real singly-mutated
+    /// copy of the conforming frame with its expected drop class.
+    fn nonconforming_frames() -> Vec<(String, Vec<u8>, IngressDropClass)> {
+        let good = conforming_frame();
+        let mut bad_magic = good.clone();
+        bad_magic[0] = b"X"[0];
+        let mut bad_version = good.clone();
+        bad_version[8] = 1;
+        let mut bad_flags = good.clone();
+        bad_flags[10] = 0x01; // FLAG_COMPRESSED: forbidden in v0
+        vec![
+            (
+                "too-short".into(),
+                good[..MIN_FRAME_SIZE - 1].to_vec(),
+                IngressDropClass::TooShort { have: MIN_FRAME_SIZE - 1 },
+            ),
+            ("bad-magic".into(), bad_magic, IngressDropClass::BadMagic),
+            (
+                "bad-version".into(),
+                bad_version,
+                IngressDropClass::BadVersion { version: 1 },
+            ),
+            (
+                "forbidden-flags".into(),
+                bad_flags,
+                IngressDropClass::ForbiddenFlags { flags: 0x01 },
+            ),
+        ]
+    }
+
+    /// COURT: every non-conforming class is dropped at the boundary with
+    /// the expected structural class, and the drop path performs ZERO
+    /// heap allocations (allocation counter unchanged across the call).
+    /// The conforming control arm admits. Anti-vacuity: weakening any
+    /// predicate in ingress_limit makes the corresponding assert fail
+    /// (sandbox flip in the lane receipt).
+    #[test]
+    fn court_ingress_drops_nonconforming_prealloc() {
+        let frames = nonconforming_frames();
+        assert_eq!(frames.len(), 4);
+        for (name, payload, expect) in &frames {
+            let before = alloc_delta();
+            let reg = ingress_register(payload);
+            match ingress_limit(payload.len(), &reg) {
+                IngressVerdict::Drop(got) => assert_eq!(&got, expect, "class for {name}"),
+                IngressVerdict::Admit => panic!("limiter ADMITTED {name} — must drop"),
+            }
+            assert_eq!(
+                alloc_delta(),
+                before,
+                "drop path for {name} allocated — pre-allocation claim broken"
+            );
+        }
+    }
+
+    /// COURT: the conforming control arm admits, and admission itself
+    /// (even for Admit) performs zero heap allocations — the register is
+    /// a stack array; the parser's allocations happen only after Admit.
+    #[test]
+    fn court_ingress_admission_is_allocation_free() {
+        let payload = conforming_frame();
+        assert!(payload.len() >= MIN_FRAME_SIZE);
+        let before = alloc_delta();
+        let reg = ingress_register(&payload);
+        assert_eq!(ingress_limit(payload.len(), &reg), IngressVerdict::Admit);
+        assert_eq!(alloc_delta(), before, "admission allocated");
+        // The parser behind the limiter does allocate (it returns owned
+        // entries) and must succeed on the admitted payload.
+        let parsed = parse_archive(&payload).expect("parse of admitted frame");
+        assert!(parsed.is_empty(), "empty vocabulary round-trips");
+    }
+
+    /// COURT: the limiter IS the parse ingress (not a dead API) — every
+    /// drop class surfaces through parse_archive as the SAME typed error
+    /// the parser's own checks produce (no second refusal taxonomy).
+    #[test]
+    fn court_ingress_wired_into_parse() {
+        for (name, payload, expect) in nonconforming_frames() {
+            let err = parse_archive(&payload)
+                .err()
+                .unwrap_or_else(|| panic!("parse ACCEPTED nonconforming {name}"));
+            let expected: BosymError = expect.into();
+            assert_eq!(err.to_string(), expected.to_string(), "refusal for {name}");
+        }
+    }
+
+    /// COURT: register construction — zero-padding for short payloads and
+    /// exact prefix capture for long ones, allocation-free.
+    #[test]
+    fn court_ingress_register_construction() {
+        // Fixtures first: the measurement window covers ONLY the calls
+        // under test (fixture Vec building allocates by design).
+        let short = vec![MAGIC.as_slice(), &[0u8; 2]].concat();
+        let long = conforming_frame();
+        let before = alloc_delta();
+        let reg = ingress_register(&short);
+        assert_eq!(reg.len(), INGRESS_REGISTER_LEN);
+        assert_eq!(&reg[..short.len()], &short[..]);
+        assert!(reg[short.len()..].iter().all(|&b| b == 0));
+        let reg_long = ingress_register(&long);
+        assert_eq!(&reg_long[..], &long[..INGRESS_REGISTER_LEN]);
+        assert_eq!(alloc_delta(), before, "register construction allocated");
     }
 }

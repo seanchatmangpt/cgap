@@ -3,7 +3,8 @@ name = "cgap-audit"
 version.workspace = true
 edition.workspace = true
 description = "CC=1 branch-audit cdylib: forces every kernel into the artifact so machine code can be inspected."
-publish = false
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A15 receipt ALIVE (docs/jira/v26.11.1/waves/a15-finish-receipt.md)
 
 [lib]
 # rlib added by lane 18 (compile-freeze minimal unblock, disclosed in both
@@ -13,5 +14,5 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow" }
-cgap-parquet = { path = "../cgap-parquet" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.1" }

@@ -961,4 +961,38 @@ mod tests {
         assert!(msg.contains("0x66697273742f6c6578656d65"), "{msg}"); // "first/lexeme"
         assert!(msg.contains("0xff000a"), "{msg}");
     }
+
+    /// T6 — namespace separation court (§5 domain separation; the lane's
+    /// authority pin `SlotId = truncate64(BLAKE3(lexeme))` UNDER the
+    /// namespace tag `b"bont\x01"`): the tagged derivation and the raw
+    /// untagged BLAKE3 truncation of the SAME lexeme must differ, over the
+    /// whole 1000-lexeme corpus, the `rho/` witness family, and the `a` /
+    /// empty anchors. Anti-vacuity: this is THE court that flips under shim
+    /// M2 (tag drop — `BONT_NS_V1` emptied makes the impl path identical to
+    /// the untagged reference here); witnessed flipping in the wave-10
+    /// finish sandbox (receipt: waves/a06-finish-receipt.md).
+    #[test]
+    fn t6_namespace_separation_tagged_differs_from_untagged() {
+        assert_eq!(BONT_NS_V1, b"bont\x01", "frozen §5 namespace tag");
+        let untagged_slot = |lex: &[u8]| {
+            let d: [u8; 32] = cgap_blake3::hash(lex);
+            SlotId(u64::from_le_bytes(d[0..8].try_into().unwrap()))
+        };
+        // Whole corpus: tagged slot differs from the untagged truncation.
+        for i in 0..1000usize {
+            let lex = corpus_lexeme(i);
+            assert_ne!(
+                slot_id(&lex),
+                untagged_slot(&lex),
+                "namespace separation failed at corpus i={i}"
+            );
+        }
+        // The collision-witness family and the b3sum-anchored lexemes.
+        for x in [7_983_680_554_871_822_341u64, 2_147_190_238_777_461_115u64] {
+            let lex = rho_lexeme(x);
+            assert_ne!(slot_id(&lex), untagged_slot(&lex), "separation at rho x={x}");
+        }
+        assert_ne!(slot_id(b"a"), untagged_slot(b"a"));
+        assert_ne!(slot_id(b""), untagged_slot(b""));
+    }
 }

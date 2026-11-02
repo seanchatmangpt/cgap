@@ -1,17 +1,21 @@
 [package]
 name = "cgap-integration"
-version = "26.10.29"
+version = "26.11.1"
 edition = "2021"
 description = "Cross-crate integration tests: C-ABI roundtrip, alignment law, format-code table, varlen/views roundtrips."
-publish = false
+license-file = "../../LICENSE.md"
+publish = true # P3-10 guard flip (2026-11-01): registry-only dep surface
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow" }
+cgap-arrow = "26.11.1"
 
 [dev-dependencies]
-cgap-arrow = { path = "../cgap-arrow" }
-cgap-audit = { path = "../audit" }
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-arrow = "26.11.1"
+# path+version dev-dep: cargo strips the path on publish (dev-deps are
+# resolved but never compiled by `cargo publish` verify); kept local because
+# cgap-audit is not yet on crates.io (404, witnessed 2026-11-01).
+cgap-audit = { path = "../audit", version = "26.11.1" }
+cgap-blake3 = "26.11.1"
 # std: the scan module (mmap scanner + ScanError surface) is feature-gated.
-cgap-parquet = { path = "../cgap-parquet", features = ["std"] }
-cgap-git = { path = "../cgap-git" }
+cgap-parquet = { version = "26.11.1", features = ["std"] }
+cgap-git = "26.11.1"

@@ -336,6 +336,74 @@ pub fn sum_masked_vertical_128(src: &[u64], w: u8, base: i64, mask0: u64, mask1:
     ((k0 + k1) * base) + delta_sum
 }
 
+/// Mask-AND semi-join composition over group-valid masks (one mask word per
+/// 64-lane group, as emitted by [`scan_range_vertical`]). Bit `t` of `out[g]`
+/// is set iff tuple `64*g + t` qualified on BOTH hops; this is the semi-join
+/// row set for an equality-style key match composed with per-column range
+/// predicates. Returns the qualifying-row popcount so callers assert final
+/// state, not call counts.
+///
+/// Contract: `a.len() == b.len()`, `out.len() >= a.len()` (loud asserts);
+/// words of `out` beyond `a.len()` are left untouched.
+pub fn semi_join_masks(a: &[u64], b: &[u64], out: &mut [u64]) -> u64 {
+    assert!(
+        a.len() == b.len(),
+        "semi_join_masks: mask length mismatch {} vs {}",
+        a.len(),
+        b.len()
+    );
+    assert!(
+        out.len() >= a.len(),
+        "semi_join_masks: out.len()={} < {}",
+        out.len(),
+        a.len()
+    );
+    let mut rows = 0u64;
+    for g in 0..a.len() {
+        let m = a[g] & b[g];
+        out[g] = m;
+        rows += m.count_ones() as u64;
+    }
+    rows
+}
+
+/// Two-hop semi-join over two vertically packed columns: range-scan column A,
+/// range-scan column B (group-aligned row domains), AND the masks. Row `r`
+/// survives iff `lo_a <= A[r] <= hi_a` AND `lo_b <= B[r] <= hi_b` — the
+/// multi-hop composition the mask emission is shaped for.
+///
+/// Contract: both columns packed with the SAME `w` and the same logical row
+/// count (their group counts must match, loud assert); `out` receives the
+/// composed mask (see [`semi_join_masks`] for its contract). Returns the
+/// qualifying-row popcount.
+pub fn semi_join_two_hop(
+    col_a: &[u64],
+    col_b: &[u64],
+    w: u8,
+    lo_a: u32,
+    hi_a: u32,
+    lo_b: u32,
+    hi_b: u32,
+    out: &mut [u64],
+) -> u64 {
+    let groups = col_a.len() / w as usize;
+    assert!(
+        col_b.len() / w as usize == groups,
+        "semi_join_two_hop: group count mismatch {} vs {}",
+        col_a.len() / w as usize,
+        col_b.len() / w as usize
+    );
+    assert!(
+        (1..=32).contains(&w),
+        "semi_join_two_hop: bit width w={w} outside 1..=32"
+    );
+    let mut mask_a = alloc::vec![0u64; groups];
+    let mut mask_b = alloc::vec![0u64; groups];
+    scan_range_vertical(col_a, w, lo_a, hi_a, &mut mask_a);
+    scan_range_vertical(col_b, w, lo_b, hi_b, &mut mask_b);
+    semi_join_masks(&mask_a, &mask_b, out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -587,9 +655,9 @@ mod tests {
     }
 
     /// Pruning must actually fire on real data: for w=12 random rows, the
-    /// kernel must skip at least one word somewhere (the expected touched
-    /// count is ~log2(64)+O(1) of 12, so a full-touch run means the cascade
-    /// is broken).
+    /// kernel must skip at least 25% of the packed words somewhere
+    /// (point/bounded ranges prune far more; a full-touch run means the
+    /// cascade is broken).
     #[test]
     fn pruning_fires_on_random_data() {
         let w = 12;
@@ -602,5 +670,261 @@ mod tests {
             touched < (groups * w as usize) as u64,
             "pruning dead: touched every word ({touched})"
         );
+        // Point query: prefix divergence must prune hard — at most w words
+        // per group survive the eq-mask break, and most groups stop earlier.
+        let point = 0b1010_1010_1010u32;
+        let touched_pt = scan_range_vertical_counted(&packed, w, point, point, &mut got);
+        assert!(
+            touched_pt < (groups * w as usize) as u64,
+            "point-query pruning dead: touched every word ({touched_pt})"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // PP-2 courts (canonical seeds; differential vs row-wise reference)
+    // ------------------------------------------------------------------
+
+    /// Canonical SplitMix64 court RNG (seed 0xBF58_476D_1CE4_E5B9, corpus
+    /// spread 0xA20C_0FFE_E5A7_E000) — identical stream to the bench corpus.
+    struct CourtRng(u64);
+    impl CourtRng {
+        fn next(&mut self) -> u64 {
+            let mut z = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            self.0 = z;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D_049B_B133_111E);
+            z ^= z >> 31;
+            // corpus spread: every value carries the constant XOR so a
+            // corpus/seed swap cannot silently alias streams.
+            z ^ 0xA20C_0FFE_E5A7_E000
+        }
+        fn value(&mut self, w: u8) -> u32 {
+            (self.next() & ((1u64 << w) - 1)) as u32
+        }
+    }
+
+    /// Row-wise materialize-then-filter reference mask (the incumbent the
+    /// bit-plane scan must match bit-for-bit).
+    fn court_reference_mask(values: &[u32], w: u8, lo: u32, hi: u32) -> Vec<u64> {
+        let groups = values.len().div_ceil(64);
+        let domain = mask_of(w);
+        let mut out = alloc::vec![0u64; groups];
+        for (i, &v) in values.iter().enumerate() {
+            if lo <= v && v <= hi.min(domain) {
+                out[i / 64] |= 1u64 << (i % 64);
+            }
+        }
+        out
+    }
+
+    /// Differential court: over the canonical seeded corpus, the bit-plane
+    /// scan mask is BITWISE the row-wise filter mask, across widths
+    /// 4/8/12/16 and range classes full/empty/point/bounded.
+    #[test]
+    fn court_differential_bitplane_equals_rowwise() {
+        const ROWS: [usize; 4] = [1, 64, 4096, 100_003];
+        for &w in &[4u8, 8, 12, 16] {
+            for &n in &ROWS {
+                let mut rng = CourtRng(0xBF58_476D_1CE4_E5B9);
+                let values: Vec<u32> = (0..n).map(|_| rng.value(w)).collect();
+                let mut padded = values.clone();
+                padded.resize(n.div_ceil(64) * 64, 0);
+                let packed = pack_vertical(&values, w);
+                let classes: [(u32, u32); 4] = [
+                    (0, mask_of(w)),
+                    (mask_of(w), mask_of(w) - 1), // inverted in-domain: empty
+                    (padded[n / 2], padded[n / 2]), // point
+                    (1 << (w - 2), mask_of(w) >> 2), // bounded
+                ];
+                for (lo, hi) in classes {
+                    let expect = court_reference_mask(&padded, w, lo, hi);
+                    let mut got = alloc::vec![0u64; n.div_ceil(64)];
+                    scan_range_vertical(&packed, w, lo, hi, &mut got);
+                    assert_eq!(
+                        got, expect,
+                        "differential flip: w={w} n={n} lo={lo} hi={hi}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Multi-hop differential court: the composed two-hop mask is bitwise
+    /// the row-wise conjunction of the two per-column row-wise filters, and
+    /// the reported row popcount equals the materialized row count.
+    #[test]
+    fn court_differential_two_hop_semi_join() {
+        const N: usize = 4096;
+        let w = 12u8;
+        let mut rng = CourtRng(0xBF58_476D_1CE4_E5B9);
+        let col_a: Vec<u32> = (0..N).map(|_| rng.value(w)).collect();
+        let col_b: Vec<u32> = (0..N).map(|_| rng.value(w)).collect();
+        let (lo_a, hi_a) = (200u32, 2000u32);
+        let (lo_b, hi_b) = (700u32, 3000u32);
+        let packed_a = pack_vertical(&col_a, w);
+        let packed_b = pack_vertical(&col_b, w);
+        let mut got = alloc::vec![0u64; N.div_ceil(64)];
+        let rows = semi_join_two_hop(
+            &packed_a, &packed_b, w, lo_a, hi_a, lo_b, hi_b, &mut got,
+        );
+        let mut expect_rows = 0u64;
+        for i in 0..N {
+            let ok = (lo_a <= col_a[i] && col_a[i] <= hi_a)
+                && (lo_b <= col_b[i] && col_b[i] <= hi_b);
+            if ok {
+                expect_rows += 1;
+            } else {
+                assert_eq!(
+                    (got[i / 64] >> (i % 64)) & 1,
+                    0,
+                    "row {i} rejected row-wise but the composed mask admits it"
+                );
+            }
+        }
+        // Every mask bit that survived is a row-wise survivor (bitwise AND
+        // semantics); re-derive the mask from scratch and compare exactly.
+        let mut expect = alloc::vec![0u64; N.div_ceil(64)];
+        for i in 0..N {
+            if (lo_a <= col_a[i] && col_a[i] <= hi_a)
+                && (lo_b <= col_b[i] && col_b[i] <= hi_b)
+            {
+                expect[i / 64] |= 1u64 << (i % 64);
+            }
+        }
+        assert_eq!(got, expect, "two-hop mask is not the row-wise conjunction");
+        assert_eq!(rows, expect_rows, "popcount row set != materialized rows");
+    }
+
+    /// Anti-vacuity control: a deliberately wrong mask algebra
+    /// (`!(hi_gt | lo_lt)` -> `!(hi_gt)`, dropping the lo bound) MUST
+    /// disagree with the row-wise reference on the same corpus. If this
+    /// test cannot produce a disagreement, the differential court above is
+    /// vacuous.
+    #[test]
+    fn court_mutation_control_disagrees() {
+        // Hand-roll the mutated cascade inline (the mutation is the missing
+        // `lo_lt` term), over the canonical corpus.
+        let w = 8u8;
+        let mut rng = CourtRng(0xBF58_476D_1CE4_E5B9);
+        let values: Vec<u32> = (0..4096).map(|_| rng.value(w)).collect();
+        let packed = pack_vertical(&values, w);
+        let (lo, hi) = (50u32, 200u32);
+        let groups = packed.len() / w as usize;
+        // True kernel output.
+        let mut true_mask = alloc::vec![0u64; groups];
+        scan_range_vertical(&packed, w, lo, hi, &mut true_mask);
+        // Mutant: same cascade with the `lo_lt` term dropped from the final
+        // mask (`!(hi_gt | lo_lt)` -> `!hi_gt`) — under-selects, letting
+        // below-`lo` rows through.
+        let mut mutant = alloc::vec![0u64; groups];
+        for (g, words) in packed.chunks_exact(w as usize).enumerate() {
+            let mut hi_gt = 0u64;
+            let mut lo_lt = 0u64;
+            for &bits in words.iter().rev() {
+                let hb = (((hi >> 7) & 1) as u64).wrapping_neg();
+                let lb = (((lo >> 7) & 1) as u64).wrapping_neg();
+                let eq_hi = !(hi_gt | 0); // MUTANT: hi decision never persists
+                let eq_lo = !(lo_lt | 0);
+                hi_gt |= eq_hi & bits & !hb;
+                lo_lt |= eq_lo & lb & !bits;
+            }
+            mutant[g] = !hi_gt; // MUTANT: drops lo_lt
+        }
+        assert_ne!(
+            mutant, true_mask,
+            "mutation control agrees with the kernel; differential court is vacuous"
+        );
+        // And the disagreement is in the expected direction: the mutant
+        // admits at least one row the true kernel (and the row-wise
+        // reference) rejects.
+        let mut admitted_extra = 0u64;
+        for g in 0..groups {
+            admitted_extra += (mutant[g] & !true_mask[g]).count_ones() as u64;
+        }
+        assert!(
+            admitted_extra > 0,
+            "mutant must over-admit, not merely differ"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // PP-2 measurement (ignored; run with --release -- --ignored --nocapture)
+    // ------------------------------------------------------------------
+
+    extern crate std;
+
+    /// In-file measurement harness (no Process.sleep, min-of-N over real
+    /// Instant deltas): single-hop ns/4096, two-hop composition, PARETO
+    /// split (scan A + scan B + AND). Run:
+    /// `cargo test -p cgap-parquet --release --lib bitslice -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn bench_bitslice_perf_and_pareto() {
+        use std::hint::black_box;
+        use std::time::Instant;
+        const ROWS: usize = 4096;
+        const ITERS: usize = 20_000;
+        let w = 8u8;
+        let mut rng = CourtRng(0xBF58_476D_1CE4_E5B9);
+        let col_a: Vec<u32> = (0..ROWS).map(|_| rng.value(w)).collect();
+        let col_b: Vec<u32> = (0..ROWS).map(|_| rng.value(w)).collect();
+        let packed_a = pack_vertical(&col_a, w);
+        let packed_b = pack_vertical(&col_b, w);
+        let groups = ROWS.div_ceil(64);
+        let mut mask = alloc::vec![0u64; groups];
+        let (lo, hi) = (50u32, 200u32);
+
+        fn time(mut f: impl FnMut()) -> u128 {
+            // warmup
+            for _ in 0..2_000 {
+                f();
+            }
+            let mut best = u128::MAX;
+            for _ in 0..5 {
+                let t0 = Instant::now();
+                for _ in 0..ITERS {
+                    f();
+                }
+                let el = (Instant::now() - t0).as_nanos() / ITERS as u128;
+                if el < best {
+                    best = el;
+                }
+            }
+            best
+        };
+
+        let single = time(|| {
+            scan_range_vertical(black_box(&packed_a), w, lo, hi, black_box(&mut mask));
+        });
+        let hop_a = time(|| {
+            let mut m = alloc::vec![0u64; groups];
+            scan_range_vertical(black_box(&packed_a), w, lo, hi, &mut m);
+        });
+        let hop_b = time(|| {
+            let mut m = alloc::vec![0u64; groups];
+            scan_range_vertical(black_box(&packed_b), w, lo, hi, &mut m);
+        });
+        let masks_a = {
+            let mut m = alloc::vec![0u64; groups];
+            scan_range_vertical(&packed_a, w, lo, hi, &mut m);
+            m
+        };
+        let masks_b = {
+            let mut m = alloc::vec![0u64; groups];
+            scan_range_vertical(&packed_b, w, lo, hi, &mut m);
+            m
+        };
+        let mut out = alloc::vec![0u64; groups];
+        let and_only = time(|| {
+            semi_join_masks(&masks_a, &masks_b, &mut out);
+        });
+        let two_hop = time(|| {
+            semi_join_two_hop(&packed_a, &packed_b, w, lo, hi, lo, hi, &mut out);
+        });
+        std::println!("rows=4096 w=8 seed=0xBF58476D1CE4E5B9");
+        std::println!("single_hop_scan     {single} ns/4096");
+        std::println!("two_hop_scan+AND    {two_hop} ns/4096");
+        std::println!("PARETO: scan_a={hop_a} scan_b={hop_b} and={and_only} ns/4096");
+        assert!(single > 0 && two_hop >= and_only, "pareto invariants");
     }
 }

@@ -1,105 +1,120 @@
 # cgap
 
-Umbrella facade for the cgap kernel crates: one dependency, no logic of its
-own. `cgap` is `#![no_std]` and re-exports the published surfaces of
-`cgap-arrow`, `cgap-blake3`, `cgap-git`, and `cgap-parquet` verbatim
-(`version = 26.10.29` for all four).
+Umbrella facade for the cgap sovereign columnar/deductive compute substrate:
+one dependency, zero logic of its own (four `pub use` lines, version tracks
+the workspace at 26.11.1). Underneath: 128 B frames (A04), B-ONT slots (A06),
+binary-N3 deduction (BN3, A11), P28-SIL licensing (A17, 80 B attestations),
+Arrow C Data Interface kernels, BLAKE3, Parquet, Git packfile v2 — all
+`#![no_std]`, zero external deps, byte-layout-up, behind four sovereign C-ABI
+entrypoints (admit/eval/commit/verify, A19). Renamed from `avec` 2026-10-31.
+Every claim cites a sibling README or a waves/ receipt; witnessed state only.
 
-## Install
+## Crate map (22 crates; witnessed 2026-11-01/02 per sibling READMEs)
+
+Nine PUBLISHED at 26.11.1, yanked=false — `waves/coord-publish-record.md`,
+`waves/p3-api-verify-all.md`.
+
+### Published kernels (26.11.1, on crates.io)
+
+| crate | purpose (from its README) | tests | standing |
+|---|---|---|---|
+| cgap-arrow | Arrow C Data Interface mask/filter/transpose | 177/0 | PUBLISHED-26.11.1 |
+| cgap-blake3 | full BLAKE3 suite, KAT vs test_vectors.json | 27/0 | PUBLISHED-26.11.1 |
+| cgap-git | packfile v2 + DAG, dual git/receipt registers | 88/0 | PUBLISHED-26.11.1 |
+| cgap-parquet | RLE hybrid, sealed verify-chain, 0 B decode | 216/0 (236 std) | PUBLISHED-26.11.1 |
+
+### Published substrate (26.11.1, on crates.io)
+
+| crate | purpose | tests | standing |
+|---|---|---|---|
+| cgap-bont | BLAKE3-addressed B-ONT slot table (SlotId law) | 35/0 | PUBLISHED-26.11.1 |
+| cgap-bosym | binary symbol slab + ingress-limiter diode | 14/0 | PUBLISHED-26.11.1 |
+| cgap-crypto | Chatman sealer + lease machinery | 24/0 | PUBLISHED-26.11.1 |
+| cgap-gpu | Metal zero-copy bridge, Apple Silicon | 1/1 | PUBLISHED-26.11.1 |
+
+### Published O-ABI packs
+
+| crate | purpose | tests | standing |
+|---|---|---|---|
+| cgap-cloud | TOSCA/CIMI lexemes, emitted `.oabi` (1,552 B) | 13/0 | PUBLISHED-26.11.1 |
+| cgap-fibo | FIBO pack, emitted `.oabi` (496 B) | 21/0 | ALIVE; 404 at its README's witness time |
+
+### Guarded (`publish = true`, registry 404 at each README's read time)
+
+| crate | purpose | tests | standing |
+|---|---|---|---|
+| cgap-core | 128 B CgapFrameHeader, DMA ring, isomorphism | 75/0 | ALIVE |
+| cgap-storage | WAL two-slot atomic commit, power-cut sweeps | 113x3 sweep | ALIVE |
+| cgap-bn3 | binary N3 deduction, 24 B statement pin, arena | 111/0 | ALIVE, unpublished |
+| cgap-gate | penstock ingress gate, 10M-frame 0-alloc corpus | 11/0 | ALIVE (workspace-local) |
+| cgap-p28 | 80 B P28LicenseAttestation, 640-bit sweep | 42/0 | ALIVE (workspace-local) |
+| cgap-ffi | sovereign C-ABI cdylib (admit/eval/commit/verify) | 54/0 | ALIVE (workspace-local) |
+
+### Membranes and aux (never published)
+
+| crate | purpose | tests | standing |
+|---|---|---|---|
+| cgap-beam | BEAM/AtomVM NIF membrane (cdylib) | 2/2 | ALIVE, `publish = false` |
+| cgap-audit | CountingAlloc + POWL + OCEL2 slabs | 37/0 | workspace-local |
+| cgap-court | whole-repo court_verdict harness (no src/) | 14/0 | workspace-local |
+| cgap-integration | cross-crate C-ABI roundtrip suites | 20/20 | ALIVE, 404 at read |
+| wasm-footprint | wasm32-wasip1 link wrapper (4,629 B) | 8/8 | ALIVE on its target |
+| cgap-cli | ggen-generated `cgap` binary (standalone ws) | 19/0 | workspace-local |
+| bench | Divan chain benches, PARETO attribution | benches | workspace-local |
+
+## Quickstart
 
 ```sh
-cargo add cgap
+cargo add cgap@26.11.1
 ```
 
-## Tutorial
-
-Every kernel is reachable through the facade root, e.g.
-`cgap::cgap_blake3::hash`. The snippets below compile and run against the
-workspace at v26.10.29 (see Receipts at the bottom).
-
-### Arrow bitmaps (cgap-arrow)
+The sovereign loop below is the registry-sourced consumer program of
+`waves/f3-14-consumer.md` (`cargo new` + `cargo add` + build/run, exit 0, 4/4 PASS):
 
 ```rust
-use cgap::cgap_arrow::bitmap;
+let d = cgap::cgap_blake3::hash(b"abc");          // [1] KAT, b3sum-grounded
+assert_eq!(d.len(), 32);
 
-let valid = [bitmap::bcast8(0b1111_1111)];
-let pred = [bitmap::bcast8(0b1010_1010)];
-// bcast8 replicates each bit into all 8 byte lanes of a u64 word:
-// 4 set bits x 8 lanes = 32 matching bits in one word.
-assert_eq!(bitmap::count_valid(&valid, &pred), 32);
-```
-
-### Hashing (cgap-blake3)
-
-```rust
-let digest = cgap::cgap_blake3::hash(b"cgap");
-assert_eq!(digest.len(), 32);
-```
-
-### Git packfiles (cgap-git)
-
-```rust
-use cgap::cgap_git::PackBuilder;
-
-let mut builder = PackBuilder::new();
-builder.push(b"hello\n");
-let (pack, idx) = builder.finish().unwrap();
+let mut pb = cgap::cgap_git::PackBuilder::new();  // [3] pack v2 -> pack+idx
+pb.push(b"hello\n");
+let (pack, idx) = pb.finish().unwrap();
 assert_eq!(&pack[0..4], b"PACK");
-assert!(!idx.is_empty());
+
+let v: [u32; 5] = [7, 7, 7, 9, 9];                // [4] RLE round-trip
+let e = cgap::cgap_parquet::rle::rle_encode(&v, 8);
+let mut out = [0u32; 5];
+cgap::cgap_parquet::rle::rle_decode(&e, &mut out).unwrap();
+assert_eq!(out, v);
 ```
 
-### Parquet RLE (cgap-parquet)
+Step [2] (arrow build/freeze/readback) ran 4/4 against the 26.10.29 registry
+surface; 26.11.1 adds the frame/deduction lanes. The v26.10.29-era README is
+archived byte-exact at `docs/jira/v26.11.1/readme-archive/cgap-umbrella-pre.md`
+(sha256 `fd7564e438b7276eaeb4d951bac7da175524f48c17133c95d5426fb288c5a2b6`).
 
-```rust
-use cgap::cgap_parquet::rle;
+## Morning DoD five gates (one-liners; dod-five-gates.md is authoritative)
 
-let values: [u32; 5] = [7, 7, 7, 9, 9];
-let encoded = rle::rle_encode(&values, 8);
-let mut decoded = [0u32; 5];
-rle::rle_decode(&encoded, &mut decoded).unwrap();
-assert_eq!(decoded, values);
-```
+Receipts: `waves/dod-five-gates.md` + the five gate markers.
 
-## Reference
+- G1 workspace purity GREEN: build+test exit 0, census 1025 pass / 0 fail.
+- G2 binary/symbol purity GREEN: court_verdict 13/0, kill_rate 1.0000 (19/19).
+- G3 1M-row ledger ALIVE: 4-of-4 seal+eval court, 14/0 exit 0.
+- G4 640-bit spoliation ALIVE: 2560 mutations / 2516 real deaths, p28 42/0.
+- G5 bare-metal silicon ALIVE*: ELF 150/65536 B flash, 0/32768 B SRAM.
+  (*size law only; XIP rule execution BLOCKED-on-owner, recorded not laundered.)
 
-### `cgap::cgap_arrow`
+## Chain PARETOs (measured 2026-11-01, bench profile)
 
-Branch-free Apache Arrow columnar substrate: `no_std` + `alloc`, zero
-external dependencies, every buffer 64-byte aligned at allocation, C Data
-Interface (`ArrowArray` / `ArrowSchema`) zero-copy export/import.
+- chains-ingress: digest fold (BLAKE3) ~85% of segment / ~91% of chain.
+- chains-sovereign: A02 sealed-block commit 87.6% of chain (N=4096).
+- chains-bn3: unify join 81.2% at 65k rows, 99.9% at 1,048,576.
+- chains-seal: no 80% stage - metering ~45% / seal+verify ~35% / validate ~19%.
 
-### `cgap::cgap_blake3`
+Receipts: `waves/bench-chains-*.md`; method in `crates/bench/README.md`.
 
-Sovereign, standalone, zero-dependency BLAKE3: complete spec including
-zero-allocation Merkle tree reduction (`hash` -> `[u8; 32]`), 4-way NEON and
-8-way AVX2 multi-parent SIMD, 16 MiB GPU dispatch crossover.
+## Links
 
-### `cgap::cgap_git`
-
-Git Packfile v2 writer (FR-04): `PackBuilder`, `write_pack_v2`,
-`write_idx_v2`; object bodies are zlib DEFLATE streams, with SHA-1, CRC32,
-and DEFLATE all in-crate — zero external dependencies.
-
-### `cgap::cgap_parquet`
-
-Parquet persistence kernels: vectorized bit-unpacking, SWAR RLE/bit-packed
-hybrid decode, direct page-to-buffer decode; fail-closed on malformed pages
-with typed errors, never a panic. The `std` feature gates the hosted `scan`
-reader.
-
-## Explanation: why an umbrella crate
-
-Each kernel is published and usable standalone; `cgap` exists so consumers
-who want the whole columnar substrate (Arrow + BLAKE3 + Parquet + Git
-packfiles) take one dependency instead of four, and so the set moves as one
-version. The facade carries zero logic: `crates/cgap/src/lib.rs` is four
-`pub use` lines, and its version tracks the workspace (26.10.29), matching
-the pins in its `Cargo.toml` exactly. Pick a single kernel crate directly if
-you need only one surface.
-
-## Receipts
-
-Examples verified 2026-10-31 in a scratch crate against the workspace path
-dependencies (`cargo run`, exit 0, all asserts passed). `cargo test -p cgap
---doc` exits 0 with 0 doc tests — the facade's `lib.rs` contains no doc
-examples of its own; the snippets above were executed externally as shown.
+- Receipt trail: `docs/jira/v26.11.1/waves/` (lane finish/audit receipts, gate
+  markers, publish chain, bench PARETOs, `v26111-campaign-ledger.md`).
+- Diataxis docs: `docs/diataxis/` (receipts `waves/dia-1`..`dia-6`).
+- Readme provenance: `docs/jira/v26.11.1/readme-archive/` (sha256'd, `INDEX.md`).

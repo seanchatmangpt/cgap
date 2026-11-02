@@ -110,3 +110,21 @@ pub fn align_test(_inputs: Map<String, Value>) -> Result<Value> {
     }
     Ok(serde_json::json!({ "aligned": aligned, "total": total }))
 }
+
+// ---- v26.11.1 crate-surface handlers (CLI-2) ------------------------------
+// Real owner-crate bodies behind the 17 new CustomBehavior routes. Each
+// handler asserts final state (Chicago) and refuses typed on any drift.
+
+mod handlers_kernel;
+mod handlers_reasoning;
+mod handlers_sovereign;
+
+pub use handlers_kernel::{
+    arrow_slab_stats, bont_pack_verify, bont_slot_lookup, git_dag_verify, parquet_pack_check,
+    parquet_pack_emit,
+};
+pub use handlers_reasoning::{audit_ocel_stats, audit_powl_stats, bn_3_eval, bn_3_unify};
+pub use handlers_sovereign::{
+    beam_info, court_verdict_run, crypto_receipt_verify, crypto_seal, gate_dam_ingest, gpu_info,
+    p_28_attest_verify,
+};

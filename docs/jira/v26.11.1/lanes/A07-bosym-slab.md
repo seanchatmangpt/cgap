@@ -1,8 +1,10 @@
 # A07: cgap-bosym — Out-of-Band Symbol Quarantine and the Zero-String Gate
 
 Lane A07 of 20, overnight-campaign doc fan-out, v26.11.1, repo
-`/Users/sac/cgap`. Status of everything in this file: **PROPOSED /
-UNVERIFIED**. Nothing here has executed; no gate has run; no receipt exists.
+`/Users/sac/cgap`. Status of everything in this file: **ALIVE** (v26.11.1
+wave F1; see `waves/a07-finish-receipt.md` — `cargo test -p cgap-bosym`
+14 passed / 0 failed, zero-string gate 1.4.1 green, sandbox flip with
+fail-closed restore).
 
 ## Role in the Wave
 
@@ -56,6 +58,7 @@ gate is prose; the gate is the mechanism.
 ## ADR-002 (authored here, numbered by the register)
 
 - **Status**: PROPOSED
+- **Status update (2026-11-02)**: `cgap-bosym` PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API, UA cgap-publish-receipt: max_version 26.11.1, num_versions 1).
 - **Context**: ontology strings compiled into execution artifacts create
   footprint tax, leak surface, and audience coupling (see above).
 - **Decision**:
@@ -446,7 +449,9 @@ PROPOSED, requiring their own receipts:
 
 ## Standing
 
-- This slab: PROPOSED / UNVERIFIED. Nothing has executed.
+- This slab: **ALIVE** (v26.11.1 wave F1; see `waves/a07-finish-receipt.md`
+  — `cargo test -p cgap-bosym` 14 passed / 0 failed, zero-string gate 1.4.1
+  green, Pyright 0/0/0, sandbox flip with fail-closed restore).
 - Exit gate wording (milestone): "objdump/binary scan of compiled
   execution crates confirms 0 ontology UTF-8 strings in
   `.rodata`/`.text`." DoD item 5 is that gate, executed with a receipt.

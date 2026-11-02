@@ -1105,6 +1105,62 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.digest, b.digest);
     }
+
+    /// emit_into determinism court: the caller-owned-buffer entry point
+    /// produces byte-identical canonical bytes, digest, popcount, and row
+    /// content across (a) fresh buffers, (b) reused dirty buffers (junk
+    /// rows + junk bytes that must be cleared, capacity retained), and
+    /// (c) match sets from different chunkings — the zero-alloc entry
+    /// point's half of the M12-6 law.
+    /// Mutation that MUST flip this court: any emission state carried
+    /// through the reused buffers (dirty rows or canonical bytes leaking
+    /// into the emitted batch or its digest).
+    #[test]
+    fn determinism_court_emit_into_reused_dirty_buffers_byte_identical() {
+        let s = [cw(1), cw(2), cw(3)];
+        let p = [cw(100), cw(100), cw(100)];
+        let o = [cw(4), cw(5), cw(6)];
+        let rule = Rule {
+            rule_id: 3,
+            body: vec![BodyAtom::new(vw(10), cw(100), vw(11))],
+            head: [vw(11), cw(200), vw(10)],
+        };
+        let compiled = RuleCompiler::compile(&rule).unwrap();
+        let cols = StatementColumns::new(&s, &p, &o).unwrap();
+        let ms_default = unify_batch(&compiled, &cols, 4096).unwrap();
+        let ms_chunk1 = unify_batch(&compiled, &cols, 1).unwrap();
+        assert_eq!(ms_default, ms_chunk1, "chunking moved the match set");
+        let proj = ConsequentProjector::new();
+        // (a) Fresh buffers.
+        let mut rows_fresh = DeltaRows::default();
+        let mut canon_fresh = Vec::new();
+        let (d1, pc1) = proj
+            .emit_into(&compiled, 5, &ms_default, &mut rows_fresh, &mut canon_fresh)
+            .unwrap();
+        assert_eq!(rows_fresh.len(), 3);
+        assert_eq!(pc1, 3);
+        // (b) Reused dirty buffers: junk row + junk canonical bytes first.
+        let mut rows_dirty = DeltaRows::default();
+        rows_dirty.push(0xDEAD, 0xBEEF, 0xCAFE, 0xFFFF);
+        let mut canon_dirty: Vec<u8> = vec![0xFF; 128];
+        let (d2, pc2) = proj
+            .emit_into(&compiled, 5, &ms_default, &mut rows_dirty, &mut canon_dirty)
+            .unwrap();
+        assert_eq!((d1, pc1), (d2, pc2), "dirty buffers changed emission");
+        assert_eq!(rows_dirty.len(), 3, "junk row leaked into emission");
+        for i in 0..rows_fresh.len() {
+            assert_eq!(rows_fresh.row(i), rows_dirty.row(i), "row {i}");
+        }
+        assert_eq!(canon_dirty, canon_fresh, "canonical bytes diverged");
+        // (c) Chunked match set: identical batch, identical digest.
+        let mut rows_chunked = DeltaRows::default();
+        let mut canon_chunked = Vec::new();
+        let (d3, pc3) = proj
+            .emit_into(&compiled, 5, &ms_chunk1, &mut rows_chunked, &mut canon_chunked)
+            .unwrap();
+        assert_eq!((d1, pc1), (d3, pc3), "chunked match set changed emission");
+        assert_eq!(canon_chunked, canon_fresh);
+    }
     // ====================================================================
     // Wave 9: cross-lane integration courts (A04 frame identity + A05
     // power-cut WAL). Spec: wave-9 slice "A04 identity court, A14 dam over

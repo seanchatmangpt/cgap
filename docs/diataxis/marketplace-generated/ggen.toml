@@ -1,0 +1,11 @@
+[project]
+name = "cgap-diataxis-consumer"
+
+[ontology]
+source = "cgap-docs.ttl"
+
+[packs]
+readme-diataxis-pack = { path = "/Users/sac/ggen-marketplace/packs/readme-diataxis-pack" }
+
+[templates]
+dir = "templates"

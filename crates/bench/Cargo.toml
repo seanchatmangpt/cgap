@@ -3,17 +3,95 @@ default-run = "bench"
 name = "bench"
 version.workspace = true
 edition.workspace = true
-description = "Gate 2 harness: line-rate benches, alloc interception, branch audit driver."
+description = "Divan membrane: v26.11.1 Phase 2 (Measure) perf-target graduation harness."
 publish = false
 
 [dependencies]
 cgap-arrow = { path = "../cgap-arrow" }
 cgap-blake3 = { path = "../cgap-blake3" }
 cgap-parquet = { path = "../cgap-parquet", features = ["std"] }
+cgap-core = { path = "../cgap-core" }
+cgap-gate = { path = "../cgap-gate" }
+cgap-bn3 = { path = "../cgap-bn3" }
+cgap-p28 = { path = "../cgap-p28" }
+cgap-crypto = { path = "../cgap-crypto" }
+cgap-ffi = { path = "../cgap-ffi" }
+cgap-git = { path = "../cgap-git" }
 
 [dev-dependencies]
-divan = "0.1.21"
+# Exact-at-authoring-time pin. `cargo search divan` 2026-11-01 -> 0.1.21
+# (exit 0, witnessed this session). A caret pin drifts silently across 0.1.x;
+# exact only.
+divan = "=0.1.21"
 
+# Prior-campaign surface (retained; nothing deleted).
 [[bench]]
 name = "v26_10_31"
+harness = false
+
+# v26.11.1 Phase 2 (Measure) membrane targets. `kernels` is the F2-10
+# scaffold stub; `ingress`/`parquet`/`bn3`/`seal` file bodies are owned by
+# lanes F2-11..F2-14 (declared here so the surface is fixed once).
+[[bench]]
+name = "kernels"
+harness = false
+
+[[bench]]
+name = "ingress"
+harness = false
+
+[[bench]]
+name = "parquet"
+harness = false
+
+[[bench]]
+name = "bn3"
+harness = false
+
+[[bench]]
+name = "seal"
+harness = false
+
+# Challenger sales report benchmark targets
+[[bench]]
+name = "challenger_parquet"
+harness = false
+
+[[bench]]
+name = "challenger_arrow"
+harness = false
+
+[[bench]]
+name = "challenger_git"
+harness = false
+
+[[bench]]
+name = "challenger_crypto"
+harness = false
+
+# BENCH-* chains: staged end-to-end chains, each over one seeded corpus.
+# Declared ONCE by BENCH-1 (all five targets in this single edit) so the
+# bench surface is fixed and polling lanes see a stable manifest; the file
+# bodies are lane-owned (chains-ingress.rs = BENCH-1; chains-parquet/bn3/
+# seal/sovereign.rs = their own lanes). Cargo refuses a manifest whose
+# declared target file is absent, so the four sibling bodies must land for
+# non-ingress chains runs — disclosed, not silent.
+[[bench]]
+name = "chains-ingress"
+harness = false
+
+[[bench]]
+name = "chains-parquet"
+harness = false
+
+[[bench]]
+name = "chains-bn3"
+harness = false
+
+[[bench]]
+name = "chains-seal"
+harness = false
+
+[[bench]]
+name = "chains-sovereign"
 harness = false

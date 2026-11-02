@@ -112,6 +112,14 @@ use alloc::{boxed::Box, vec, vec::Vec};
 use crate::Oid;
 use crate::pack_write::{git_object_oid, sha1};
 
+// Stable pack facade (DoD-2, `pack.rs`). Wired here via `#[path]` because
+// `lib.rs` is contract-off-limits to this lane: the module is reachable and
+// courted as `cgap_git::dag::pack`; promoting it to the DoD-2 top-level
+// path `crate::pack` is a one-line coordinator edit (`pub mod pack;` +
+// `pub use dag::pack::*;` in lib.rs). Recorded in the finish receipt.
+#[path = "pack.rs"]
+pub mod pack;
+
 // ---------------------------------------------------------------------------
 // Digest + OID registers
 // ---------------------------------------------------------------------------
@@ -1298,6 +1306,15 @@ mod tests {
         let c1 = commit_blocks(&refs, &GENESIS_OID).expect("commit");
         let c2 = commit_blocks(&refs, &GENESIS_OID).expect("commit");
         assert_eq!(c1, c2);
+        // Byte-exact structural offset stability across independent
+        // derivations (dispatch court formula): the persisted §5.1 wire
+        // form is a pure function of the block set — two fresh derivations
+        // encode byte-identical `.cgap-dag` files, header offsets included.
+        assert_eq!(
+            encode_dag_file(&c1.tree),
+            encode_dag_file(&c2.tree),
+            "independent derivations produced different .cgap-dag bytes"
+        );
 
         let mut mutated = owned.clone();
         mutated[1][0] ^= 0x01;

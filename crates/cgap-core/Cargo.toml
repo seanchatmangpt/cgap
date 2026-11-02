@@ -2,7 +2,9 @@
 name = "cgap-core"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "128-byte sovereign CgapFrameHeader codec and triumvirate isomorphism kernels for the cgap substrate."
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A04 receipt ALIVE (docs/jira/v26.11.1/waves/a04-finish-receipt.md)
 # P28-SIL v2.1.0 sovereign license instrument:
 #   urn:avec:license:p28-sil:v2.1.0-sovereign
 # (canonical spec identifier per LICENSE-P28-SIL.md; URN frozen per
@@ -18,10 +20,10 @@ publish = false
 # runtime library keeps E=0 externals (dev-dependencies never compile into
 # the lib target).
 [dev-dependencies]
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
 # Wave 9 cross-lane integration: the A14 dam (cgap-gate penstock `ingress`)
 # consumes real A04 frames in tests/cross_lane_gate_court.rs. Same §3 named
 # exception as cgap-blake3 — dev-only, never compiled into the lib target;
 # the runtime library stays E=0 externals.
-cgap-gate = { path = "../cgap-gate" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.1" }
 

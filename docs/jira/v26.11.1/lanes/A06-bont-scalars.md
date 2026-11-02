@@ -2,6 +2,7 @@
 
 - **Lane**: A06 of 20, Squadron 2, overnight-campaign doc fan-out, v26.11.1
 - **Status**: PROPOSED (design lane; no `crates/cgap-bont` exists yet)
+- **Status update (2026-11-02)**: `cgap-bont` PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API, UA cgap-publish-receipt: max_version 26.11.1, num_versions 1).
 - **Files in scope (PROPOSED)**: `crates/cgap-bont/src/primitives.rs`,
   `crates/cgap-bont/src/oabi.rs`
 - **Coordinator owns**: `Cargo.toml` workspace membership, any edit outside this lane.

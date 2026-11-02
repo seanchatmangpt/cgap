@@ -10,6 +10,30 @@ Assert 64-byte alignment for Buf sizes 1..1000 step 7.
 
 This command takes no arguments.
 
+## `cgap arrow slab-stats`
+
+Slab occupancy statistics for the Arrow Buf allocator.
+
+This command takes no arguments.
+
+## `cgap audit ocel-stats`
+
+OCEL event-log statistics from the audit log.
+
+This command takes no arguments.
+
+## `cgap audit powl-stats`
+
+POWL model statistics from the audit log.
+
+This command takes no arguments.
+
+## `cgap beam info`
+
+Report BEAM membrane host availability.
+
+This command takes no arguments.
+
 ## `cgap bench mask`
 
 64 MiB mask_words line-rate bench, min-of-5.
@@ -19,6 +43,84 @@ This command takes no arguments.
 ## `cgap bench parquet`
 
 Literal-page w=4 RLE encode comparison, min-of-5.
+
+This command takes no arguments.
+
+## `cgap bn3 eval`
+
+Evaluate a closed BN3 program to its result term.
+
+This command takes no arguments.
+
+## `cgap bn3 unify`
+
+Binary N3 unification over the term arena.
+
+This command takes no arguments.
+
+## `cgap bont pack-verify`
+
+Verify the B-ONT pack digest chain.
+
+This command takes no arguments.
+
+## `cgap bont slot-lookup`
+
+SlotId lookup over the B-ONT scalar slab.
+
+This command takes no arguments.
+
+## `cgap court verdict-run`
+
+Run the cgap-court verdict harness and print the report.
+
+This command takes no arguments.
+
+## `cgap crypto receipt-verify`
+
+Verify a signed receipt's PQC signature.
+
+This command takes no arguments.
+
+## `cgap crypto seal`
+
+Seal a payload under the Chatman-PQC key schedule.
+
+This command takes no arguments.
+
+## `cgap gate dam-ingest`
+
+Ingest a DAM evidence bundle through the gate.
+
+This command takes no arguments.
+
+## `cgap git dag-verify`
+
+Verify the Git packfile Merkle DAG chain.
+
+This command takes no arguments.
+
+## `cgap gpu info`
+
+Report GPU membrane device availability.
+
+This command takes no arguments.
+
+## `cgap p28 attest-verify`
+
+Verify a P28LicenseAttestation (80B) against the frozen URN.
+
+This command takes no arguments.
+
+## `cgap parquet pack-check`
+
+Check a Parquet pack's footer and checksums.
+
+This command takes no arguments.
+
+## `cgap parquet pack-emit`
+
+Emit a Parquet pack from the columnar store.
 
 This command takes no arguments.
 

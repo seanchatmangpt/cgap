@@ -83,11 +83,7 @@ impl core::fmt::Display for TierMismatch {
 /// Tier-specific re-derivation obligations (digest, `payload_byte_len`) are
 /// asserted by [`crate::frame::CgapFrameHeader::verify_payload`] at the call
 /// site; the executed combination is `tests/identity_court.rs`.
-pub fn identity_assert(
-    wire: &[u8],
-    tier: Tier,
-    projection: &[u8],
-) -> Result<(), TierMismatch> {
+pub fn identity_assert(wire: &[u8], tier: Tier, projection: &[u8]) -> Result<(), TierMismatch> {
     let report = |offset: usize| TierMismatch {
         tier,
         offset,

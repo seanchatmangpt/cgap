@@ -1,6 +1,8 @@
 # A08: SHACL NodeShape -> Fixed Struct + Bitmask Compiler (Lane A08)
 
-- **Status**: PARTIAL_ALIVE (design landed; crate `cgap-bont` PROPOSED, not yet built)
+- **Status**: ALIVE (v26.11.1 wave F1; see `waves/a08-finish-receipt.md` —
+  `cargo test -p cgap-bont` exit 0, 35 passed / 0 failed, two compiler-level
+  sandbox flips M1c/M3c with fail-closed restores)
 - **Lane**: A08 of 20, Squadron 2, overnight-campaign v26.11.1
 - **Subject file**: `crates/cgap-bont/src/shacl_compiler.rs` (crate PROPOSED)
 - **Exit gate**: mandatory/optional SHACL property constraints evaluate via a
@@ -336,9 +338,11 @@ loud (named UNSUPPORTED with blocking fact), never a faked pass.
 
 ## 11. Standing
 
-- Design/ADR/this doc: PARTIAL_ALIVE (written this session).
-- Crate `cgap-bont` + `shacl_compiler.rs`: NOT BUILT (PROPOSED).
-- Exit gate: UNVERIFIED (no cargo run, no asm witness this session).
+- Design/ADR/this doc: ALIVE (v26.11.1 wave F1; see
+  `waves/a08-finish-receipt.md`).
+- Crate `cgap-bont` + `shacl_compiler.rs`: ALIVE (gate exit 0, 35/35).
+- Exit gate: ALIVE (cargo gate + T5 asm witness ran this session; sandbox
+  flips M1c/M3c with sha256 fail-closed restores).
 - Standing rises only from receipts: cargo exit codes, asm witness file,
   mutation-court flip receipts.
 

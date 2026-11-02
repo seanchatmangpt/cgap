@@ -2,6 +2,8 @@
 name = "cgap-gate"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "Campaign boundary gate kernels: fail-closed guard evaluation courts for the cgap substrate."
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A14 receipt ALIVE (docs/jira/v26.11.1/waves/a14-finish-receipt.md)
 
 [lib]

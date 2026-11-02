@@ -2,7 +2,9 @@
 name = "cgap-crypto"
 version.workspace = true
 edition.workspace = true
-publish = false
+publish = true
+description = "Sovereign, zero-dependency #![no_std] keyed BLAKE3 cryptography kernel (keyed digest engine, sealed transcripts, Merkle helpers) on the cgap-blake3 substrate."
+license-file = "../../LICENSE.md"
 # P28-SIL v2.1.0 sovereign license instrument:
 #   urn:avec:license:p28-sil:v2.1.0-sovereign
 # (cited like cgap-core per lane-A16 receipt; no SPDX identifiers.)
@@ -14,9 +16,9 @@ publish = false
 # engine in `src/chatman.rs` binds cgap-blake3's public `compress_scalar`
 # + chunk/parent/root flags. cgap-blake3 itself exposes NO keyed API (its
 # external-vector test says so loudly); the keyed mode lives here.
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
 
 [dev-dependencies]
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }

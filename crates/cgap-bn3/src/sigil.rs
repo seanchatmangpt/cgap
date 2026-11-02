@@ -193,6 +193,24 @@ pub enum BN3Error {
         /// Value actually observed in the image.
         got: u64,
     },
+    /// Fixed-capacity arena bound (A11 finisher, mission item 2): an init
+    /// request above the compile-time hard bound
+    /// ([`MAX_ARENA_STATEMENTS`](crate::arena::MAX_ARENA_STATEMENTS) /
+    /// [`MAX_ARENA_FORMULAS`](crate::arena::MAX_ARENA_FORMULAS)), or an
+    /// admission into a capacity-bounded arena whose slab/header table is
+    /// already at its declared capacity. `requested` is the count asked of
+    /// the arena, `bound` the law that refused it. The refusal is typed:
+    /// the capacity guard runs before any allocation, so an over-bound
+    /// request admits nothing and allocates nothing.
+    ///
+    /// Third named extension beyond the seven-row spec Section 7 table;
+    /// recorded divergence.
+    ArenaCapacityExceeded {
+        /// Count the caller asked the arena to hold.
+        requested: u64,
+        /// Capacity law that refused the request.
+        bound: u64,
+    },
 }
 
 impl core::fmt::Display for BN3Error {
@@ -213,6 +231,9 @@ impl core::fmt::Display for BN3Error {
             }
             BN3Error::ImageMalformed { expected, got } => {
                 write!(f, "restore image violates its framing: demanded {expected}, observed {got}")
+            }
+            BN3Error::ArenaCapacityExceeded { requested, bound } => {
+                write!(f, "fixed-capacity arena bound: requested {requested}, bound {bound}")
             }
         }
     }

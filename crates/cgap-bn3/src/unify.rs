@@ -545,6 +545,34 @@ impl Interner {
     }
 }
 
+/// All-ones lane mask: the "match" element of the mask algebra.
+const MASK_ALL: u64 = u64::MAX;
+
+/// Branch-free u64-lane equality mask (the constant-time comparator arm;
+/// spec ADR 3.3's honest scoping, doe-4 Section 2 "u64-lane arm"): all-ones
+/// when `a == b`, zero otherwise. Pure mask arithmetic — XOR, neg, OR,
+/// shift, subtract — so the executed instruction stream is identical for
+/// every operand pair: no data-dependent branch, no early exit, no lookup.
+/// Both comparator sites ([`atom_local_match_into`] and the join probe)
+/// AND these masks into an accumulator and branch once on the final mask,
+/// never per comparison.
+///
+/// Anti-vacuity anchor: the binding-alias comparator class (doe-4 Section 8
+/// SHIM-DOE4) replaces the VALUE compare feeding this function; the
+/// binding-consistency court and the differential court both flip under it
+/// (receipt: `docs/jira/v26.11.1/waves/a12-finish-receipt.md`).
+#[inline(always)]
+fn lane_eq_mask(a: u64, b: u64) -> u64 {
+    let d = a ^ b;
+    // `nz` = 1 iff `d != 0`: for nonzero d, `d.wrapping_neg()` = `!d + 1`
+    // has ones everywhere above d's highest set bit, so the OR sets bit 63
+    // (and if d's highest set bit IS bit 63, d supplies it directly); zero
+    // maps to zero. `nz.wrapping_sub(1)` then underflows to all-ones iff
+    // equal.
+    let nz = (d | d.wrapping_neg()) >> 63;
+    nz.wrapping_sub(1)
+}
+
 /// Reusable per-chunk evaluation scratch (Wave 4 hardening, spec 7.4):
 /// every heap buffer the nested-loop evaluation touches, owned once and
 /// reused across chunks, fixpoint rounds, and court runs. The
@@ -593,13 +621,17 @@ fn atom_local_match_into(
 ) -> bool {
     binds.clear();
     seen.clear();
+    // Constant-time comparator arm: the slot comparisons AND their
+    // [`lane_eq_mask`]s into `acc` with no data-dependent early exit — the
+    // conjunction of pure comparisons is order-independent, so accept/reject
+    // semantics and first-occurrence binding order are identical to the
+    // retired early-return form. One branch, on the final mask.
+    let mut acc = MASK_ALL;
     for si in 0..3 {
         let w = cols.col(si)[row];
         match atom[si] {
             CompiledTerm::Const(creg) => {
-                if w != const_pool[creg as usize] {
-                    return false;
-                }
+                acc &= lane_eq_mask(w, const_pool[creg as usize]);
             }
             CompiledTerm::Var(idx) => {
                 let idx = idx as usize;
@@ -608,9 +640,7 @@ fn atom_local_match_into(
                 }
                 match seen.iter().copied().find(|&(_, fi)| fi == idx) {
                     Some((fs, _)) => {
-                        if w != cols.col(fs)[row] {
-                            return false;
-                        }
+                        acc &= lane_eq_mask(w, cols.col(fs)[row]);
                     }
                     None => {
                         seen.push((si, idx));
@@ -620,7 +650,7 @@ fn atom_local_match_into(
             }
         }
     }
-    true
+    acc == MASK_ALL
 }
 
 /// Evaluate one compiled rule over one batch (all body atoms), atom-0
@@ -820,14 +850,16 @@ fn eval_chunk_into(
         for m in 0..cur {
             for (c, &j) in sc.cand_rows.iter().enumerate() {
                 let (b0, blen) = sc.cand_spans[c];
-                let mut ok = true;
+                // Bound-slot probe, constant-time comparator arm (doe-4
+                // INV-1): every bound slot compares the match's bound VALUE
+                // (register-dereferenced) against the candidate lane — never
+                // the variable's register index or slot position — masks
+                // ANDed with no early exit; one branch on the final mask.
+                let mut ok = MASK_ALL;
                 for &(si, vidx) in &sc.bound_slots {
-                    if cols.col(si)[j as usize] != sc.cur_vars[vidx][m] {
-                        ok = false;
-                        break;
-                    }
+                    ok &= lane_eq_mask(cols.col(si)[j as usize], sc.cur_vars[vidx][m]);
                 }
-                if !ok {
+                if ok != MASK_ALL {
                     continue;
                 }
                 for a in 0..ai {
@@ -945,7 +977,11 @@ pub fn unify_to_fixpoint_opt(
 }
 
 #[cfg(test)]
-mod tests {
+// [W2-9 unblock 2026-11-01, disclosed per fan-out SLA] `pub(crate)` so the
+// noalloc.rs courts can read the SAME counting-allocator thread-local via
+// `current_allocs` — a second `#[global_allocator]` is E0152, and the
+// binary's single Counting allocator must stay the one counting substrate.
+pub(crate) mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
@@ -1437,6 +1473,54 @@ mod tests {
         assert_eq!(m.atom_rows[0], vec![0, 2]);
     }
 
+    /// Occurs/self-join semantics court (doe-4 Section 7 INV-2): within-
+    /// atom variable repetition (`?x p ?x`) is WITHIN-ROW value equality on
+    /// the row's own slot columns; the differential oracle's occurs-check
+    /// semantics (M12-8) are the preserved reference, so the kernel's
+    /// derivations must equal the naive oracle's on an adversarial store —
+    /// rows whose values are swapped ACROSS rows (8,9 then 9,8) must not
+    /// self-join: no row has subject == object.
+    /// Mutation that MUST flip this court: any comparator that matches a
+    /// repeated variable across rows, or drops the within-row check.
+    #[test]
+    fn semantics_court_occurs_self_join_is_within_row_and_matches_oracle() {
+        // 0: (7,P3,7) MATCH; 1: (8,P3,9) no; 2: (9,P3,8) no (cross-row swap);
+        // 3: (5,P3,5) MATCH.
+        let s = [cw(7), cw(8), cw(9), cw(5)];
+        let p = [cw(300); 4];
+        let o = [cw(7), cw(9), cw(8), cw(5)];
+        let rule = Rule {
+            rule_id: 8,
+            body: vec![BodyAtom::new(vw(10), cw(300), vw(10))],
+            head: [vw(10), cw(100), cw(1)],
+        };
+        let c = RuleCompiler::compile(&rule).unwrap();
+        let cols = StatementColumns::new(&s, &p, &o).unwrap();
+        let m = unify_batch(&c, &cols, 4096).unwrap();
+        assert_eq!(m.len, 2);
+        assert_eq!(m.atom_rows[0], vec![0, 3]);
+        assert_eq!(m.var_values[0], vec![cw(7), cw(5)]);
+        // Occurs-check reference: the naive oracle's independent matcher
+        // derives exactly the same two rows, same order (M12-8 semantics).
+        let mut out = Vec::new();
+        let mut binding = HashMap::new();
+        naive_match_rule(&rule, &s, &p, &o, &mut binding, &mut out);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0], (cw(7), cw(100), cw(1)));
+        assert_eq!(out[1], (cw(5), cw(100), cw(1)));
+        // Typed-refusal half of INV-2: an unbound head variable stays a
+        // named compile refusal (compile court co-witnesses this arm).
+        let bad = Rule {
+            rule_id: 9,
+            body: vec![BodyAtom::new(vw(10), cw(300), cw(7))],
+            head: [vw(99), cw(100), cw(1)],
+        };
+        assert_eq!(
+            RuleCompiler::compile(&bad),
+            Err(UnifyError::UnboundHeadVariable)
+        );
+    }
+
     /// Cross-row join court: `?x P1 ?y . ?y P2 ?z` over a hand-computed
     /// store, including a candidate that passes atom-1 locally but fails
     /// the bound-variable probe.
@@ -1471,6 +1555,64 @@ mod tests {
             vec![cw(3), cw(5), cw(6)],
             "?z bindings"
         );
+    }
+
+    /// Binding-consistency court (doe-4 Section 7 INV-1): one variable
+    /// binds exactly one value per match, and the bound-slot probe compares
+    /// the match's bound VALUE (register-dereferenced) — never the
+    /// variable's register number or slot position.
+    /// Mutation that MUST flip this court (doe-4 Section 8 SHIM-DOE4, run
+    /// in a /tmp sandbox this wave): an aliasing comparator comparing the
+    /// register NUMBER `R{64+idx}` against the candidate lane — the planted
+    /// raw word 65 (= ?y's register number) then falsely joins trap row 2,
+    /// and the exact-match/exact-binding asserts fail.
+    #[test]
+    fn semantics_court_binding_consistency_value_probe_not_alias() {
+        // Rule ?x P1 ?y . ?y P2 ?z: ?x->idx0/R64, ?y->idx1/R65, ?z->idx2/R66.
+        let rule = Rule {
+            rule_id: 7,
+            body: vec![
+                BodyAtom::new(vw(10), cw(100), vw(11)),
+                BodyAtom::new(vw(11), cw(200), vw(12)),
+            ],
+            head: [vw(12), cw(100), vw(10)],
+        };
+        let c = RuleCompiler::compile(&rule).unwrap();
+        assert_eq!(c.var_count, 3);
+        let reg_of = |idx: usize| (VAR_BAND_FIRST + idx) as u64;
+        assert_eq!(reg_of(1), 65);
+        // Rows: 0 (1,P1,2) real anchor; 1 (2,P2,3) real join; 2 (65,P2,9)
+        // TRAP — the subject IS the raw register number 65, so a value-blind
+        // comparator aliases the ?y binding onto it; 3 (2,P2,5) real join.
+        let s = [cw(1), cw(2), 65, cw(2)];
+        let p = [cw(100), cw(200), cw(200), cw(200)];
+        let o = [cw(2), cw(3), cw(9), cw(5)];
+        let cols = StatementColumns::new(&s, &p, &o).unwrap();
+        let m = unify_batch(&c, &cols, 2).unwrap();
+        // Exactly one bound value per variable per match (column alignment).
+        for col in m.var_values.iter().take(c.var_count) {
+            assert_eq!(col.len(), m.len);
+        }
+        // Exact matches under the value probe: rows 1 and 3 join; trap row 2
+        // is rejected because the bound ?y VALUE cw(2) != its subject word 65.
+        assert_eq!(m.len, 2, "alias trap row must not join");
+        assert_eq!(m.atom_rows[0], vec![0, 0]);
+        assert_eq!(m.atom_rows[1], vec![1, 3]);
+        // Binding consistency: each variable's value is the store word at
+        // its first-binding atom's matched row, for every match.
+        for (idx, &(fa, fs)) in c.var_first.iter().enumerate() {
+            for mm in 0..m.len {
+                let anchor = m.atom_rows[fa][mm] as usize;
+                assert_eq!(
+                    m.var_values[idx][mm],
+                    cols.col(fs)[anchor],
+                    "var {idx} match {mm}"
+                );
+            }
+        }
+        assert_eq!(m.var_values[0], vec![cw(1), cw(1)]);
+        assert_eq!(m.var_values[1], vec![cw(2), cw(2)]);
+        assert_eq!(m.var_values[2], vec![cw(3), cw(5)]);
     }
 
     /// No-match court: a constant bound to an absent value selects
@@ -1689,6 +1831,51 @@ mod tests {
         }
     }
 
+    /// Same-input/same-bindings determinism court: repeated evaluation of
+    /// one (rule, store) pair yields identical `MatchSet`s — across
+    /// repeated runs, fresh vs warm state-carrying scratch, and chunk
+    /// sizes — the binding-map property M12-6 pins at batch level.
+    /// Mutation that MUST flip this court: any state carried between runs
+    /// through [`EvalScratch`] that leaks into bindings or match order.
+    #[test]
+    fn determinism_court_same_input_yields_identical_bindings() {
+        let c = gen_witnessed_corpus(11);
+        let cols = StatementColumns::new(&c.s, &c.p, &c.o).unwrap();
+        let compiled: Vec<_> = c
+            .rules
+            .iter()
+            .map(RuleCompiler::compile)
+            .collect::<Result<_, _>>()
+            .unwrap();
+        let rule = &compiled[1]; // the join rule ?x P1 ?y . ?y P2 ?z
+        let reference = unify_batch(rule, &cols, DEFAULT_CHUNK_ROWS).unwrap();
+        // (a) Fresh-scratch repeat: byte-identical bindings and match order.
+        let again = unify_batch(rule, &cols, DEFAULT_CHUNK_ROWS).unwrap();
+        assert_eq!(reference, again, "fresh-scratch repeat diverged");
+        // (b) Warm scratch previously dirtied by a DIFFERENT rule over the
+        // same store: no state may leak into bindings or order.
+        let mut warm = EvalScratch::default();
+        let dirty = Rule {
+            rule_id: 99,
+            body: vec![BodyAtom::new(vw(20), cw(c.p[0]), vw(21))],
+            head: [vw(21), cw(1), vw(20)],
+        };
+        let dc = RuleCompiler::compile(&dirty).unwrap();
+        let mut dust = MatchSet::default();
+        unify_batch_into(&dc, &cols, 7, &mut warm, &mut dust).unwrap();
+        let mut via_warm = MatchSet::default();
+        unify_batch_into(rule, &cols, DEFAULT_CHUNK_ROWS, &mut warm, &mut via_warm).unwrap();
+        assert_eq!(reference, via_warm, "warm-scratch state leaked");
+        // (c) Chunk size 1: same bindings, same order (M12-6 partition law
+        // at match-set granularity).
+        let mut chunked = MatchSet::default();
+        unify_batch_into(rule, &cols, 1, &mut warm, &mut chunked).unwrap();
+        assert_eq!(reference, chunked, "chunk-1 bindings diverged");
+        // The named property, asserted directly: identical variable bindings.
+        assert_eq!(reference.var_values, via_warm.var_values);
+        assert_eq!(reference.var_values, chunked.var_values);
+    }
+
     /// Witness-independence court (DoD 7): the witnessed generator really
     /// does produce corpora where every rule fires — the M12-5 court's
     /// non-vacuity premise, asserted over the differential court's seed
@@ -1755,7 +1942,9 @@ mod tests {
     #[global_allocator]
     static COUNTING_ALLOC: Counting = Counting;
 
-    fn current_allocs() -> usize {
+    /// [W2-9 unblock 2026-11-01] `pub(crate)`: noalloc.rs zero-alloc court
+    /// reads this same thread-local counter (single counting substrate).
+    pub(crate) fn current_allocs() -> usize {
         ALLOCS.with(Cell::get)
     }
 

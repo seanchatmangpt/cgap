@@ -276,29 +276,47 @@ DEFAULT_MAX_MUTANTS = 24
 #   no longer sampled) — removed per the register's own law; the two
 #   currently-sampled survivor sites were triaged from the run ledger
 #   (property analysis below); :1735 remains sampled and keeps its row.
+#   A20-finish refresh (this session): commit 9be9109d appended the SEAL
+#   (GATE-3) section (+591 lines) to the court kernel, the stride-24 sample
+#   shifted again, and the check refused the 3 Wave-9 keys (:827/:1625/:1735
+#   no longer sampled — sites still exist, none is in the current sample).
+#   This session's campaign ledger (crates/cgap-court/a20-kill-ledger.json)
+#   killed ALL 24 sampled mutants (21 KilledByBuild + 3 KilledByTest, 0
+#   survivors), so the refreshed register is the EMPTY set — removal per the
+#   fail-closed law, never a widening: no survivor existed to triage.
 EQUIVALENT_TRIAGE = {
-    "tests/court_verdict.rs:827:int-bump-up:0": (
-        "Row-0 admission anchor SOURCE index `rows[0]` -> `rows[1]`: the "
-        "anchor's only obligation is to differ from row 0's key (row 0 is "
-        "never degenerate, so row 0's admission check is `!=`), and "
-        "prev_key is re-seeded from row 0 after the first iteration, so no "
-        "later row consumes the anchor. Over the sha256-receipt-pinned "
-        "corpus the two anchors are distinct values, so every pinned "
-        "observation (1M admissions, nonzero checksum, 976-alloc budget) "
-        "is identical. Corpus-pinned equivalence, disclosed as such."
+    "tests/court_verdict.rs:812:cmp-swap:0": (
+        "`zero > 0` -> `zero >= 0`: unsigned tautology. The zero-family "
+        "population law is carried by sibling pins — the corpus receipt "
+        "court's all-four-families assert (A20-finish repair, this "
+        "session) plus the sha256 corpus receipt itself — so the battery "
+        "conjunct is defense-in-depth and both polarities are "
+        "observation-identical over the receipt-pinned corpus."
     ),
-    "tests/court_verdict.rs:1625:int-bump-down:0": (
-        "Content-independence length list is a coverage sample: the "
-        "pinned property is length-independence of the ingress verdict "
-        "(same status at any payload_len, view length tracks the declared "
-        "length — asserted per iteration), so `1024` -> `1023` swaps one "
-        "non-boundary sample point for another."
+    "tests/court_verdict.rs:1379:int-bump-up:1": (
+        "FormulaRef-ban fixture body var `a12_var(1)` -> `a12_var(2)`: the "
+        "pinned law is the p-slot Sigil ban, which is var-agnostic; the "
+        "compile-refusal assert fires for any var pair, so the fixture's "
+        "variable identity is setup material with every pinned observation "
+        "identical."
     ),
-    "tests/court_verdict.rs:1735:int-bump-down:9": (
-        "KAT sweep length `200` -> `199`: the streaming-identity property "
-        "holds at every length, the list is a coverage sample of block "
-        "boundaries (54..57, 63..65, 119/120, 200, 1000), and the mutant "
-        "swaps one non-boundary sample point for another."
+    "tests/court_verdict.rs:1475:cmp-swap:0": (
+        "`op >= sp` -> `op > sp`: provably redundant conjunct — the second "
+        "conjunct `op - sp >= 2` implies strict inequality, so both "
+        "polarities are observation-identical whenever the assertion "
+        "evaluates at all. Logical implication, not corpus dependence."
+    ),
+    "tests/court_verdict.rs:1666:int-bump-up:0": (
+        "Zero-alloc sweep template source `rows[7]` -> `rows[8]`: both rows "
+        "are non-degenerate, the template's only obligation is a valid "
+        "frame encoding, and the sweep's asserts (all 1M admitted, zero "
+        "allocs, per-row digest patching) are parametric in the template."
+    ),
+    "tests/court_verdict.rs:2008:int-bump-up:0": (
+        "Mutation-witness fixture row `rows[0]` -> `rows[1]`: the pinned "
+        "law is value-independence of the identity detector (any payload "
+        "bit flip must flip the digest and Err), so the witness row's "
+        "identity is setup material; both rows flip the same byte offset."
     ),
 }
 
@@ -319,32 +337,57 @@ def write_bytes(path, data):
 
 # --- line analysis -----------------------------------------------------------
 
-def code_regions(line):
+def string_state_at_line_starts(lines):
+    """The string state at the start of each line (same state machine as
+    code_regions, run across the whole file): the cross-line context a
+    per-line scanner needs for multi-line string literals. Entry i is the
+    in_str at the first character of line i+1; entry 0 is always False
+    (file start)."""
+    states = [False]
+    in_str = False
+    for line in lines:
+        i = 0
+        while i < len(line):
+            c = line[i]
+            if in_str:
+                if c == '"' and line[i - 1] != "\\":
+                    in_str = False
+            elif c == '"':
+                in_str = True
+            i += 1
+        states.append(in_str)
+    states.pop()
+    return states
+
+
+def code_regions(line, in_str_start=False):
     """Character ranges of a line that are CODE: not string interiors, not a
-    comment suffix. Positions are original-line indices."""
+    comment suffix. Positions are original-line indices. `in_str_start` is
+    the cross-line string state at the line's first character — multi-line
+    string literals make it True; a per-line state machine cannot see it."""
     regions = []
     start = 0
     i = 0
-    in_str = False
+    in_str = in_str_start
     while i < len(line):
         c = line[i]
         if in_str:
             if c == '"' and line[i - 1] != "\\":
                 i += 1
+                start = i  # code resumes after the closing quote
                 in_str = False
                 continue
         elif c == '"':
             if i > start:
                 regions.append((start, i))
+            start = i + 1  # the quote is not code; interior excluded
             in_str = True
         elif c == "/" and i + 1 < len(line) and line[i + 1] == "/":
             if i > start:
                 regions.append((start, i))
             return regions
         i += 1
-    if in_str:
-        regions.append((start, len(line)))
-    elif len(line) > start:
+    if not in_str and len(line) > start:
         regions.append((start, len(line)))
     return regions
 
@@ -353,9 +396,9 @@ def in_code(regions, start, end):
     return any(a <= start and end <= b for a, b in regions)
 
 
-def find_matches(line, regex):
+def find_matches(line, regex, in_str_start=False):
     """Matches fully inside code regions: [(start, end, text)]."""
-    regions = code_regions(line)
+    regions = code_regions(line, in_str_start)
     out = []
     for m in regex.finditer(line):
         if in_code(regions, m.start(), m.end()):
@@ -402,11 +445,14 @@ def _rebuild_hex(lit, new_value):
     return "0x" + "".join(out)
 
 
-def mutate_line(line, operator, occurrence):
+def mutate_line(line, operator, occurrence, in_str_start=False):
     """One operator instance on a line; None when the occurrence doesn't
-    exist. Deterministic: occurrence counts matches left-to-right."""
+    exist. Deterministic: occurrence counts matches left-to-right. The
+    optional `in_str_start` is the cross-line string state at the line's
+    first character (multi-line string literals); without it the scanner
+    would treat a continuation line's string text as code."""
     if operator == "hex-bump":
-        for start, end, lit in find_matches(line, HEX_RE):
+        for start, end, lit in find_matches(line, HEX_RE, in_str_start):
             digits = lit[2:].replace("_", "")
             if not digits:
                 continue
@@ -418,7 +464,7 @@ def mutate_line(line, operator, occurrence):
             occurrence -= 1
         return None
     if operator in ("int-bump-up", "int-bump-down"):
-        for start, end, text in find_matches(line, INT_RE):
+        for start, end, text in find_matches(line, INT_RE, in_str_start):
             n = int(text)
             if operator == "int-bump-down":
                 if n == 0:
@@ -431,20 +477,20 @@ def mutate_line(line, operator, occurrence):
             occurrence -= 1
         return None
     if operator == "cmp-swap":
-        for start, end, tok in find_matches(line, CMP_RE):
+        for start, end, tok in find_matches(line, CMP_RE, in_str_start):
             if occurrence == 0:
                 return line[:start] + CMP_SWAP[tok] + line[end:]
             occurrence -= 1
         return None
     if operator == "bool-flip":
-        for start, end, tok in find_matches(line, BOOL_RE):
+        for start, end, tok in find_matches(line, BOOL_RE, in_str_start):
             new = "false" if tok == "true" else "true"
             if occurrence == 0:
                 return line[:start] + new + line[end:]
             occurrence -= 1
         return None
     if operator == "ret-remove":
-        for start, end, _stmt in find_matches(line, RET_RE):
+        for start, end, _stmt in find_matches(line, RET_RE, in_str_start):
             if occurrence == 0:
                 return line[:start] + line[end:]
             occurrence -= 1
@@ -453,7 +499,7 @@ def mutate_line(line, operator, occurrence):
         # masks first, then shift/rotate amounts; each left-to-right. The
         # match span includes the `&`/`|`/`<<` context; only the trailing
         # literal/amount is replaced, never the operator token.
-        for start, end, text in find_matches(line, MASK_RE):
+        for start, end, text in find_matches(line, MASK_RE, in_str_start):
             m_lit = HEX_RE.search(text)
             if not m_lit:
                 continue
@@ -467,7 +513,7 @@ def mutate_line(line, operator, occurrence):
             if occurrence == 0:
                 return line[: start + m_lit.start()] + new_lit + line[end:]
             occurrence -= 1
-        for start, end, text in find_matches(line, SHIFT_RE):
+        for start, end, text in find_matches(line, SHIFT_RE, in_str_start):
             last_digits = None
             for m_d in re.finditer(r"\d+", text):
                 last_digits = m_d
@@ -485,13 +531,17 @@ def mutate_line(line, operator, occurrence):
 
 def enumerate_mutants(lines):
     """All (line_no_1based, operator, occurrence) triples; deterministic
-    order: line ascending, operator order = OPERATORS, occurrences L-to-R."""
+    order: line ascending, operator order = OPERATORS, occurrences L-to-R.
+    Per-line cross-line string state (multi-line string literals) is
+    computed once and passed to every per-line scan."""
     mutants = []
+    str_states = string_state_at_line_starts(lines)
     for line_no, line in enumerate(lines, start=1):
+        s = str_states[line_no - 1]
         for op in OPERATORS:
             occ = 0
             while True:
-                mutated = mutate_line(line, op, occ)
+                mutated = mutate_line(line, op, occ, s)
                 if mutated is None:
                     break
                 mutants.append((line_no, op, occ))
@@ -1751,11 +1801,13 @@ def main():
     for t in target_list:
         path = os.path.join(REPO, t)
         data = read_bytes(path)
+        lines = data.decode().split("\n")
         states[t] = {
             "path": path,
             "baseline": data,
             "sha": sha256_bytes(data),
-            "lines": data.decode().split("\n"),
+            "lines": lines,
+            "str_state": string_state_at_line_starts(lines),
         }
 
     only_ops = None
@@ -1937,7 +1989,8 @@ def main():
     survivors = []
     for (t, line_no, op, occ) in sampled:
         st = states[t]
-        mutated_line = mutate_line(st["lines"][line_no - 1], op, occ)
+        mutated_line = mutate_line(st["lines"][line_no - 1], op, occ,
+                                   st["str_state"][line_no - 1])
         if mutated_line is None:
             continue
         # Wave 8: pre-write interference check before EVERY mutant write

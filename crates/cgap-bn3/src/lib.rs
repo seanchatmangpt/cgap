@@ -2,5 +2,6 @@
 pub mod arena;
 pub mod sigil;
 pub mod unify;
+pub mod noalloc;
 pub mod project;
 pub mod builtins;

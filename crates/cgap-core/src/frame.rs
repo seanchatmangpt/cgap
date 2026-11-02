@@ -116,8 +116,7 @@ impl P28LicenseAttestation {
         if self.safe_harbor_ceiling_cents > SAFE_HARBOR_CEILING_CENTS_MAX {
             return Err(FrameError::AttestationMismatch);
         }
-        let needs_upstream =
-            flags & (LICENSE_FLAG_DERIVATIVE | LICENSE_FLAG_TRANSPILED) != 0;
+        let needs_upstream = flags & (LICENSE_FLAG_DERIVATIVE | LICENSE_FLAG_TRANSPILED) != 0;
         let has_upstream = self.upstream_receipt != [0u8; 32];
         if needs_upstream != has_upstream {
             return Err(FrameError::AttestationMismatch);
@@ -238,6 +237,37 @@ impl CgapFrameHeader {
         })
     }
 
+    /// Wire-to-memory ingress: project a `&CgapFrameHeader` onto `region`
+    /// without copying one byte (§8.1 memory tier — "zero-copy
+    /// addressability"; the `slice::from_raw_parts` shape, made safe: the
+    /// alignment precondition is a typed runtime gate, the layout
+    /// precondition is a compile-time pin, so no `unsafe` precondition is
+    /// left unchecked at either call site shape).
+    ///
+    /// The returned reference aliases `region`: reads through it are the
+    /// bytes on the wire, and a field's address is the §6.1 offset from the
+    /// region base — both pinned by `tests/ingress_layout_court.rs`.
+    /// Layout-only (like [`CgapFrameHeader::decode`]): call
+    /// [`CgapFrameHeader::validate`] / [`CgapFrameHeader::verify_payload`]
+    /// to re-establish validity.
+    pub fn project<'a>(
+        region: &'a [u8; FRAME_HEADER_LEN],
+    ) -> Result<&'a CgapFrameHeader, FrameError> {
+        if region.as_ptr() as usize % core::mem::align_of::<CgapFrameHeader>() != 0 {
+            return Err(FrameError::Misaligned);
+        }
+        // SAFETY: the gate above proves the address satisfies
+        // align_of::<CgapFrameHeader>() (§6.4 pin: 64). repr(C) plus the
+        // gap-free const lattice below make all 128 bytes field data (no
+        // padding — so no uninitialized-padding read), and every field type
+        // ([u8; N], u8, u64, P28LicenseAttestation) accepts every bit
+        // pattern, so any 128 bytes at a 64-aligned address form a
+        // structurally valid value. Validity (magic/version/digest/
+        // attestation) is deliberately re-established by validate(), never
+        // here — ingress is layout-only, mirroring decode().
+        unsafe { Ok(&*(region.as_ptr() as *const CgapFrameHeader)) }
+    }
+
     /// Structural validation (§8.3 rows: magic flip → `BadMagic`; reserved
     /// flag bit → `ReservedBitsSet`), plus A17 §2.2 attestation validity.
     ///
@@ -320,6 +350,11 @@ pub enum FrameError {
     AttestationMismatch,
     /// `payload_byte_len` disagrees with the payload actually presented.
     PayloadLenMismatch,
+    /// Ingress projection [`CgapFrameHeader::project`] was handed a region
+    /// whose address is not 64-byte aligned — no `&CgapFrameHeader` can be
+    /// formed there without a copy or UB, so the ingress refuses (typed,
+    /// fail-closed; §7.2 cache-line discipline).
+    Misaligned,
     /// §8.3: re-derived digest differs from the embedded `oabi_digest`.
     DigestMismatch,
     /// Encode/decode buffer shorter than the pinned 128 B / 80 B layout.
@@ -334,6 +369,7 @@ impl core::fmt::Display for FrameError {
             FrameError::ReservedBitsSet => "ReservedBitsSet",
             FrameError::AttestationMismatch => "AttestationMismatch",
             FrameError::PayloadLenMismatch => "PayloadLenMismatch",
+            FrameError::Misaligned => "Misaligned",
             FrameError::DigestMismatch => "DigestMismatch",
             FrameError::BufferTooSmall => "BufferTooSmall",
         };
@@ -347,6 +383,10 @@ const _: () = assert!(core::mem::size_of::<CgapFrameHeader>() == 128);
 const _: () = assert!(core::mem::align_of::<CgapFrameHeader>() == 64);
 const _: () = assert!(core::mem::size_of::<P28LicenseAttestation>() == 80);
 const _: () = assert!(core::mem::align_of::<P28LicenseAttestation>() == 8);
+// The wire-length constant and the layout pin are one fact, stated twice
+// here so neither can drift (finisher lane A04: ingress projection pin).
+const _: () = assert!(FRAME_HEADER_LEN == core::mem::size_of::<CgapFrameHeader>());
+const _: () = assert!(ATTESTATION_LEN == core::mem::size_of::<P28LicenseAttestation>());
 
 // §6.1 byte-offset table, machine-checked at compile time (`offset_of!`,
 // stable 1.77). Each row below is one table line from §6.1 / A17 §2.1;
@@ -466,7 +506,14 @@ mod tests {
                 4 => h.attestation.upstream_receipt[0] ^= 0xFF, // nonzero receipt on ROOT
                 _ => h.attestation.attestation_flags &= !0x07,
             }
-            let names = ["magic", "version", "flags_reserved", "ceiling", "upstream", "lineage_zero"];
+            let names = [
+                "magic",
+                "version",
+                "flags_reserved",
+                "ceiling",
+                "upstream",
+                "lineage_zero",
+            ];
             assert_eq!(
                 h.validate(),
                 Err(FrameError::AttestationMismatch),
@@ -509,13 +556,22 @@ mod tests {
         assert_eq!(back.oabi_digest, h.oabi_digest);
         assert_eq!(back.attestation.license_magic, h.attestation.license_magic);
         assert_eq!(back.attestation.version, h.attestation.version);
-        assert_eq!(back.attestation.attestation_flags, h.attestation.attestation_flags);
+        assert_eq!(
+            back.attestation.attestation_flags,
+            h.attestation.attestation_flags
+        );
         assert_eq!(
             back.attestation.safe_harbor_ceiling_cents,
             h.attestation.safe_harbor_ceiling_cents
         );
-        assert_eq!(back.attestation.origin_authority_digest, h.attestation.origin_authority_digest);
-        assert_eq!(back.attestation.upstream_receipt, h.attestation.upstream_receipt);
+        assert_eq!(
+            back.attestation.origin_authority_digest,
+            h.attestation.origin_authority_digest
+        );
+        assert_eq!(
+            back.attestation.upstream_receipt,
+            h.attestation.upstream_receipt
+        );
         // re-encode is byte-stable (wire identity, §8.1)
         let mut buf2 = [0u8; FRAME_HEADER_LEN];
         back.encode_into(&mut buf2).unwrap();
@@ -537,7 +593,9 @@ mod tests {
         let decoded = CgapFrameHeader::decode(&buf).unwrap();
         assert_eq!(decoded.payload_byte_len, 0x0102030405060708);
         assert_ne!(
-            u64::from_be_bytes([buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]]),
+            u64::from_be_bytes([
+                buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]
+            ]),
             decoded.payload_byte_len
         );
         // attestation ceiling LE too (A17 §2.1): 5_000_000_000 = 0x12A05F200
@@ -613,13 +671,19 @@ mod tests {
     #[test]
     fn short_buffers_refused_typed() {
         let h = valid_header(0);
-        assert_eq!(h.encode_into(&mut [0u8; 127]), Err(FrameError::BufferTooSmall));
+        assert_eq!(
+            h.encode_into(&mut [0u8; 127]),
+            Err(FrameError::BufferTooSmall)
+        );
         assert_eq!(
             CgapFrameHeader::decode(&[0u8; 127]),
             Err(FrameError::BufferTooSmall)
         );
         let a = root_attestation();
-        assert_eq!(a.encode_into(&mut [0u8; 79]), Err(FrameError::BufferTooSmall));
+        assert_eq!(
+            a.encode_into(&mut [0u8; 79]),
+            Err(FrameError::BufferTooSmall)
+        );
         assert_eq!(
             P28LicenseAttestation::decode(&[0u8; 79]),
             Err(FrameError::BufferTooSmall)

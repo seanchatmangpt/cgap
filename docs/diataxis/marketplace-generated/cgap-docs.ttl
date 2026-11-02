@@ -1,0 +1,73 @@
+@prefix rdx: <https://seanchatmangpt.github.io/ggen-marketplace/readme-diataxis#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex: <http://example.org/cgap-docs#> .
+
+# Facts grounded in /Users/sac/cgap/README.md (read this session) and the
+# repo CLAUDE.md command surface. Every fact below is copied or directly
+# paraphrased from those on-disk sources.
+
+ex:cgap a rdx:Project ;
+    dcterms:title "cgap" ;
+    dcterms:description "Sovereign columnar/deductive compute substrate: fixed-width columnar frames (A04 CgapFrameHeader, 128 B), binary ontology slots (B-ONT), string-free deduction (BN3 binary N3), spoliation-enforced P28-SIL licensing, and an Arrow C Data Interface kernel family — all #![no_std] with zero external dependencies, exposed through four sovereign C-ABI entrypoints (admit / eval / commit / verify) and a cgap umbrella facade." ;
+    rdx:license "Apache-2.0" ;
+    rdx:repositoryUrl "https://github.com/seanchatmangpt/cgap" .
+
+# Tutorial quadrant: clone/install/start (README Quickstart + workspace build)
+ex:step1 a rdx:RunStep ; rdx:position 1 ; rdx:kind "clone" ;
+    rdx:label "Clone the repository" ; rdx:command "git clone https://github.com/seanchatmangpt/cgap && cd cgap" .
+ex:step2 a rdx:RunStep ; rdx:position 2 ; rdx:kind "install" ;
+    rdx:label "Add the umbrella crate to a consumer project" ; rdx:command "cargo add cgap@26.11.1" .
+ex:step3 a rdx:RunStep ; rdx:position 3 ;
+    rdx:kind "start" ;
+    rdx:label "Build the workspace" ;
+    rdx:command "cargo build --workspace" .
+
+# How-to quadrant: deploy/test kinds + usage examples
+ex:step4 a rdx:RunStep ; rdx:position 4 ; rdx:kind "test" ;
+    rdx:label "Run the workspace tests" ; rdx:command "cargo test --workspace" .
+ex:step5 a rdx:RunStep ; rdx:position 5 ; rdx:kind "test" ;
+    rdx:label "Run the court harness" ; rdx:command "cargo test -p cgap-court" .
+ex:step6 a rdx:RunStep ; rdx:position 6 ; rdx:kind "test" ;
+    rdx:label "Run the boundary and zero-string gates" ;
+    rdx:command "python3 scripts/boundary_gate.py && python3 scripts/zero_string_gate.py" .
+ex:step7 a rdx:RunStep ; rdx:position 7 ; rdx:kind "deploy" ;
+    rdx:label "Regenerate the ggen CLI from the graph" ;
+    rdx:command "cd crates/cli && rm Cargo.toml && ggen sync run && python3 manifest_patch.py" .
+ex:step8 a rdx:RunStep ; rdx:position 8 ; rdx:kind "deploy" ;
+    rdx:label "Run the doctor" ; rdx:command "just doctor" .
+
+# Reference quadrant: tech stack + functions
+ex:t1 a rdx:TechStackItem ; rdx:layer "client" ; rdx:techName "Rust (#![no_std] kernels)" .
+ex:t2 a rdx:TechStackItem ; rdx:layer "server" ; rdx:techName "ggen (ontology-first generation)" .
+ex:t3 a rdx:TechStackItem ; rdx:layer "server" ; rdx:techName "Metal (cgap-gpu zero-copy bridge)" .
+ex:f1 a rdx:FunctionRef ; rdx:position 1 ;
+    rdx:signature "cgap_blake3::hash(b\"abc\")" ;
+    dcterms:description "BLAKE3 known-answer hash (b3sum-grounded)." .
+ex:f2 a rdx:FunctionRef ; rdx:position 2 ;
+    rdx:signature "cgap_git::PackBuilder -> pack + idx -> parse_idx_v2" ;
+    dcterms:description "Packfile v2 write/parse round trip with checksum refusal." .
+ex:f3 a rdx:FunctionRef ; rdx:position 3 ;
+    rdx:signature "cgap_arrow::BatchBuilder -> finish" ;
+    dcterms:description "Build -> freeze -> read back an Arrow C Data Interface batch." .
+ex:f4 a rdx:FunctionRef ; rdx:position 4 ;
+    rdx:signature "cgap_parquet RLE round-trip" ;
+    dcterms:description "Parquet bit-unpacking / SWAR RLE decode with truncation refusal." .
+
+# Explanation quadrant
+ex:faq1 a rdx:FaqEntry ; rdx:position 1 ;
+    rdx:question "Why zero external dependencies?" ;
+    rdx:answer "Each format is implemented from the byte layout up (branch-free inner loops, 64-byte-aligned buffers, LSB-first validity bitmaps), so kernels stay #![no_std] and audit-surface minimal." .
+ex:faq2 a rdx:FaqEntry ; rdx:position 2 ;
+    rdx:question "What are the four sovereign entrypoints?" ;
+    rdx:answer "admit / eval / commit / verify (A19), exposed through the cgap-ffi C-ABI cdylib." .
+ex:l1 a rdx:LessonLearned ; rdx:position 1 ;
+    rdx:text "Chicago courts mutate /tmp sandbox copies with sha256 fail-closed restore, never the shared tree; a court that cannot flip is FAIL." .
+
+ex:rel1 a rdx:RelatedLink ; rdx:position 1 ; dcterms:title "ggen-marketplace" ;
+    rdx:url "https://github.com/seanchatmangpt/ggen-marketplace" .
+
+# Meta quadrant (outside the four Diataxis quadrants)
+ex:r1 a rdx:RoadmapItem ; rdx:position 1 ;
+    rdx:text "Publish the guarded crates (cgap-core, cgap-storage, cgap-bn3, cgap-gate, cgap-p28, cgap-ffi) once the registry chain completes." .
+ex:r2 a rdx:RoadmapItem ; rdx:position 2 ;
+    rdx:text "v26.11.1 moonshot lanes A01-A20: binary ontology, binary N3, P28-SIL." .

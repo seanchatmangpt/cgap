@@ -172,10 +172,7 @@ impl DmaRing {
     /// validation or the length disagrees, `PublishWithoutClaim` when no
     /// claim is live (including an abandoned one).
     pub fn publish(&mut self, len: usize) -> Result<(), RingError> {
-        let idx = self
-            .claimed
-            .take()
-            .ok_or(RingError::PublishWithoutClaim)?;
+        let idx = self.claimed.take().ok_or(RingError::PublishWithoutClaim)?;
         if len > self.slot_size {
             return Err(RingError::Overflow);
         }
@@ -184,8 +181,8 @@ impl DmaRing {
         }
         let start = idx * self.slot_size;
         let slot = &self.region[start..start + self.slot_size];
-        let header = crate::frame::CgapFrameHeader::decode(slot)
-            .map_err(|_| RingError::BadFrame)?;
+        let header =
+            crate::frame::CgapFrameHeader::decode(slot).map_err(|_| RingError::BadFrame)?;
         if header.validate().is_err() {
             return Err(RingError::BadFrame);
         }

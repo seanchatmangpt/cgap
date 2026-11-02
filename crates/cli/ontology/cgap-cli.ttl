@@ -3,11 +3,14 @@
 cnv:CgapCli a cnv:Cli ;
     cnv:crateName "cgap-cli" ;
     cnv:binaryName "cgap" ;
-    cnv:version "26.10.29" ;
+    cnv:version "26.11.1" ;
     cnv:edition "2021" ;
     cnv:rustVersion "1.85" ;
     cnv:about "cgap CLI over the cgap columnar kernels, generated from this graph by ggen." ;
-    cnv:hasNoun cnv:SelfNoun, cnv:BenchNoun, cnv:AlignNoun .
+    cnv:hasNoun cnv:SelfNoun, cnv:BenchNoun, cnv:AlignNoun,
+        cnv:BontNoun, cnv:Bn3Noun, cnv:GateNoun, cnv:ParquetNoun,
+        cnv:P28Noun, cnv:CryptoNoun, cnv:AuditNoun, cnv:GitNoun,
+        cnv:ArrowNoun, cnv:GpuNoun, cnv:BeamNoun, cnv:CourtNoun .
 
 cnv:SelfNoun a cnv:Noun ;
     cnv:name "self" ;
@@ -55,3 +58,199 @@ cnv:AlignTest a cnv:Command ;
     cnv:hasBehavior cnv:AlignTestBehavior .
 
 cnv:AlignTestBehavior a cnv:CustomBehavior .
+
+cnv:BontNoun a cnv:Noun ;
+    cnv:name "bont" ;
+    cnv:about "Binary ontology (B-ONT) scalar surfaces." ;
+    cnv:hasCommand cnv:BontSlotLookup, cnv:BontPackVerify .
+
+cnv:BontSlotLookup a cnv:Command ;
+    cnv:name "slot-lookup" ;
+    cnv:about "SlotId lookup over the B-ONT scalar slab." ;
+    cnv:belongsToNoun cnv:BontNoun ;
+    cnv:hasBehavior cnv:BontSlotLookupBehavior .
+
+cnv:BontSlotLookupBehavior a cnv:CustomBehavior .
+
+cnv:BontPackVerify a cnv:Command ;
+    cnv:name "pack-verify" ;
+    cnv:about "Verify the B-ONT pack digest chain." ;
+    cnv:belongsToNoun cnv:BontNoun ;
+    cnv:hasBehavior cnv:BontPackVerifyBehavior .
+
+cnv:BontPackVerifyBehavior a cnv:CustomBehavior .
+
+cnv:Bn3Noun a cnv:Noun ;
+    cnv:name "bn3" ;
+    cnv:about "Binary N3 reasoning surfaces." ;
+    cnv:hasCommand cnv:Bn3Unify, cnv:Bn3Eval .
+
+cnv:Bn3Unify a cnv:Command ;
+    cnv:name "unify" ;
+    cnv:about "Binary N3 unification over the term arena." ;
+    cnv:belongsToNoun cnv:Bn3Noun ;
+    cnv:hasBehavior cnv:Bn3UnifyBehavior .
+
+cnv:Bn3UnifyBehavior a cnv:CustomBehavior .
+
+cnv:Bn3Eval a cnv:Command ;
+    cnv:name "eval" ;
+    cnv:about "Evaluate a closed BN3 program to its result term." ;
+    cnv:belongsToNoun cnv:Bn3Noun ;
+    cnv:hasBehavior cnv:Bn3EvalBehavior .
+
+cnv:Bn3EvalBehavior a cnv:CustomBehavior .
+
+cnv:GateNoun a cnv:Noun ;
+    cnv:name "gate" ;
+    cnv:about "Campaign gate surfaces." ;
+    cnv:hasCommand cnv:GateDamIngest .
+
+cnv:GateDamIngest a cnv:Command ;
+    cnv:name "dam-ingest" ;
+    cnv:about "Ingest a DAM evidence bundle through the gate." ;
+    cnv:belongsToNoun cnv:GateNoun ;
+    cnv:hasBehavior cnv:GateDamIngestBehavior .
+
+cnv:GateDamIngestBehavior a cnv:CustomBehavior .
+
+cnv:ParquetNoun a cnv:Noun ;
+    cnv:name "parquet" ;
+    cnv:about "Parquet persistence surfaces." ;
+    cnv:hasCommand cnv:ParquetPackEmit, cnv:ParquetPackCheck .
+
+cnv:ParquetPackEmit a cnv:Command ;
+    cnv:name "pack-emit" ;
+    cnv:about "Emit a Parquet pack from the columnar store." ;
+    cnv:belongsToNoun cnv:ParquetNoun ;
+    cnv:hasBehavior cnv:ParquetPackEmitBehavior .
+
+cnv:ParquetPackEmitBehavior a cnv:CustomBehavior .
+
+cnv:ParquetPackCheck a cnv:Command ;
+    cnv:name "pack-check" ;
+    cnv:about "Check a Parquet pack's footer and checksums." ;
+    cnv:belongsToNoun cnv:ParquetNoun ;
+    cnv:hasBehavior cnv:ParquetPackCheckBehavior .
+
+cnv:ParquetPackCheckBehavior a cnv:CustomBehavior .
+
+cnv:P28Noun a cnv:Noun ;
+    cnv:name "p28" ;
+    cnv:about "P28-SIL sovereign licensing surfaces." ;
+    cnv:hasCommand cnv:P28AttestVerify .
+
+cnv:P28AttestVerify a cnv:Command ;
+    cnv:name "attest-verify" ;
+    cnv:about "Verify a P28LicenseAttestation (80B) against the frozen URN." ;
+    cnv:belongsToNoun cnv:P28Noun ;
+    cnv:hasBehavior cnv:P28AttestVerifyBehavior .
+
+cnv:P28AttestVerifyBehavior a cnv:CustomBehavior .
+
+cnv:CryptoNoun a cnv:Noun ;
+    cnv:name "crypto" ;
+    cnv:about "Chatman-PQC crypto surfaces." ;
+    cnv:hasCommand cnv:CryptoSeal, cnv:CryptoReceiptVerify .
+
+cnv:CryptoSeal a cnv:Command ;
+    cnv:name "seal" ;
+    cnv:about "Seal a payload under the Chatman-PQC key schedule." ;
+    cnv:belongsToNoun cnv:CryptoNoun ;
+    cnv:hasBehavior cnv:CryptoSealBehavior .
+
+cnv:CryptoSealBehavior a cnv:CustomBehavior .
+
+cnv:CryptoReceiptVerify a cnv:Command ;
+    cnv:name "receipt-verify" ;
+    cnv:about "Verify a signed receipt's PQC signature." ;
+    cnv:belongsToNoun cnv:CryptoNoun ;
+    cnv:hasBehavior cnv:CryptoReceiptVerifyBehavior .
+
+cnv:CryptoReceiptVerifyBehavior a cnv:CustomBehavior .
+
+cnv:AuditNoun a cnv:Noun ;
+    cnv:name "audit" ;
+    cnv:about "Audit substrate statistics surfaces." ;
+    cnv:hasCommand cnv:AuditPowlStats, cnv:AuditOcelStats .
+
+cnv:AuditPowlStats a cnv:Command ;
+    cnv:name "powl-stats" ;
+    cnv:about "POWL model statistics from the audit log." ;
+    cnv:belongsToNoun cnv:AuditNoun ;
+    cnv:hasBehavior cnv:AuditPowlStatsBehavior .
+
+cnv:AuditPowlStatsBehavior a cnv:CustomBehavior .
+
+cnv:AuditOcelStats a cnv:Command ;
+    cnv:name "ocel-stats" ;
+    cnv:about "OCEL event-log statistics from the audit log." ;
+    cnv:belongsToNoun cnv:AuditNoun ;
+    cnv:hasBehavior cnv:AuditOcelStatsBehavior .
+
+cnv:AuditOcelStatsBehavior a cnv:CustomBehavior .
+
+cnv:GitNoun a cnv:Noun ;
+    cnv:name "git" ;
+    cnv:about "Git packfile v2 / Merkle DAG surfaces." ;
+    cnv:hasCommand cnv:GitDagVerify .
+
+cnv:GitDagVerify a cnv:Command ;
+    cnv:name "dag-verify" ;
+    cnv:about "Verify the Git packfile Merkle DAG chain." ;
+    cnv:belongsToNoun cnv:GitNoun ;
+    cnv:hasBehavior cnv:GitDagVerifyBehavior .
+
+cnv:GitDagVerifyBehavior a cnv:CustomBehavior .
+
+cnv:ArrowNoun a cnv:Noun ;
+    cnv:name "arrow" ;
+    cnv:about "Arrow kernel statistics surfaces." ;
+    cnv:hasCommand cnv:ArrowSlabStats .
+
+cnv:ArrowSlabStats a cnv:Command ;
+    cnv:name "slab-stats" ;
+    cnv:about "Slab occupancy statistics for the Arrow Buf allocator." ;
+    cnv:belongsToNoun cnv:ArrowNoun ;
+    cnv:hasBehavior cnv:ArrowSlabStatsBehavior .
+
+cnv:ArrowSlabStatsBehavior a cnv:CustomBehavior .
+
+cnv:GpuNoun a cnv:Noun ;
+    cnv:name "gpu" ;
+    cnv:about "GPU membrane info surfaces." ;
+    cnv:hasCommand cnv:GpuInfo .
+
+cnv:GpuInfo a cnv:Command ;
+    cnv:name "info" ;
+    cnv:about "Report GPU membrane device availability." ;
+    cnv:belongsToNoun cnv:GpuNoun ;
+    cnv:hasBehavior cnv:GpuInfoBehavior .
+
+cnv:GpuInfoBehavior a cnv:CustomBehavior .
+
+cnv:BeamNoun a cnv:Noun ;
+    cnv:name "beam" ;
+    cnv:about "BEAM membrane info surfaces." ;
+    cnv:hasCommand cnv:BeamInfo .
+
+cnv:BeamInfo a cnv:Command ;
+    cnv:name "info" ;
+    cnv:about "Report BEAM membrane host availability." ;
+    cnv:belongsToNoun cnv:BeamNoun ;
+    cnv:hasBehavior cnv:BeamInfoBehavior .
+
+cnv:BeamInfoBehavior a cnv:CustomBehavior .
+
+cnv:CourtNoun a cnv:Noun ;
+    cnv:name "court" ;
+    cnv:about "Chicago court harness surfaces." ;
+    cnv:hasCommand cnv:CourtVerdictRun .
+
+cnv:CourtVerdictRun a cnv:Command ;
+    cnv:name "verdict-run" ;
+    cnv:about "Run the cgap-court verdict harness and print the report." ;
+    cnv:belongsToNoun cnv:CourtNoun ;
+    cnv:hasBehavior cnv:CourtVerdictRunBehavior .
+
+cnv:CourtVerdictRunBehavior a cnv:CustomBehavior .

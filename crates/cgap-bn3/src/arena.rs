@@ -194,6 +194,27 @@
 //! `FormulaRef` (referenced by NO formula) is un-mintable shape — flatten
 //! always wraps the program in the root header — so `from_image` refuses
 //! it; stricter than the spec's minimum, recorded here.
+//!
+//! Wave 11 (A11 finisher, 2026-11-01, mission items 1-2): the
+//! **fixed-capacity deductive arena**. [`Arena::with_capacity`] names the
+//! statement and header capacity once at init; the init-time bound is
+//! hard ([`MAX_ARENA_STATEMENTS`] / [`MAX_ARENA_FORMULAS`], the frozen
+//! `u32` index space, pinned by const asserts — a widening is a build
+//! failure) and refuses typed
+//! ([`BN3Error::ArenaCapacityExceeded`], the third named extension)
+//! before any allocation. After init the arena is deterministic and
+//! zero-heap at capacity: the backing buffers are reserved exactly once,
+//! the push/reserve guards fire before the allocator is touched, an
+//! over-capacity flatten refuses typed with no admitted residue (the
+//! Wave-7 rollback), and `Vec::capacity` observables never change
+//! (positive-control court proves the observable detects real growth).
+//! `Arena::new()` remains the growable dynamic arena; one flatten path
+//! serves both. Courts: `fixed_arena_court_init_capacity_bound_...`,
+//! `fixed_arena_court_over_capacity_admission_...`,
+//! `fixed_arena_court_deterministic_image_and_sequential_scan`,
+//! `fixed_arena_court_zero_capacity_...` + positive control. Mission item
+//! 1 (24 B triple layout frozen, cache-line-tiled sequential scan) rides
+//! the existing size/abi courts plus the new scan court.
 
 extern crate alloc;
 
@@ -216,6 +237,19 @@ pub const MAX_FORMULA_NESTING_DEPTH: u32 = 64;
 /// 4.4), so a slab addresses at most 2^32 statements. Flatten enforces
 /// this via [`Slab::push`]; the width itself is the frozen ABI.
 pub const STATEMENT_INDEX_BITS: u32 = 32;
+
+/// Compile-time hard statement-capacity bound of a fixed arena (A11
+/// finisher): the frozen `u32` interval-index space of spec 4.4, 2^32
+/// statements. `Arena::with_capacity` refuses above it at init time
+/// ([`BN3Error::ArenaCapacityExceeded`], typed, before any allocation);
+/// the bound itself is pinned by the const-assert block below, so a
+/// silent widening is a build failure.
+pub const MAX_ARENA_STATEMENTS: u64 = 1u64 << STATEMENT_INDEX_BITS;
+
+/// Compile-time hard formula-capacity bound: the same frozen `u32`
+/// header-index space (spec 4.4 `FORMULA_REF` payloads are header
+/// indices). Same init-time refusal law as [`MAX_ARENA_STATEMENTS`].
+pub const MAX_ARENA_FORMULAS: u64 = 1u64 << STATEMENT_INDEX_BITS;
 
 /// `u32` header-index guard for the formula table (Wave 4 hardening):
 /// `FORMULA_REF` payloads are header indices (spec 4.4), and the
@@ -314,6 +348,11 @@ const _: () = assert!(core::mem::offset_of!(BN3FormulaHeader, _pad) == 12);
 const _: () = assert!(BN3_FORMULA_HEADER_SIZE == 16);
 const _: () = assert!(MAX_FORMULA_NESTING_DEPTH == 64);
 const _: () = assert!(STATEMENT_INDEX_BITS == 32);
+// Fixed-capacity bound laws (A11 finisher): the hard bounds derive from
+// the frozen index space and cannot silently widen.
+const _: () = assert!(MAX_ARENA_STATEMENTS == 1u64 << 32);
+const _: () = assert!(MAX_ARENA_FORMULAS == 1u64 << 32);
+const _: () = assert!(MAX_ARENA_STATEMENTS == u32::MAX as u64 + 1);
 
 // --- Wave 9 (cross-lane integration): the arena byte image ---------------
 
@@ -327,8 +366,19 @@ pub const ARENA_IMAGE_PREFIX_LEN: usize = 8;
 /// store; u32 statement indices"). Indices are `u32` (spec 4.4 interval
 /// endpoints); a push past `u32::MAX` statements is the typed refusal
 /// [`BN3Error::StatementIndexOverflow`].
+///
+/// A slab built by [`Slab::fixed`] is the fixed-capacity deductive
+/// arena's statement store: capacity is declared once at init (bounded
+/// by [`MAX_ARENA_STATEMENTS`]), the backing buffer is reserved exactly
+/// once, and the push guard refuses past it with
+/// [`BN3Error::ArenaCapacityExceeded`] *before* touching the allocator —
+/// after construction the store performs zero heap allocations,
+/// deterministically (`fixed_capacity` is observable and never changes).
 pub struct Slab {
     stmts: Vec<BN3Statement>,
+    /// Fixed capacity in statements (`None` = growable: the dynamic
+    /// arena, bounded only by the `u32` index guard).
+    fixed_capacity: Option<usize>,
 }
 
 /// `u32` statement-index guard: the index space of spec 4.4's interval
@@ -340,13 +390,52 @@ fn stmt_index(len: usize) -> Result<u32, BN3Error> {
 
 impl Slab {
     pub const fn new() -> Slab {
-        Slab { stmts: Vec::new() }
+        Slab {
+            stmts: Vec::new(),
+            fixed_capacity: None,
+        }
+    }
+
+    /// Fixed-capacity constructor (A11 finisher, mission item 2): the
+    /// init-time half of the capacity law. `capacity` above the
+    /// compile-time hard bound [`MAX_ARENA_STATEMENTS`] refuses typed
+    /// ([`BN3Error::ArenaCapacityExceeded`]) before any allocation; the
+    /// lawful path reserves the backing buffer exactly once here, so a
+    /// fixed slab never grows and never re-allocates.
+    pub fn fixed(capacity: u64) -> Result<Slab, BN3Error> {
+        if capacity > MAX_ARENA_STATEMENTS {
+            return Err(BN3Error::ArenaCapacityExceeded {
+                requested: capacity,
+                bound: MAX_ARENA_STATEMENTS,
+            });
+        }
+        Ok(Slab {
+            stmts: Vec::with_capacity(capacity as usize),
+            fixed_capacity: Some(capacity as usize),
+        })
+    }
+
+    /// The declared fixed capacity in statements, or `None` (growable).
+    pub fn fixed_capacity(&self) -> Option<usize> {
+        self.fixed_capacity
     }
 
     /// Append one statement; returns its `u32` arena index. Refuses with
-    /// [`BN3Error::StatementIndexOverflow`] above the `u32` index space.
+    /// [`BN3Error::StatementIndexOverflow`] above the `u32` index space,
+    /// and with [`BN3Error::ArenaCapacityExceeded`] at a fixed slab's
+    /// declared capacity — the admission guard runs before the allocator
+    /// is touched, so an over-capacity push admits nothing, allocates
+    /// nothing, and (by the flatten rollback) leaves no residue.
     pub fn push(&mut self, stmt: BN3Statement) -> Result<u32, BN3Error> {
         let idx = stmt_index(self.stmts.len())?;
+        if let Some(cap) = self.fixed_capacity {
+            if self.stmts.len() >= cap {
+                return Err(BN3Error::ArenaCapacityExceeded {
+                    requested: self.stmts.len() as u64 + 1,
+                    bound: cap as u64,
+                });
+            }
+        }
         self.stmts.push(stmt);
         Ok(idx)
     }
@@ -380,22 +469,58 @@ impl Slab {
 }
 
 /// Formula table (spec C4: `Vec<BN3FormulaHeader>`; "Index intervals
-/// [start,end) into the arena; no pointers").
+/// [start,end) into the arena; no pointers"). Fixed-capacity tables are
+/// built by [`FormulaTable::fixed`] (same law as [`Slab::fixed`], bound
+/// [`MAX_ARENA_FORMULAS`]).
 pub struct FormulaTable {
     headers: Vec<BN3FormulaHeader>,
+    /// Fixed capacity in headers (`None` = growable).
+    fixed_capacity: Option<usize>,
 }
 
 impl FormulaTable {
     pub const fn new() -> FormulaTable {
-        FormulaTable { headers: Vec::new() }
+        FormulaTable {
+            headers: Vec::new(),
+            fixed_capacity: None,
+        }
+    }
+
+    /// Fixed-capacity constructor; the init-time refusal above
+    /// [`MAX_ARENA_FORMULAS`] is typed ([`BN3Error::ArenaCapacityExceeded`])
+    /// and pre-allocation, mirroring [`Slab::fixed`].
+    pub fn fixed(capacity: u64) -> Result<FormulaTable, BN3Error> {
+        if capacity > MAX_ARENA_FORMULAS {
+            return Err(BN3Error::ArenaCapacityExceeded {
+                requested: capacity,
+                bound: MAX_ARENA_FORMULAS,
+            });
+        }
+        Ok(FormulaTable {
+            headers: Vec::with_capacity(capacity as usize),
+            fixed_capacity: Some(capacity as usize),
+        })
+    }
+
+    /// The declared fixed capacity in headers, or `None` (growable).
+    pub fn fixed_capacity(&self) -> Option<usize> {
+        self.fixed_capacity
     }
 
     /// Reserve a header slot pre-order (flatten phase 1); returns its
     /// index. The slot is a placeholder until phase 2's post-order close
     /// patches `start`/`end`/`term_words`. Refuses past the `u32` header
-    /// index space (Wave 4: the same frozen index space as the slab —
-    /// no silent `usize`→`u32` truncation remains in the table path).
+    /// index space (Wave 4) and at a fixed table's declared capacity
+    /// ([`BN3Error::ArenaCapacityExceeded`], guard before allocation).
     fn reserve(&mut self) -> Result<u32, BN3Error> {
+        if let Some(cap) = self.fixed_capacity {
+            if self.headers.len() >= cap {
+                return Err(BN3Error::ArenaCapacityExceeded {
+                    requested: self.headers.len() as u64 + 1,
+                    bound: cap as u64,
+                });
+            }
+        }
         let idx = header_index(self.headers.len())?;
         self.headers.push(BN3FormulaHeader {
             start: 0,
@@ -648,6 +773,27 @@ impl Arena {
         }
     }
 
+    /// Fixed-capacity deductive arena constructor (A11 finisher, mission
+    /// item 2): capacity is declared once at init and is final. The
+    /// init-time bound is hard — `statements` above
+    /// [`MAX_ARENA_STATEMENTS`] or `formulas` above [`MAX_ARENA_FORMULAS`]
+    /// refuses typed ([`BN3Error::ArenaCapacityExceeded`]) *before any
+    /// allocation* (the refusing return proves the guard precedes the
+    /// reserve); the lawful path reserves both backing buffers exactly
+    /// once here. After construction the arena is deterministic and
+    /// allocation-free at capacity: same admission sequence -> same
+    /// layout/bytes (`fixed_arena_court_deterministic_image_...`), and an
+    /// admission that would pass the declared capacity refuses typed with
+    /// zero allocator traffic and no admitted residue (the flatten
+    /// rollback, Wave 7). `Arena::new()` remains the growable dynamic
+    /// arena; `with_capacity` is the deductive, fixed form.
+    pub fn with_capacity(statements: u64, formulas: u64) -> Result<Arena, BN3Error> {
+        Ok(Arena {
+            slab: Slab::fixed(statements)?,
+            formulas: FormulaTable::fixed(formulas)?,
+        })
+    }
+
     /// Flatten a (possibly nested) formula program into the arena (spec
     /// Section 6 `flatten`): statements appended contiguously in source
     /// order, one header per formula, nesting as recursive sub-intervals,
@@ -814,8 +960,14 @@ impl Arena {
         }
 
         Ok(Arena {
-            slab: Slab { stmts },
-            formulas: FormulaTable { headers },
+            slab: Slab {
+                stmts,
+                fixed_capacity: None,
+            },
+            formulas: FormulaTable {
+                headers,
+                fixed_capacity: None,
+            },
         })
     }
 }
@@ -1851,5 +2003,170 @@ mod tests {
              slab bytes = {}",
             arena.slab.len() * BN3_STATEMENT_SIZE
         );
+    }
+
+    // --- A11 finisher (2026-11-01): the fixed-capacity deductive arena --
+
+    /// Positive control for the capacity observable: a plain
+    /// `Vec::with_capacity(n)` pushed past `n` MUST grow — proving
+    /// `Vec::capacity` detects reallocation, so the fixed-arena courts
+    /// below assert a law, not `Vec` goodwill. Mutation that MUST flip
+    /// this control: none in this crate — it reads the allocator's real
+    /// growth policy; a stubbed `Vec` (impossible) would.
+    #[test]
+    fn fixed_arena_positive_control_capacity_observable_detects_growth() {
+        let mut v: Vec<u32> = Vec::with_capacity(3);
+        for i in 0..3 {
+            v.push(i);
+        }
+        assert_eq!(v.capacity(), 3);
+        v.push(3);
+        assert!(
+            v.capacity() > 3,
+            "Vec::capacity observable did not detect growth (capacity {}) — capacity courts vacuous",
+            v.capacity()
+        );
+        assert_eq!(v.len(), 4);
+    }
+
+    /// Init-time bound court (mission item 2): `with_capacity` above the
+    /// compile-time hard bound refuses typed — and the Err itself proves
+    /// the guard precedes the reserve (the refused request is a 96 GiB
+    /// allocation ask; returning `Err` means the allocator was never
+    /// asked). Mutation that MUST flip this court: neutering the init
+    /// guard makes the same call attempt the 96 GiB reserve (allocation
+    /// failure abort = flip, not a pass); the executed sandbox shim is
+    /// the admission-guard neuter M-F2 below.
+    #[test]
+    fn fixed_arena_court_init_capacity_bound_refuses_typed_above_compile_time_max() {
+        let over = MAX_ARENA_STATEMENTS + 1;
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) =
+            Arena::with_capacity(over, 0)
+        else {
+            panic!("init above the hard statement bound must refuse typed");
+        };
+        exact_init_refusal(&requested, &bound, over, MAX_ARENA_STATEMENTS);
+
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) =
+            Arena::with_capacity(0, MAX_ARENA_FORMULAS + 1)
+        else {
+            panic!("init above the hard formula bound must refuse typed");
+        };
+        exact_init_refusal(&requested, &bound, MAX_ARENA_FORMULAS + 1, MAX_ARENA_FORMULAS);
+    }
+
+    /// Exact-refusal helper shared by the init court.
+    fn exact_init_refusal(requested: &u64, bound: &u64, want_req: u64, want_bound: u64) {
+        assert_eq!(requested, &want_req, "requested must carry the ask");
+        assert_eq!(bound, &want_bound, "bound must carry the refusing law");
+    }
+
+    /// Over-capacity admission court (mission item 2, the named court):
+    /// a program that would pass the declared capacity refuses typed
+    /// ([`BN3Error::ArenaCapacityExceeded`]) with the exact refused ask,
+    /// leaves no admitted residue (the Wave-7 transactional flatten), and
+    /// the backing stores never grow — zero allocation after init, at or
+    /// past capacity, proven by the unchanged `Vec::capacity` observable
+    /// (positive control above proves the observable detects growth).
+    /// Mutation that MUST flip this court: neutering the `Slab::push`
+    /// capacity guard — the over-capacity program then ADMITS (the Vec
+    /// grows, observable capacity jumps) and the refusal asserts fail
+    /// (executed sandbox shim M-F2).
+    #[test]
+    fn fixed_arena_court_over_capacity_admission_refuses_rolls_back_no_growth() {
+        let mut arena = Arena::with_capacity(3, 8).expect("3 stmts / 8 headers is lawful");
+        assert_eq!(arena.slab.fixed_capacity(), Some(3));
+        assert_eq!(arena.formulas.fixed_capacity(), Some(8));
+
+        let leaf = |s: u64, p: u64, o: u64| {
+            FormulaNode::leaf(vec![[(Sigil::SlotConst, s), (Sigil::VarUni, p), (Sigil::SlotConst, o)]])
+        };
+        arena.flatten(&leaf(1, 2, 3)).expect("first admission fits");
+        arena.flatten(&leaf(4, 5, 6)).expect("second admission fits");
+        assert_eq!(arena.slab.len(), 2);
+
+        // Two statements requested with one slot left: refuse, roll back.
+        let two = FormulaNode::leaf(vec![
+            [(Sigil::SlotConst, 7), (Sigil::VarUni, 8), (Sigil::SlotConst, 9)],
+            [(Sigil::SlotConst, 10), (Sigil::VarUni, 11), (Sigil::SlotConst, 12)],
+        ]);
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) = arena.flatten(&two) else {
+            panic!("over-capacity admission must refuse typed");
+        };
+        assert_eq!((requested, bound), (4, 3), "exact refused ask: stmt 4 vs capacity 3");
+        assert_eq!(arena.slab.len(), 2, "refused program leaves no residue");
+        assert_eq!(arena.slab.stmts.capacity(), 3, "no allocator traffic after init");
+        assert_eq!(arena.formulas.headers.capacity(), 8);
+
+        // Header-side capacity: the nested program needs 3 headers
+        // (root, Q0, Q1); a 1-header table refuses on the second reserve
+        // and rolls the placeholder back.
+        let mut tight = Arena::with_capacity(16, 1).expect("lawful");
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) =
+            tight.flatten(&nested_program())
+        else {
+            panic!("header-side over-capacity must refuse typed");
+        };
+        assert_eq!((requested, bound), (2, 1));
+        assert_eq!(tight.slab.len(), 0, "no slab residue");
+        assert_eq!(tight.formulas.len(), 0, "reserved placeholder rolled back");
+
+        // Fill the last slot, then the next admission refuses with the
+        // store still exactly at capacity — no growth, ever.
+        arena.flatten(&leaf(13, 14, 15)).expect("third admission fills the arena");
+        assert_eq!(arena.slab.len(), 3);
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) = arena.flatten(&leaf(16, 17, 18))
+        else {
+            panic!("admission at full capacity must refuse typed");
+        };
+        assert_eq!((requested, bound), (4, 3));
+        assert_eq!(arena.slab.len(), 3);
+        assert_eq!(arena.slab.stmts.capacity(), 3, "still zero growth after refusal");
+        assert_eq!(arena.formulas.headers.capacity(), 8);
+    }
+
+    /// Determinism + sequential-scan court (mission items 1-2): two fresh
+    /// fixed arenas fed the same admission sequence produce byte-identical
+    /// images (deterministic, no allocator-history sensitivity), and the
+    /// slab is one contiguous 24-byte-per-record run scanned sequentially
+    /// in agreement with indexed access. Cache-line tiling of the 24 B
+    /// record is the abi court's law (2 statements + 1 header = 64 B);
+    /// this court pins the scan. Mutation that MUST flip: reordering the
+    /// slab appends (any non-source-order emit) breaks image equality.
+    #[test]
+    fn fixed_arena_court_deterministic_image_and_sequential_scan() {
+        let build = || -> Arena {
+            let mut a = Arena::with_capacity(4, 8).expect("lawful capacity");
+            a.flatten(&nested_program()).expect("nested program fits");
+            a
+        };
+        let a = build();
+        let b = build();
+        assert_eq!(a.slab.len(), 4);
+        assert_eq!(a.to_image(), b.to_image(), "same admissions -> same bytes");
+
+        let stmts = a.slab.statements();
+        assert_eq!(stmts.as_ptr() as usize % core::mem::align_of::<BN3Statement>(), 0);
+        for (i, stmt) in stmts.iter().enumerate() {
+            assert_eq!(a.slab.get(i as u32), Some(*stmt), "scan order == index order");
+            let _ = stmts.len() * BN3_STATEMENT_SIZE; // 24 B per record
+        }
+        assert_eq!(a.slab.len() * BN3_STATEMENT_SIZE, 96);
+    }
+
+    /// Degenerate-capacity court: a zero-capacity fixed arena is lawful
+    /// at init and refuses the first admission typed — with zero header
+    /// or statement residue.
+    #[test]
+    fn fixed_arena_court_zero_capacity_refuses_first_admission() {
+        let mut arena = Arena::with_capacity(0, 0).expect("zero capacity is representable");
+        let Err(BN3Error::ArenaCapacityExceeded { requested, bound }) =
+            arena.flatten(&nested_program())
+        else {
+            panic!("zero-capacity arena must refuse the first admission");
+        };
+        assert_eq!((requested, bound), (1, 0), "the first header ask vs capacity 0");
+        assert!(arena.slab.is_empty());
+        assert!(arena.formulas.is_empty());
     }
 }

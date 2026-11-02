@@ -2,12 +2,14 @@
 name = "cgap-storage"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "WAL-framed transactional storage engine (flash model, Txn commit path, differential erase sweeps) for the cgap substrate."
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A05 receipt ALIVE (docs/jira/v26.11.1/waves/a05-finish-receipt.md)
 
 [dependencies]
 # A05 §3.3: BLAKE3 binds payload identity (96-bit prefix split header/trailer).
 # Workspace-internal, zero-dependency, no_std — E=0 runtime externals preserved.
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
 
 [dev-dependencies]
 # Wave-5 defect repair: the "same identity as cgap-git" claim for the
@@ -15,4 +17,4 @@ cgap-blake3 = { path = "../cgap-blake3" }
 # workspace-internal, zero-external-dependency dev-dep backs
 # tests/court_crc_identity.rs — a real-collaborator differential court.
 # Runtime externals stay E=0 (dev-deps are test-only).
-cgap-git = { path = "../cgap-git" }
+cgap-git = { path = "../cgap-git", version = "26.11.1" }

@@ -143,8 +143,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import NoReturn
 
-GATE_VERSION = "1.4.0"
+GATE_VERSION = "1.4.1"
 
 # ---------------------------------------------------------------------------
 # .bosym v0 framing constants — mirror of crates/cgap-bosym/src/slab.rs
@@ -187,7 +188,7 @@ class VocabError(Exception):
 def bosym_parse(data: bytes) -> list:
     """Parse a v0 archive to [(sym_id, kind, name)]; any deviation raises
     VocabError with the framing violation. Never returns partial results."""
-    def fail(detail: str) -> None:
+    def fail(detail: str) -> NoReturn:
         raise VocabError(detail)
 
     if len(data) < BOSYM_HEADER_SIZE + BOSYM_TRAILER_SIZE:
@@ -669,7 +670,22 @@ class AllowEntry:
     def matches(self, s: str) -> bool:
         if self.exact is not None:
             return s == self.exact
+        if self.regex is None:
+            # Neither predicate: fail closed with a typed error instead of
+            # an untyped AttributeError (the gate never exits 0 on an error
+            # path either way; T7 pins that reviewed entries have one arm).
+            raise VocabError("allowlist entry has neither exact nor regex")
         return self.regex.search(s) is not None
+
+    def pattern_or_exact(self) -> str:
+        """The entry's match key for register/report rendering: exact text
+        when present, else the anchored regex source. Raises on an entry
+        with neither arm (T7 pins reviewed entries to carry one)."""
+        if self.exact is not None:
+            return self.exact
+        if self.regex is None:
+            raise VocabError("allowlist entry has neither exact nor regex")
+        return self.regex.pattern
 
 
 # Allowlist: legitimate non-ontology strings (lane doc lines 222-229). The
@@ -781,7 +797,7 @@ def a07_register() -> dict:
             "a20_6_4_doc_list": list(A20_6_4_DOC_LIST),
             "patterns": [[p, tag] for p, tag in CLOUD_STRING_PATTERNS],
             "allowlist": [
-                {"match": e.exact if e.exact is not None else e.regex.pattern,
+                {"match": e.pattern_or_exact(),
                  "justification": e.justification}
                 for e in CLOUD_STRING_ALLOWLIST
             ],
@@ -794,7 +810,7 @@ def a07_register() -> dict:
                 "ontologies/*/src/lib.rs fibo: token derivation",
             ],
             "allowlist": [
-                {"match": e.exact if e.exact is not None else e.regex.pattern,
+                {"match": e.pattern_or_exact(),
                  "justification": e.justification}
                 for e in ALLOWLIST
             ],
@@ -1521,7 +1537,7 @@ EMITTER_BIN = "emit-fibo-pack"   # the REAL producer bin name — the exact (pkg
 CTL_PKG = "a07ctl_pack"          # control: identical poison, NON-granted (package, bin)
 
 
-def build_emitter_fixture_workspace(workdir: Path) -> dict:
+def build_emitter_fixture_workspace(workdir: Path) -> "tuple[dict, Path]":
     """T16 fixture (Wave-7): a real cargo build of a two-package workspace
     where package `cgap-fibo` declares bin `emit-fibo-pack` — the exact
     (package, bin) key the producer exemption grants — and package
@@ -1665,7 +1681,7 @@ def court_t6_allowlist_non_absorption(vocab, _workdir):
             if not hit and entry.exact is not None:
                 hit = entry.exact in tok or tok in entry.exact
             if hit:
-                absorbed.append((tok, entry.exact or entry.regex.pattern))
+                absorbed.append((tok, entry.pattern_or_exact()))
     if absorbed:
         return ("T6_absorption", "FAIL", f"absorbed pairs: {absorbed}")
     return ("T6_allowlist_non_absorption", "PASS", f"{len(vocab)} tokens x {len(ALLOWLIST)} entries: no absorption")
@@ -1677,7 +1693,7 @@ def court_t7_allowlist_justified(_vocab, _workdir):
     bad = []
     for entry in ALLOWLIST:
         if not entry.justification.startswith("ALLOWLIST-JUSTIFICATION:") or len(entry.justification) < 30:
-            bad.append(entry.exact or entry.regex.pattern)
+            bad.append(entry.pattern_or_exact())
         if entry.exact is None and entry.regex is None:
             bad.append("<empty-entry>")
     if bad:

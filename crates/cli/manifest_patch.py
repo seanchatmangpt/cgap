@@ -23,6 +23,15 @@ KERNELS = (
     'cgap-parquet = { path = "../cgap-parquet" }\n'
     'cgap-git = { path = "../cgap-git" }\n'
     'cgap-blake3 = { path = "../cgap-blake3" }\n'
+    'cgap-bont = { path = "../cgap-bont" }\n'
+    'cgap-bn3 = { path = "../cgap-bn3" }\n'
+    'cgap-gate = { path = "../cgap-gate" }\n'
+    'cgap-p28 = { path = "../cgap-p28" }\n'
+    'cgap-crypto = { path = "../cgap-crypto" }\n'
+    'cgap-audit = { path = "../audit" }\n'
+    'cgap-court = { path = "../cgap-court" }\n'
+    'cgap-gpu = { path = "../cgap-gpu" }\n'
+    'cgap-beam = { path = "../cgap-beam" }\n'
 )
 
 # 1) kernel path deps after the generated blake3 pin

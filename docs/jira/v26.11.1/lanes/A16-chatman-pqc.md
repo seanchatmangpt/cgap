@@ -9,6 +9,7 @@ PROPOSED — this lane writes no code.
 
 - Lane doc: WRITTEN (this file).
 - Crate `cgap-crypto` (modules `chatman.rs`, `lease.rs`): PROPOSED.
+- Status update (2026-11-02): `cgap-crypto` PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API, UA cgap-publish-receipt: max_version 26.11.1, num_versions 1).
 - Exit gate (design-level, enforced later by courts): (a) the `Phi_lease` tick
   counter is monotonic and TRAPS on exhaustion — a rewind attempt is
   unrepresentable in the type; (b) every valid equation transition emits a

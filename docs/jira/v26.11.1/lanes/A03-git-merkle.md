@@ -422,8 +422,9 @@ its mutation is FAIL, not PASS (shim-court protocol).
   `parse_pack_v2`, `parse_idx_v2`), `crates/cgap-git/src/idx_read.rs`
   (public fn surface), `crates/cgap-git/src/ladder.rs` (16-stage ladder,
   `LADDER_WINDOW`, probe counter), docs/jira/v26.11.1 ticket index.
-- Status: **UNVERIFIED** (design lane doc written; no code landed this
-  session — implementation is the lane's next transition).
-- Standing: doc ALIVE as a written artifact at
-  `docs/jira/v26.11.1/lanes/A03-git-merkle.md`; claims about code are
-  UNVERIFIED until courts D-1..D-10 run.
+- Status: **ALIVE** (v26.11.1 wave F1; see `waves/a03-finish-receipt.md` —
+  `cargo test -p cgap-git` exit 0, 88 passed / 0 failed, three sandbox
+  flips with sha256 fail-closed restores).
+- Standing: code claims ALIVE per the finish receipt (courts D-1..D-9,
+  F-1, the facade court and ABI pin all green this session).
+- Status: `cgap-git` PUBLISHED-26.11.1 on crates.io (witnessed 2026-11-02 via crates.io API, UA cgap-publish-receipt: max_version 26.11.1, num_versions 2).

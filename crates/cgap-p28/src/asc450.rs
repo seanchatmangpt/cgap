@@ -1153,6 +1153,124 @@ mod tests {
         );
     }
 
+    // -- A18-F1: default-ceiling boundary court (dispatch court (a)) ----------
+    //
+    // The §4.2 law re-proven at the REAL frozen ceiling (5_000_000_000 cents
+    // = $50,000,000), not a toy scale: accumulated == ceiling exactly emits
+    // NOTHING (still inside the safe harbor — PASS); the +1 cent event
+    // (crossing total 5_000_000_001) emits THE proof. Named anti-vacuity
+    // mutation: the `>=` off-by-one (ceil-vs-floor at the boundary) emits at
+    // exactly 5_000_000_000 and is killed by the is_none assert below; the
+    // strict-`>` half is killed by the emission assert at 5_000_000_001.
+
+    #[test]
+    fn f1_default_ceiling_boundary_court() {
+        let ceiling = DEFAULT_SAFE_HARBOR_CEILING_CENTS;
+        assert_eq!(ceiling, 5_000_000_000);
+        let mut m = meter(ceiling, 0xF1);
+
+        // Drive to EXACTLY the frozen ceiling in two unlicensed events.
+        assert!(m
+            .record_unlicensed(2_500_000_000, 1)
+            .expect("accept")
+            .is_none());
+        assert!(m
+            .record_unlicensed(2_500_000_000, 2)
+            .expect("accept")
+            .is_none());
+        assert_eq!(m.accumulated_cents(), 5_000_000_000);
+        assert!(
+            !m.is_latched(),
+            "exactly at the ceiling is still inside the safe harbor: no emit"
+        );
+
+        // +1 cent: prev=5_000_000_000 <= ceiling, next=5_000_000_001 > ceiling
+        // -> EMIT; crossing_total is the first over-ceiling total.
+        let proof = m
+            .record_unlicensed(1, 3)
+            .expect("accept")
+            .expect("5_000_000_001 must emit the crossing proof (§4.2)");
+        // Packed record: fields are read by copy, never by reference
+        // (E0793 — no references into a #[repr(packed)] struct).
+        let p_ceiling = proof.ceiling_cents;
+        let p_total = proof.crossing_total_cents;
+        let p_seq = proof.crossing_seq;
+        let p_tick = proof.crossing_tick;
+        assert_eq!(p_ceiling, 5_000_000_000);
+        assert_eq!(p_total, 5_000_000_001);
+        assert_eq!(p_seq, 3);
+        assert_eq!(p_tick, 3);
+        assert!(m.is_latched(), "emission latches the meter (§4.2)");
+
+        // Latch holds at the real ceiling too: post-crossing exposure still
+        // accumulates and bumps seq, never re-emits (§4.2).
+        assert!(m.record_unlicensed(7, 4).expect("accept").is_none());
+        assert_eq!(m.accumulated_cents(), 5_000_000_008);
+        assert_eq!(m.last_seq(), 4);
+    }
+
+    // -- A18-F2: proof self-attestation court (dispatch court (b)) ------------
+    //
+    // The emitted proof must re-derive from ITS OWN BYTES plus the emitted
+    // state: parse from_bytes, recompute the seal over span 0..104 with a
+    // FRESH sealer keyed to the same epoch root (verify is pure — consumes no
+    // authority), recompute the chain-head digest, re-derive the attestation
+    // anchor — every recomputed value MATCHES the emitted record. Named
+    // anti-vacuity mutation: a verify that does not actually recompute (or a
+    // to_bytes that drifts from the wire layout) fails the positive match;
+    // the in-court span byte-flip kills a verify-that-always-oks.
+
+    #[test]
+    fn f2_proof_self_attestation_court() {
+        let ceiling = DEFAULT_SAFE_HARBOR_CEILING_CENTS;
+        let mut m = meter(ceiling, 0xF2);
+        let proof = m
+            .record_unlicensed(5_000_000_001, 42)
+            .expect("accept")
+            .expect("single event over the ceiling emits (§4.2)");
+
+        // 1. Wire round trip: the emitted struct re-parses from its own 168
+        //    bytes, byte-identical.
+        let bytes = proof.to_bytes();
+        let reparsed = SignedProof::from_bytes(&bytes).expect("emitted bytes parse");
+        assert_eq!(reparsed, proof);
+
+        // 2. Self-attestation: a FRESH sealer over the same epoch root
+        //    (0xF2), holding no consumed authority, recomputes the seal from
+        //    the emitted span alone and it MATCHES.
+        let fresh = fresh_sealer(0xF2);
+        reparsed.verify(&fresh).expect("self-attestation recomputes");
+
+        // 3. Emitted-state recompute: chain head and anchor match the meter.
+        assert_eq!(
+            Asc450Meter::<LeaseEpochSealer>::proof_digest(&reparsed),
+            m.prev_proof_digest(),
+            "proof_digest of the emitted bytes == the meter's chain head"
+        );
+        // Packed record: fields are read by copy, never by reference
+        // (E0793 — no references into a #[repr(packed)] struct).
+        let r_att = reparsed.attestation_digest;
+        let r_ceiling = reparsed.ceiling_cents;
+        let r_prev = reparsed.prev_proof_digest;
+        assert_eq!(
+            r_att,
+            cgap_blake3::hash(&real_attestation().to_bytes()),
+            "attestation anchor re-derives from the A17 instrument bytes"
+        );
+        assert_eq!(r_ceiling, ceiling);
+        assert_eq!(r_prev, GENESIS_PREV_PROOF_DIGEST);
+
+        // 4. Negative control: one flipped byte in the signed span must fail
+        //    the same fresh-sealer recompute (the match is not vacuous).
+        let mut tampered = bytes;
+        tampered[16] ^= 0x01; // crossing_total_cents low bit
+        let bad = SignedProof::from_bytes(&tampered).expect("shape still parses");
+        assert!(
+            bad.verify(&fresh).is_err(),
+            "flipped span byte must fail the recompute"
+        );
+    }
+
     // -- C2: signature court — exhaustive byte-flip sweep (§6) ----------------
     //
     // Named anti-vacuity mutation: a verify that compares only the first

@@ -4,8 +4,22 @@
 //! a foreign consumer (PyArrow, DuckDB, Polars) imports via the C Data
 //! Interface. Wire parity is proven by `scripts/gate3_cdata.py` importing
 //! through pyarrow's `_import_from_c`.
+//!
+//! no_std gate (lane doc §5 placement law, enacted): a `target_os = "none"`
+//! build (the XIP rv32imc staticlib) has no `std`, so the crate root is
+//! `no_std` EXACTLY there — host cdylib/test builds keep the implicit std
+//! prelude (Box/Vec in the slot exports and courts compile unchanged). The
+//! heap-dependent slot surface below is cfg'd out on none-targets, so the
+//! staticlib needs no allocator at all. The digest path is host-surface too:
+//! `cgap-arrow` gates its `c_abi` module (the `ArrowArray` type) out on
+//! none-targets, so `cgap_digest_of` compiles out with it — the XIP surface
+//! is the sovereign ABI freeze + panic handler (A19 finish lane, 2026-11-01).
 
+#![cfg_attr(target_os = "none", no_std)]
+
+#[cfg(not(target_os = "none"))]
 use cgap_arrow::c_abi::{export, ArrowArray, ArrowSchema};
+#[cfg(not(target_os = "none"))]
 use cgap_arrow::primitive::PrimitiveBuilder;
 use core::sync::atomic::{AtomicPtr, Ordering};
 
@@ -114,6 +128,7 @@ fn fold_word(acc: u64, w: u64) -> u64 {
 /// see `docs/CONTENT_ADDRESSING.md` for the claim boundary and the
 /// tree-hash upgrade path.
 #[no_mangle]
+#[cfg(not(target_os = "none"))]
 pub extern "C" fn cgap_digest_of(array_addr: usize) -> u64 {
     assert!(array_addr != 0, "cgap_digest_of: null array address");
     // SAFETY: array_addr is the caller-asserted address of a live exported
@@ -131,6 +146,7 @@ pub extern "C" fn cgap_digest_of(array_addr: usize) -> u64 {
 /// # Safety
 /// `array` must point at a live, cgap-exported ArrowArray for the duration
 /// of the call (read-only).
+#[cfg(not(target_os = "none"))]
 unsafe fn digest_of_raw(array: *const ArrowArray) -> u64 {
     let length = (*array).length;
     assert!(length >= 0, "cgap_digest_of: negative length {length}");
@@ -314,6 +330,15 @@ mod digest_ffi {
 
 // v26.11.1 moonshot lanes (coordinator-scaffolded, additive only):
 pub mod sovereign;
+
+pub mod oabi_lookup; // F2-6 SEAM-OABI: typed UNSUPPORTED(scope) + surface-freeze court (A19 §2)
+
+/// W2-10 (Wave R2 item 10, OABI-PROD-BYTES): the production `.oabi`/`.bn3`
+/// flash-rodata tables for the XIP link — real owner bytes as
+/// `#[used] #[link_section]` statics, cfg-gated to the none-target
+/// (`all(target_os = "none", target_arch = "riscv32")`); courts below in
+/// the module (byte identity, production link, budget math).
+pub mod xip_tables;
 
 /// XIP glue (lane doc §5): a `target_os = "none"` staticlib needs a panic
 /// handler and no `std`. Host targets use std's handler — this item does not

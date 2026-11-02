@@ -3,7 +3,7 @@
 
 [package]
 name = "cgap-cli"
-version = "26.10.29"
+version = "26.11.1"
 edition = "2021"
 rust-version = "1.85"
 publish = false
@@ -14,6 +14,15 @@ cgap-arrow = { path = "../cgap-arrow" }
 cgap-parquet = { path = "../cgap-parquet" }
 cgap-git = { path = "../cgap-git" }
 cgap-blake3 = { path = "../cgap-blake3" }
+cgap-bont = { path = "../cgap-bont" }
+cgap-bn3 = { path = "../cgap-bn3" }
+cgap-gate = { path = "../cgap-gate" }
+cgap-p28 = { path = "../cgap-p28" }
+cgap-crypto = { path = "../cgap-crypto" }
+cgap-audit = { path = "../audit" }
+cgap-court = { path = "../cgap-court" }
+cgap-gpu = { path = "../cgap-gpu" }
+cgap-beam = { path = "../cgap-beam" }
 clap-noun-verb = "=26.8.22"
 clap-noun-verb-macros = "=26.8.22"
 linkme = "0.3"

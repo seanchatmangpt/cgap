@@ -2,7 +2,9 @@
 name = "cgap-bn3"
 version.workspace = true
 edition.workspace = true
-publish = false
+description = "Binary N3 (BN3) reasoning kernel: slab arena, sigil codec, BN3 unifier and projection for the cgap substrate."
+license-file = "../../LICENSE.md"
+publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A11 receipt ALIVE (docs/jira/v26.11.1/waves/a11-finish-receipt.md)
 
 [lib]
 
@@ -13,4 +15,4 @@ publish = false
 # (crates/audit/Cargo.toml precedent). Coordinator: review or revert this
 # edge; the lane did not touch the root workspace manifest.
 [dependencies]
-cgap-blake3 = { path = "../cgap-blake3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
