@@ -28,3 +28,14 @@ target-*/
 .claude/settings.local.json
 .clap-noun-verb/
 
+
+# vendored external checkouts (lane scratch, never committed)
+vendors/
+**/vendors/
+vendor/
+**/vendor/
+
+# Lane/testing artifact debris (v26.11.2 closure wave): never commit
+*.profraw
+coverage_export.json
+lane-dispatch-ledger.jsonl.tmp
