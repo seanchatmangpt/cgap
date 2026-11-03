@@ -2,6 +2,7 @@
 repository.workspace = true
 authors.workspace = true
 name = "cgap-audit"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "CC=1 branch-audit cdylib: forces every kernel into the artifact so machine code can be inspected."

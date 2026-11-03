@@ -1,0 +1,18 @@
+[package]
+name = "cgap-fleet-ops"
+rust-version = "1.85"
+version = "26.11.2"
+edition = "2021"
+license-file = "../../LICENSE.md" # DOD-01 F3d: no license field; depth crates/ -> repo root
+publish = false
+
+# Standalone membrane crate (NOT a root workspace member) — same pattern as
+# crates/cli. Host-side fleet coordination: RMA lifecycle (A3) + SLO
+# poller/alerting (A6). Zero dependencies by design.
+
+[dependencies]
+
+[dev-dependencies]
+
+# Standalone: own workspace root, excluded from the repo root workspace.
+[workspace]

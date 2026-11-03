@@ -127,6 +127,103 @@ impl EgressError {
     }
 }
 
+/// Typed refusal-quota seam (FIX-04, red-14 hardening) — same contract as
+/// `ingress_ring::RefusalQuota` (restated here: cgap-git is a zero-dep
+/// kernel, no cross-module type dependency beyond this file's existing
+/// ingress reuse). Sustained class-101 floods escalate to this REPORTABLE,
+/// RECOVERABLE typed state; it never gates admission or serving (a garbage
+/// flood cannot wedge the ring) and carries no process-exit semantics.
+///
+/// ADV-12 repair (mirrors `ingress_ring::RefusalQuota`): the escalation
+/// is LEVEL-TRIGGERED — `tripped` is sticky, cleared only by an explicit
+/// [`RefusalQuota::acknowledge`] or `CLEAN_ADMISSIONS_TO_CLEAR`
+/// consecutive clean admissions. `window_refusals` saturates at
+/// `u32::MAX` instead of overflowing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefusalQuota {
+    /// Refusals tolerated in the current window before `tripped`.
+    pub max_refusals: u32,
+    /// Refusals since the last successful admission (window). Saturates
+    /// at `u32::MAX` — typed saturation, never a wrap or panic.
+    pub window_refusals: u32,
+    /// Lifetime refusals observed (never reset — audit counter).
+    pub total_refusals: u64,
+    /// Escalated state: the window hit `max_refusals`. Sticky until
+    /// acknowledged or `CLEAN_ADMISSIONS_TO_CLEAR` clean admissions.
+    pub tripped: bool,
+    /// Consecutive clean admissions since the last refusal (private:
+    /// drives the level-triggered auto-clear).
+    clean_streak: u32,
+}
+
+impl RefusalQuota {
+    /// Default quota: 4,096 sustained refusals in one window trip the
+    /// escalation (red-14's flood is 1,000,000 — three orders above).
+    pub const DEFAULT_MAX_REFUSALS: u32 = 4_096;
+
+    /// Level-triggered auto-clear threshold (ADV-12 repair): after a
+    /// trip, `tripped` clears only after this many CONSECUTIVE clean
+    /// admissions — a named const, never a single-frame edge.
+    pub const CLEAN_ADMISSIONS_TO_CLEAR: u32 = 1024;
+
+    pub const fn new() -> Self {
+        RefusalQuota {
+            max_refusals: Self::DEFAULT_MAX_REFUSALS,
+            window_refusals: 0,
+            total_refusals: 0,
+            tripped: false,
+            clean_streak: 0,
+        }
+    }
+
+    /// Record one class-101 refusal. Escalates exactly when the window
+    /// count reaches `max_refusals`. The window count saturates at
+    /// `u32::MAX` (no overflow panic in debug, no silent wrap in release).
+    pub fn note_refusal(&mut self) {
+        self.window_refusals = self.window_refusals.saturating_add(1);
+        self.total_refusals = self.total_refusals.wrapping_add(1);
+        self.clean_streak = 0;
+        if self.window_refusals >= self.max_refusals {
+            self.tripped = true;
+        }
+    }
+
+    /// Record one successful admission: window resets (recoverable) and
+    /// the clean streak grows; the escalated state is LEVEL-TRIGGERED, so
+    /// `tripped` clears only after `CLEAN_ADMISSIONS_TO_CLEAR` consecutive
+    /// clean admissions. Lifetime total preserved for audit.
+    pub fn note_admission(&mut self) {
+        self.window_refusals = 0;
+        if self.tripped {
+            self.clean_streak = self.clean_streak.saturating_add(1);
+            if self.clean_streak >= Self::CLEAN_ADMISSIONS_TO_CLEAR {
+                self.tripped = false;
+                self.clean_streak = 0;
+            }
+        }
+    }
+
+    /// Explicit host acknowledgement: clear the escalation NOW (the
+    /// level-triggered manual path).
+    pub fn acknowledge(&mut self) {
+        self.tripped = false;
+        self.window_refusals = 0;
+        self.clean_streak = 0;
+    }
+
+    /// `true` while the quota is escalated (reportable flood state).
+    /// Sticky: survives individual admitted frames.
+    pub fn tripped(&self) -> bool {
+        self.tripped
+    }
+}
+
+impl Default for RefusalQuota {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Capacity guard as a pure named function so the mutation court can pin
 /// exactly the guard whose deletion the flip twin targets.
 #[inline(always)]
@@ -316,6 +413,35 @@ pub fn parse_page(bytes: &[u8]) -> Result<Page<'_>, EgressError> {
     })
 }
 
+/// Cache-line byte width (ingress_ring:33 restatement — cgap-git is a
+/// zero-dep kernel; shared constants are restated with source pins).
+pub const CACHE_LINE_BYTES: usize = 64;
+
+/// Cache-line-isolated atomic index (OPT-01 hazard closure; ingress_ring
+/// PaddedIndex §7.2 pattern reuse). `head`/`tail` are bare `AtomicUsize`
+/// co-resident with `RefusalQuota` on one 64-B line in the pre-CE-05
+/// layout; wrapping them isolates each index and pushes `quota` onto its
+/// own line. Size/align pinned by const asserts below — a padding
+/// regression to 32 B fails to compile (CE-05 layout court mutation
+/// target).
+#[repr(align(64))]
+struct PaddedIndex(AtomicUsize);
+
+impl PaddedIndex {
+    const fn new(v: usize) -> Self {
+        PaddedIndex(AtomicUsize::new(v))
+    }
+    fn load(&self, ord: Ordering) -> usize {
+        self.0.load(ord)
+    }
+    fn store(&self, v: usize, ord: Ordering) {
+        self.0.store(v, ord)
+    }
+}
+
+const _: () = assert!(core::mem::size_of::<PaddedIndex>() == CACHE_LINE_BYTES);
+const _: () = assert!(core::mem::align_of::<PaddedIndex>() == CACHE_LINE_BYTES);
+
 /// SPSC circular byte ring over an inline fixed buffer serving
 /// fixed-stride records as synthetic page blobs. One handle; `&mut self`
 /// methods enforce single-accessor. Free-running `head` (producer) and
@@ -324,9 +450,25 @@ pub fn parse_page(bytes: &[u8]) -> Result<Page<'_>, EgressError> {
 /// number of records (const assert below).
 pub struct EgressRing<const CAP: usize, const STRIDE: usize> {
     buf: [u8; CAP],
-    head: AtomicUsize,
-    tail: AtomicUsize,
+    head: PaddedIndex,
+    tail: PaddedIndex,
+    quota: RefusalQuota,
 }
+
+/// CE-05 layout pin: `head` and `tail` are each exactly 64 B (PaddedIndex
+/// size/align asserts above), so with `buf` at offset 0 and `CAP % 64 == 0`
+/// (the `EGRESS_RING_BYTES % 32 == 0` assert tightens via `new`'s stride
+/// assert for the canonical ring), head lands on its own line, tail on the
+/// next, and `quota` starts at offset `CAP + 128` — a fresh 64-B line, no
+/// shared line with either index. The struct-size formula flips if any
+/// index loses its padding (size drops by 64 → assert fails).
+const _: () = assert!(
+    core::mem::size_of::<EgressRing<EGRESS_RING_BYTES, 64>>()
+        == EGRESS_RING_BYTES
+            + 2 * CACHE_LINE_BYTES
+            + ((core::mem::size_of::<RefusalQuota>() + CACHE_LINE_BYTES - 1) / CACHE_LINE_BYTES)
+                * CACHE_LINE_BYTES
+);
 
 const _: () = assert!(EGRESS_RING_BYTES % 32 == 0);
 
@@ -338,9 +480,16 @@ impl<const CAP: usize, const STRIDE: usize> EgressRing<CAP, STRIDE> {
         assert!(CAP % STRIDE == 0, "ring capacity must be whole records");
         EgressRing {
             buf: [0u8; CAP],
-            head: AtomicUsize::new(0),
-            tail: AtomicUsize::new(0),
+            head: PaddedIndex::new(0),
+            tail: PaddedIndex::new(0),
+            quota: RefusalQuota::new(),
         }
+    }
+
+    /// Reportable refusal-quota state (FIX-04): observability seam for
+    /// sustained class-101 floods; never gates admission or serving.
+    pub fn refusal_quota(&self) -> &RefusalQuota {
+        &self.quota
     }
 
     /// Free-running producer counter.
@@ -379,6 +528,7 @@ impl<const CAP: usize, const STRIDE: usize> EgressRing<CAP, STRIDE> {
     /// Overflow refusal leaves the ring untouched (fail-closed).
     pub fn push_record(&mut self, record: &[u8]) -> Result<(), EgressError> {
         if record.len() != STRIDE {
+            self.quota.note_refusal();
             if record.len() > STRIDE {
                 return Err(EgressError::RecordTooLarge {
                     record_len: record.len(),
@@ -391,6 +541,7 @@ impl<const CAP: usize, const STRIDE: usize> EgressRing<CAP, STRIDE> {
         let head = self.head();
         let tail = self.tail();
         if would_overflow(head, tail, STRIDE, CAP) {
+            self.quota.note_refusal();
             return Err(EgressError::Overflow {
                 head,
                 tail,
@@ -407,6 +558,7 @@ impl<const CAP: usize, const STRIDE: usize> EgressRing<CAP, STRIDE> {
         // the Release store; observers load with Acquire.
         self.head
             .store(head.wrapping_add(STRIDE), Ordering::Release);
+        self.quota.note_admission();
         Ok(())
     }
 

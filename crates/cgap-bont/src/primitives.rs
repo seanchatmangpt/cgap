@@ -20,7 +20,7 @@
 //! (/tmp/a06-w8.k8yZKp, sha256 fail-closed restores), replacing the
 //! evaporated wave-5 sandbox citations; external b3sum 1.8.5 anchor
 //! re-verified (`printf 'bont\x01a' | b3sum` =
-//! `ffe66d54817825f3...` = GOLDEN[2]). D-A08-5 (52 MB nested build root
+//! `ffe66d54817825f3...` = GOLDEN\[2]). D-A08-5 (52 MB nested build root
 //! `crates/cgap-bont/target-a06/`) surfaced to the coordinator for
 //! integration deletion; this lane's own runs use the repo-root lease
 //! `target-a06/`.

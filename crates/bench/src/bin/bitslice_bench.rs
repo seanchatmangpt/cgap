@@ -17,7 +17,7 @@
 //! Payload: 1M random rows per width, widths {2,4,8,12} — cache-resident at
 //! these sizes (packed column <= 1.5 MiB), so this is a compute-rate
 //! receipt, not a DRAM-bandwidth one. Rates are per packed input bytes
-//! (groups * w * 8). Range classes: full [0,m], empty (in-domain inverted
+//! (groups * w * 8). Range classes: full \[0,m], empty (in-domain inverted
 //! lo=m, hi=m-1), top-half [2^(w-1), m], bottom-half [0, 2^(w-1)-1], point
 //! (a value present in the data). `skipped` is the pruning-effectiveness
 //! column: fraction of the column's words never loaded, from

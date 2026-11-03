@@ -1,5 +1,6 @@
 [package]
 name = "cgap-git"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Git Packfile v2 writer: stored blob objects, .idx v2 generation, in-crate SHA-1 and CRC32 (zero external dependencies)."
@@ -10,7 +11,19 @@ categories = ['development-tools', 'encoding']
 keywords = ['git', 'packfile', 'sha1', 'crc32', 'no_std']
 license-file = "../../LICENSE.md"
 
+[lints.rust]
+# R-ADV11FIX introduced cfg(implcell_critical_provided) in ref_store.rs
+# (opt-in via RUSTFLAGS="--cfg implcell_critical_provided"); rustc 1.101.0-nightly
+# flags it as unexpected_cfgs. Allowlist per rustc's own printed suggestion.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(implcell_critical_provided)'] }
+
 [features]
+# `std` is a HOST-ONLY convenience feature (red-11 finding 5): OS-less
+# targets (riscv32imc-unknown-none-elf, target_os = "none") have no std
+# in their toolchain core (raw E0463, exit 101 with default features).
+# The no_std kernel build is `--no-default-features`; selecting `std` on
+# an OS-less target now fails LOUDLY with a compile_error pointing at
+# the fix (RC-02 witness, crates/cgap-git/src/ref_store.rs, file tail).
 default = ["std"]
 std = []
 

@@ -28,7 +28,7 @@ use cgap_git::admission_gate::{
 };
 use cgap_git::ingress_ring::{IngressError, IngressRing, INGRESS_RING_BYTES};
 use cgap_git::pack_demux::Demux;
-use cgap_git::pack_write::write_pack_v2;
+use cgap_git::pack_write::{encode_object_header, sha1};
 
 /// 24-byte fact stride: one (u64, u64, u64) record.
 const FACT_STRIDE: usize = 3 * core::mem::size_of::<u64>();
@@ -60,11 +60,24 @@ unsafe impl GlobalAlloc for CountingAlloc {
 #[global_allocator]
 static GLOBAL: CountingAlloc = CountingAlloc;
 
-/// A clean minimal pack (real write_pack_v2) — the BEFORE subject for
-/// arm 1, consumed by the real Demux.
+/// A clean minimal pack — the BEFORE subject for arm 1, consumed by the
+/// real Demux. STORED framing (raw body bytes + sha1 trailer), because
+/// the demux law is stored framing: write_pack_v2 emits zlib bodies, so
+/// writer output does not end at the demux trailer (FIX-05 unblock
+/// disclosure: pre-fix, the zlib overflow was silently absorbed by the
+/// Done arm; the typed TrailingBytes refusal exposed the latent
+/// framing mismatch).
 fn clean_pack() -> Vec<u8> {
     let blob: &[u8] = b"posh-arm1-blob";
-    write_pack_v2(&[blob]).expect("clean pack writes")
+    let mut out = Vec::new();
+    out.extend_from_slice(b"PACK");
+    out.extend_from_slice(&2u32.to_be_bytes());
+    out.extend_from_slice(&1u32.to_be_bytes());
+    out.extend_from_slice(&encode_object_header(3, blob.len() as u64));
+    out.extend_from_slice(blob);
+    let sum = sha1(&out);
+    out.extend_from_slice(&sum);
+    out
 }
 
 fn clean_update() -> RefUpdate {

@@ -129,6 +129,28 @@ impl NaMatches {
     pub fn contains(&self, m: usize) -> bool {
         m < self.len
     }
+
+    /// RED-12 (lane RC-03) enclave constructor: init against the physical
+    /// 131,072 B ceiling. With the current NA_MAX_* consts this REFUSES
+    /// loudly — the static charge is 2,162,696 B, ~16.5x the ceiling —
+    /// before any buffer is materialized.
+    pub fn init_enclave() -> Result<Self, CapacityExceeded> {
+        Self::init_within(NA_SRAM_CEILING_BYTES)
+    }
+
+    /// Enclave constructor under a caller-declared byte ceiling:
+    /// `Ok` only when the static charge fits (documented reduced-capacity
+    /// path — an embedder with a larger heap budget passes a larger
+    /// ceiling and constructs the full-width buffers).
+    pub fn init_within(ceiling_bytes: usize) -> Result<Self, CapacityExceeded> {
+        if na_matches_bytes() > ceiling_bytes {
+            return Err(CapacityExceeded {
+                required_bytes: na_matches_bytes(),
+                ceiling_bytes,
+            });
+        }
+        Ok(Self::zeroed())
+    }
 }
 
 /// Heap-allocate an all-zero `T` directly (no stack temporary): the
@@ -173,6 +195,27 @@ impl NaEngine {
             bound: [false; NA_MAX_VARS],
             radix_rows: [0; NA_MAX_ROWS],
         }
+    }
+
+    /// RED-12 (lane RC-03) enclave constructor: init against the physical
+    /// 131,072 B ceiling. With the current NA_MAX_* consts this REFUSES
+    /// loudly — the static charge is 4,358,288 B, ~33.3x the ceiling —
+    /// before any buffer is materialized.
+    pub fn init_enclave() -> Result<Self, CapacityExceeded> {
+        Self::init_within(NA_SRAM_CEILING_BYTES)
+    }
+
+    /// Enclave constructor under a caller-declared byte ceiling: `Ok`
+    /// only when the static charge fits (documented reduced-capacity
+    /// path — an embedder with a larger budget passes a larger ceiling).
+    pub fn init_within(ceiling_bytes: usize) -> Result<Self, CapacityExceeded> {
+        if na_engine_bytes() > ceiling_bytes {
+            return Err(CapacityExceeded {
+                required_bytes: na_engine_bytes(),
+                ceiling_bytes,
+            });
+        }
+        Ok(Self::zeroed())
     }
 }
 
@@ -972,4 +1015,72 @@ mod courts {
         let b = gen_rows(64);
         assert_eq!(a, b);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Init-time capacity bound (lane RC-03; RED-12 closure, P3 roadmap).
+//
+// The SRAM GATE (scripts/verify_cscb_sram.py, FIX-02) refuses the bn3
+// enclave surface STATICALLY (6,520,984 B > 131,072 B), but before this
+// section the ENGINE itself had no runtime bound: an NaEngine+NaMatches
+// built at the full NA_MAX_* consts charged 49.75x the ceiling with no
+// bound check firing on buffer size. These items give an embedder a
+// LOUD typed init-time refusal before any multi-MB static is built.
+//
+// Parse-free law: the charge arithmetic below REUSES the NA_MAX_* consts
+// directly (same model as the gate's bn3_capacity_table — the gate
+// parses these same consts from this file; do not restate literals).
+// ---------------------------------------------------------------------------
+
+/// Physical SRAM ceiling of the boundary enclave (bytes; gate + red-12
+/// W2 referent: lane-09-linker-asserts.md:16).
+pub const NA_SRAM_CEILING_BYTES: usize = 131_072;
+
+/// Typed init-time refusal: the requested static state tables exceed the
+/// embedder's byte ceiling. Loud, before any buffer is materialized.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CapacityExceeded {
+    /// Static bytes the full-capacity buffers would charge.
+    pub required_bytes: usize,
+    /// The embedder's declared byte bound.
+    pub ceiling_bytes: usize,
+}
+
+/// Static byte charge of one [`NaMatches`] at the current NA_MAX_*
+/// consts. Model matches the gate's `bn3_capacity_table`
+/// (scripts/verify_cscb_sram.py:171): len: usize + rows [[u32; A]; M]
+/// + vars [[u64; V]; M].
+pub fn na_matches_bytes() -> usize {
+    core::mem::size_of::<usize>()
+        + 4 * NA_MAX_ATOMS * NA_MAX_MATCHES
+        + 8 * NA_MAX_VARS * NA_MAX_MATCHES
+}
+
+/// Static byte charge of one [`NaEngine`] at the current NA_MAX_*
+/// consts. Model matches the gate's `bn3_capacity_table`
+/// (scripts/verify_cscb_sram.py:171): cur/nxt double buffers + 2 len
+/// words + bound flags + radix table.
+pub fn na_engine_bytes() -> usize {
+    let tables = 4 * NA_MAX_ATOMS * NA_MAX_MATCHES + 8 * NA_MAX_VARS * NA_MAX_MATCHES;
+    2 * tables + 2 * core::mem::size_of::<usize>() + NA_MAX_VARS + 4 * NA_MAX_ROWS
+}
+
+/// Combined static charge of a full init (engine + matches buffer) at
+/// the current consts.
+pub fn na_enclave_charge_bytes() -> usize {
+    na_engine_bytes() + na_matches_bytes()
+}
+
+/// Init-time capacity check against an embedder-declared byte ceiling.
+/// `Ok(charge)` when the full-capacity statics fit; `Err` carries the
+/// typed refusal — nothing is constructed on `Err`.
+pub fn na_init_capacity_check(ceiling_bytes: usize) -> Result<usize, CapacityExceeded> {
+    let required = na_enclave_charge_bytes();
+    if required > ceiling_bytes {
+        return Err(CapacityExceeded {
+            required_bytes: required,
+            ceiling_bytes,
+        });
+    }
+    Ok(required)
 }

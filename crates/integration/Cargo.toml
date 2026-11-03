@@ -1,6 +1,7 @@
 [package]
 repository.workspace = true
 name = "cgap-integration"
+rust-version.workspace = true
 version.workspace = true
 edition = "2021"
 description = "Cross-crate integration tests: C-ABI roundtrip, alignment law, format-code table, varlen/views roundtrips."

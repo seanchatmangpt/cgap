@@ -667,14 +667,32 @@ pub trait Medium {
     /// Whether the artifact-durability fence has been taken (§9: the commit
     /// protocol must make artifact bytes durable BEFORE the journal record).
     fn artifacts_fenced(&self) -> bool;
+    /// Whether the journal artifact exists on this medium at all. Default
+    /// `true` (additive S-04b: every pre-existing impl keeps its behavior;
+    /// hosted/file backends override to report a genuinely missing journal
+    /// file). `false` is the kernel-side input to the typed DATA_LOSS
+    /// classification in [`recover_loss_classified`].
+    fn journal_present(&self) -> bool {
+        true
+    }
+    /// Whether a full, lawful base-root superblock exists on this medium.
+    /// Default `true` (additive S-04b, same rationale as
+    /// [`Medium::journal_present`]).
+    fn base_root_present(&self) -> bool {
+        true
+    }
 }
 
 /// Write side of the journal medium: byte-granular `pwrite` surface used by
 /// both the `Txn` commit path and the per-offset cut simulation.
 pub trait JournalWriter: Medium {
     /// Write one journal byte (visible to subsequent `Medium::read_slot`).
-    fn write_journal_byte(&mut self, slot: usize, offset: usize, value: u8)
-        -> Result<(), MediumError>;
+    fn write_journal_byte(
+        &mut self,
+        slot: usize,
+        offset: usize,
+        value: u8,
+    ) -> Result<(), MediumError>;
     /// Durability fence (§9): models fsync of artifact bytes; must precede
     /// any journal-record write (`TxnError::ArtifactsNotFenced` otherwise).
     fn fence_artifacts(&mut self);
@@ -936,7 +954,11 @@ pub fn recover_mode<M: Medium>(
     let top: Option<JournalRecord> = match (cands[0], cands[1]) {
         (Some(a), Some(b)) => {
             if mode == M2LowestSeq {
-                if a.header.seq <= b.header.seq { Some(a) } else { Some(b) }
+                if a.header.seq <= b.header.seq {
+                    Some(a)
+                } else {
+                    Some(b)
+                }
             } else if a.header.seq >= b.header.seq {
                 Some(a)
             } else {
@@ -967,9 +989,7 @@ pub fn recover_mode<M: Medium>(
             // No valid candidate: base root stands. Degraded only when a slot
             // holds non-conforming bytes (damage), not when slots are erased
             // (fresh journal) — F2 semantics with the erased-state carve-out.
-            let degraded = verdicts
-                .iter()
-                .any(|&v| v == SlotVerdict::Damaged);
+            let degraded = verdicts.iter().any(|&v| v == SlotVerdict::Damaged);
             Ok(RecoveryOutcome {
                 root: base,
                 report: if degraded {
@@ -982,6 +1002,123 @@ pub fn recover_mode<M: Medium>(
             })
         }
     }
+}
+
+// ---------------------------------------------------- loss classification --
+//
+// S-04b (2026-11-02): closes RC-06's registered divergence
+// (`docs/jira/v26.11.2/lanes/lane-rc06-media-loss-dr-court.md:71-74`) — the
+// irrecoverable-loss outcomes that court expressed only as typed harness
+// refusals (`RestoreRefusal::{JournalMissing, BaseRootMissingOrShort}`)
+// now have a KERNEL-side typed verdict on the `Medium`/recover API itself
+// (FIX-14 R-A2.2: "base root + journal both lost => typed DATA_LOSS
+// verdict, fail-closed, no fabricated root").
+//
+// Sharpness law (R-A2.2 vs F2): DATA_LOSS = the loss is unrecoverable
+// WITHOUT an off-site copy — no lawful recovery substrate exists, so no
+// root may be fabricated; Degraded = recovery ran and completed WITH
+// losses (rollback to base, torn tail). Truncation/corruption never
+// classifies DATA_LOSS here: bytes exist and the validator chain can
+// classify them.
+
+/// Which artifact is irrecoverably absent (S-04b evidence taxonomy).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataLossClass {
+    /// The journal artifact does not exist on the medium.
+    JournalMissing,
+    /// No lawful base-root superblock exists on the medium.
+    BaseRootMissing,
+}
+
+/// Evidence carried by the typed DATA_LOSS verdict — the same lost-seq /
+/// slot-verdict data RC-06's harness surfaced, now on the kernel API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataLossEvidence {
+    /// Which artifact is gone.
+    class: DataLossClass,
+    /// The base root, when it survived (`None` when the superblock itself
+    /// is the lost artifact).
+    base_root: Option<NewRootDescriptor>,
+    /// Per-slot verdicts decoded from whatever bytes exist (`None` when the
+    /// journal artifact is entirely absent — nothing to decode).
+    slot_verdicts: Option<[SlotVerdict; SLOT_COUNT]>,
+    /// Highest VALID journal sequence decodable from surviving bytes
+    /// (`None` when nothing valid decodes or the journal is absent).
+    top_journal_seq: Option<u64>,
+    /// Lowest journal sequence that can no longer be proven durable
+    /// ([`FIRST_SEQ`] when the journal artifact is gone entirely).
+    lost_seq_floor: u64,
+}
+
+impl DataLossEvidence {
+    /// Which artifact is gone.
+    pub fn class(&self) -> DataLossClass {
+        self.class
+    }
+    /// The surviving base root, if any.
+    pub fn base_root(&self) -> Option<NewRootDescriptor> {
+        self.base_root
+    }
+    /// Per-slot verdicts from surviving bytes, when decodable.
+    pub fn slot_verdicts(&self) -> Option<[SlotVerdict; SLOT_COUNT]> {
+        self.slot_verdicts
+    }
+    /// Highest valid journal seq decodable from surviving bytes.
+    pub fn top_journal_seq(&self) -> Option<u64> {
+        self.top_journal_seq
+    }
+    /// Lowest journal sequence that can no longer be proven durable.
+    pub fn lost_seq_floor(&self) -> u64 {
+        self.lost_seq_floor
+    }
+}
+
+/// Recovery verdict including the kernel-side DATA_LOSS arm (S-04b).
+/// `Ok(Recovered)` is exactly [`recover`]'s result; `Ok(DataLoss)` fires
+/// only when no lawful recovery substrate exists (R-A2.2 fail-closed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryVerdict {
+    /// A lawful recovery substrate exists: the ordinary recovery outcome.
+    Recovered(RecoveryOutcome),
+    /// No lawful substrate: typed DATA_LOSS with postmortem evidence.
+    DataLoss(DataLossEvidence),
+}
+
+/// `recover` extended with the typed DATA_LOSS arm (S-04b). Pure function of
+/// medium presence predicates + the same validator chain as [`recover`]
+/// (Strict); `RecoveryError` arms (JournalAmbiguous / SeqRegression) are
+/// UNCHANGED — they still fire in the `Recovered` path exactly as before.
+pub fn recover_loss_classified<M: Medium>(medium: &M) -> Result<RecoveryVerdict, RecoveryError> {
+    if !medium.base_root_present() {
+        let mut verdicts = [SlotVerdict::Empty; SLOT_COUNT];
+        let mut top: Option<u64> = None;
+        for slot in 0..SLOT_COUNT {
+            if let Ok(rec) = decode_slot_mode(&medium.read_slot(slot), Strict) {
+                verdicts[slot] = SlotVerdict::Valid;
+                top = Some(match top {
+                    Some(t) => t.max(rec.header.seq),
+                    None => rec.header.seq,
+                });
+            }
+        }
+        return Ok(RecoveryVerdict::DataLoss(DataLossEvidence {
+            class: DataLossClass::BaseRootMissing,
+            base_root: None,
+            slot_verdicts: Some(verdicts),
+            top_journal_seq: top,
+            lost_seq_floor: FIRST_SEQ,
+        }));
+    }
+    if !medium.journal_present() {
+        return Ok(RecoveryVerdict::DataLoss(DataLossEvidence {
+            class: DataLossClass::JournalMissing,
+            base_root: Some(medium.read_base_root()),
+            slot_verdicts: None,
+            top_journal_seq: None,
+            lost_seq_floor: FIRST_SEQ,
+        }));
+    }
+    recover(medium).map(RecoveryVerdict::Recovered)
 }
 
 #[cfg(test)]
@@ -999,12 +1136,7 @@ mod tests {
             let bytes = encode_record(seq, &rec);
             let wire_payload = &bytes[HEADER_SIZE..OFF_TRAILER];
             let recomputed = crc32(wire_payload);
-            let stored = u32::from_le_bytes([
-                bytes[24],
-                bytes[25],
-                bytes[26],
-                bytes[27],
-            ]);
+            let stored = u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]);
             assert_eq!(
                 stored, recomputed,
                 "seq {seq}: stored payload crc {stored:#010x} vs crc over wire bytes {recomputed:#010x}; wire payload {wire_payload:02x?}"

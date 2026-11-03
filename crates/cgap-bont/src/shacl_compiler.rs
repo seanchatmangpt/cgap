@@ -26,7 +26,7 @@
 //! T7c malformed known locals (M6), T7d deny-by-default for unclassified
 //! SHACL constructs (M8), T7e mandatory-group contradiction (M9), T8
 //! parse-side report invariants, and the 64-bit boundary court; plus the
-//! Wave-6 repair courts: T9 IRIREF character law (Turtle production [8] —
+//! Wave-6 repair courts: T9 IRIREF character law (Turtle production \[8] —
 //! a space-bearing IRIREF used to compile into a canonical report the
 //! parser refuses, breaking the round-trip law at the lexer) and T10
 //! single-valued `sh:closed` (a contradictory `true` + `false` pair used
@@ -373,7 +373,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Turtle IRIREF character law (Turtle 1.1 grammar production [8]
+    /// Turtle IRIREF character law (Turtle 1.1 grammar production \[8]
     /// IRIREF): between `<` and `>` the characters U+0000..U+0020, `"`,
     /// `<`, `>`, `{`, `}`, `|`, `^`, `\`, and `` ` `` are forbidden. The
     /// lexer previously accepted any ASCII except `>`, so a space-bearing
@@ -823,7 +823,7 @@ pub struct PropertyShapeIr {
     pub max_count: Option<u64>,
     /// `sh:group` IRI, if declared.
     pub group: Option<String>,
-    /// Known SHACL locals (see [`KNOWN_PROP_LOCALS`]) observed malformed,
+    /// Known SHACL locals (see `KNOWN_PROP_LOCALS`) observed malformed,
     /// stored as canonical space-free construct tokens ready for the report:
     /// `"malformed:sh:<local>"` for a wrong-typed object (e.g. `sh:minCount
     /// -1`, `sh:minCount "many"`, `sh:path` as a string) and

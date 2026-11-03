@@ -79,7 +79,7 @@
 //!   skipped_artifacts=0; cgap-git scanned=2 artifacts, 0 hits.
 //!
 //! New in this file (wave 9):
-//! [`wave9_powercut_sweep_dag_wire`] — the A05 cut-at-every-offset
+//! `wave9_powercut_sweep_dag_wire` — the A05 cut-at-every-offset
 //! discipline transplanted onto the §5.1 dag wire; every proper prefix
 //! of a real 416-byte L=5 file refuses typed `Truncated`, Ok anchor at
 //! full length, four-layer defense-in-depth disclosed.

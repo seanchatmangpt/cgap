@@ -3,6 +3,7 @@ repository.workspace = true
 license-file.workspace = true
 default-run = "bench"
 name = "bench"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Divan membrane: v26.11.1 Phase 2 (Measure) perf-target graduation harness."
@@ -12,6 +13,16 @@ publish = false
 cgap-arrow = { path = "../cgap-arrow" }
 cgap-blake3 = { path = "../cgap-blake3" }
 cgap-parquet = { path = "../cgap-parquet", features = ["std"] }
+
+# R6-16: cgap-ffi/cgap-git/cgap-storage are used ONLY by [[bench]] targets
+# (mctq_consolidation, seal, chains-sovereign, challenger_git, dred_churn,
+# closure, mat_closure — no src/bin usage), and cargo's `unused_dependencies`
+# lint does not scan bench/test targets. Moved here from [dependencies] so
+# the 3 manifest warnings (FS-17 census) resolve without deleting real use.
+# cgap-core/gate/bn3/p28 moved likewise: bench-only usage, and once
+# cgap-ffi left [dependencies] they left the normal-dep closure (the lint
+# counts transitive appearance as use) and began warning themselves.
+[dev-dependencies]
 cgap-core = { path = "../cgap-core" }
 cgap-gate = { path = "../cgap-gate" }
 cgap-bn3 = { path = "../cgap-bn3" }
@@ -20,8 +31,6 @@ cgap-crypto = { path = "../cgap-crypto" }
 cgap-ffi = { path = "../cgap-ffi" }
 cgap-git = { path = "../cgap-git" }
 cgap-storage = { path = "../cgap-storage" }
-
-[dev-dependencies]
 # Exact-at-authoring-time pin. `cargo search divan` 2026-11-01 -> 0.1.21
 # (exit 0, witnessed this session). A caret pin drifts silently across 0.1.x;
 # exact only.
@@ -122,4 +131,10 @@ harness = false
 # over full-chain matches; court = cgap-bn3/tests/bgp_hop_courts.rs).
 [[bench]]
 name = "bgp"
+harness = false
+
+# Lane XC-04: M-CTQ-04/05/06 consolidation bench (harness=false Instant
+# method, csct N=7 Min/Median/Max; see mctq_consolidation.rs header).
+[[bench]]
+name = "mctq_consolidation"
 harness = false

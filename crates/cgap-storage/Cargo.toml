@@ -2,6 +2,7 @@
 repository.workspace = true
 authors.workspace = true
 name = "cgap-storage"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "WAL-framed transactional storage engine (flash model, Txn commit path, differential erase sweeps) for the cgap substrate."

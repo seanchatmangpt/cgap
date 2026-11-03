@@ -2,6 +2,7 @@
 repository.workspace = true
 authors.workspace = true
 name = "cgap-gate"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Campaign boundary gate kernels: fail-closed guard evaluation courts for the cgap substrate."

@@ -600,7 +600,7 @@ fn page_len(values: &[u32], bits: u8, num_rows: u32) -> usize {
 /// The platform-tier backend seam: a sink that hands the writer a window to
 /// write into and then commits `len` bytes of it.
 ///
-/// Tier H (hosted, `std`): a file/mmap backend — [`FileSink`] is the
+/// Tier H (hosted, `std`): a file/mmap backend — `FileSink` is the
 /// in-crate file witness; a real `mmap` backend is attachable externally.
 /// Tier M (default): [`StaticWindow`] over the static buffer. Tier B:
 /// [`StaticWindow`] as plain RAM. The core never mentions an OS.
@@ -1600,7 +1600,7 @@ mod courts {
         /// see. k == N asserts Ok inside the same court, so a neutered
         /// `verify_seal` that always refuses flips on the k=N arm. A
         /// neutered SHAPE layer (the layer this artifact class structurally
-        /// anchors on — see below) flips the differing k<N arms.
+        /// anchors on — see below) flips the differing k `<` N arms.
         /// STRUCTURAL ANCHOR (discovered by running the sweep against a
         /// neutered checksum admission — the mutation was live and flipped
         /// c1/c2/hostile while the sweep stayed green): a torn-append

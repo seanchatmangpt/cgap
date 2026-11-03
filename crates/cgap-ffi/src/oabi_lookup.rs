@@ -115,7 +115,11 @@ mod surface_court {
     const POLL_STEP: Duration = Duration::from_millis(200);
     const BUILD_DEADLINE: Duration = Duration::from_secs(600);
 
-    fn run_bounded(program: &str, args: &[&str], envs: &[(&str, String)]) -> Result<(Option<std::process::ExitStatus>, String, String), String> {
+    fn run_bounded(
+        program: &str,
+        args: &[&str],
+        envs: &[(&str, String)],
+    ) -> Result<(Option<std::process::ExitStatus>, String, String), String> {
         let mut cmd = Command::new(program);
         cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
         for (k, v) in envs {
@@ -149,7 +153,11 @@ mod surface_court {
                 Err(e) => return Err(format!("try_wait: {e}")),
             }
         };
-        Ok((status, rd_out.join().expect("stdout reader"), rd_err.join().expect("stderr reader")))
+        Ok((
+            status,
+            rd_out.join().expect("stdout reader"),
+            rd_err.join().expect("stderr reader"),
+        ))
     }
 
     /// The detector under test: refuse any exported symbol whose normalized
@@ -158,7 +166,9 @@ mod surface_court {
     fn oabi_verb_refusal(nm_out: &str) -> Result<(), String> {
         let mut hits: Vec<String> = Vec::new();
         for line in nm_out.lines() {
-            let Some(tok) = line.split_whitespace().last() else { continue };
+            let Some(tok) = line.split_whitespace().last() else {
+                continue;
+            };
             let norm = tok.trim_start_matches('_').to_ascii_lowercase();
             if norm.contains("oabi") {
                 hits.push(norm);
@@ -187,13 +197,32 @@ mod surface_court {
             ("CARGO_TARGET_DIR", td),
             ("CARGO_NET_OFFLINE", "true".to_string()),
         ];
-        let (status, out, err) = run_bounded("cargo", &["build", "-p", "cgap-ffi", "--lib", "--manifest-path", mp.as_str()], &envs)?;
+        let (status, out, err) = run_bounded(
+            "cargo",
+            &[
+                "build",
+                "-p",
+                "cgap-ffi",
+                "--lib",
+                "--manifest-path",
+                mp.as_str(),
+            ],
+            &envs,
+        )?;
         let st = status.ok_or_else(|| "lease build exceeded deadline".to_string())?;
         if !st.success() {
-            return Err(format!("lease cargo build failed: {}\n{}", tail(&out), tail(&err)));
+            return Err(format!(
+                "lease cargo build failed: {}\n{}",
+                tail(&out),
+                tail(&err)
+            ));
         }
         find_lease_cdylib(&dir.join("target")).ok_or_else(|| {
-            format!("lease build produced no cdylib under {}: {}", dir.join("target").display(), tail(&out))
+            format!(
+                "lease build produced no cdylib under {}: {}",
+                dir.join("target").display(),
+                tail(&out)
+            )
         })
     }
 
@@ -210,7 +239,11 @@ mod surface_court {
 
     fn tail(text: &str) -> String {
         let n = text.chars().count();
-        if n <= 800 { text.to_string() } else { text.chars().skip(n - 800).collect() }
+        if n <= 800 {
+            text.to_string()
+        } else {
+            text.chars().skip(n - 800).collect()
+        }
     }
 
     /// Presence pin: every frozen symbol must appear in the nm output
@@ -250,10 +283,15 @@ mod surface_court {
     }
 
     fn nm_gu(path: &PathBuf) -> Result<String, String> {
-        let (status, out, err) = run_bounded("nm", &["-gU", path.display().to_string().as_str()], &[])?;
+        let (status, out, err) =
+            run_bounded("nm", &["-gU", path.display().to_string().as_str()], &[])?;
         let st = status.ok_or_else(|| "nm exceeded deadline".to_string())?;
         if !st.success() {
-            return Err(format!("nm -gU failed on {}: {}", path.display(), tail(&err)));
+            return Err(format!(
+                "nm -gU failed on {}: {}",
+                path.display(),
+                tail(&err)
+            ));
         }
         Ok(out)
     }
@@ -267,8 +305,7 @@ mod surface_court {
         let verdict = (|| -> Result<(), String> {
             let dylib = lease_build_cdylib(&dir)?;
             let text = nm_gu(&dylib)?;
-            oabi_verb_refusal(&text)
-                .map_err(|e| format!("FROZEN SURFACE BROKEN: {e}"))?;
+            oabi_verb_refusal(&text).map_err(|e| format!("FROZEN SURFACE BROKEN: {e}"))?;
             let missing = missing_frozen(&text);
             if !missing.is_empty() {
                 return Err(format!(
@@ -305,7 +342,10 @@ mod surface_court {
         // (b) The detector must be a no-op only on a verb-free surface; on
         // an empty surface it is green by construction (correct: nothing
         // exported = nothing violated). Its flip sensor is leg 3.
-        assert!(oabi_verb_refusal("").is_ok(), "empty surface must not fabricate a verb");
+        assert!(
+            oabi_verb_refusal("").is_ok(),
+            "empty surface must not fabricate a verb"
+        );
     }
 
     // -- Leg 3: the real flip — cc fixture with the forbidden verb -----------
@@ -318,8 +358,7 @@ mod surface_court {
 
     #[test]
     fn fifth_verb_fixture_flips_the_detector() {
-        let dir =
-            std::env::temp_dir().join(format!("cgap-f26-flip-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("cgap-f26-flip-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         // Pristine twin first: the detector must PASS it (else the court
         // flips on anything and proves nothing).
@@ -334,13 +373,12 @@ mod surface_court {
         );
         // The mutant: real dylib, real export, detector must REFUSE it,
         // and the refusal must NAME the law (§2).
-        let mutant =
-            cc_fixture(&dir.join("mutant"), FIXTURE_OABI, "libmutant.dylib")
-                .unwrap_or_else(|e| panic!("mutant fixture: {e}"));
+        let mutant = cc_fixture(&dir.join("mutant"), FIXTURE_OABI, "libmutant.dylib")
+            .unwrap_or_else(|e| panic!("mutant fixture: {e}"));
         let mutant_out = nm_gu(&mutant).unwrap_or_else(|e| panic!("nm mutant: {e}"));
-        let refusal = oabi_verb_refusal(&mutant_out)
-            .err()
-            .expect("VACUOUS GATE: the cgap_oabi_lookup export was NOT refused — the detector cannot flip");
+        let refusal = oabi_verb_refusal(&mutant_out).err().expect(
+            "VACUOUS GATE: the cgap_oabi_lookup export was NOT refused — the detector cannot flip",
+        );
         assert!(
             refusal.contains("A19 §2") && refusal.contains("fifth-verb"),
             "refusal must name the law (A19 §2 fifth-verb), got: {refusal}"
@@ -357,9 +395,21 @@ mod surface_court {
         // (or replacing the law with prose) flips here.
         let s = OABI_LOOKUP_UNSUPPORTED.scope;
         assert!(s.contains("A19"), "scope must cite A19");
-        assert!(s.contains(":47"), "scope must cite the four-function decision line");
-        assert!(s.contains("57-60"), "scope must cite the fifth-verb law lines");
-        assert!(s.contains("157-166"), "scope must cite the owner-table lines");
-        assert!(s.contains("a19-finish-receipt"), "scope must cite the DoD-5 structural blocker");
+        assert!(
+            s.contains(":47"),
+            "scope must cite the four-function decision line"
+        );
+        assert!(
+            s.contains("57-60"),
+            "scope must cite the fifth-verb law lines"
+        );
+        assert!(
+            s.contains("157-166"),
+            "scope must cite the owner-table lines"
+        );
+        assert!(
+            s.contains("a19-finish-receipt"),
+            "scope must cite the DoD-5 structural blocker"
+        );
     }
 }

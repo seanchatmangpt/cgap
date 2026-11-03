@@ -1,5 +1,6 @@
 [package]
 name = "cgap-arrow"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Freestanding Apache Arrow columnar substrate: branch-free kernel inner-loop bodies, itemized latches/dispatch (no_std, zero dependencies)."

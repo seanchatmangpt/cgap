@@ -318,7 +318,7 @@ impl RowGroupEntry {
     /// stated fully: (1) absent bounds for `col` are never pruned (fail
     /// open to a full scan — missing statistics must not change results,
     /// only cost); (2) present-and-valid bounds (`min <= max` in bit-pattern
-    /// order, enforced at parse time in [`read_statistics`]) prune;
+    /// order, enforced at parse time in `read_statistics`) prune;
     /// (3) present-but-invalid bounds (inverted `min > max`) were rejected
     /// at parse time and surface here as `None` — also never pruned. A
     /// corrupt bounds struct must degrade to "no information", never to a
@@ -326,7 +326,7 @@ impl RowGroupEntry {
     ///
     /// Ordering is bit-pattern (`u64`), which is safe by construction: the
     /// type system admits only `u32`/`u64`/`bytes32` columns
-    /// ([`PhysType::from_id`] refuses FLOAT/DOUBLE, ids 3/4), and the scan's
+    /// (`PhysType::from_id` refuses FLOAT/DOUBLE, ids 3/4), and the scan's
     /// value accessors compare the same PLAIN bit patterns.
     pub fn rg_prunes(&self, col: usize, pred: (u64, u64)) -> bool {
         match self.bounds.get(col).copied().flatten() {

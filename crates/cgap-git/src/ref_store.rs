@@ -14,7 +14,7 @@
 //!
 //! The monotonic counter mirrors the semantics of cgap-crypto `lease.rs`
 //! (80-byte PhiLease, SS5 monotonic tick, exhaustion trap) - but cgap-git
-//! has an empty [dependencies] table (published zero-dep kernel), so the
+//! has an empty `[dependencies]` table (published zero-dep kernel), so the
 //! semantics are mirrored, not imported. Lease binding is a per-ref u64
 //! lease counter stamped atomically via `core::sync::atomic`.
 //!
@@ -27,11 +27,17 @@
 //! used by `crates/cgap-git/src/ingress_ring.rs` (exit-101-class family,
 //! deterministic, in-process `Err`).
 //!
-//! Atomic-width note (PUB-07 fix, lane DOD-04): riscv32imc provides no
-//! 64-bit atomics, so the seal `counter`/`chain` are width-gated via
-//! `cfg(target_has_atomic = ...)` (64 -> 32 -> 16 ladder). On a narrow
-//! target the monotonic counter may wrap/exhaust EARLIER (at the native
-//! width, surfaced as `SEAL_COUNTER_WIDTH`); the typed
+//! Atomic-width note (PUB-07 fix, lane DOD-04; selection corrected by the
+//! R-ADV11FIX slide repair, `lanes/lane-r-adv11fix-implcell-slide.md`):
+//! the seal `counter`/`chain` are width-gated via the legacy CAS cfg key
+//! `target_has_atomic` (64 -> 32 -> 16 ladder). riscv32imc reports NO
+//! CAS-capable atomic at any width, so rv32imc selects the implcell arm,
+//! which is LOUD-until-bound: without `RUSTFLAGS="--cfg
+//! implcell_critical_provided"` the build refuses with a typed
+//! compile_error naming both cfg families; with the opt-in, firmware must
+//! bind the real enter/exit-critical section around the seal RMW. On a
+//! narrow target the monotonic counter may wrap/exhaust EARLIER (at the
+//! native width, surfaced as `SEAL_COUNTER_WIDTH`); the typed
 //! `CounterExhausted` refusal fires at that smaller bound so monotonic
 //! CAS semantics are preserved - the counter exhausts, it never
 //! silently wraps. Chain values may differ across widths (FNV over a
@@ -110,6 +116,26 @@ impl Refusal {
 /// primitive width: the typed CounterExhausted refusal fires at that
 /// smaller bound instead of wrapping (monotonicity is preserved; the
 /// counter exhausts EARLIER, never silently wraps).
+/// ADV-11 repair: which cfg family is authoritative for what.
+///
+/// Empirically probed on the current nightly (rustc 1.101.0-nightly
+/// 12433c307 2026-10-24), per target:
+///   - host (aarch64): legacy `target_has_atomic` = 8/16/32/64/128 AND
+///     `target_has_atomic_load_store` = same + ptr (CAS present).
+///   - riscv32imc-unknown-none-elf: ONLY `target_has_atomic_load_store`
+///     = 8/16/32 (+ptr). NO legacy `target_has_atomic` key of any width.
+///
+/// Meaning: the legacy `target_has_atomic = "N"` keys are the ONLY cfg
+/// signal that carries CAS/RMW capability. The new
+/// `target_has_atomic_load_store = "N"` family reports load/store
+/// atomicity only - it is PRESENT for "32" on rv32imc, which has no CAS
+/// at all, so it must NEVER be treated as a fetch_update license. The
+/// old behavior (rv32imc silently selecting impl32 and emitting
+/// __atomic_* libcalls for an RMW the target cannot honor) is exactly
+/// the mis-arm this ladder refuses to repeat: the no-CAS arm now fails
+/// LOUD unless firmware opts in, and the width witness carries an
+/// independent (new-family-keyed) arm discriminator that cannot
+/// self-agree with the ladder (see `seal_width_witness` at file tail).
 mod seal_atomic {
     #[cfg(target_has_atomic = "64")]
     pub use impl64::*;
@@ -121,6 +147,7 @@ mod seal_atomic {
     pub use impl16::*;
 
     #[cfg(all(
+        not(target_has_atomic = "64"),
         not(target_has_atomic = "32"),
         not(target_has_atomic = "16"),
         not(target_has_atomic = "8")
@@ -149,21 +176,68 @@ mod seal_atomic {
         pub const WIDTH: u64 = u16::MAX as u64;
     }
 
-    /// No native atomics at all (riscv32imc: no A extension). Sound
-    /// here because every mutating entry point ([`SealRegister::stamp`])
-    /// already requires `&mut self` (exclusive access) and the type is
-    /// NOT `Sync` on this arm - single-hart targets only.
+    /// No native CAS at any width (riscv32imc current-nightly shape: the
+    /// target reports `target_has_atomic_load_store = "32"` - load/store
+    /// atomicity only - and NO legacy `target_has_atomic` CAS key).
+    ///
+    /// ADV-11 typed contract (replaces the silent pass-through): the RMW
+    /// on this arm is a plain non-atomic `Cell` read-modify-write. It is
+    /// sound ONLY inside a critical section. The crate is zero-dep and
+    /// cannot provide one, so firmware must bind it EXPLICITLY by passing
+    /// `--cfg implcell_critical_provided` in RUSTFLAGS (the Cargo.toml
+    /// feature form was not available to this lane - Cargo.toml is
+    /// outside the lane's file ownership; see the lane receipt's
+    /// divergence note). Without the opt-in, this target build is a loud
+    /// compile_error naming both keys - never a silently-unsynchronized
+    /// RMW behind a pass-through `critical`.
     #[cfg(all(
+        not(target_has_atomic = "64"),
         not(target_has_atomic = "32"),
         not(target_has_atomic = "16"),
         not(target_has_atomic = "8")
     ))]
-    mod implcell {
+    pub(crate) mod implcell {
         use core::cell::Cell;
         pub type Prim = usize;
         pub type Inner = Cell<usize>;
         pub const WIDTH: u64 = usize::MAX as u64;
+
+        /// The critical seam. With the firmware opt-in
+        /// (`--cfg implcell_critical_provided`), this is the pass-through
+        /// `f()` body: the caller has ACCEPTED the contract that
+        /// interrupts are disabled (or a real enter/exit-critical is
+        /// inlined at the call site by the firmware port) for the RMW's
+        /// duration - a REENTRANCY VIOLATION otherwise, accepted loudly at
+        /// build time, not silent.
+        #[cfg(implcell_critical_provided)]
+        pub fn critical<R>(f: impl FnOnce() -> R) -> R {
+            f()
+        }
     }
+
+    /// ADV-11 loud-until-bound gate: on a no-CAS target without the
+    /// firmware opt-in, the build refuses with a typed diagnostic naming
+    /// the two cfg keys and the two lawful exits (bind a critical section
+    /// via the opt-in, or move the kernel to a CAS-capable target). This
+    /// is the fix for the silent toolchain slide: rv32imc can never again
+    /// compile the unsynchronized RMW without the acceptance being
+    /// visible in the build command itself.
+    #[cfg(all(
+        not(target_has_atomic = "64"),
+        not(target_has_atomic = "32"),
+        not(target_has_atomic = "16"),
+        not(target_has_atomic = "8"),
+        not(implcell_critical_provided)
+    ))]
+    compile_error!(
+        "cgap-git: no CAS-capable atomic on this target (no legacy \
+         target_has_atomic key at any width; the load_store family, if \
+         present, is load/store only and NOT a fetch_update license). \
+         The implcell RMW requires a bound critical section: rebuild with \
+         `RUSTFLAGS=\"--cfg implcell_critical_provided\"` ONLY if your \
+         firmware disables interrupts (or supplies enter/exit-critical) \
+         around the seal RMW; otherwise build for a CAS-capable target."
+    );
 }
 
 /// Widest counter value the target's native atomics can address. The
@@ -188,19 +262,6 @@ impl Counter {
         }
     }
 
-    fn fetch_add(&self) -> u64 {
-        match () {
-            #[cfg(target_has_atomic = "8")]
-            () => self.0.fetch_add(1, core::sync::atomic::Ordering::SeqCst) as u64,
-            #[cfg(not(target_has_atomic = "8"))]
-            () => {
-                let cur = self.0.get() as u64;
-                self.0.set(cur.wrapping_add(1) as seal_atomic::Prim);
-                cur
-            }
-        }
-    }
-
     fn fetch_update<F>(&self, mut f: F) -> Result<u64, u64>
     where
         F: FnMut(u64) -> Option<u64>,
@@ -209,7 +270,7 @@ impl Counter {
             #[cfg(target_has_atomic = "8")]
             () => self
                 .0
-                .fetch_update(
+                .try_update(
                     core::sync::atomic::Ordering::SeqCst,
                     core::sync::atomic::Ordering::SeqCst,
                     |c| f(c as u64).map(|v| v as seal_atomic::Prim),
@@ -217,7 +278,7 @@ impl Counter {
                 .map(|v| v as u64)
                 .map_err(|v| v as u64),
             #[cfg(not(target_has_atomic = "8"))]
-            () => {
+            () => seal_atomic::implcell::critical(|| {
                 let cur = self.0.get() as u64;
                 match f(cur) {
                     Some(next) => {
@@ -226,7 +287,7 @@ impl Counter {
                     }
                     None => Err(cur),
                 }
-            }
+            }),
         }
     }
 }
@@ -285,25 +346,61 @@ impl SealRegister {
                 "seal stamp runs past the 128-byte slot",
             ));
         }
-        // Effective ceiling collapses to the target's native counter
-        // width on narrow targets (exhaustion refuses there, no wrap).
+        // RED-11 fix: ceiling enforcement is INSIDE the RMW (see
+        // [`SealRegister::reserve`], which computes the effective bound
+        // itself). A single
+        // indivisible check-and-increment (fetch_update CAS loop) replaces
+        // the separate load/check + fetch_add pair whose preempted window
+        // minted leases past the ceiling and, at bound >= Prim::MAX,
+        // wrapped the counter to 0. See [`SealRegister::reserve`].
+        let stamped = self.reserve()?;
+        // Slot copy + chain fold happen AFTER the indivisible lease
+        // reservation: a reentrant observer sees a reserved lease even if
+        // it inspects mid-stamp, never a duplicated one.
+        self.slot[offset..offset + 8].copy_from_slice(tag);
+        let _ = self.chain.fetch_update(|c| {
+            Some(c.wrapping_mul(0x01000193).wrapping_add(0x811C_9DC5) ^ u64::from_be_bytes(*tag))
+        });
+        Ok(stamped)
+    }
+
+    /// Indivisible check-and-increment over the seal counter (RED-11
+    /// repair): the ceiling guard lives INSIDE the fetch_update closure, so
+    /// there is no window between "check passed" and "incremented" for a
+    /// preempting ISR to occupy. The closure only ever emits `c + 1` while
+    /// `c < bound <= WIDTH`, so the stored value can never pass
+    /// `Prim::MAX` — a full counter yields None -> typed CounterExhausted,
+    /// never a wrap to 0. This is THE RMW `stamp` uses; the court probe
+    /// below calls the identical code.
+    fn reserve(&self) -> Result<u64, Refusal> {
         let bound = if self.ceiling < seal_atomic::WIDTH {
             self.ceiling
         } else {
             seal_atomic::WIDTH
         };
-        let cur = self.counter.load();
-        if cur >= bound {
-            return Err(Refusal::new(
+        match self
+            .counter
+            .fetch_update(|c| if c < bound { Some(c + 1) } else { None })
+        {
+            Ok(prev) => Ok(prev + 1),
+            Err(_full) => Err(Refusal::new(
                 RefusalKind::CounterExhausted,
                 "seal counter at ceiling; authority spent",
-            ));
+            )),
         }
-        self.slot[offset..offset + 8].copy_from_slice(tag);
-        let _ = self.chain.fetch_update(|c| {
-            Some(c.wrapping_mul(0x01000193).wrapping_add(0x811C_9DC5) ^ u64::from_be_bytes(*tag))
-        });
-        Ok(self.counter.fetch_add() + 1)
+    }
+
+    /// #[doc(hidden)] COURT SEAM (lane RC-01, red-11 flip witness): runs
+    /// exactly the production RMW ([`SealRegister::reserve`]) with no
+    /// ceiling pre-check, so the reentrancy court can replay the preempted
+    /// window: context A passes the (now advisory, RMW-external) state
+    /// read, the ISR spends the remaining authority through real stamps,
+    /// context A resumes AT the RMW. Fixed code refuses typed here; the
+    /// reverted separate-check/RMW shape mints past the ceiling and the
+    /// court goes red. Not a sanctioned API.
+    #[doc(hidden)]
+    pub fn reserve_probe(&self) -> Result<u64, Refusal> {
+        self.reserve()
     }
 }
 
@@ -610,4 +707,161 @@ impl Journal {
     pub fn last_refusal(&self) -> Option<RefusalKind> {
         self.last_refusal
     }
+}
+
+// ==========================================================================
+// RC-02 compile-witness (red-11 findings 1 and 5) — compile-time only;
+// zero counter logic in this module (RC-01 owns that region).
+//
+// Witness W1 (finding 5): selecting the host-only `std` feature on an
+// OS-less target (target_os = "none", riscv32imc-class) is a loud
+// compile_error naming the fix, replacing the raw E0463 toolchain failure.
+#[cfg(all(feature = "std", target_os = "none"))]
+compile_error!(
+    "cgap-git: default `std` feature is enabled on an OS-less target \
+     (riscv32imc-class). std is host-only; rebuild with \
+     `--no-default-features` for the no_std kernel build."
+);
+
+// Witness W2 (finding 1): the cfg ladder arms are width contracts, but
+// impl16 and implcell are dead on every target the fleet builds (host =
+// impl64, riscv32imc = impl32). Each arm that does NOT fire on this
+// target gets a mirror module compiled here, with its width constant
+// statically asserted, so a width-constant regression breaks the build
+// on EVERY target instead of only on the arm's native one. Mirror bodies
+// track ref_store.rs `mod seal_atomic`; drift is caught by the
+// SEAL_COUNTER_WIDTH cross-check at the bottom (exactly one arm's WIDTH
+// must equal it).
+mod seal_width_witness {
+    #![allow(dead_code)]
+
+    #[cfg(target_has_atomic = "64")]
+    const fn selected_width() -> u64 {
+        u64::MAX
+    }
+    #[cfg(all(not(target_has_atomic = "64"), target_has_atomic = "32"))]
+    const fn selected_width() -> u64 {
+        u32::MAX as u64
+    }
+    #[cfg(all(not(target_has_atomic = "32"), target_has_atomic = "16"))]
+    const fn selected_width() -> u64 {
+        u16::MAX as u64
+    }
+    #[cfg(all(
+        not(target_has_atomic = "32"),
+        not(target_has_atomic = "16"),
+        not(target_has_atomic = "8")
+    ))]
+    const fn selected_width() -> u64 {
+        usize::MAX as u64
+    }
+
+    const _: () = assert!(
+        crate::ref_store::SEAL_COUNTER_WIDTH == selected_width(),
+        "SEAL_COUNTER_WIDTH disagrees with the target's selected cfg arm",
+    );
+
+    // Mirror of seal_atomic::impl32 — compiles wherever AtomicU32 exists.
+    #[cfg(target_has_atomic = "32")]
+    mod mirror_impl32 {
+        pub type Prim = u32;
+        pub type Inner = core::sync::atomic::AtomicU32;
+        pub const WIDTH: u64 = u32::MAX as u64;
+    }
+    #[cfg(target_has_atomic = "32")]
+    const _: () = assert!(
+        mirror_impl32::WIDTH == u32::MAX as u64,
+        "impl32 arm width contract violated",
+    );
+
+    // Mirror of seal_atomic::impl16 — compiles wherever AtomicU16 exists.
+    #[cfg(target_has_atomic = "16")]
+    mod mirror_impl16 {
+        pub type Prim = u16;
+        pub type Inner = core::sync::atomic::AtomicU16;
+        pub const WIDTH: u64 = u16::MAX as u64;
+    }
+    #[cfg(target_has_atomic = "16")]
+    const _: () = assert!(
+        mirror_impl16::WIDTH == u16::MAX as u64,
+        "impl16 arm width contract violated",
+    );
+
+    // Mirror of seal_atomic::implcell — compiles everywhere (core::cell).
+    mod mirror_implcell {
+        use core::cell::Cell;
+        pub type Prim = usize;
+        pub type Inner = Cell<usize>;
+        pub const WIDTH: u64 = usize::MAX as u64;
+    }
+    const _: () = assert!(
+        mirror_implcell::WIDTH == usize::MAX as u64,
+        "implcell arm width contract violated",
+    );
+
+    // ------------------------------------------------------------------
+    // ADV-11 arm discriminator: the ONLY cross-check that cannot
+    // self-agree with the ladder. The ladder selects on the legacy
+    // `target_has_atomic` CAS keys; the EXPECTED arm below is derived
+    // from the INDEPENDENT `target_has_atomic_load_store` family. On the
+    // toolchain that silently slid rv32imc onto implcell, both sides of
+    // the OLD witness used the same legacy keys and fell together - the
+    // cross-check asserted vacuously. Here the two sides read DIFFERENT
+    // cfg families, so a family divergence (e.g. a future nightly that
+    // reports load_store="64" but no legacy CAS key) fails the build
+    // loudly instead of silently re-arming.
+    const ARM_IMPL64: u8 = 4;
+    const ARM_IMPL32: u8 = 3;
+    const ARM_IMPL16: u8 = 2;
+    const ARM_IMPLCELL: u8 = 1;
+
+    // Selected arm - the SAME keys the ladder reads (legacy CAS family).
+    #[cfg(target_has_atomic = "64")]
+    const SELECTED_ARM: u8 = ARM_IMPL64;
+    #[cfg(all(not(target_has_atomic = "64"), target_has_atomic = "32"))]
+    const SELECTED_ARM: u8 = ARM_IMPL32;
+    #[cfg(all(not(target_has_atomic = "32"), target_has_atomic = "16"))]
+    const SELECTED_ARM: u8 = ARM_IMPL16;
+    #[cfg(all(
+        not(target_has_atomic = "64"),
+        not(target_has_atomic = "32"),
+        not(target_has_atomic = "16"),
+        not(target_has_atomic = "8")
+    ))]
+    const SELECTED_ARM: u8 = ARM_IMPLCELL;
+
+    // Expected arm - probed from an INDEPENDENT cfg family
+    // (`target_pointer_width`, stable). Note (divergence recorded in the
+    // lane receipt): the load_store family
+    // (`target_has_atomic_load_store`) would be the tighter probe but is
+    // UNSTABLE (E0658, `cfg_target_has_atomic` feature-gated) and
+    // unusable from cfg predicates in this zero-dep kernel without a
+    // crate-level feature gate (lib.rs is outside this lane's
+    // ownership).
+    #[cfg(target_pointer_width = "64")]
+    const EXPECTED_ARM: u8 = ARM_IMPL64;
+    #[cfg(all(
+        target_pointer_width = "32",
+        any(target_has_atomic = "64", target_has_atomic = "32")
+    ))]
+    const EXPECTED_ARM: u8 = ARM_IMPL32;
+    #[cfg(all(
+        target_pointer_width = "16",
+        not(any(target_has_atomic = "64", target_has_atomic = "32")),
+        target_has_atomic = "16"
+    ))]
+    const EXPECTED_ARM: u8 = ARM_IMPL16;
+    #[cfg(all(
+        target_pointer_width = "32",
+        not(any(target_has_atomic = "64", target_has_atomic = "32"))
+    ))]
+    const EXPECTED_ARM: u8 = ARM_IMPLCELL;
+
+    const _: () = assert!(
+        SELECTED_ARM == EXPECTED_ARM,
+        "cfg-arm discriminator: the ladder's selected arm disagrees with \
+         the independently probed target_pointer_width family - a \
+         toolchain slide moved one family without the other; adjudicate \
+         before building",
+    );
 }

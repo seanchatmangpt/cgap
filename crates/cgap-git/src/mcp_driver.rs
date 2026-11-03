@@ -33,12 +33,12 @@
 //! operation is a pure in-process function call; latency is measured
 //! with `Instant` and *reported* as a typed value, not gated as an SLA.
 
-#![no_std]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
 use alloc::string::String;
+#[cfg(feature = "std")]
 use alloc::vec::Vec;
 use core::fmt;
 

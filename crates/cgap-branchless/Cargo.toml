@@ -1,5 +1,6 @@
 [package]
 name = "cgap-branchless"
+rust-version.workspace = true
 version = "26.11.2"
 edition = "2021"
 license-file = "../../LICENSE.md"

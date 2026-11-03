@@ -93,6 +93,113 @@ pub enum IngressError {
     Empty,
 }
 
+/// Typed refusal-quota seam (FIX-04, red-14 hardening): class-101
+/// refusals are trip-able by any caller at zero cost, so a sustained
+/// refusal FLOOD escalates to this REPORTABLE, RECOVERABLE typed state
+/// instead of being invisible. The quota is OBSERVATIONAL ONLY — it never
+/// gates admission (a garbage flood cannot wedge the ring), carries no
+/// process-exit semantics, and gives a future host that maps
+/// `andon_exit_class` to `process::exit` a rate-limit signal to front it
+/// with (red-14 §2 recommendation). Recovery is a successful admission
+/// resetting the sliding window; the lifetime total is never reset.
+///
+/// ADV-12 repair: the escalation is LEVEL-TRIGGERED, not edge-triggered.
+/// `tripped` is sticky — one admitted frame does NOT erase it. It clears
+/// only after (a) an explicit [`RefusalQuota::acknowledge`], or (b) a
+/// sustained quiet window of `CLEAN_ADMISSIONS_TO_CLEAR` consecutive
+/// clean admissions. `window_refusals` saturates at `u32::MAX` instead
+/// of overflowing (a debug-build panic / release wrap under a
+/// zero-admission flood).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefusalQuota {
+    /// Refusals tolerated in the current window before `tripped`.
+    pub max_refusals: u32,
+    /// Refusals since the last successful admission (window). Saturates
+    /// at `u32::MAX` — typed saturation, never a wrap or panic.
+    pub window_refusals: u32,
+    /// Lifetime refusals observed (never reset — audit counter).
+    pub total_refusals: u64,
+    /// Escalated state: the window hit `max_refusals`. Sticky until
+    /// acknowledged or `CLEAN_ADMISSIONS_TO_CLEAR` clean admissions.
+    pub tripped: bool,
+    /// Consecutive clean admissions since the last refusal (private:
+    /// drives the level-triggered auto-clear).
+    clean_streak: u32,
+}
+
+impl RefusalQuota {
+    /// Default quota: 4,096 sustained refusals in one window trip the
+    /// escalation (far above any legitimate retry burst, far below a
+    /// red-14-class 1,000,000-frame flood).
+    pub const DEFAULT_MAX_REFUSALS: u32 = 4_096;
+
+    /// Level-triggered auto-clear threshold (ADV-12 repair): after a
+    /// trip, `tripped` clears only after this many CONSECUTIVE clean
+    /// admissions — a named const, never a single-frame edge.
+    pub const CLEAN_ADMISSIONS_TO_CLEAR: u32 = 1024;
+
+    pub const fn new() -> Self {
+        RefusalQuota {
+            max_refusals: Self::DEFAULT_MAX_REFUSALS,
+            window_refusals: 0,
+            total_refusals: 0,
+            tripped: false,
+            clean_streak: 0,
+        }
+    }
+
+    /// Record one class-101 refusal. Escalates (sets `tripped`) exactly
+    /// when the window count reaches `max_refusals`. The window count
+    /// saturates at `u32::MAX` (no overflow panic in debug, no silent
+    /// wrap in release).
+    pub fn note_refusal(&mut self) {
+        self.window_refusals = self.window_refusals.saturating_add(1);
+        self.total_refusals = self.total_refusals.wrapping_add(1);
+        self.clean_streak = 0;
+        if self.window_refusals >= self.max_refusals {
+            self.tripped = true;
+        }
+    }
+
+    /// Record one successful admission: the window resets (recoverable)
+    /// and the clean streak grows. The escalated state is LEVEL-TRIGGERED:
+    /// `tripped` stays set through a single admission and clears only
+    /// after `CLEAN_ADMISSIONS_TO_CLEAR` consecutive clean admissions.
+    /// The lifetime total is preserved for audit.
+    pub fn note_admission(&mut self) {
+        self.window_refusals = 0;
+        if self.tripped {
+            self.clean_streak = self.clean_streak.saturating_add(1);
+            if self.clean_streak >= Self::CLEAN_ADMISSIONS_TO_CLEAR {
+                self.tripped = false;
+                self.clean_streak = 0;
+            }
+        }
+    }
+
+    /// Explicit host acknowledgement: clear the escalation NOW (the
+    /// level-triggered manual path — a host that has observed and acted
+    /// on the flood may drop the signal immediately).
+    pub fn acknowledge(&mut self) {
+        self.tripped = false;
+        self.window_refusals = 0;
+        self.clean_streak = 0;
+    }
+
+    /// `true` while the quota is escalated (reportable flood state).
+    /// Sticky: survives individual admitted frames until acknowledged or
+    /// a sustained quiet window.
+    pub fn tripped(&self) -> bool {
+        self.tripped
+    }
+}
+
+impl Default for RefusalQuota {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IngressError {
     /// Andon refusal class (dispatch: overflow maps to the
     /// AndonRefusal-class exit-101 family — deterministic and caught by the
@@ -147,6 +254,7 @@ pub struct IngressRing<const CAP: usize> {
     buf: [u8; CAP],
     head: PaddedIndex,
     tail: PaddedIndex,
+    quota: RefusalQuota,
 }
 
 impl<const CAP: usize> IngressRing<CAP> {
@@ -157,7 +265,14 @@ impl<const CAP: usize> IngressRing<CAP> {
             buf: [0u8; CAP],
             head: PaddedIndex::new(0),
             tail: PaddedIndex::new(0),
+            quota: RefusalQuota::new(),
         }
+    }
+
+    /// Reportable refusal-quota state (FIX-04): observability seam for
+    /// sustained class-101 floods; never gates admission.
+    pub fn refusal_quota(&self) -> &RefusalQuota {
+        &self.quota
     }
 
     /// Free-running producer counter (monotonic, wraps at usize).
@@ -189,6 +304,7 @@ impl<const CAP: usize> IngressRing<CAP> {
     /// and no bytes are written — refusal leaves the ring untouched.
     pub fn push(&mut self, frame: &[u8]) -> Result<(), IngressError> {
         if frame.len() > CAP {
+            self.quota.note_refusal();
             return Err(IngressError::FrameTooLarge {
                 frame_len: frame.len(),
             });
@@ -196,6 +312,7 @@ impl<const CAP: usize> IngressRing<CAP> {
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Acquire);
         if would_overflow(head, tail, frame.len(), CAP) {
+            self.quota.note_refusal();
             return Err(IngressError::Overflow {
                 head,
                 tail,
@@ -213,6 +330,7 @@ impl<const CAP: usize> IngressRing<CAP> {
         // read the index with Acquire.
         self.head
             .store(head.wrapping_add(frame.len()), Ordering::Release);
+        self.quota.note_admission();
         Ok(())
     }
 
@@ -255,6 +373,7 @@ impl<const CAP: usize> IngressRing<CAP> {
     pub fn pop(&mut self, out: &mut [u8]) -> Result<usize, IngressError> {
         let pending = self.pending();
         if pending == 0 {
+            self.quota.note_refusal();
             return Err(IngressError::Empty);
         }
         let n = core::cmp::min(out.len(), pending);

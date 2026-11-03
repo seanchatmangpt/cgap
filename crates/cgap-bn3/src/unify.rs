@@ -10,7 +10,7 @@
 //! assignments), the per-atom mask kernels over columnar term words, the
 //! join probe (RADIXFIX: radix-mask default, nested-loop leg retained and
 //! court-guarded in `chains-bn3.rs`), selection emission, and the fixpoint
-//! driver (W6-BFX: [`SplitStore`] borrowed-prefix + owned-delta-tail view)
+//! driver (W6-BFX: `SplitStore` borrowed-prefix + owned-delta-tail view)
 //! that feeds the [`crate::project::ConsequentProjector`]. Posture:
 //! W6-BN3NS `no_std` (alloc collections, no std dep); the fixpoint is NOT
 //! budget-0 (H8 honesty court, `noalloc.rs` counting allocator); the AE6

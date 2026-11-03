@@ -14,12 +14,12 @@
 //!   differ only in which 90/10 side of the 12-byte inline threshold they
 //!   sit on — this is the branch classifier's real per-row cost.
 //! - `sliced get full iter` vs `primitive values direct iter`: zero-copy
-//!   overhead check. [`slice::slice`] window (offset 7) over an all-valid
+//!   overhead check. `cgap_arrow::slice::slice` window (offset 7) over an all-valid
 //!   64 MiB `Primitive<i64>` (all-valid freeze drops the validity bitmap,
 //!   so `get` is pure pointer arithmetic + bounds + `Option` wrap) against
 //!   iterating `Primitive::values()` directly. Checksums asserted equal
 //!   pre-flight; expect the rates to agree to noise (~0 overhead).
-//! - `runend get` + `runend decode_to_dense`: [`RunEndEncoded::get`]
+//! - `runend get` + `runend decode_to_dense`: `RunEndEncoded::get`
 //!   binary-search decode over a 1,048,576-row / 100-run array (run ends
 //!   span 400 B, L1-resident: this is CPU-bound per-row decode cost, not a
 //!   bandwidth wall) and full dense decode (4 MiB dst written per pass).

@@ -19,10 +19,7 @@ static UNIQUE: AtomicU64 = AtomicU64::new(0);
 
 fn unique_dir() -> PathBuf {
     let n = UNIQUE.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "cgap-storage-court-{}-{n}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("cgap-storage-court-{}-{n}", std::process::id()))
 }
 
 /// The immutable superblock root every court starts from: dag_seq 9, so

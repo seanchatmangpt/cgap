@@ -345,6 +345,11 @@ pub mod oabi_lookup; // F2-6 SEAM-OABI: typed UNSUPPORTED(scope) + surface-freez
 /// the module (byte identity, production link, budget math).
 pub mod xip_tables;
 
+/// RC-05 (FIX-14 A1 / RED-16 A1): typed runtime stats block — the
+/// runtime telemetry seam (pull-based C-ABI snapshot, six-row refusal
+/// taxonomy counters, quota state, receipt digest).
+pub mod stats;
+
 /// XIP glue (lane doc §5): a `target_os = "none"` staticlib needs a panic
 /// handler and no `std`. Host targets use std's handler — this item does not
 /// exist there, so host builds are untouched (the slot-surface cfg gates

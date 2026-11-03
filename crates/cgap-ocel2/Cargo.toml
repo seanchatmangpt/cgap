@@ -1,0 +1,22 @@
+[package]
+name = "cgap-ocel2"
+rust-version = "1.85"
+version = "26.11.2"
+edition = "2021"
+description = "cgap-to-OCEL 2.0 projection membrane: receipt-chain events, (dev,ino) objects, E2O edges, Arrow-shaped tables + SQL view DDL for pm4py."
+license-file = "../../LICENSE.md" # DOD-01 F3b: "../LICENSE.md" resolved to crates/LICENSE.md (absent)
+publish = false
+
+# Standalone membrane crate (the crates/cli pattern): NOT a root-workspace
+# member; own [workspace] so it never perturbs the 23-member root metadata.
+[workspace]
+
+[dependencies]
+# Real collaborators, Chicago law: the projection consumes the REAL chain,
+# REAL sealed blocks, REAL license record, REAL BLAKE3 kernel. Path deps
+# only; no existing file is modified.
+cgap-ffi = { path = "../cgap-ffi", version = "26.11.2" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.2", features = ["std"] }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.2" }

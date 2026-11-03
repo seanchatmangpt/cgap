@@ -3,6 +3,7 @@ publish = true
 categories = ['api-bindings', 'os:macos']
 keywords = ['metal', 'gpu', 'zero-copy', 'unified-memory']
 name = "cgap-gpu"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "GPU execution membrane for the cgap sovereign substrate: Metal Unified Memory zero-copy buffer bridging."

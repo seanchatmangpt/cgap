@@ -59,7 +59,7 @@
 //!   [`ParquetError::RunOverrun`], never silent truncation. The row-group
 //!   spans ride a fixed inline `[u32; MAX_ROW_GROUPS]` (the writer's own
 //!   representation, [`crate::mmap_writer::MAX_ROW_GROUPS`]); a summary
-//!   with more than [`MAX_ROW_GROUPS`] row groups is a typed seal
+//!   with more than [`crate::mmap_writer::MAX_ROW_GROUPS`] row groups is a typed seal
 //!   refusal. The prior lawful carve-out ("allocation is lawful on the
 //!   seal path") is CLOSED as of v26.11.2 wave 6.
 //! - **List encoding**: meta field 4's elements are bare zigzag-i32

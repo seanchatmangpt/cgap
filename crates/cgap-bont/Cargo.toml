@@ -1,5 +1,6 @@
 [package]
 name = "cgap-bont"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Binary ontology (B-ONT) primitives, SHACL bitmask compiler and O-ABI reader for the cgap sovereign columnar substrate."

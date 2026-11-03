@@ -1,5 +1,6 @@
 [package]
 name = "cgap-bosym"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Binary ontology symbol slab (B-OSYM) interned-identifier slab for the cgap sovereign columnar substrate."

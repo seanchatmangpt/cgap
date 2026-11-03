@@ -1,6 +1,7 @@
 [package]
 repository = "https://github.com/seanchatmangpt/cgap"
 name = "cgap-verification"
+rust-version = "1.85"
 version = "26.11.2"
 edition = "2021"
 description = "Deterministic Verification Surface: extracted-triple ingestion (cgap-bont SlotId law), integrity rule evaluation, and tamper-evident sealing of the grounded context via the A16 cgap-crypto chatman keyed sealer."

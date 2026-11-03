@@ -9,7 +9,7 @@
 //! yet wired into lib.rs — composition lands with that wire-in).
 //!
 //! Refusal vocabulary composes with the existing substrate rather than
-//! minting a parallel one: framing reuses [`pkt_line::PktError`];
+//! minting a parallel one: framing reuses `pkt_line::PktError`;
 //! ontology refusals mirror the cgap-bn3 compile refusal names
 //! (`UnboundHeadVariable`, `EmptyRuleBody`); the fixpoint refusal mirrors
 //! bn3's `FixpointBudgetExceeded` semantics (a non-converging fixpoint IS
@@ -129,7 +129,7 @@ pub struct ProposedUpdate {
 /// lines a pre-receive hook can paste into the push rejection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateError {
-    /// Wire framing failed (composes GIT-02's [`PktError`], not a minted
+    /// Wire framing failed (composes GIT-02's `PktError`, not a minted
     /// parallel error).
     Pkt(PktError),
     /// A command payload is not `"<old> <new> <refname>"` (3 fields).

@@ -31,6 +31,7 @@
 //! offsets 0/4/6/8/16/48, size 80, align 8, magic `P28S` all match.
 
 /// offset 0, 4 B — `'P','2','8','S'` = 0x50 0x32 0x38 0x53 (§2.1).
+
 pub const LICENSE_MAGIC: [u8; 4] = *b"P28S";
 
 /// offset 4, 2 B — u16 LE, currently 1 (§2.1). Unknown versions fail closed (§5.3).
@@ -365,9 +366,7 @@ pub fn find_in_elf(elf: &[u8]) -> Option<core::ops::Range<usize>> {
         // hostile bytes (a03-wave5 F-1 class, repaired wave 6 — a public
         // parser of untrusted bytes must refuse typed, never panic).
         let base = shoff.checked_add(i.checked_mul(shentsize)?)?;
-        let name = u32::from_le_bytes(
-            elf.get(base..base.checked_add(4)?)?.try_into().ok()?,
-        );
+        let name = u32::from_le_bytes(elf.get(base..base.checked_add(4)?)?.try_into().ok()?);
         let off = u64_at(base.checked_add(0x18)?)?;
         let size = u64_at(base.checked_add(0x20)?)?;
         Some((name, off, size))
@@ -458,8 +457,11 @@ fn leb_u32(bytes: &[u8], pos: usize) -> Option<(u32, usize)> {
 /// real bytes on disk) is used in preference to fixtures (Chicago).
 #[cfg(test)]
 pub(crate) mod test_support {
-    use std::{string::{String, ToString}, vec::Vec};
     use std::path::Path;
+    use std::{
+        string::{String, ToString},
+        vec::Vec,
+    };
 
     /// Canonical instrument bytes, read from the real pinned file on disk.
     pub(crate) fn instrument_file_bytes() -> Vec<u8> {
@@ -740,10 +742,10 @@ for i in range(sn):
 
 #[cfg(test)]
 mod tests {
-    use std::{string::String, vec::Vec};
     use super::test_support::*;
     use super::*;
     use std::process::Command;
+    use std::{string::String, vec::Vec};
 
     /// §2.1 offset table rendered as a runtime witness (court for the table
     /// itself, not the struct — the const pins above are the primary gate).
@@ -1357,6 +1359,144 @@ mod tests {
             "section size overrun past the buffer is absent, not a span"
         );
     }
+}
+
+// ===========================================================================
+// RC-04 — keyed attestation MAC (RED-18 §3.3 clone vector, honest scope).
+//
+// The 80-B attestation is BLAKE3-bound but keyless: anyone with one flash
+// readout can recompute a fully self-consistent image+attestation pair
+// (RED-18 §3.3 BREACH-CONFIRMED). This layer adds a device-key-parameterized
+// tag over the 80-B body so a cloned image cannot carry a valid attestation
+// unless the attacker also holds the device key.
+//
+// HONEST SCOPE: this closes the clone vector ONLY when the device key lives
+// outside flash (secure element / OTP / host-side secret). It is a designed-in
+// software seam, NOT a claim of hardware security: an attacker who reads the
+// key from the same readout defeats it trivially. The key is never stored in
+// or derivable from the attestation record, the MAC wire form, or the image.
+// ===========================================================================
+
+/// Derivation domain string for the attestation MAC (RC-04). Bind into the
+/// subkey derivation so the same device key cannot be reused unbound for
+/// another purpose.
+pub const MAC_DOMAIN: &[u8] = b"cgap-p28/attestation-mac/v1";
+
+/// Wire length of [`AttestationMac`]: 16-B key commitment + 32-B tag.
+pub const ATTESTATION_MAC_LEN: usize = 48;
+
+/// Keyed-MAC error (RC-04). Opaque by the same non-fingerprinting law as
+/// [`Spoliation`]: every MAC failure — wrong key, wrong key_id, tampered
+/// body — maps to one typed halt class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct MacMismatch;
+
+impl core::fmt::Display for MacMismatch {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("p28 attestation MAC mismatch (fail-closed)")
+    }
+}
+
+impl core::error::Error for MacMismatch {}
+
+use cgap_crypto::chatman::keyed_digest;
+
+/// Device-key-parameterized tag over the 80-B attestation body (RC-04).
+///
+/// Wire form is 48 B: 16-B `key_id` commitment + 32-B keyed-BLAKE3 tag. The
+/// device key itself is NEVER on disk here — `key_id` is only a selector the
+/// out-of-band key store resolves; knowing `key_id` and the full image gives
+/// an attacker nothing to forge with (RED-18 §3.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AttestationMac {
+    /// 16 B — key commitment: selector into the OUT-OF-BAND device key store.
+    pub key_id: [u8; 16],
+    /// 32 B — keyed-BLAKE3 tag over `MAC_DOMAIN || key_id || attestation`.
+    pub tag: [u8; 32],
+}
+
+impl AttestationMac {
+    /// 48-B LE wire form.
+    pub fn to_bytes(&self) -> [u8; ATTESTATION_MAC_LEN] {
+        let mut b = [0u8; ATTESTATION_MAC_LEN];
+        b[0..16].copy_from_slice(&self.key_id);
+        b[16..48].copy_from_slice(&self.tag);
+        b
+    }
+
+    /// Parse the 48-B wire form; anything else is a typed refusal.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, MacMismatch> {
+        if bytes.len() != ATTESTATION_MAC_LEN {
+            return Err(MacMismatch);
+        }
+        let mut m = Self {
+            key_id: [0u8; 16],
+            tag: [0u8; 32],
+        };
+        m.key_id.copy_from_slice(&bytes[0..16]);
+        m.tag.copy_from_slice(&bytes[16..48]);
+        Ok(m)
+    }
+}
+
+/// Keyed-BLAKE3 subkey derivation: `mac_key = keyed(domain || key_id, device_key)`.
+/// Binds the domain string and key commitment into the subkey itself so two
+/// purposes sharing one device key cannot collide on tags.
+fn mac_subkey(device_key: &[u8; 32], key_id: &[u8; 16]) -> Result<[u8; 32], MacMismatch> {
+    // MAC_DOMAIN(27) || key_id(16) = 43 B, fixed-width (no alloc, zero-dep law).
+    const INPUT_LEN: usize = MAC_DOMAIN.len() + 16;
+    const _: () = assert!(INPUT_LEN == 43);
+    let mut input = [0u8; INPUT_LEN];
+    input[..MAC_DOMAIN.len()].copy_from_slice(MAC_DOMAIN);
+    input[MAC_DOMAIN.len()..].copy_from_slice(key_id);
+    keyed_digest(device_key, &input).map_err(|_| MacMismatch)
+}
+
+/// Tag computation: `tag = keyed(mac_subkey, attestation wire bytes)`.
+fn attestation_tag(
+    device_key: &[u8; 32],
+    key_id: &[u8; 16],
+    att: &P28LicenseAttestation,
+) -> Result<[u8; 32], MacMismatch> {
+    let subkey = mac_subkey(device_key, key_id)?;
+    keyed_digest(&subkey, &att.to_bytes()).map_err(|_| MacMismatch)
+}
+
+/// Compute the keyed attestation MAC (RC-04). `device_key` MUST live outside
+/// flash for the clone-resistance property to hold (honest scope, above).
+pub fn attestation_mac(
+    device_key: &[u8; 32],
+    key_id: [u8; 16],
+    att: &P28LicenseAttestation,
+) -> Result<AttestationMac, MacMismatch> {
+    let tag = attestation_tag(device_key, &key_id, att)?;
+    Ok(AttestationMac { key_id, tag })
+}
+
+/// Verify a keyed attestation MAC (RC-04): recompute the tag under the
+/// presented `device_key`/`key_id` and compare in constant time. Typed
+/// refusal ([`MacMismatch`]) on key mismatch, key_id mismatch, or any
+/// tampered byte of the 80-B body. This is the seam trap.rs (NOT owned by
+/// RC-04) wires into the loader when it lands.
+pub fn verify_with_key(
+    device_key: &[u8; 32],
+    key_id: [u8; 16],
+    att: &P28LicenseAttestation,
+    mac: &AttestationMac,
+) -> Result<(), MacMismatch> {
+    if mac.key_id != key_id {
+        return Err(MacMismatch);
+    }
+    let expect = attestation_tag(device_key, &key_id, att)?;
+    // Constant-time fold compare (no_std, no early exit on tag bytes).
+    let mut diff = 0u8;
+    for i in 0..32 {
+        diff |= expect[i] ^ mac.tag[i];
+    }
+    if diff != 0 {
+        return Err(MacMismatch);
+    }
+    Ok(())
 }
 
 /// §3 receipt pin: BLAKE3-256 of the canonical header span of

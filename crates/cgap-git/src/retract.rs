@@ -19,7 +19,7 @@
 //!
 //! Law (identical to dred::cascade_retract): fact F is cascade-purged iff
 //! F is a deleted root, OR F is reachable from a purged fact through the
-//! lineage edge relation with alt_support[F] == 0 (least fixpoint). A
+//! lineage edge relation with alt_support\[F] == 0 (least fixpoint). A
 //! dependent with an alive alternative derivation survives and does NOT
 //! propagate the purge.
 //!
@@ -124,7 +124,7 @@ pub fn build_csr(
 /// Real scalar-host math (64 logical bit-lanes per word, word-parallel
 /// AND/AND-NOT/OR); this is NOT SIMD and no SIMD claim is made — the
 /// host is scalar, the lanes are logical.
-/// keep[f] == 1 iff fact f SURVIVES the static pass:
+/// keep\[f] == 1 iff fact f SURVIVES the static pass:
 /// keep = !(derived & del) | (alt_support != 0).
 pub fn keep_mask_swar(
     derived_deps: &[u64],

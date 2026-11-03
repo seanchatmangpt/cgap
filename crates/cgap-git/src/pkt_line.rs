@@ -24,6 +24,7 @@
 pub const MAX_PKT_PAYLOAD: usize = 65_516;
 
 /// Fixed stack buffer a single pkt-line encodes into (header + payload).
+#[allow(dead_code)] // lib-unused: sized in every encode_* signature below (court-tested surface)
 pub const PKT_BUF_LEN: usize = 64;
 
 /// The 4-hex-digit header of a flush-pkt.
@@ -161,6 +162,7 @@ impl<'a> Pkt<'a> {
     /// If this is an `ERR <msg>` packet (payload begins with the 4 bytes
     /// `ERR ` per `gitprotocol-http.txt` "Error Status" and smart-protocol
     /// ERR convention), return the message bytes after the prefix.
+    #[allow(dead_code)] // lib-unused: asserted by tests/pkt_line_court.rs ERR-decode court
     pub fn err_message(&self) -> Option<&'a [u8]> {
         match self {
             Pkt::Data(p) if p.starts_with(b"ERR ") => Some(&p[4..]),
@@ -169,6 +171,7 @@ impl<'a> Pkt<'a> {
     }
 
     /// True if this is the flush-pkt (`0000`).
+    #[allow(dead_code)] // lib-unused: asserted by tests/pkt_line_court.rs:179
     pub fn is_flush(&self) -> bool {
         matches!(self, Pkt::Flush)
     }
@@ -183,6 +186,7 @@ impl<'a> Pkt<'a> {
 /// (buffer cap), or [`PktError::BadLength`] if it exceeds the 65,516-byte
 /// protocol cap (unreachable here but enforced for API symmetry with a
 /// future large-payload encoder).
+#[allow(dead_code)] // lib-unused: wire-encode completeness; exercised by tests/pkt_line_court.rs
 pub fn encode_pkt(payload: &[u8], out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, PktError> {
     let n = payload.len();
     if n > 60 {
@@ -209,27 +213,32 @@ pub fn encode_pkt(payload: &[u8], out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, 
 }
 
 /// Uppercase hex digit table for length headers.
+#[allow(dead_code)] // lib-unused: header nibble table for encode_* (court-tested wire surface)
 const HEX: [u8; 16] = *b"0123456789ABCDEF";
 
 /// Encode a flush-pkt (`0000`) into `out`, returning 4.
+#[allow(dead_code)] // lib-unused: wire-encode completeness; exercised by tests/pkt_line_court.rs:153
 pub fn encode_flush(out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, PktError> {
     out[..4].copy_from_slice(&FLUSH);
     Ok(4)
 }
 
 /// Encode a delim-pkt (`0001`) into `out`, returning 4.
+#[allow(dead_code)] // lib-unused: wire-encode completeness; exercised by tests/pkt_line_court.rs:155
 pub fn encode_delim(out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, PktError> {
     out[..4].copy_from_slice(&DELIM);
     Ok(4)
 }
 
 /// Encode a response-end-pkt (`0002`) into `out`, returning 4.
+#[allow(dead_code)] // lib-unused: wire-encode completeness; exercised by tests/pkt_line_court.rs:157
 pub fn encode_response_end(out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, PktError> {
     out[..4].copy_from_slice(&RESPONSE_END);
     Ok(4)
 }
 
 /// Encode an `ERR <msg>` data packet (payload `ERR ` + message) into `out`.
+#[allow(dead_code)] // lib-unused: wire-encode completeness; exercised by tests/pkt_line_court.rs:166
 pub fn encode_err(msg: &[u8], out: &mut [u8; PKT_BUF_LEN]) -> Result<usize, PktError> {
     let n = msg.len();
     if n > 52 {

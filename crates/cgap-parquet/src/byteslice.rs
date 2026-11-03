@@ -17,7 +17,7 @@
 //! Scan reuse, not a new trick: the per-word compare math is exactly the
 //! `w = 8` arm of [`crate::packed_filter::filter_eq_packed`]
 //! (packed_filter.rs module docs, lanes 0..8 of a u64), restated below in
-//! [`eq_mask_word`] because that kernel's helpers are private and operate
+//! `eq_mask_word` because that kernel's helpers are private and operate
 //! on tight-packed lanes. The secondary sub-column is the SAME kernel over
 //! the needle's high byte; a row matches iff every sub-column matches, so
 //! the full mask is the AND of per-sub-column masks.
@@ -81,7 +81,7 @@ pub fn pack_byteslice(values: &[u32], k: u8) -> Vec<Vec<u8>> {
 ///
 /// The needle is masked to `k` bits first (rule 5). Per sub-column the scan
 /// reuses the `w = 8` SWAR byte-compare of `crate::packed_filter` (see
-/// [`eq_mask_word`]); masks are ANDed across sub-columns and the final
+/// `eq_mask_word`); masks are ANDed across sub-columns and the final
 /// word's tail bits past `n` are zeroed (rule 2). Panics LOUDLY on the rule
 /// 1/3/4 violations ("ragged sub-columns", "mask buffer too small",
 /// "unsupported bit width", "sub-column count"); excess mask words are left

@@ -158,7 +158,7 @@ fn words_from_bytes(bytes: &[u8], out: &mut [u32; 16]) {
 /// returning its 16-word compression output (first 8 words form the 32-byte CV or root digest).
 ///
 /// No-panic law (GATE-2 leg 3, v26.11.1): delegates to
-/// [`hash_chunk_window`] — no subslicing, no `unreachable!()`, no bounds
+/// `hash_chunk_window` — no subslicing, no `unreachable!()`, no bounds
 /// checks — so this body emits zero panic-family symbols on the
 /// `riscv32imc` object (falsifier: rebuild + `rust-nm` family count).
 #[inline(always)]
@@ -219,7 +219,7 @@ fn hash_chunk_window(
 /// Standalone `#![no_std]` 32-byte BLAKE3 computation with zero-allocation stack Merkle reduction.
 ///
 /// No-panic law (GATE-2 leg 3): chunk windows travel as `(base, n)` pairs
-/// to [`hash_chunk_window`] (never materialized as subslices), the 32-byte
+/// to `hash_chunk_window` (never materialized as subslices), the 32-byte
 /// assembly runs through provably-bounded index loops, and the Merkle
 /// stack accesses are itemized-`SAFETY` unchecked — the bounds checks
 /// they would otherwise emit are exactly the panic paths leg 3 forbids

@@ -1,5 +1,6 @@
 [package]
 name = "wasm-footprint"
+rust-version = "1.85"
 version = "26.11.2"
 edition = "2021"
 description = "no_std cdylib wrapper supplying the wasm link glue (panic handler + global allocator) around the cgap-arrow / cgap-parquet kernels; the wasm32-wasip1 footprint subject measured by scripts/footprint.sh"

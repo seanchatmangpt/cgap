@@ -1,5 +1,6 @@
 [package]
 name = "cgap"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "cgap umbrella facade: columnar substrate (Arrow), BLAKE3 hashing, Parquet persistence, and Git packfile writing — one dependency for the published cgap kernel crates."

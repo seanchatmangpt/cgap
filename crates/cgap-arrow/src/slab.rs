@@ -23,9 +23,9 @@
 //!
 //! Wave 9 is the cross-lane integration slice: the `wave9_tests` courts
 //! bind the slab to the four authoritative neighbor surfaces at their
-//! real, on-disk implementations (A04 [`cgap_core::frame::CgapFrameHeader`],
-//! A14 [`cgap_gate::penstock::ingress`], A05
-//! [`cgap_storage::atomic_commit`]) — a sealed slab rides a real frame,
+//! real, on-disk implementations (A04 `cgap_core::frame::CgapFrameHeader`,
+//! A14 `cgap_gate::penstock::ingress`, A05
+//! `cgap_storage::atomic_commit`) — a sealed slab rides a real frame,
 //! the dam admits or refuses it, and power-cut sweeps enumerate every
 //! byte offset on both the framed-slab plane and the real double-slot
 //! journal plane; the A20 1M-row stress pages a deterministic

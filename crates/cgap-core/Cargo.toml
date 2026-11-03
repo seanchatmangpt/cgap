@@ -1,12 +1,14 @@
 [package]
 repository.workspace = true
 name = "cgap-core"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "128-byte sovereign CgapFrameHeader codec and triumvirate isomorphism kernels for the cgap substrate."
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A04 receipt ALIVE (docs/jira/v26.11.1/waves/a04-finish-receipt.md)
 categories = ["no-std", "data-structures"]
 keywords = ["frame-header", "codec", "isomorphism", "no_std"]
+license-file = "../../LICENSE.md" # DOD-01 F3a / DOD-05 FLAG flip: branchless pattern (cgap-branchless/Cargo.toml:5); no SPDX keys per lane-A04 DoD 10
 # P28-SIL v2.1.0 sovereign licensing instrument (no SPDX-shaped keys per
 # lane-A04 DoD 10 / tests/manifest_court.rs — the URN is the only lawful
 # instrument pointer; FIX-01's key reverted, see

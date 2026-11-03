@@ -49,7 +49,7 @@ pub enum PipelineError {
 /// Enclave self-play pipeline: holds real subsystem handles.
 ///
 /// `LIFE` carries the P28 license; construction refuses (typed, no panic)
-/// when the attestation fails [`P28LicenseAttestation::validate_intrinsic`].
+/// when the attestation fails `P28LicenseAttestation::validate_intrinsic`.
 pub struct EnclavePipeline<'att> {
     /// P28 attestation (A17, 80 B) — pipeline admission proof.
     attestation: &'att cgap_p28::attestation::P28LicenseAttestation,
@@ -125,13 +125,13 @@ impl<'att> EnclavePipeline<'att> {
     }
 
     /// The BLAKE3 hash entry (real `fn` pointer, same surface as
-    /// [`Self::ingress_fn`]).
+    /// `Self::ingress_fn`).
     pub fn hash_fn(&self) -> fn(&[u8]) -> [u8; 32] {
         self.hash
     }
 
     /// The git pack-write entry (real `fn` pointer, same surface as
-    /// [`Self::ingress_fn`]).
+    /// `Self::ingress_fn`).
     pub fn pack_write_fn(
         &self,
     ) -> for<'a> fn(&[&'a [u8]]) -> Result<alloc::vec::Vec<u8>, cgap_git::GitError> {

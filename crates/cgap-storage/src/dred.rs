@@ -49,7 +49,7 @@ pub fn suspect_mask(derived_deps: &[u64], del_mask: &[u64], suspect: &mut [u64])
     }
 }
 
-/// keep[f] == 1 iff fact f SURVIVES retraction:
+/// keep\[f] == 1 iff fact f SURVIVES retraction:
 /// keep = !suspect | (alt_support != 0). Word-parallel.
 pub fn keep_mask(
     derived_deps: &[u64],

@@ -2,6 +2,7 @@
 repository.workspace = true
 authors.workspace = true
 name = "cgap-ffi"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "C Data Interface cdylib membrane for cgap (Gate 3 wire-parity exports)."

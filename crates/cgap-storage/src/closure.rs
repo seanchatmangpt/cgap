@@ -100,7 +100,7 @@ impl Adjacency {
         Self { sources, targets }
     }
 
-    /// Stream all z with edges_x[j] == y (via binary search range).
+    /// Stream all z with edges_x\[j] == y (via binary search range).
     fn stream(&self, y: u32) -> impl Iterator<Item = u32> + '_ {
         let start = self.sources.partition_point(|&s| s < y);
         let end = self.sources.partition_point(|&s| s <= y);

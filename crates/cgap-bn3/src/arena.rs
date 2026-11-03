@@ -29,7 +29,7 @@
 //!
 //! Wave 4 (harden + close DoD, 2026-11-01): the formula-table reserve
 //! path now refuses past the `u32` header index space
-//! ([`header_index`], the same frozen index space as the slab) — the
+//! (`header_index`, the same frozen index space as the slab) — the
 //! last silent `usize`→`u32` truncation in the module is gone. (The
 //! Wave 4 report this doc once cited was never landed — audit receipt
 //! `docs/jira/v26.11.1/waves/a11-wave4-audit-receipt.md` Section 1 —

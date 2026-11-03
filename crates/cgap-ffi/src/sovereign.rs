@@ -520,7 +520,7 @@ fn read_le_word(bytes: &[u8], off: usize) -> Result<u64, CgapStatus> {
 /// flash-resident `.bn3` network under the pinned eval encoding (above).
 /// Rules compile through the REAL A12 compiler, evaluate via the REAL A12
 /// nested-loop unifier over the zero-copy payload columns, and every match
-/// projects through the REAL A12 consequent projector; lane[i] = projected
+/// projects through the REAL A12 consequent projector; lane\[i] = projected
 /// head row i object word, refused typed outside the declared i32 lane
 /// domain. Callee never writes past `lanes_cap`; on cap overflow the call
 /// refuses typed (fail-closed; the caller retries with a larger lease).
@@ -769,12 +769,24 @@ pub unsafe extern "C" fn cgap_commit_parquet(
         // `path` — the rotation spill target — and mint the ring. This is
         // the ONLY File::create in the path; steady-state never touches it.
         if slot.is_none() {
+            // ADV-10/ADV-17: re-verify the world at GRANT time (the file
+            // may resolve differently than at claim). A typed denial here
+            // never reaches File::create.
+            if !spill_gate::verify(path.as_bytes()) {
+                return CGAP_ERR_CONCURRENT_WRITER_DENIED;
+            }
             match std::fs::File::create(path) {
                 Ok(f) => {
                     *slot = Some(CommitLease {
                         block: cgap_parquet::mmap_writer::StaticPageBuffer::<65_536>::new(),
                         ring: cgap_parquet::mmap_writer::RingSink::new(Some(f)),
                     });
+                    // ADV-10 rebind: the grant just created the spill file,
+                    // so the lease re-keys from canonical-text bytes to the
+                    // (dev, ino) identity NOW, in the same synchronous call
+                    // — closing the rename-mid-lease TOCTOU for the rest of
+                    // the lease lifetime.
+                    spill_gate::rebind(path.as_bytes());
                 }
                 Err(_) => return CGAP_ERR_LEASE_EXHAUSTED,
             }
@@ -844,7 +856,35 @@ thread_local! {
 /// drained bytes — the exact FA9 finding. The gate therefore keys per
 /// (path-hash, thread) with lease-lifetime ownership instead. The residual
 /// bound is the 64-bit FNV-1a path-hash collision probability (negligible;
-/// documented, not silenced).
+/// documented, not silenced). RED-13 hardening (v26.11.2): the registry key
+/// is now derived from the CANONICAL path (`fs::canonicalize` on the full
+/// path, falling back to canonicalized-parent + file name when the spill
+/// file does not exist yet), so textual aliases of the same file
+/// (`dir/./x`, `dir/../dir/x`, symlinked components) collide into ONE lease
+/// and the racer is denied typed before any IO. Mutation court: reverting
+/// to raw-byte keying makes the alias race ADMIT again (see
+/// tests/fa9_commit_gating.rs `fa9_alias_race_denied`).
+///
+/// ADV-10/ADV-17 hardening (v26.11.2 R-ADV10FIX lane): the registry now
+/// keys on (dev, ino) identity (`fs::metadata`) whenever the file EXISTS,
+/// falling back to canonical parent+name only for the first-claim-while-
+/// absent case. The lease RE-BINDS to the identity key inside the same
+/// synchronous commit call that performs the grant (`spill_gate::rebind`,
+/// called from the grant arm), and the grant itself is re-verified
+/// (`spill_gate::verify`) immediately before `File::create`. This closes:
+/// (1) the rename-mid-lease TOCTOU — `rename dir -> dir2` preserves
+/// (dev, ino), so a racer claiming `dir2/x` collides into the owner's key
+/// and is denied typed; (2) the absent→symlink key-flip — a symlink at the
+/// spill path's FINAL component is refused typed (the grant would follow
+/// the link and O_TRUNC the target's lease holder's bytes), while
+/// symlinked PARENT components stay legal. Residuals, stated: a
+/// verify→create intra-syscall swap is kernel-serialization-bound (needs
+/// O_NOFOLLOW|O_EXCL semantics, separate lane); the 64-bit FNV-1a collision
+/// bound on the key space is unchanged. Mutation courts:
+/// tests/fa9_commit_gating.rs `fa9_rename_race_denied` (ADV-10) and
+/// `fa9_symlink_keyflip_denied` (ADV-17), both flip under text-key-only
+/// reversion; `fa9_rebind_no_stale_ownership` witnesses the rebind upgrade
+/// path leaves no stale dual-ownership shape.
 #[cfg(not(target_os = "none"))]
 mod spill_gate {
     use std::sync::Mutex;
@@ -870,25 +910,175 @@ mod spill_gate {
         h
     }
 
-    /// Fail-closed acquisition. Denies iff another thread owns the path.
-    /// The owner's own re-entry (steady-state commit) is allowed through.
+    /// RED-13 hardening: collapse TEXTUAL PATH ALIASES to one registry key.
+    /// FNV-1a over raw bytes let `dir/./x` hash differently from `dir/x`,
+    /// so a racer was ADMITTED at the alias and its grant `File::create`
+    /// (O_TRUNC) destroyed the owner's drained spill (red-13: exit 7,
+    /// 65,508 B -> 0 B, reproduced twice). Key derivation:
+    ///   1. if the full path resolves (`canonicalize`), use the canonical
+    ///      bytes — resolves `.`/`..` segments AND file-level symlinks;
+    ///   2. else (typical FIRST claim: the spill file does not exist yet —
+    ///      the owner's grant creates it) canonicalize the PARENT and join
+    ///      the file name. This is alias-stable across the pre-existence
+    ///      gap: once the file exists, full-path canonicalize yields the
+    ///      same bytes (parent canonical + same name), so owner and racer
+    ///      collide into ONE key either way.
+    ///   3. only if even the parent cannot be canonicalized (nonexistent
+    ///      directory chain) fall back to the raw-text hash — nothing
+    ///      exists to truncate yet, and the first successful grant re-keys
+    ///      on canonical bytes; the residual bound is the documented
+    ///      64-bit FNV-1a collision probability.
+    fn canonical_key(path: &[u8]) -> Vec<u8> {
+        use std::os::unix::ffi::OsStrExt;
+        // FIX-07 compile-freeze SLA minimal unblock (disclosed in both
+        // receipts): OsStr::from_encoded_bytes / PathBuf::into_os_str do not
+        // exist on this toolchain; stable Unix OsStrExt equivalents.
+        let os = std::ffi::OsStr::from_bytes(path);
+        let p = std::path::Path::new(os);
+        // Resolve to a canonical file identity, then derive the key with ONE
+        // uniform rule (canonical-parent bytes + NUL + file-name bytes) so a
+        // claim made BEFORE the spill file exists and a claim made AFTER it
+        // exists hash identically — otherwise the owner (pre-existence,
+        // parent+name key) and any later same-path thread (full canonicalize
+        // key) would hash differently and the gate would admit its own breach.
+        let resolved = if let Ok(full) = p.canonicalize() {
+            full
+        } else {
+            let name = match p.file_name() {
+                Some(n) => n,
+                None => return path.to_vec(),
+            };
+            let parent = p.parent().unwrap_or_else(|| std::path::Path::new("."));
+            match parent.canonicalize() {
+                Ok(canon) => canon.join(name),
+                Err(_) => return path.to_vec(),
+            }
+        };
+        let name = match resolved.file_name() {
+            Some(n) => n,
+            None => return resolved.into_os_string().into_encoded_bytes(),
+        };
+        let mut key = resolved
+            .parent()
+            .map(|d| d.as_os_str().as_encoded_bytes().to_vec())
+            .unwrap_or_default();
+        key.push(0); // unambiguous join separator
+        key.extend_from_slice(name.as_encoded_bytes());
+        key
+    }
+
+    /// inode-identity key: FNV-1a over tag `"I"` + dev(u64 LE) + ino(u64 LE)
+    /// from `fs::metadata` (follows symlinks — the identity of the TARGET
+    /// file, which is what a racer's O_TRUNC would destroy). Stable across
+    /// directory renames (ADV-10): `rename dir -> dir2` moves the file but
+    /// preserves (dev, ino), so a racer claiming `dir2/x` while the owner
+    /// holds `dir/x` collides into the SAME key and is denied typed.
+    fn identity_key(path: &[u8]) -> Option<u64> {
+        use std::os::unix::ffi::OsStrExt; // R-14 SLA unblock (disclosed both receipts): in-flight ADV-10 edit missing the trait import
+        use std::os::unix::fs::MetadataExt;
+        let md = std::fs::metadata(std::ffi::OsStr::from_bytes(path)).ok()?;
+        let mut bytes = Vec::with_capacity(17);
+        bytes.push(b'I');
+        bytes.extend_from_slice(&md.dev().to_le_bytes());
+        bytes.extend_from_slice(&md.ino().to_le_bytes());
+        Some(fnv1a(&bytes))
+    }
+
+    /// ADV-17 refusal: a SYMLINK at the spill path's FINAL component means
+    /// the grant `File::create` would follow the link and O_TRUNC whatever
+    /// inode the TARGET names — including a dangling link whose target is
+    /// another lease's spill file (ADV-17 attack 1). The owner's own
+    /// steady state never places a symlink at its spill path, so this is
+    /// fail-closed typed denial, not a behavior change for honest callers.
+    /// Symlinked PARENT components remain allowed (the alias leg
+    /// `dir/./x` and symlinked-parent case still pass).
+    fn path_is_symlink(path: &[u8]) -> bool {
+        use std::os::unix::ffi::OsStrExt; // R-14 SLA unblock (disclosed both receipts): in-flight ADV-10 edit missing the trait import
+        std::fs::symlink_metadata(std::ffi::OsStr::from_bytes(path))
+            .is_ok_and(|m| m.file_type().is_symlink())
+    }
+
+    /// The deny predicate shared by claim and grant-time verify: another
+    /// thread holds this file's identity key or canonical text key.
+    fn denied_by_others(owners: &[(u64, u64)], tid: u64, th: u64, ih: Option<u64>) -> bool {
+        owners
+            .iter()
+            .any(|&(k, t)| t != tid && (k == th || ih.is_some_and(|i| i == k)))
+    }
+
+    /// Fail-closed acquisition. Denies iff (a) the spill path's final
+    /// component is a symlink (ADV-17 refusal), or (b) another thread owns
+    /// the file's (dev, ino) identity (file exists) OR the file's canonical
+    /// text key (file absent — the pre-grant case, where no identity exists
+    /// yet). The owner's own re-entry (steady-state commit) is allowed.
     pub fn claim(path: &[u8]) -> Claim {
         // Force the Drop-guard registration for this thread so ownership is
         // released when the lease thread exits (thread_locals are lazy; a
         // guard never `.with`-ed never drops).
         OWNERS_GUARD.with(|_| ());
+        if path_is_symlink(path) {
+            return Claim::Denied;
+        }
         let tid = CURRENT_TID.with(|&t| t);
-        let h = fnv1a(path);
+        let th = fnv1a(&canonical_key(path));
+        let ih = identity_key(path);
         let mut owners = OWNERS
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if owners.iter().any(|&(ph, t)| ph == h && t != tid) {
+        if denied_by_others(&owners, tid, th, ih) {
             return Claim::Denied;
         }
-        if !owners.contains(&(h, tid)) {
-            owners.push((h, tid));
+        // Register under the STRONGEST available key: (dev, ino) when the
+        // file exists, canonical-text key for the first pre-existence claim.
+        let key = ih.unwrap_or(th);
+        if !owners.contains(&(key, tid)) {
+            owners.push((key, tid));
         }
         Claim::Acquired
+    }
+
+    /// ADV-10/ADV-17 grant-time re-verification (re-canonicalize at GRANT,
+    /// the second repair ADV-10 registered): the world can change between a
+    /// thread's claim and its grant slot. Called by the commit path
+    /// immediately BEFORE the lease `File::create`; a typed denial here
+    /// returns CGAP_ERR_CONCURRENT_WRITER_DENIED before any IO. Residual
+    /// (documented, not hidden): a verify→create intra-syscall swap by a
+    /// concurrent attacker process is a kernel-serialization residual —
+    /// no user-space registry can close it without O_NOFOLLOW|O_EXCL
+    /// creation semantics (a separate A-lane change).
+    pub fn verify(path: &[u8]) -> bool {
+        OWNERS_GUARD.with(|_| ());
+        if path_is_symlink(path) {
+            return false;
+        }
+        let tid = CURRENT_TID.with(|&t| t);
+        let th = fnv1a(&canonical_key(path));
+        let ih = identity_key(path);
+        let owners = OWNERS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        !denied_by_others(&owners, tid, th, ih)
+    }
+
+    /// ADV-10 rebind: swap this thread's text-key lease entry for the
+    /// (dev, ino) identity key once the spill file EXISTS (called by the
+    /// owner immediately after its grant `File::create` succeeds). This
+    /// closes the pre-identity window: an owner that claimed while the
+    /// file was absent holds a text key that cannot mention the inode; the
+    /// rebind runs in the same synchronous commit call as the grant, so
+    /// the residual exposure is bounded to intra-call nanoseconds, not
+    /// the whole lease lifetime (the pre-ADV-10 state).
+    pub fn rebind(path: &[u8]) {
+        let Some(ih) = identity_key(path) else {
+            return; // file still absent — nothing to bind; claim text stays
+        };
+        let th = fnv1a(&canonical_key(path));
+        let tid = CURRENT_TID.with(|&t| t);
+        let mut owners = OWNERS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        owners.retain(|&(k, t)| !(t == tid && (k == th || k == ih)));
+        owners.push((ih, tid));
     }
 
     /// Lease lifetime == thread lifetime: releasing this thread's spill

@@ -15,6 +15,19 @@
 //! (`ReceiptChainRefusal::Spoliation`), mirroring p28's single halt
 //! class (attestation.rs §5 preamble: no failure fingerprinting).
 //!
+//! PROSE-ONLY FORMULA (XC-03, honest status): the PRD equation
+//! `ΔS_admitted + Φ_lease ≡ R_receipt (mod Σ_PQC)` has NO code referent
+//! here. `Σ_PQC` is INVENTED LORE — zero Rust hits tree-wide (audit
+//! `docs/jira/v26.11.2/audit/cgapprd-02-equation-grounding.md:47-55`;
+//! redteam `red-13-receipt-desync-exploit.md:11-18`); ΔS/Φ live only as
+//! cgap-git commit trailers (commit_synth.rs), not in any block payload
+//! this chain hashes. Per dispatch law the missing quantities were NOT
+//! invented. What IS code: the real link law
+//! `R_i = BLAKE3(prev_hash || block_bytes || license_bytes)` and the
+//! strict per-link position invariant — `index` strictly increasing with
+//! zero gaps and `prev_hash == prior link's hash` — enforced in
+//! `verify` (court: `chain_position_monotonicity_invariant`).
+//!
 //! Host surface only: the XIP `target_os = "none"` build keeps the
 //! pre-existing dep set (cgap-blake3/cgap-p28/cgap-parquet are
 //! cfg(not(target_os = "none")) dependencies of this crate).
@@ -74,7 +87,9 @@ pub struct RingReceiptChain {
 
 impl RingReceiptChain {
     pub fn new() -> Self {
-        Self { receipts: Vec::new() }
+        Self {
+            receipts: Vec::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -105,18 +120,31 @@ impl RingReceiptChain {
         hash(&[prev_hash.as_slice(), block, license.as_slice()].concat())
     }
 
-    /// Append one receipt for `sealed`, bound to `license`. The
-    /// attestation MUST pass `validate_intrinsic` first — license
-    /// verify gates the append (typed refusal, chain unchanged on
-    /// refusal). The digest recorded is recomputed from the block
-    /// bytes here, cross-checked against the sealer's own digest: a
-    /// sealer/recompute disagreement is spoliation, never trusted.
-    /// Append one receipt for `sealed`, bound to `license`. The
-    /// attestation MUST pass `validate_intrinsic` first — license
-    /// verify gates the append (typed refusal, chain unchanged on
-    /// refusal). The recorded block digest is recomputed from the
-    /// committed bytes and cross-checked against the sealer's own
-    /// digest: a disagreement is spoliation, never trusted.
+    /// Append one receipt for `sealed`, bound to `license`. Gates, in
+    /// order (any refusal leaves the chain UNCHANGED — append is the
+    /// only writer):
+    ///
+    /// 1. License verify gate: the attestation MUST pass
+    ///    `validate_intrinsic` (typed refusal). RED-13 §4 repair.
+    /// 2. Sealer cross-check: `cgap_parquet::footer::verify_seal`
+    ///    re-runs the FULL block verdict (shape -> attestation slot ->
+    ///    FNV-1a-64 checksum -> sealer content digest) over the live
+    ///    committed bytes and the sealer's own digest. The chain's
+    ///    BLAKE3 link alone cannot detect a post-seal byte tamper
+    ///    (it hashes whatever bytes it is handed); the FNV checksum +
+    ///    content digest the sealer recorded CAN — so a
+    ///    tampered-bytes/sealer-digest disagreement is Spoliation,
+    ///    never trusted (RED-13 §4 repair; court:
+    ///    `append_cross_checks_sealer_digest`).
+    ///
+    /// COMMIT-LEG BOUNDARY (stated, RED-13 §3): `RingReceiptChain` is
+    /// NOT wired into `cgap_commit_parquet` (sovereign.rs) — that path
+    /// seals with `seal(None)` (no P28 attestation surface), keeps its
+    /// lease thread-local with no chain handle, and has no FFI return
+    /// path for receipts; wiring it is not a small coherent diff and
+    /// was NOT scaffolded by FIX-08. Any "receipts bind commits"
+    /// non-repudiation claim over the commit leg is UNSUPPORTED as
+    /// implemented — the chain is a host witness type only.
     pub fn append(
         &mut self,
         sealed: &SealedBlock,
@@ -127,6 +155,15 @@ impl RingReceiptChain {
             return Err(ReceiptChainRefusal::Spoliation);
         }
         let bytes = sealed.bytes();
+        // Sealer cross-check (RED-13 §4 repair): the FULL block verdict —
+        // shape -> attestation slot -> FNV checksum -> sealer content
+        // digest — re-run over the live committed bytes. The chain's own
+        // BLAKE3 link hashes whatever bytes it is handed, so it cannot see
+        // a post-seal tamper; the sealer's recorded FNV checksum/digest
+        // can. Disagreement is Spoliation, chain unchanged.
+        if cgap_parquet::footer::verify_seal(bytes, sealed.digest()).is_err() {
+            return Err(ReceiptChainRefusal::Spoliation);
+        }
         let license_bytes = license.to_bytes();
         // NOTE: the sealer's own digest (SealedBlock::digest) is the
         // FNV-1a-64 four-lane content address (footer.rs:34-38) —
@@ -152,9 +189,11 @@ impl RingReceiptChain {
     /// license record the chain is bound to. Recomputes every link
     /// (genesis anchor, prev-hash linkage, block digests over the
     /// actual block bytes, license digest over the live license wire
-    /// bytes) and compares with the stored receipts; any mismatch is
-    /// the one opaque refusal. A post-hoc license tamper fails either
-    /// the intrinsic verify gate or the link recomputation.
+    /// bytes) plus the STRICT POSITION INVARIANT (XC-03): receipt i
+    /// must carry `index == i` (strictly increasing, zero gaps) and
+    /// `prev_hash == prior link's hash` (genesis anchor at i = 0); any
+    /// mismatch is the one opaque refusal. A post-hoc license tamper
+    /// fails either the intrinsic verify gate or the link recomputation.
     pub fn verify(
         &self,
         blocks: &[&SealedBlock],
@@ -174,9 +213,16 @@ impl RingReceiptChain {
             return Err(ReceiptChainRefusal::Spoliation);
         }
         let mut prev = GENESIS;
-        for (r, b) in self.receipts.iter().zip(blocks.iter()) {
+        for (i, (r, b)) in self.receipts.iter().zip(blocks.iter()).enumerate() {
             let bytes = b.bytes();
-            if r.prev_hash != prev
+            // Strict position invariant (XC-03): zero-gap monotone
+            // index + prev-hash linkage. A rewound, gap-spliced, or
+            // duplicated position is Spoliation even though every
+            // digest in the receipt is internally consistent.
+            if r.index != i as u64 || r.prev_hash != prev {
+                return Err(ReceiptChainRefusal::Spoliation);
+            }
+            if r.block_digest != hash(bytes)
                 || r.block_digest != hash(bytes)
                 || r.license_digest != hash(&license_bytes)
                 || r.hash != Self::link(&prev, bytes, &license_bytes)
@@ -205,11 +251,9 @@ impl core::fmt::Display for RingReceiptChain {
 // ===========================================================================
 #[cfg(test)]
 mod courts {
-    use super::{
-        ReceiptChainRefusal, RingReceiptChain, GENESIS,
-    };
+    use super::{ReceiptChainRefusal, RingReceiptChain, GENESIS};
     use cgap_p28::attestation::{
-        LICENSE_MAGIC, P28LicenseAttestation, ATTESTATION_VERSION, FLAG_ROOT,
+        P28LicenseAttestation, ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC,
         SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     use cgap_parquet::footer::SealedBlock;
@@ -231,9 +275,7 @@ mod courts {
     /// distinct payloads and a chain appending all of them. Blocks are
     /// leaked `&'static` buffers so the `SealedBlock` borrows live for
     /// the court (bounded count, test-only).
-    fn fixture(
-        n: usize,
-    ) -> (RingReceiptChain, Vec<&'static SealedBlock<'static>>) {
+    fn fixture(n: usize) -> (RingReceiptChain, Vec<&'static SealedBlock<'static>>) {
         let mut chain = RingReceiptChain::new();
         let mut blocks: Vec<&'static SealedBlock<'static>> = Vec::new();
         for i in 0..n {
@@ -254,7 +296,9 @@ mod courts {
             writer.write_slab(&slab).expect("fixture slab writes");
             let sealed: &'static SealedBlock<'static> =
                 Box::leak(Box::new(writer.seal(None).expect("fixture seal")));
-            chain.append(sealed, &root_license()).expect("fixture append");
+            chain
+                .append(sealed, &root_license())
+                .expect("fixture append");
             blocks.push(sealed);
         }
         (chain, blocks)
@@ -277,7 +321,6 @@ mod courts {
         let license = root_license();
         assert_eq!(chain.verify(&blocks, &license), Ok(()));
     }
-
 
     /// THE TAMPER COURT: every stored-field mutation, every committed
     /// block-byte mutation, and a post-hoc license mutation each flip
@@ -376,30 +419,139 @@ mod courts {
         );
     }
 
+    /// RED-13 §4 repair court — the sealer cross-check at append.
+    /// Append must run `verify_seal(bytes, sealed.digest())` and refuse
+    /// typed when the committed bytes disagree with the sealer's own
+    /// FNV checksum/content digest: the chain's BLAKE3 link alone hashes
+    /// whatever bytes it is handed, so WITHOUT the cross-check a
+    /// post-seal tamper mints a receipt that internally verifies (the
+    /// vacuous pass this court exists to kill).
+    ///
+    /// Anti-vacuity mutation (in-court, data-level): the tamper arm
+    /// flips one committed byte through the block buffer's live bytes;
+    /// the checksum channel of verify_seal must fire. Baseline arm:
+    /// the PRISTINE block appends and verifies (an always-refusing
+    /// append is a VACUOUS GATE, not a pass). The full structural flip
+    /// witness (removing the verify_seal call from append) was also run
+    /// this session as a /tmp sandbox mutation with sha256-exact
+    /// restore + mtime bump — see the FIX-08 lane receipt.
+    #[test]
+    fn append_cross_checks_sealer_digest() {
+        let mut buf = StaticPageBuffer::<65_536>::new();
+        let lane_data: [u32; 4] = [9, 8, 7, 6];
+        let mut writer = buf.writer();
+        writer
+            .write_slab(&SlabView {
+                lanes: &[&lane_data[..]],
+                rows: 4,
+                bits: 8,
+            })
+            .expect("fixture slab writes");
+        let sealed = writer.seal(None).expect("fixture seal");
+
+        // BASELINE (non-vacuity): the pristine block appends and the
+        // chain verifies.
+        let mut chain = RingReceiptChain::new();
+        chain
+            .append(&sealed, &root_license())
+            .expect("pristine append");
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain.verify(&[&sealed], &root_license()), Ok(()));
+
+        // MUTATION: flip one committed body byte (through the buffer the
+        // block borrows — test-only tamper of the sealed artifact).
+        let ptr = sealed.bytes().as_ptr() as *mut u8;
+        unsafe {
+            *ptr.add(2) ^= 0x01;
+        }
+
+        // AFTER: the cross-check must refuse typed and the chain must be
+        // UNCHANGED (append is the only writer; refusal mints nothing).
+        let mut chain2 = RingReceiptChain::new();
+        assert_eq!(
+            chain2.append(&sealed, &root_license()),
+            Err(ReceiptChainRefusal::Spoliation),
+            "tampered bytes vs sealer digest must refuse at append"
+        );
+        assert!(chain2.is_empty(), "refused append must not mint a receipt");
+        // And the earlier pristine chain no longer verifies against the
+        // mutated bytes either — tamper detection is total.
+        assert_eq!(
+            chain.verify(&[&sealed], &root_license()),
+            Err(ReceiptChainRefusal::Spoliation)
+        );
+    }
+
     /// Lease-exhaustion court: the 64 KiB commit lease holds exactly
     /// 65,376 lanes; a larger call must refuse typed
     /// (CGAP_ERR_LEASE_EXHAUSTED), never truncate. Drives the REAL
     /// `cgap_commit_parquet` body over the ceiling.
     #[test]
     fn lease_exhaustion_is_typed_refusal() {
-        use crate::sovereign::{
-            cgap_commit_parquet, CGAP_ERR_LEASE_EXHAUSTED, CGAP_OK,
-        };
+        use crate::sovereign::{cgap_commit_parquet, CGAP_ERR_LEASE_EXHAUSTED, CGAP_OK};
         let path = std::ffi::CString::new("/tmp/p2-lease-court.par2").unwrap();
         let lanes: Vec<i32> = (0..16).map(|r| (r % 256) as i32).collect();
         // Grant leg: an in-ceiling call commits OK (lease granted).
-        let st = unsafe {
-            cgap_commit_parquet(lanes.as_ptr(), lanes.len(), path.as_ptr())
-        };
+        let st = unsafe { cgap_commit_parquet(lanes.as_ptr(), lanes.len(), path.as_ptr()) };
         assert_eq!(st, CGAP_OK, "in-ceiling commit must commit");
         // Over-ceiling leg: 70,000 lanes exceeds the 64 KiB lease.
         let over: Vec<i32> = (0..70_000).map(|r| (r % 256) as i32).collect();
-        let st = unsafe {
-            cgap_commit_parquet(over.as_ptr(), over.len(), path.as_ptr())
-        };
+        let st = unsafe { cgap_commit_parquet(over.as_ptr(), over.len(), path.as_ptr()) };
         assert_eq!(
             st, CGAP_ERR_LEASE_EXHAUSTED,
             "over-ceiling commit must refuse typed"
+        );
+    }
+
+    /// XC-03 court — the strict per-link position/monotonicity
+    /// invariant (the achievable subset of the prose-only
+    /// `ΔS + Φ ≡ R (mod Σ_PQC)` law; Σ_PQC has no code referent,
+    /// red-13 §1 / cgapprd-02:47-55). Baseline: k pristine links
+    /// verify OK (always-refusing verify = VACUOUS GATE). Mutations
+    /// over in-memory receipt copies: (a) rewound index on one link,
+    /// (b) gap-spliced index, (c) foreign link inserted mid-chain —
+    /// each must be the ONE typed refusal, final state asserted.
+    #[test]
+    fn chain_position_monotonicity_invariant() {
+        let license = root_license();
+        let (chain, blocks) = fixture(4);
+
+        // BASELINE (non-vacuity): pristine chain, positions 0..4.
+        for (i, r) in chain.receipts().iter().enumerate() {
+            assert_eq!(r.index, i as u64, "mint positions must be zero-gap");
+        }
+        assert_eq!(chain.verify(&blocks, &license), Ok(()));
+
+        // MUTATION A — rewound index: link 1 re-labeled 0. Every digest
+        // stays internally consistent; ONLY the position invariant can
+        // see this.
+        let mut rewound = chain.clone();
+        rewound.receipts_mut()[1].index = 0;
+        assert_eq!(
+            rewound.verify(&blocks, &license),
+            Err(ReceiptChainRefusal::Spoliation),
+            "rewound link index must refuse typed"
+        );
+
+        // MUTATION B — gap: link 2 advanced past its position.
+        let mut gap = chain.clone();
+        gap.receipts_mut()[2].index = 3;
+        assert_eq!(
+            gap.verify(&blocks, &license),
+            Err(ReceiptChainRefusal::Spoliation),
+            "gap-spliced position must refuse typed"
+        );
+
+        // MUTATION C — position permutation: links 2 and 3 swap their
+        // chain positions (hashes intact, ordering desynced).
+        let mut permuted = chain.clone();
+        let i2 = permuted.receipts_mut()[2].index;
+        permuted.receipts_mut()[2].index = permuted.receipts_mut()[3].index;
+        permuted.receipts_mut()[3].index = i2;
+        assert_eq!(
+            permuted.verify(&blocks, &license),
+            Err(ReceiptChainRefusal::Spoliation),
+            "position-permuted chain must refuse typed"
         );
     }
 }

@@ -9,7 +9,7 @@
 //! and every view is bounds- and alignment-checked against that supply.
 //!
 //! Provenance note: new module (ticket T2), sitting beside `c_abi.rs`'s
-//! raw [`ForeignArray`] and reusing [`crate::bitmap::get_bit`] for the
+//! raw `ForeignArray` and reusing [`crate::bitmap::get_bit`] for the
 //! validity walk.
 
 use crate::c_abi::{ArrowArray, ArrowSchema};

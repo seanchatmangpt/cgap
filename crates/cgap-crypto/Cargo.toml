@@ -2,6 +2,7 @@
 repository.workspace = true
 authors.workspace = true
 name = "cgap-crypto"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 publish = true

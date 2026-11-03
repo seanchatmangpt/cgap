@@ -353,7 +353,7 @@ pub trait ProofSealer {
 
 /// The real A16-bound sealer (divergence D3): keyed BLAKE3 under the lease
 /// epoch's `issued_root`, with A16's §5 lease authority — every seal consumes
-/// exactly one [`Lease`] tick, and exhaustion TRAPS (A16 §5 trap discipline:
+/// exactly one `Lease` tick, and exhaustion TRAPS (A16 §5 trap discipline:
 /// minting a sealed artifact with spent authority is an invariant failure,
 /// not a recoverable condition). Verification is pure and consumes nothing.
 ///

@@ -1,5 +1,6 @@
 [package]
 name = "cgap-parquet"
+rust-version.workspace = true
 version.workspace = true
 edition.workspace = true
 description = "Parquet persistence kernels with branch-free inner-loop bodies: bit-unpacking, SWAR RLE, page-to-buffer decode (no_std, zero dependencies)."

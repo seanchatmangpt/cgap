@@ -71,6 +71,18 @@ pub enum DemuxError {
     BadDeltaOffset,
     /// More than RECORD_CAP records accumulated without a drain.
     RecordCapExceeded,
+    /// Bytes arrived after the 20-byte trailer was captured (FIX-05 F1:
+    /// post-trailer poison is refused, never silently absorbed). The
+    /// payload is the cumulative trailing-byte count.
+    TrailingBytes(u64),
+    /// A record tried to close past the header-declared object count
+    /// (FIX-05 F2: surplus-object header lie is a typed refusal).
+    /// Invariant guard: the streaming state machine enters ObjHeader
+    /// only while `objects_seen < declared_objects`, so this arm is
+    /// unreachable through well-formed transitions — it exists so the
+    /// surplus channel is refused AT THE RECORD CLOSURE SITE if the
+    /// phase law ever drifts (defense against RED-09 F2).
+    ObjectSurplus { seen: u32, declared: u32 },
 }
 
 impl fmt::Display for DemuxError {
@@ -87,6 +99,12 @@ impl fmt::Display for DemuxError {
                 f,
                 "more than {RECORD_CAP} records without a drain_records call"
             ),
+            DemuxError::TrailingBytes(n) => {
+                write!(f, "{n} poison byte(s) after the pack trailer")
+            }
+            DemuxError::ObjectSurplus { seen, declared } => {
+                write!(f, "surplus object: {seen} seen exceeds {declared} declared")
+            }
         }
     }
 }
@@ -168,6 +186,8 @@ pub struct Demux {
     records: [DemuxRecord; RECORD_CAP],
     n_records: usize,
     bytes_fed: u64,
+    /// FIX-05 F1: cumulative post-trailer poison bytes refused.
+    trailing_bytes: u64,
 }
 
 impl Default for Demux {
@@ -202,6 +222,7 @@ impl Demux {
             records: [DEMUX_EMPTY_RECORD; RECORD_CAP],
             n_records: 0,
             bytes_fed: 0,
+            trailing_bytes: 0,
         }
     }
 
@@ -242,6 +263,12 @@ impl Demux {
     /// Bytes consumed across all feeds.
     pub fn bytes_fed(&self) -> u64 {
         self.bytes_fed
+    }
+
+    /// FIX-05 F1: cumulative post-trailer poison bytes refused so far
+    /// (nonzero only after a TrailingBytes error fired).
+    pub fn trailing_poison(&self) -> u64 {
+        self.trailing_bytes
     }
 
     /// Trailer captured at Done (pack checksum bytes, unverified —
@@ -340,8 +367,16 @@ impl Demux {
                         self.phase = Phase::Done;
                     }
                 }
-                Phase::Done => {}
+                Phase::Done => {
+                    // FIX-05 F1: post-trailer poison is a typed refusal,
+                    // never silent absorption (RED-09 F1 witness: feed=Ok,
+                    // done=true, bytes_fed 34->38 on a 4-byte poison tail).
+                    self.trailing_bytes += 1;
+                }
             }
+        }
+        if self.trailing_bytes > 0 {
+            return Err(DemuxError::TrailingBytes(self.trailing_bytes));
         }
         Ok(())
     }
@@ -411,6 +446,16 @@ impl Demux {
         if self.n_records == RECORD_CAP {
             return Err(DemuxError::RecordCapExceeded);
         }
+        // FIX-05 F2 (RED-09): surplus-object header lie refused at the
+        // record-closure site. Guard is placed BEFORE the increment so
+        // the legitimate final record (objects_seen == declared - 1)
+        // closes normally.
+        if self.objects_seen >= self.declared_objects {
+            return Err(DemuxError::ObjectSurplus {
+                seen: self.objects_seen,
+                declared: self.declared_objects,
+            });
+        }
         self.records[self.n_records] = DemuxRecord {
             offset: self.cur_hdr_start,
             obj_type: self.cur_type,
@@ -427,5 +472,58 @@ impl Demux {
             Phase::ObjHeader
         };
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FIX-05 in-module courts (cfg(test)): the ObjectSurplus guard in
+// close_record is unreachable through the public streaming API (the
+// phase law only enters ObjHeader while objects_seen < declared), so
+// the guard's runtime flip is proven here by forcing the surplus state
+// through the private fields — real type, no mocks.
+// ---------------------------------------------------------------------------
+#[cfg(all(test, feature = "std"))]
+mod fix05_courts {
+    use super::*;
+
+    /// Q1 twin baseline: a record close under the normal law (seen <
+    /// declared) succeeds and pins the phase transition.
+    #[test]
+    fn q1_normal_close_succeeds_below_declared() {
+        let mut d = Demux::new();
+        d.declared_objects = 1;
+        d.phase = Phase::ObjHeader;
+        d.cur_hdr_start = 1;
+        d.bytes_fed = 1;
+        // 0x34: type 3, size 4; then 4 body bytes -> close_record
+        let ok = d.feed(&[0x34, b'a', b'a', b'a', b'a']);
+        assert_eq!(ok, Ok(()), "VACUOUS twin: normal close must succeed");
+        assert_eq!(d.objects_seen(), 1);
+        assert_eq!(
+            d.phase,
+            Phase::Trailer,
+            "seen==declared must transition to Trailer"
+        );
+    }
+
+    /// Q2 F2 MUTATION COURT: with declared_objects already consumed, a
+    /// record close MUST refuse typed ObjectSurplus (the surplus guard).
+    /// ANTI-VACUITY MUTATION (m3): delete the close_record surplus guard
+    /// (run_fix05_mutation.sh); the close then succeeds and this court
+    /// flips to failure.
+    #[test]
+    fn q2_surplus_close_refuses_typed() {
+        let mut d = Demux::new();
+        d.declared_objects = 0; // everything is surplus
+        d.phase = Phase::ObjHeader;
+        d.cur_hdr_start = 1;
+        d.bytes_fed = 1;
+        let err = d
+            .feed(&[0x34, b'a', b'a', b'a', b'a'])
+            .expect_err("VACUOUS: surplus close admitted");
+        assert_eq!(
+            err,
+            DemuxError::ObjectSurplus { seen: 0, declared: 0 }
+        );
     }
 }

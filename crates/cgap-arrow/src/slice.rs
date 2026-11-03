@@ -2,9 +2,9 @@
 //!
 //! # Zero-copy contract
 //!
-//! A [`Sliced`] borrows its parent [`Primitive`](crate::primitive::Primitive):
+//! A [`Sliced`] borrows its parent [`Primitive`]:
 //! it holds exactly one reference plus two `usize`s (`offset`, `len`) — no
-//! buffer is copied, duplicated, or reallocated, ever. [`slice`] performs no
+//! buffer is copied, duplicated, or reallocated, ever. [`fn@slice`] performs no
 //! heap allocation (proven by the allocation-counting test below), and every
 //! [`Sliced::get`] reads through to the parent's value buffer by pointer
 //! arithmetic — base `values_ptr` plus `(offset + i) * T::WIDTH` — and to the
@@ -12,7 +12,7 @@
 
 use crate::primitive::{Primitive, Scalar};
 
-/// Typed failure of a [`slice`] bounds check (bad input never panics).
+/// Typed failure of a [`fn@slice`] bounds check (bad input never panics).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SliceError {
     /// `offset + len` (checked) exceeds the parent row count.
@@ -43,9 +43,9 @@ impl core::fmt::Display for SliceError {
 
 impl core::error::Error for SliceError {}
 
-/// Zero-copy window over a borrowed [`Primitive`](crate::primitive::Primitive).
+/// Zero-copy window over a borrowed [`Primitive`].
 ///
-/// Constructed only through [`slice`], which validates the window bounds.
+/// Constructed only through [`fn@slice`], which validates the window bounds.
 /// See the [module docs](self) for the zero-copy contract.
 pub struct Sliced<'a, T: Scalar> {
     array: &'a Primitive<T>,
