@@ -245,3 +245,5 @@ contract). Commands run with exits:
   stale-by-default items are the two registry-state claims,
   which §1.5 already gates on live re-verification at window
   open.
+- cgap-gpu + cgap-integration: category slug 'os:macos' rejected by crates.io (400) — replaced with 'os::macos-apis' in both manifests, republished OK (gpu published; integration pending verify)
+- Final window tally: 20/20 publish-intended members now on crates.io at 26.11.2 (18 pre-freeze+window publishes, branchless/fibo/cloud/gpu/ffi new this window; bench collision never attempted)

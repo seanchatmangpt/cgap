@@ -1,6 +1,6 @@
 [package]
 publish = true
-categories = ['api-bindings', 'os:macos']
+categories = ['api-bindings', 'os::macos-apis']
 keywords = ['metal', 'gpu', 'zero-copy', 'unified-memory']
 name = "cgap-gpu"
 rust-version.workspace = true

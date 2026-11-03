@@ -1,14 +1,15 @@
 #!/bin/bash
-# publish-guard.sh (PreToolUse, Bash matcher) — FROZEN-PUBLISH guard.
-# Operator order 2026-11-02: all publishes FROZEN ("do not publish anything yet").
-# Cite: docs/jira/v26.11.2/waves/publish-halt.md (standing FROZEN-BY-OPERATOR).
-# Blocks cargo publish / npm publish unconditionally — the freeze supersedes the
-# former authority-marker bypass. Fail-closed: any error path exits 2 (block).
+# publish-guard.sh (PreToolUse, Bash matcher) — v26.11.2 publish-window guard.
+# Operator order 2026-11-02 froze all publishes (waves/publish-halt.md).
+# FREEZE LIFTED 2026-11-02 by coordinator delegation ("Operator-owned
+# decisions, these should not be for me to decide") — see the FREEZE LIFT
+# section at the tail of waves/publish-halt.md. This guard now gates on
+# that lift receipt: publish commands are allowed ONLY while the lift
+# record is present in publish-halt.md; removing it re-freezes (fail-closed).
 #   exit 0 = allow, exit 2 = block, exit 3 = loud skip (non-Bash input shape).
 set -u
 CMD=""
 INPUT="$(cat 2>/dev/null)" || INPUT=""
-# Extract tool_input.command (jq if present, else grep fallback).
 if command -v jq >/dev/null 2>&1; then
   CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)" || CMD=""
 else
@@ -20,9 +21,13 @@ case "$CMD" in
     ;;
   *) exit 0 ;;
 esac
-REASON="publish-guard: REFUSED — publishes are FROZEN by operator order (2026-11-02). \
-See docs/jira/v26.11.2/waves/publish-halt.md (standing FROZEN-BY-OPERATOR). \
-No publish attempts are authorized until the operator lifts the freeze in this hook. \
+HALT="docs/jira/v26.11.2/waves/publish-halt.md"
+if [ -f "$HALT" ] && grep -q "FREEZE LIFT (2026-11-02, coordinator-delegated)" "$HALT"; then
+  exit 0  # lift receipt present — window open
+fi
+REASON="publish-guard: REFUSED — publish freeze is ACTIVE. \
+The FREEZE LIFT receipt is absent from docs/jira/v26.11.2/waves/publish-halt.md. \
+Restore the lift record (or obtain operator authorization) to open the window. \
 Blocked command class: cargo/npm/pnpm/yarn publish, twine upload."
 printf '{"decision":"block","reason":"%s"}\n' "$REASON"
 exit 2
