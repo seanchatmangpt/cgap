@@ -46,6 +46,10 @@ cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.2", defaul
 license-file = "LICENSE.md"
 version = "26.11.2"
 edition = "2021"
+# MSRV-02 (DOD-01 F2): workspace-scope MSRV. Matches crates/cli's declared
+# 1.85 (edition-2021-era stable features). Members opt in via
+# `rust-version.workspace = true`; not yet wired (file ownership).
+rust-version = "1.85"
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]
 

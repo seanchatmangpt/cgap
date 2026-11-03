@@ -39,6 +39,18 @@ if "cgap-arrow" not in s:
     assert 'blake3 = "1.8"' in s, "anchor missing - manifest shape drifted"
     s = s.replace('blake3 = "1.8"', 'blake3 = "1.8"\n' + KERNELS.rstrip())
 
+# 1.5 add workspace-relative license-file after the generated publish pin
+# (CLI-01: house style per cgap-core/Cargo.toml:10; crates/cli is one level
+# deeper than crates/*, so ../../LICENSE.md — NOT ../LICENSE.md, which
+# dangles against the absent crates/LICENSE.md, same defect DOD-01 F3c
+# fixed in crates/csct)
+if "license-file" not in s:
+    assert "publish = false" in s, "anchor missing - manifest shape drifted"
+    s = s.replace(
+        "publish = false",
+        'publish = false\nlicense-file = "../../LICENSE.md"',
+    )
+
 # 2) operator-named local clap-noun-verb override appended at the end
 PATCHSEC = (
     "\n# Operator-named local checkout override (~/clap-noun-verb, 26.9.1) over\n"

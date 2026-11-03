@@ -1,10 +1,11 @@
 [package]
 name = "csct"
-version = "0.1.0"
+rust-version = "1.85"
+version = "26.11.2" # CALVER-01: was 0.1.0 (dod-01 F1)
 edition = "2021"
 publish = false
 description = "Sovereign code-signing court tool (csct) for cgap sealed-evidence verification."
-license-file = "../LICENSE.md"
+license-file = "../../LICENSE.md" # DOD-01 F3c: "../LICENSE.md" dangling (crates/LICENSE.md absent)
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]
 

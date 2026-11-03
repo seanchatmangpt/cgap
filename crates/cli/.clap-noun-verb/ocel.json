@@ -22,12 +22,12 @@
       "attributes": []
     },
     {
-      "id": "proc-80808-18e42beb290b7650",
+      "id": "proc-52498-18e4671b458ef250",
       "type": "process",
       "attributes": []
     },
     {
-      "id": "proc-80811-18e42beb29302108",
+      "id": "proc-52504-18e4671b464a3ba0",
       "type": "process",
       "attributes": []
     },
@@ -37,21 +37,71 @@
       "attributes": []
     },
     {
-      "id": "proc-80812-18e42beb9546dff8",
+      "id": "proc-52502-18e4671bb3c08a90",
       "type": "process",
       "attributes": []
     },
     {
-      "id": "proc-80810-18e42beb95fba168",
+      "id": "proc-52503-18e4671bb4891668",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "self:version",
+      "type": "command",
+      "attributes": []
+    },
+    {
+      "id": "proc-76414-18e46cc862e5cf38",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-76413-18e46cc879d335a0",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-76416-18e46cc879fd52e0",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-76412-18e46cc8e64829c0",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-76415-18e46cc8e6bfe230",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-13563-18e46f0769e23a60",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-13565-18e46f077f63a518",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-13561-18e46f077faf38c0",
+      "type": "process",
+      "attributes": []
+    },
+    {
+      "id": "proc-13564-18e46f07eb506dd8",
       "type": "process",
       "attributes": []
     }
   ],
   "events": [
     {
-      "id": "evt-18e42beb290b89d8-0",
+      "id": "evt-18e4671b458f01f0-0",
       "type": "cli_invocation",
-      "time": "2026-11-02T08:07:20.606231+00:00",
+      "time": "2026-11-03T02:11:58.429079+00:00",
       "attributes": [
         {
           "name": "noun",
@@ -67,7 +117,7 @@
         },
         {
           "name": "duration_ms",
-          "value": 368
+          "value": 357
         }
       ],
       "relationships": [
@@ -76,15 +126,15 @@
           "qualifier": "regards"
         },
         {
-          "objectId": "proc-80808-18e42beb290b7650",
+          "objectId": "proc-52498-18e4671b458ef250",
           "qualifier": "performed_by"
         }
       ]
     },
     {
-      "id": "evt-18e42beb29304048-0",
+      "id": "evt-18e4671b464a4f28-0",
       "type": "cli_invocation",
-      "time": "2026-11-02T08:07:20.608639+00:00",
+      "time": "2026-11-03T02:11:58.441354+00:00",
       "attributes": [
         {
           "name": "noun",
@@ -100,7 +150,7 @@
         },
         {
           "name": "duration_ms",
-          "value": 367
+          "value": 363
         }
       ],
       "relationships": [
@@ -109,15 +159,15 @@
           "qualifier": "regards"
         },
         {
-          "objectId": "proc-80811-18e42beb29302108",
+          "objectId": "proc-52504-18e4671b464a3ba0",
           "qualifier": "performed_by"
         }
       ]
     },
     {
-      "id": "evt-18e42beb9546f380-0",
+      "id": "evt-18e4671bb3c09e18-0",
       "type": "cli_invocation",
-      "time": "2026-11-02T08:07:22.422066+00:00",
+      "time": "2026-11-03T02:12:00.277824+00:00",
       "attributes": [
         {
           "name": "noun",
@@ -133,7 +183,7 @@
         },
         {
           "name": "duration_ms",
-          "value": 2181
+          "value": 2206
         }
       ],
       "relationships": [
@@ -142,15 +192,15 @@
           "qualifier": "regards"
         },
         {
-          "objectId": "proc-80812-18e42beb9546dff8",
+          "objectId": "proc-52502-18e4671bb3c08a90",
           "qualifier": "performed_by"
         }
       ]
     },
     {
-      "id": "evt-18e42beb95fbb108-0",
+      "id": "evt-18e4671bb4892608-0",
       "type": "cli_invocation",
-      "time": "2026-11-02T08:07:22.433911+00:00",
+      "time": "2026-11-03T02:12:00.290966+00:00",
       "attributes": [
         {
           "name": "noun",
@@ -166,7 +216,7 @@
         },
         {
           "name": "duration_ms",
-          "value": 2196
+          "value": 2212
         }
       ],
       "relationships": [
@@ -175,7 +225,304 @@
           "qualifier": "regards"
         },
         {
-          "objectId": "proc-80810-18e42beb95fba168",
+          "objectId": "proc-52503-18e4671bb4891668",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46cc862e5daf0-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T03:55:59.508791+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "self"
+        },
+        {
+          "name": "verb",
+          "value": "version"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 0
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "self:version",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-76414-18e46cc862e5cf38",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46cc879d34928-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T03:55:59.893452+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "mask"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 384
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:mask",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-76413-18e46cc879d335a0",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46cc879fd5e98-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T03:55:59.896208+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "mask"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 384
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:mask",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-76416-18e46cc879fd52e0",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46cc8e6483960-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T03:56:01.713055+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "parquet"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 2204
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:parquet",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-76412-18e46cc8e64829c0",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46cc8e6bfede8-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T03:56:01.720898+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "parquet"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 2209
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:parquet",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-76415-18e46cc8e6bfe230",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46f0769e24a00-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T04:37:09.232192+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "self"
+        },
+        {
+          "name": "verb",
+          "value": "version"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 0
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "self:version",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-13563-18e46f0769e23a60",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46f077f63b8a0-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T04:37:09.592997+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "mask"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 358
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:mask",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-13565-18e46f077f63a518",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46f077faf4860-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T04:37:09.597949+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "mask"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 366
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:mask",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-13561-18e46f077faf38c0",
+          "qualifier": "performed_by"
+        }
+      ]
+    },
+    {
+      "id": "evt-18e46f07eb507990-0",
+      "type": "cli_invocation",
+      "time": "2026-11-03T04:37:11.403675+00:00",
+      "attributes": [
+        {
+          "name": "noun",
+          "value": "bench"
+        },
+        {
+          "name": "verb",
+          "value": "parquet"
+        },
+        {
+          "name": "success",
+          "value": true
+        },
+        {
+          "name": "duration_ms",
+          "value": 2172
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "bench:parquet",
+          "qualifier": "regards"
+        },
+        {
+          "objectId": "proc-13564-18e46f07eb506dd8",
           "qualifier": "performed_by"
         }
       ]
