@@ -1,7 +1,8 @@
 # cgap
 
 Sovereign `#![no_std]` columnar/deductive substrate; 23-crate root
-workspace at 26.11.1, 18 crates on crates.io (`bench` there is a name
+workspace at 26.11.1, 19 of 20 publish-intended member crates exist on
+crates.io (`bench` there is a name
 collision, not ours; `cgap-beam`/`cgap-integration`/`cgap-court`/
 `cgap-branchless`/`cgap-verification` are registry-absent or
 `publish = false`). cgap-datafusion was removed
@@ -42,10 +43,11 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   root members. gate/p28/crypto/branchless carry `publish = true`
   explicitly (branchless flipped to true by lane DOD-02, 2026-11-02:
   first-publish candidate, `lanes/lane-dod-02-branchless-pub.md`).
-  12/23 members declare an explicit flag (9 true, 3 false); the other
-  11 default to publishable. Prior "19/22 published" was UNVERIFIED
-  registry state — guarded table at
-  `docs/jira/v26.11.2/01-release-gates.md:28-32`.
+  23/23 members declare an explicit flag (20 true, 3 false) as of
+  2026-11-02 (01-release-gates.md refreshed table; audit/
+  pub-02-flag-table-rederivation.md). Prior "19/22 published" was
+  UNVERIFIED registry state — guarded table at
+  `docs/jira/v26.11.2/01-release-gates.md:325ff`.
 
 ## CLI (ggen six-pack generated)
 
@@ -61,7 +63,7 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
 - `crates/{cgap-core,cgap-storage,cgap-bont,cgap-bosym,cgap-bn3,
   cgap-gate,cgap-crypto,cgap-p28}` — moonshot lane crates
 - `crates/{cgap-ffi,cgap-beam,cgap-gpu,audit,integration,cgap-court}` — membranes, court harness
-- `crates/cgap-verification` — on disk, NOT in the 22-member `cargo metadata` list
+- `crates/cgap-verification` — on disk, NOT in the 23-member `cargo metadata` list
 - `crates/cli` — standalone ggen CLI (above); `ontologies/{fibo,cloud}` — O-ABI packs
 - `docs/jira/v26.11.1/{lanes,waves}/` — A01-A20 specs + 152 receipts
   (`docs/jira/v26.11.2/waves/v2-07-census.md:9`)

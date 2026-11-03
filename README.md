@@ -1,56 +1,54 @@
 # cgap
 
-Sovereign columnar/deductive compute substrate: fixed-width columnar frames
-(A04 CgapFrameHeader, 128 B), binary ontology slots (A06/B-ONT), string-free
-deduction (BN3 binary N3, A11), and spoliation-enforced P28-SIL licensing
-(A17, 80 B attestations). Kernels are `#![no_std]` with zero external
-dependencies — each format is implemented from the byte layout up (branch-free
-inner loops, 64-byte-aligned buffers, LSB-first validity bitmaps), exposed
-through four sovereign C-ABI entrypoints (admit / eval / commit / verify,
-A19) and a `cgap` umbrella facade. Renamed from `avec` 2026-10-31.
+Sovereign columnar/deductive compute substrate:
+- fixed-width columnar frames (A04 CgapFrameHeader, 128 B), binary ontology
+  slots (A06/B-ONT), string-free deduction (BN3 binary N3, A11), and
+  spoliation-enforced P28-SIL licensing (A17, 80 B attestations).
+- Kernels are `#![no_std]` with zero external dependencies — each format is
+  implemented from the byte layout up (branch-free inner loops,
+  64-byte-aligned buffers, LSB-first validity bitmaps), exposed through four
+  sovereign C-ABI entrypoints (admit / eval / commit / verify, A19) and a
+  `cgap` umbrella facade. Renamed from `avec` 2026-10-31.
 
 ## Crates
 
-22 crates. Registry status below is live crates.io API truth sampled
-2026-11-02 (UA cgap-publish-receipt; receipt:
-docs/jira/v26.11.1/waves/coord-publish-record.md + p3-api-verify-all.md).
+23 workspace members: 20 publish-true / 3 publish-false (flag table
+re-derived 2026-11-02; authority:
+docs/jira/v26.11.2/01-release-gates.md "G1-PUBLISH flag table —
+refreshed re-derivation", receipt
+docs/jira/v26.11.2/audit/pub-02-flag-table-rederivation.md). Plus 6
+standalone non-members (cgap-verification, csct, cli, cgap-fleet-ops,
+cgap-ocel2, wasm-footprint). Registry codes are live crates.io API
+reads sampled 2026-11-02 (UA cgap-publish-receipt; receipts:
+docs/jira/v26.11.1/waves/coord-publish-record.md +
+p3-api-verify-all.md). Prior "22 crates" claim superseded (ERRATA:
+drift sources fibo+cloud members, branchless DOD-02 flip).
 
-Published at 26.11.1 (9):
+Published on registry (17; five still at 26.11.1 — pre-bump lag,
+per flag table): cgap, cgap-arrow, cgap-core, cgap-blake3,
+cgap-gate, cgap-storage, cgap-git, cgap-bn3, cgap-parquet, cgap-p28,
+cgap-crypto, cgap-bont, cgap-bosym, cgap-gpu, cgap-audit, cgap-fibo,
+cgap-cloud.
 
-| crate | what it is |
-|---|---|
-| cgap | Umbrella facade re-exporting the kernel crates. |
-| cgap-arrow | Arrow C Data Interface columnar kernels, no_std. |
-| cgap-blake3 | BLAKE3 tree hash, no_std; NEON/AVX2 Merkle reduction. |
-| cgap-git | Packfile v2 writer: stored blobs, .idx v2, in-crate SHA-1/CRC32. |
-| cgap-parquet | Parquet kernels: bit-unpacking, SWAR RLE, page decode. |
-| cgap-bont | Binary ontology scalars/slots (B-ONT). |
-| cgap-bosym | Binary symbol slab. |
-| cgap-crypto | Keyed BLAKE3 crypto: sealed transcripts, Merkle helpers. |
-| cgap-gpu | Metal zero-copy bridge for aligned frame buffers (macOS). |
+Registry-absent first-publish candidates (`publish = true`, 404 at
+sampling): cgap-branchless (DOD-02 flip,
+docs/jira/v26.11.2/lanes/lane-dod-02-branchless-pub.md),
+cgap-integration (flag re-read `crates/integration/Cargo.toml:8`).
 
-Guarded, manifest `publish = true`, not yet on the registry (live API 404
-at sampling; publish chain receipts under waves/):
+`publish = false` (3): cgap-beam (BEAM NIF membrane), bench
+(registry name collision), cgap-court (structural [[test]]-only).
 
-| crate | what it is |
-|---|---|
-| cgap-core | CgapFrameHeader — 128 B fixed-width frame wire format (A04). |
-| cgap-storage | WAL framing + persistence (A05). |
-| cgap-bn3 | Binary N3 deduction engine (A11-A13). |
-| cgap-gate | SHACL bitmask validation (A08/A14). |
-| cgap-p28 | P28-SIL 640-bit spoliation + licensing (A16/A17). |
-| cgap-ffi | Sovereign C-ABI cdylib (A19). |
-
-Harness / structural crates (never published): cgap-beam (BEAM NIF
-membrane, `publish = false`), cgap-audit (CC=1 branch-audit cdylib), bench
-(line-rate benches), cgap-court (court_verdict harness), cgap-cli
-(standalone ggen-generated `cgap` binary), cgap-integration (cross-crate
-C-ABI roundtrip tests), wasm-footprint (wasm32-wasip1 link wrapper).
+- One-line crate roles are kept in the flag table itself.
+- Descriptive tables here were removed (ERRATA: they had drifted —
+  listed cgap-core/storage/bn3/gate/p28/ffi as unregistered when the
+  2026-11-02 API read shows 17 of 23 members on the registry).
+- Removal receipt: waves/w-readme2.md (docs/jira/v26.11.2) — the
+  table removal is the README reconciliation wave's diff.
 
 ## Quickstart
 
 ```sh
-cargo add cgap@26.11.1
+cargo add cgap@26.11.2
 ```
 
 The umbrella re-exports the kernel crates. Real consumer surfaces
@@ -71,12 +69,14 @@ cgap_blake3::hash(b"abc");
 ```
 
 At 26.10.29 (the version the consumer receipt exercised) the registry
-surface predates the 26.11.1 frame/deduction lanes; 26.11.1 adds them.
+surface predates the 26.11.x frame/deduction lanes; the live registry
+max-version truth is the flag table cited above (never this README).
 
 ## Morning DoD gates
 
-Receipts: docs/jira/v26.11.1/waves/{gate-1-workspace,gate-3-ledger-proof,
-f3-04-courts-green,gate-4-spoliation,gate-5-silicon,dod-five-gates}.md.
+Receipts (docs/jira/v26.11.1/waves/):
+- gate-1-workspace.md, gate-3-ledger-proof.md, f3-04-courts-green.md,
+- gate-4-spoliation.md, gate-5-silicon.md, dod-five-gates.md.
 Aggregate verdict (dod-five-gates.md, first-hand re-witnessed):
 
 | gate | standing | witness |
@@ -104,4 +104,7 @@ in gate-5-silicon.md, not laundered).
 
 Full execution history: docs/jira/v26.11.1/waves/ (per-lane finish and
 audit receipts, gate markers, publish chain, bench PARETO receipts,
-campaign ledger v26111-campaign-ledger.md).
+campaign ledger v26111-campaign-ledger.md); v26.11.2 starDF campaign:
+docs/jira/v26.11.2/ (00..14 docs, OVERNIGHT-LOOP.md, DEFECT-REGISTER.md,
+lanes/, waves/, dflss/ control plan). Security policy: SECURITY.md.
+Contribution + court law: CONTRIBUTING.md.
