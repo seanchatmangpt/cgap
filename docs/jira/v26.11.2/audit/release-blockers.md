@@ -169,6 +169,28 @@ CLAUDE.md: ALIVE requires command+exit run this session.
   /tmp/gap04_mut.md, /tmp/gap04_mut2.md; lane receipt
   lanes/lane-gap-04-zero-tax.md.
 
+- DOD-11 append (2026-11-02): R10 close condition now satisfied on its
+  OWN stated terms — every present child flips natively, no reliance on
+  the runner-level designation. Child-native CSCB_MUTATE=zero-tax
+  typed-refusal arms landed in cscb_c1_c2_ingress.rs,
+  cscb_c4_alloc.rs, cscb_c7_receipt_sealing.rs; C3/C6 already aliased
+  zero-tax (MV-5, verified fresh this session:
+  cscb_c3_closure.rs:178, cscb_c6_retraction.rs:53-54) — skipped, no
+  edit. Per-child flip witnesses (fresh release bins, lease target
+  /tmp/dod11-target, this session):
+  `CSCB_MUTATE=zero-tax ./cscb_c1_c2_ingress` -> exit 1 (ANDON line);
+  `./cscb_c4_alloc` -> exit 1; `./cscb_c7_receipt_sealing` -> exit 1;
+  cscb_c3_closure -> exit 1; cscb_c6_retraction -> exit 1 (via
+  pre-existing aliases). Clean runs of the same three bins -> exit 0.
+  Full ladder: clean exit 0 (receipt /tmp/dod11_clean3.md, all 8
+  coordinates exit 0) vs CSCB_MUTATE=zero-tax exit 1 (receipt
+  /tmp/dod11_mut2.md: C1 1, C2 1, C3 1, C4 gate 1 + child 1, C6 1,
+  C7 1; C5 python skipped by design, C8 test court not env-driven —
+  both disclosed, not silent). Belongs-to-both note: the mutated
+  ladder receipt also carries the GAP-04 runner-level C4 gate row, so
+  the flip is witnessed at BOTH layers. Receipt:
+  lanes/lane-dod-11-r10.md.
+
 ## R11 — w-commitplan-v2 stale vs live tree
 
 - Status: OPEN (doc/process), stale-by-default per receipt law.

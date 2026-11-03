@@ -17,16 +17,16 @@ publish = true
 # `cgap-bont` is a test-only collaborator (T10 loader court reads A06's
 # frozen container types, never redefines them).
 [dependencies]
-cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.1" }
+cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.2" }
 
 [dev-dependencies]
-cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.1" }
+cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.2" }
 # Wave-9 cross-lane integration (2026-11-01): A04's `identity_assert` +
 # `CgapFrameHeader`/`P28LicenseAttestation` are court collaborators for the
 # wave-9 slice items "A04 identity court" / "A14 dam over A04 frames"
 # (tests/wave9_integration_courts.rs). Test-only; the no_std facade stays
 # zero-dependency (DoD 1).
-cgap-core = { path = "../../crates/cgap-core", version = "26.11.1" }
+cgap-core = { path = "../../crates/cgap-core", version = "26.11.2" }
 
 # Wave-6 repair (2026-11-01): the Wave-2 bin target name `emit-pack`
 # collided with lane A10's identically-named bin (ontologies/cloud) — two

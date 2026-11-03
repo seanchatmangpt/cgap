@@ -1,11 +1,14 @@
 [package]
 repository.workspace = true
+authors.workspace = true
 name = "cgap-gate"
 version.workspace = true
 edition.workspace = true
 description = "Campaign boundary gate kernels: fail-closed guard evaluation courts for the cgap substrate."
 license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A14 receipt ALIVE (docs/jira/v26.11.1/waves/a14-finish-receipt.md)
+categories = ['no-std', 'development-tools']
+keywords = ['guard', 'fail-closed', 'court', 'no_std']
 
 [lib]
 
@@ -14,3 +17,7 @@ publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A14 recei
 # shipped branchless primitive exactly (see waves/w6-b7-gate-consume.md).
 [dependencies]
 cgap-branchless = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

@@ -46,6 +46,10 @@ LEDGER = {
     "cgap-crypto": {"state": "PUBLISHED", "pointer": _C + ":101"},
     "cgap-p28": {"state": "PUBLISHED", "pointer": _C + ":101"},
     "cgap-court": {"state": "DELISTED", "pointer": _C + ":92"},
+    "cgap-branchless": {
+        "state": "UNPUBLISHED",
+        "pointer": "docs/jira/v26.11.2/waves/w6-branchless-workspace-wire.md:9",
+    },
     "cgap-fibo": {"state": "PUBLISHED", "pointer": _C + ":101"},
     "cgap-cloud": {"state": "PUBLISHED", "pointer": _C + ":101"},
     "cgap-cli": {"state": "DELISTED", "pointer": "docs/jira/v26.11.2/waves/v2-10-cli-state.md:1"},

@@ -116,7 +116,9 @@
   {
    "cell": "MISSING",
    "crate": "cgap-branchless",
-   "reason": "no-ledger-row"
+   "local_version": "26.11.2",
+   "reason": "manifest lost the publish guard; ledger expects DELISTED; a crates.io row is now demanded for cgap-branchless",
+   "registry_state": "PUBLISHABLE-UNATTESTED"
   },
   {
    "cell": "PASS",

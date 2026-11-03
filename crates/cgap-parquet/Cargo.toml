@@ -6,6 +6,8 @@ description = "Parquet persistence kernels with branch-free inner-loop bodies: b
 repository.workspace = true
 authors.workspace = true
 publish = true
+categories = ['no-std', 'encoding', 'parser-implementations']
+keywords = ['parquet', 'columnar', 'swar', 'bit-unpack', 'no_std']
 license-file = "../../LICENSE.md"
 
 [features]
@@ -19,3 +21,7 @@ std = []
 # reaches the real cgap-arrow layout — same crate-as-dev-dep pattern as
 # cgap-ffi. Workspace path dep; adds no external dependency.
 cgap-arrow = { path = "../cgap-arrow" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

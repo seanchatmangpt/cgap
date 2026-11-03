@@ -90,6 +90,15 @@ fn process_frame(frame: &[u8; 24]) -> u64 {
 }
 
 fn main() {
+    // R10 zero-tax typed-refusal arm (child-native, belt-and-suspenders
+    // over the runner-level C4 gate, lane-gap-04): CSCB_MUTATE=zero-tax
+    // is not this bin's mutation; refuse loudly rather than run clean.
+    if env::var("CSCB_MUTATE").as_deref() == Ok("zero-tax") {
+        eprintln!(
+            "ANDON: cscb_c1_c2_ingress typed-REFUSES CSCB_MUTATE=zero-tax (R10 flip court) -> exit 1"
+        );
+        std::process::exit(1);
+    }
     let args: Vec<String> = env::args().collect();
     let self_gen = args.iter().any(|a| a == "--self-gen");
     let flag_mutate = args.iter().any(|a| a == "--mutate=branchy");

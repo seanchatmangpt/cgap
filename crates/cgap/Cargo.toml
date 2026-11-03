@@ -7,6 +7,8 @@ repository.workspace = true
 authors.workspace = true
 license-file = "../../LICENSE.md"
 publish = true
+categories = ["no-std", "data-structures", "cryptography"]
+keywords = ["columnar", "arrow", "parquet", "git", "umbrella"]
 
 [[bench]]
 name = "bench_self_play_ingress_parquet"
@@ -45,3 +47,7 @@ default = ["host"]
 # the A04 core-frame constants compile OUT of every none-target image until
 # those crates carry no_std posture themselves.
 host = ["dep:cgap-core", "dep:cgap-storage"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

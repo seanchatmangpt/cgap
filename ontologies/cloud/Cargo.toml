@@ -18,5 +18,5 @@ publish = true
 # its own output through A06's real loader before writing (Chicago: real
 # collaborators end to end).
 [dependencies]
-cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.1" }
-cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.1" }
+cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.2" }
+cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.2" }

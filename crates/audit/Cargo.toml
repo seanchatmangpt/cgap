@@ -1,11 +1,14 @@
 [package]
 repository.workspace = true
+authors.workspace = true
 name = "cgap-audit"
 version.workspace = true
 edition.workspace = true
 description = "CC=1 branch-audit cdylib: forces every kernel into the artifact so machine code can be inspected."
 license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A15 receipt ALIVE (docs/jira/v26.11.1/waves/a15-finish-receipt.md)
+categories = ['development-tools', 'development-tools::profiling']
+keywords = ['branch-audit', 'machine-code', 'audit']
 
 [lib]
 # rlib added by lane 18 (compile-freeze minimal unblock, disclosed in both
@@ -15,5 +18,9 @@ publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A15 recei
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.1" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.2" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

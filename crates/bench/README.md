@@ -29,6 +29,10 @@ chain costs stage by stage; receipts under
 - **chains-ingress**: stage `digest_fold` (BLAKE3 payload digest) is the
   ~80% segment — 93.38 ms of 109.7 ms segment work ≈ 85% of segment cost /
   ~91% of the 102.7 ms chain mean; frame ≈ 98 ns end-to-end, ~89 ns hash.
+  Freshness: figures are as-of the 2026-11-01 receipt — receipted 10.1x;
+  fresh 9.6x (audit/tps-01-reality-ledger.md:24) — DRIFT, not
+  refutation: fastest 10.70 ns/frame vs receipted 10.20/10.30, the
+  <15 ns/frame target is met on fresh numbers. Cite both figures.
   Lever: hash only on policy triggers or escalate from an 8-byte prefilter
   (>10x chain-level).
 - **chains-sovereign** (N=4096 fastest): commit = 164.4 ms of 187.6 ms

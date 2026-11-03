@@ -6,6 +6,8 @@ description = "Git Packfile v2 writer: stored blob objects, .idx v2 generation, 
 repository.workspace = true
 authors.workspace = true
 publish = true
+categories = ['development-tools', 'encoding']
+keywords = ['git', 'packfile', 'sha1', 'crc32', 'no_std']
 license-file = "../../LICENSE.md"
 
 [features]
@@ -23,3 +25,7 @@ cgap-blake3 = { path = "../cgap-blake3" }
 cgap-parquet = { path = "../cgap-parquet" }
 
 cgap-bn3 = { path = "../cgap-bn3" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

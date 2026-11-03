@@ -37,10 +37,12 @@ mutation-free green gate run is VACUOUS (exit nonzero).
 - Registry slide (index reject or timeout): back off 1 hour. No retry
   storms.
 - `publish = false` (explicit, on disk, re-derived 2026-11-02): bench
-  (registry name collision), beam, branchless, court (structural
+  (registry name collision), beam, court (structural
   [[test]]-only); `cgap-verification`/`csct`/`cli` are on disk but NOT
-  root members. gate/p28/crypto carry `publish = true` explicitly.
-  12/23 members declare an explicit flag (8 true, 4 false); the other
+  root members. gate/p28/crypto/branchless carry `publish = true`
+  explicitly (branchless flipped to true by lane DOD-02, 2026-11-02:
+  first-publish candidate, `lanes/lane-dod-02-branchless-pub.md`).
+  12/23 members declare an explicit flag (9 true, 3 false); the other
   11 default to publishable. Prior "19/22 published" was UNVERIFIED
   registry state — guarded table at
   `docs/jira/v26.11.2/01-release-gates.md:28-32`.

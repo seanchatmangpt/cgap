@@ -7,6 +7,10 @@
 //! # Safety
 //! Pointers wrapped into `MetalSharedBuffer` must remain valid for the lifetime
 //! of the buffer reference.
+//!
+//! Platform gate is documented via `doc(cfg(target_os = "macos"))` so docs.rs (x86_64-linux) renders
+//! the macOS-only surface with its gate visible.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use core::ffi::c_void;
 
@@ -16,6 +20,7 @@ extern "C" {
 }
 
 /// Freestanding wrapper around a zero-copy Metal Unified Memory buffer (`id<MTLBuffer>`).
+#[cfg_attr(docsrs, doc(cfg(target_os = "macos")))]
 pub struct MetalSharedBuffer {
     raw: *mut c_void,
     len: usize,

@@ -1,5 +1,7 @@
 [package]
 publish = true
+categories = ['api-bindings', 'os:macos']
+keywords = ['metal', 'gpu', 'zero-copy', 'unified-memory']
 name = "cgap-gpu"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +11,11 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
 
 [build-dependencies]
 cc = "1.0"
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

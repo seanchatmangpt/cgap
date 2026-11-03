@@ -37,6 +37,16 @@ RUN curl -sSf https://sh.rustup.rs | sh -s -- -y \
       --profile minimal \
       --component llvm-tools-preview,rust-src \
  && /usr/local/cargo/bin/rustup target add riscv32imc-unknown-none-elf
-RUN curl -sSfL https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -o /tmp/go.tgz \
+# DOD-13 fix (TC-14 W6-2): the go tarball arch was hardcoded to amd64 while
+# the bases are pulled arm64 on this host — amd64 go emitted `-m64` into the
+# aarch64 gcc and every cgo build died. Derive the arch from TARGETARCH
+# (set by BuildKit for every build, native or cross) and refuse loudly on
+# anything outside the supported pair.
+ARG TARGETARCH
+RUN set -eu; case "$TARGETARCH" in \
+      amd64) GO_TARBALL=go1.23.4.linux-amd64.tar.gz ;; \
+      arm64) GO_TARBALL=go1.23.4.linux-arm64.tar.gz ;; \
+      *) echo "DOD-13 FAIL: unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; esac; \
+    curl -sSfL "https://go.dev/dl/$GO_TARBALL" -o /tmp/go.tgz \
  && tar -C /usr/local -xzf /tmp/go.tgz && rm /tmp/go.tgz \
  && /usr/local/go/bin/go version

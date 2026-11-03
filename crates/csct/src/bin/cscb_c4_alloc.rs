@@ -82,6 +82,15 @@ fn main() {
     // All env/path/fs work happens BEFORE the budget window is armed:
     // the window must see only the hot loop's allocations.
     let mutate = std::env::var("CSCB_MUTATE").ok().as_deref() == Some("alloc");
+    // R10 zero-tax typed-refusal arm (child-native, belt-and-suspenders
+    // over the runner-level C4 gate, lane-gap-04): zero-tax is not this
+    // bin's mutation; refuse loudly before any budget window is armed.
+    if std::env::var("CSCB_MUTATE").as_deref() == Ok("zero-tax") {
+        eprintln!(
+            "ANDON: cscb_c4_alloc typed-REFUSES CSCB_MUTATE=zero-tax (R10 flip court) -> exit 1"
+        );
+        std::process::exit(1);
+    }
     let (corpus, provenance) = load_corpus();
     let warm = black_box(corpus.len());
     println!(

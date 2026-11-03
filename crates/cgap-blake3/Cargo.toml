@@ -2,10 +2,12 @@
 name = "cgap-blake3"
 version.workspace = true
 edition.workspace = true
-description = "Sovereign, zero-dependency #![no_std] BLAKE3 cryptographic tree hash with 4-way NEON & 8-way AVX2 parent Merkle reduction."
+description = "Sovereign, zero-dependency #![no_std] BLAKE3 cryptographic tree hash with 4-way NEON parent Merkle reduction (8-way AVX2 path feature-gated; 26.11.3 re-witness owed)."
 repository.workspace = true
 authors.workspace = true
 publish = true
+categories = ['no-std', 'cryptography']
+keywords = ['blake3', 'hash', 'merkle', 'avx2', 'neon']
 license-file = "../../LICENSE.md"
 
 [features]
@@ -13,3 +15,7 @@ default = []
 std = []
 
 [dependencies]
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

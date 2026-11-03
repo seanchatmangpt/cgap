@@ -56,7 +56,7 @@ flowchart TD
 
     subgraph Substrate ["2. Sovereign Execution Substrate (A = μ(O*))"]
         Frame["128B CgapFrameHeader + 80B P28 Attestation"]
-        Penstock["cgap-gate::penstock (5.70 ns/frame Admission)"]
+        Penstock["cgap-gate::penstock (7.71 ns/frame receipted Admission)"]
         Lease["cgap-crypto::Lease (Monotonic Tick Ceiling κ)"]
         Meter["cgap-p28::Asc450Meter (168B SignedProof 'A450')"]
     end
@@ -234,7 +234,8 @@ Sold as part of the **CGAP Sovereign Runtime & Edge OEM License**:
 | Crate | Path | Technical Capability | Commercial Role |
 |---|---|---|---|
 | **`cgap-core`** | [`crates/cgap-core`](file:///Users/sac/cgap/crates/cgap-core/src/lib.rs) | Defines the frozen 128-byte `CgapFrameHeader` (`align(64)`), zero-copy wire-to-memory `isomorphism`, and lock-free `dma_ring` handshake. Zero runtime dependencies (`E=0`). | Enforces the mandatory 80-byte P28 attestation header on every frame entering the system. |
-| **`cgap-gate`** | [`crates/cgap-gate`](file:///Users/sac/cgap/crates/cgap-gate/src/lib.rs) | The **Penstock Dam** (`penstock.rs`): 6-row normative admission taxonomy evaluating frame geometry, magic, O-ABI digest, and P28 spoliation laws in **5.70 ns/frame** (175.5M frames/sec/core) with 0 heap allocations. | High-speed perimeter security and license-compliance enforcement gate. |
+| **`cgap-gate`** | [`crates/cgap-gate`](file:///Users/sac/cgap/crates/cgap-gate/src/lib.rs) | The **Penstock Dam** (`penstock.rs`): 6-row normative admission taxonomy evaluating frame geometry, magic, O-ABI digest, and P28 spoliation laws in **7.71 ns/frame receipted** (7.35-8.13 re-derived; Errata 2) with
+0 heap allocations. | High-speed perimeter security and license-compliance enforcement gate. |
 | **`cgap-storage`** | [`crates/cgap-storage`](file:///Users/sac/cgap/crates/cgap-storage/src/lib.rs) | Dual-slot crash-consistent `atomic_commit` flash journal with IEEE CRC32 header protection, BLAKE3 trailer digests, and exhaustive power-cut recovery (`recover_mode`). | Monetizable for embedded NVMe, automotive, aerospace, and industrial IoT flash storage. |
 | **`cgap-ffi`** | [`crates/cgap-ffi`](file:///Users/sac/cgap/crates/cgap-ffi/src/lib.rs) | Frozen 4-verb Sovereign C-ABI (`include/cgap.h`): `cgap_admit_frame`, `cgap_eval_bn3`, `cgap_commit_parquet`, `cgap_verify_p28`, plus `xip.ld` linker script placing `.text` (`0x42000020`), `.oabi` (`0x42010000`), and `.bn3` (`0x42020000`) page-aligned in flash for Execute-In-Place (XIP). | Enables C/C++/Python/Go/Zig host integration and `<32 KB` bare-metal RISC-V silicon deployment. |
 
@@ -285,7 +286,7 @@ Below is the complete synthesis of all **8 Divan benchmark suites** in `crates/b
 | `bn3` (F2-13) | `statement_scan_24b` | 65,536 (1.57 MB) & 1,048,576 (25.1 MB) | $> 1.0\text{ GB/s}$ charter target | **82.24 GB/s** (64k) / **78.94 GB/s** (1M) | 80.40 GB/s / 76.14 GB/s | **0 B** | **82.2x over target**; saturates L2/L3 cache bandwidth |
 | `bn3` (F2-13) | `unify_join_2atom_pairs` | 4,096 pairs ($N=1024$) & 65,536 pairs ($N=64\text{k}$) | $< 1,000\text{ ns/pair}$ target | **6.499 ns/pair** (1k) / **94.36 ns/pair** (64k) | 6.58 ns / 95.44 ns | **0 B** | **153x faster** than sub-µs target; **153.8M joins/sec/core** |
 | `bn3` (F2-13) | `builtin_dispatch_hot_arms_65k` | 65,536 evaluations (`gt`, `sum`, `min`, `assert`) | Indirect vtable/closure dispatch | **204.2 µs** (**3.116 ns/eval**) | 210.1 µs | **0 B** | **320.9M rule evaluations/sec/core**; 0 indirect branch instructions |
-| `ingress` (F2-11) | `a14_penstock_admission` | 1,048,576 & 10,485,760 frames | Software API gateway ($\sim 50\text{ µs}$) | **5.79 ns/frame** (1M) / **5.70 ns/frame** (10M) | 5.87 ns / 6.40 ns | **0 B** | **175.5M frames/sec/core** full 6-row security & P28 admission |
+| `ingress` (F2-11) | `a14_penstock_admission` | 1,048,576 & 10,485,760 frames | Software API gateway ($\sim 50\text{ µs}$) | **7.71 ns/frame receipted** (1M) / **7.35 ns/frame fresh** (10M) | 8.13 ns | **0 B** | **136.1M frames/sec/core** (derived from 7.35 fresh) full 6-row security & P28 admission — Errata 2 |
 | `ingress` (F2-11) | `cgap_admit_frame` (A04) | 1,024 / 65,536 / 1,048,576 frames | Standard deserialization | **1.99 ns** (1k) / **3.64 ns** (64k) / **5.18 ns** (1M) | 2.07–5.21 ns | **0 B** | **501.8M frames/sec/core** at L1-resident burst |
 | `seal` (F2-14) | `p28_attestation_verify` | 1,024 & 65,536 records (80 B / 640-bit) | Asymmetric ECDSA/RSA ($\sim 100\text{ µs}$) | **459.8 ns/record** (1k) / **459.1 ns/record** (64k) | 461.6 ns | **0 B** | **2.17M 640-bit spoliation & license checks/sec/core** |
 | `seal` (F2-14) | `crypto_seal_verify_roundtrip` | 1,024 & 65,536 receipts | External KMS/HSM roundtrip | **834.5 ns/receipt** (1k) / **837.5 ns/receipt** (64k) | 838.9 ns | **0 B** | **1.19M cryptographic lease receipts minted & verified/sec/core** |
@@ -473,3 +474,12 @@ docs/jira/v26.11.2/). The 175.5M frames/sec/core derivative figure
 shares the same defect. Assertable form: "7.35-8.13 ns/frame
 re-derived, receipted 7.71". Original lines retained above unedited;
 this errata supersedes them.
+
+**Errata 3 — body rows corrected for Errata 2 (2026-11-02, DOD-10).**
+Lines :59, :237, and :288 now carry the re-derived figures directly:
+7.71 ns/frame receipted / 7.35 fresh / 8.13 median
+(audit/tps-01-reality-ledger.md:21,28). The 175.5M frames/sec/core
+derivative is replaced by 136.1M frames/sec/core derived from the
+7.35 fresh figure. Errata 2's "original lines retained above
+unedited" clause is superseded by this correction; Errata 2 remains
+the re-derivation authority.

@@ -24,8 +24,19 @@
 //! framing).
 //!
 //! AndonRefusal-class: typed refusal matching the RFC-0042 Rule 3 shape
-//! used by `csct/src/andon.rs` and `cgap-git/src/ingress_ring.rs`
-//! (exit-101-class family, deterministic, in-process `Err`).
+//! used by `crates/cgap-git/src/ingress_ring.rs` (exit-101-class family,
+//! deterministic, in-process `Err`).
+//!
+//! Atomic-width note (PUB-07 fix, lane DOD-04): riscv32imc provides no
+//! 64-bit atomics, so the seal `counter`/`chain` are width-gated via
+//! `cfg(target_has_atomic = ...)` (64 -> 32 -> 16 ladder). On a narrow
+//! target the monotonic counter may wrap/exhaust EARLIER (at the native
+//! width, surfaced as `SEAL_COUNTER_WIDTH`); the typed
+//! `CounterExhausted` refusal fires at that smaller bound so monotonic
+//! CAS semantics are preserved - the counter exhausts, it never
+//! silently wraps. Chain values may differ across widths (FNV over a
+//! narrower accumulator) - chains are width-local ordering witnesses,
+//! not cross-target invariants.
 
 /// No hardware map exists in-tree binding this address; see module
 /// provenance note. Named only so the constant is citable and falsifiable.
@@ -90,13 +101,119 @@ impl Refusal {
     }
 }
 
+/// Width-gated native-atomic backend for the seal counter/chain.
+///
+/// riscv32imc has NO 64-bit atomics (`core::sync::atomic::AtomicU64`
+/// does not exist on that target - PUB-07 failure B); the widest native
+/// primitive is addressed by the cfg ladder below (64 -> 32 -> 16).
+/// On a narrow target the monotonic counter ceiling collapses to the
+/// primitive width: the typed CounterExhausted refusal fires at that
+/// smaller bound instead of wrapping (monotonicity is preserved; the
+/// counter exhausts EARLIER, never silently wraps).
+mod seal_atomic {
+    #[cfg(target_has_atomic = "64")]
+    pub use impl64::*;
+
+    #[cfg(all(not(target_has_atomic = "64"), target_has_atomic = "32"))]
+    pub use impl32::*;
+
+    #[cfg(all(not(target_has_atomic = "32"), target_has_atomic = "16"))]
+    pub use impl16::*;
+
+    #[cfg(all(
+        not(target_has_atomic = "32"),
+        not(target_has_atomic = "16"),
+        not(target_has_atomic = "8")
+    ))]
+    pub use implcell::*;
+
+    #[cfg(target_has_atomic = "64")]
+    mod impl64 {
+        pub type Prim = u64;
+        pub type Inner = core::sync::atomic::AtomicU64;
+        /// Widest value the native counter can hold (ceiling bound).
+        pub const WIDTH: u64 = u64::MAX;
+    }
+
+    #[cfg(all(not(target_has_atomic = "64"), target_has_atomic = "32"))]
+    mod impl32 {
+        pub type Prim = u32;
+        pub type Inner = core::sync::atomic::AtomicU32;
+        pub const WIDTH: u64 = u32::MAX as u64;
+    }
+
+    #[cfg(all(not(target_has_atomic = "32"), target_has_atomic = "16"))]
+    mod impl16 {
+        pub type Prim = u16;
+        pub type Inner = core::sync::atomic::AtomicU16;
+        pub const WIDTH: u64 = u16::MAX as u64;
+    }
+
+    /// No native atomics at all (riscv32imc: no A extension). Sound
+    /// here because every mutating entry point ([`SealRegister::stamp`])
+    /// already requires `&mut self` (exclusive access) and the type is
+    /// NOT `Sync` on this arm - single-hart targets only.
+    #[cfg(all(
+        not(target_has_atomic = "32"),
+        not(target_has_atomic = "16"),
+        not(target_has_atomic = "8")
+    ))]
+    mod implcell {
+        use core::cell::Cell;
+        pub type Prim = usize;
+        pub type Inner = Cell<usize>;
+        pub const WIDTH: u64 = usize::MAX as u64;
+    }
+}
+
+/// Widest counter value the target's native atomics can address. The
+/// seal counter never exceeds this bound: exhaustion refuses first.
+pub const SEAL_COUNTER_WIDTH: u64 = seal_atomic::WIDTH;
+
+/// Monotonic counter backed by the widest native atomic on the target.
+/// All values cross the API in `u64`; storage is width-narrowed.
+struct Counter(seal_atomic::Inner);
+
+impl Counter {
+    fn new(v: u64) -> Self {
+        Counter(seal_atomic::Inner::new(v as seal_atomic::Prim))
+    }
+
+    fn load(&self) -> u64 {
+        match () {
+            #[cfg(target_has_atomic = "8")]
+            () => self.0.load(core::sync::atomic::Ordering::SeqCst) as u64,
+            #[cfg(not(target_has_atomic = "8"))]
+            () => self.0.get() as u64,
+        }
+    }
+
+    fn fetch_add(&self) -> u64 {
+        match () {
+            #[cfg(target_has_atomic = "8")]
+            () => self.0.fetch_add(1, core::sync::atomic::Ordering::SeqCst) as u64,
+            #[cfg(not(target_has_atomic = "8"))]
+            () => {
+                let cur = self.0.get();
+                self.0.set(cur.wrapping_add(1));
+                cur
+            }
+        }
+    }
+
+    fn fetch_update<F>(&self, mut f: F) -> Result<u64, u64>
+    where
+        F: FnMut(u64) -> Option<u contention_marker,
+    }
+}
+
 /// Caller-provided fixed 128-byte slot + atomic monotonic counter.
 pub struct SealRegister {
     slot: [u8; SEAL_SLOT_LEN],
-    counter: core::sync::atomic::AtomicU64,
+    counter: Counter,
     ceiling: u64,
     /// FNV-1a chain over every stamp (tamper-evident ordering witness).
-    chain: core::sync::atomic::AtomicU64,
+    chain: Counter,
 }
 
 impl SealRegister {
@@ -104,9 +221,9 @@ impl SealRegister {
     pub fn new() -> Self {
         SealRegister {
             slot: [0u8; SEAL_SLOT_LEN],
-            counter: core::sync::atomic::AtomicU64::new(0),
+            counter: Counter::new(0),
             ceiling: u64::MAX,
-            chain: core::sync::atomic::AtomicU64::new(0),
+            chain: Counter::new(0),
         }
     }
 
@@ -120,12 +237,12 @@ impl SealRegister {
 
     /// Reads the current monotonic counter (pure, atomic load).
     pub fn counter(&self) -> u64 {
-        self.counter.load(core::sync::atomic::Ordering::SeqCst)
+        self.counter.load()
     }
 
     /// Reads the FNV chain (pure, atomic load).
     pub fn chain(&self) -> u64 {
-        self.chain.load(core::sync::atomic::Ordering::SeqCst)
+        self.chain.load()
     }
 
     /// 128-byte slot read (court observability).
@@ -145,22 +262,25 @@ impl SealRegister {
                 "seal stamp runs past the 128-byte slot",
             ));
         }
-        let cur = self.counter.load(Ordering::SeqCst);
-        if cur >= self.ceiling {
+        // Effective ceiling collapses to the target's native counter
+        // width on narrow targets (exhaustion refuses there, no wrap).
+        let bound = if self.ceiling < seal_atomic::WIDTH {
+            self.ceiling
+        } else {
+            seal_atomic::WIDTH
+        };
+        let cur = self.counter.load();
+        if cur >= bound {
             return Err(Refusal::new(
                 RefusalKind::CounterExhausted,
                 "seal counter at ceiling; authority spent",
             ));
         }
         self.slot[offset..offset + 8].copy_from_slice(tag);
-        let _ = self
-            .chain
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| {
-                Some(
-                    c.wrapping_mul(0x01000193).wrapping_add(0x811C_9DC5) ^ u64::from_be_bytes(*tag),
-                )
-            });
-        Ok(self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+        let _ = self.chain.fetch_update(|c| {
+            Some(c.wrapping_mul(0x01000193).wrapping_add(0x811C_9DC5) ^ u64::from_be_bytes(*tag))
+        });
+        Ok(self.counter.fetch_add() + 1)
     }
 }
 

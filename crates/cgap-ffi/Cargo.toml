@@ -1,17 +1,20 @@
 [package]
 repository.workspace = true
+authors.workspace = true
 name = "cgap-ffi"
 version.workspace = true
 edition.workspace = true
 description = "C Data Interface cdylib membrane for cgap (Gate 3 wire-parity exports)."
 license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): was `publish = false`; A19 receipt substantially-witnessed PARTIAL/ALIVE (docs/jira/v26.11.1/waves/a19-finish-receipt.md)
+categories = ['api-bindings', 'development-tools::ffi']
+keywords = ['c-data-interface', 'cabi', 'wire-parity', 'ffi']
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
 
 # Wave F2 item 5 (SEAM-CRYPTO-FFI) — DISCLOSED CROSS-TOUCH (lane lease was
 # src/sovereign.rs; manifest is coordinator-owned, disclosed both directions
@@ -22,7 +25,7 @@ cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
 # (`target_os = "none"`) build keeps the pre-existing dep set — the T1
 # rv32imc staticlib size court and the rv32imc check gate are unaffected.
 [target.'cfg(not(target_os = "none"))'.dependencies]
-cgap-p28 = { path = "../cgap-p28", version = "26.11.1" }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.2" }
 # GAP-1 (2026-11-01) — DISCLOSED UNAVOIDABLE CROSS-TOUCH (lane lease was
 # src/sovereign.rs + include/cgap.h; manifest is coordinator-owned, disclosed
 # here and in the lane receipt per the Wave-F2 cgap-p28 precedent above):
@@ -34,23 +37,27 @@ cgap-p28 = { path = "../cgap-p28", version = "26.11.1" }
 # `use cgap_blake3::hash as oabi_digest`). All five stay HOST-surface: the
 # `target_os = "none"` XIP build keeps the pre-existing dep set, so the T1
 # rv32imc ELF size court and the rv32imc check gate are unaffected.
-cgap-core = { path = "../cgap-core", version = "26.11.1" }
-cgap-gate = { path = "../cgap-gate", version = "26.11.1" }
-cgap-bn3 = { path = "../cgap-bn3", version = "26.11.1" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.1", features = ["std"] }
+cgap-core = { path = "../cgap-core", version = "26.11.2" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.2" }
+cgap-bn3 = { path = "../cgap-bn3", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.2", features = ["std"] }
 
 [dev-dependencies]
 # Same crate as the normal dependency; needed only by tests/ to reach the
 # c_abi release callbacks and ForeignArray for lifecycle assertions.
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.1" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
 # Hot-path allocation courts (tests/alloc_courts.rs): linking cgap_audit into
 # the test binary installs its CountingAlloc #[global_allocator] and exposes
 # with_alloc_tracking for the zero-alloc assertions.
-cgap-audit = { path = "../audit", version = "26.11.1" }
+cgap-audit = { path = "../audit", version = "26.11.2" }
 # The stardf consumer court now lives with its subject: stardf WIP upstream
 # (2026-10-31), and cgap must not carry any stardf dependency — cargo resolves
 # every workspace member's dev-deps during `cargo publish`, so a stardf
 # dev-dep here blocked packaging all four published crates. Moved to
 # ggen-legacy/stardf/arrow crates/stardf-arrow-capi/tests/cgap_consumer_court.rs
 # (path-dev-deps on cgap-ffi/cgap-audit from the stardf side).
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

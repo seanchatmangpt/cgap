@@ -4,10 +4,17 @@ version.workspace = true
 edition.workspace = true
 description = "Binary ontology (B-ONT) primitives, SHACL bitmask compiler and O-ABI reader for the cgap sovereign columnar substrate."
 repository.workspace = true
+authors.workspace = true
 license-file = "../../LICENSE.md"
 publish = true # P3-2b guard flip (2026-11-01): no guard line existed; A06 receipt ALIVE (docs/jira/v26.11.1/waves/a06-finish-receipt.md)
+categories = ['no-std', 'data-structures']
+keywords = ['ontology', 'shacl', 'bitmask', 'oabi', 'no_std']
 [lib]
 
 [dependencies]
 # A06 §9.1: zero dependencies except cgap-blake3 (workspace path dep).
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

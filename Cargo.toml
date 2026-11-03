@@ -40,7 +40,7 @@ members = [
 
 [workspace.dependencies]
 # v26.11.2 W6 lane W1: centralized branchless ALU/SWAR mechanics.
-cgap-branchless = { path = "crates/cgap-branchless", default-features = false }
+cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.2", default-features = false }
 
 [workspace.package]
 license-file = "LICENSE.md"

@@ -3,6 +3,10 @@ name = "csct"
 version = "0.1.0"
 edition = "2021"
 publish = false
+description = "Sovereign code-signing court tool (csct) for cgap sealed-evidence verification."
+license-file = "../LICENSE.md"
+repository = "https://github.com/seanchatmangpt/cgap"
+authors = ["Sean Chatman <info@chatmangpt.com>"]
 
 [dependencies]
 cgap-blake3 = { path = "../cgap-blake3" }

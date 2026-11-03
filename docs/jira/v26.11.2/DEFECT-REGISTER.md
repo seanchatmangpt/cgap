@@ -125,3 +125,86 @@ Every CLOSED row names the receipt that would re-open it (anti-vacuity law).
 
 - Close condition: a repair receipt with (1)+(2) witnesses and census
   exit 0. Re-open trigger: census exit 1 on any later tree.
+
+## D-DOD-20 refresh (2026-11-02, lane DOD-20) -- APPEND-ONLY status lines per row
+
+Re-census after the ~60-lane landing wave. Source of truth for this
+append: `audit/tc-10-open-recensus.md` re-read fresh this session, plus
+each cited receipt re-read from disk (not session memory). No history
+row rewritten; every line below is dated and cites file:line.
+
+- **D-G08-1 / R4 G2-PARETO (rollup)**: still OPEN,
+  measured-but-failing -- L1 MET, L2 NOT MET 2.31x, L4@4096 NOT MET
+  9.35 us/tx, L5 NOT MET with fused 29% REGRESSION (lane-gap-07:50-58),
+  L1 flip court VACUOUS (lane-gap-07:90), divan2receipt.py REFUSED
+  chains-* exit 1 (lane-gap-07:14-17). L3 remains CLOSED
+  (repairs/repair-06-radix-default-flip.md:58-81 unchanged).
+- **D-G08-2 / FA10 maximal consumer**: stays CLOSED as re-derived
+  2026-11-02 (this register, D-G08-2 above); fix (b) binding-gate arm
+  still OPEN per countermeasures/lane-fa10r:46-48. No new evidence.
+- **D-G08-3 / FA1 bench-doc framing**: still OPEN. No lane receipt
+  quoting an edited chains-ingress.rs:24 exists on disk this session
+  (grep over docs/jira/v26.11.2/lanes/ exit 1). Close condition
+  unchanged (owning lane's receipt + bench re-run exit 0).
+- **D-G08-4 / FA2 Cpk n=1**: still OPEN (owned by G09); no 30-trial
+  receipt on disk (grep exit 1 this session).
+- **D-G08-5 / RV1 per-lane select_slice**: still OPEN; LAW RV1-PERLANE
+  unchanged; no census-exit-0 witness landed.
+- **FR-06 checkpoint prototype: DEFECT-OPEN -> PARTIAL (2026-11-02)**.
+  Prototype EXISTS and is witnessed: zero-alloc-stage checkpoint.rs +
+  tracking_alloc.rs landed under crates/cgap-core/src/ and
+  #[path]-mounted as TEST-HARNESS modules, not lib members
+  (crates/cgap-core/src/lib.rs:4-5; lane-cgap-prd-06-checkpoint.md:11,:29).
+  Owed: (1) real lib mount (lib.rs membership), (2) fixpoint-scope --
+  the 2,662-alloc fixpoint sweep is lane-posh-04-sentry.md:21, not in
+  the checkpoint. Close = lib mount + fixpoint-scope receipt.
+- **R1 C6/C3 gates: CLOSED** (2026-11-02). MV-5 DECIDED re-scope;
+  c6 exit 0 min 211,174,510.4 facts/s vs 150M; c3 exit 0 min
+  36,918.401 ms vs 60,000 ms; anti-vacuity mutants exit 1 (both)
+  (lane-mv-05-sla-reconcile.md:22-27; tc-10-open-recensus.md section 1
+  row R1). 800M / 25 ms are ASPIRATIONAL, never gating.
+- **R2 parquet default-feature abort: CLOSED** (2026-11-02). Per-item
+  std gates landed: default `default = []`, std-only court under
+  `#[cfg(all(test, feature = "std"))]` (lane-fix02-parquet-features.md:7-13;
+  tc-10-open-recensus.md section 1 row R2).
+- **R8 build debris: CLOSED** (2026-11-02) per lane-gap-11-hygiene.md:13-20
+  (tc-10-open-recensus.md section 1 row R8).
+- **R9 member-count stale: CLOSED** (2026-11-02). "22-crate" corrected
+  to 23-crate truth (bench/beam/court/integration/cgap-verification
+  not counted the same way; publish=false table) --
+  lane-mv-08-doc-refresh.md:7-15, R9 CLOSED by that lane (:34).
+- **R10 zero-tax: OPEN-NARROWED, appends conflict flagged** (2026-11-02).
+  GAP-04 claimed CLOSED-by-append (lane-gap-04-zero-tax.md:56,:81);
+  MV-5's later append supersedes -- alias flips C3+C6 only;
+  C1/C2/C4-runner/C5/C7/C8 ignore zero-tax
+  (tc-10-open-recensus.md section 2 row R10; release-blockers:248-255).
+  Dispatch named "GAP-04+DOD-11" as the closing pair: NO
+  lane-dod-11*.md receipt exists on disk this session (ls exit 1), so
+  the DOD-11 half of that closure is UNVERIFIED and NOT cited here.
+- **R11 stale commit plan: CLOSED** (2026-11-02). R11 REFRESHED by
+  MV-8 (lane-mv-08-doc-refresh.md:34); 252 fresh entries at
+  release-blockers:185 per tc-10-open-recensus section 1.
+- **NEW-7 cgap-core manifest_court::dod10_no_spdx: FIXED this session**
+  (2026-11-02). Previously the ONLY failure, full-suite exit 101
+  (lane-cgap-prd-06:5-8; owner unassigned then). DOD-01 landed the SPDX
+  fix: suite green exit 0, anti-vacuity sandbox mutation re-flips the
+  court at 101 (lane-dod-01-spdx.md:28-35). DOD-20 independent
+  re-witness THIS session: `CARGO_TARGET_DIR=/tmp/dod20-target cargo
+  test -p cgap-core` -> exit 0, 13 test binaries all `test result: ok`,
+  0 failures, dod10_no_spdx passing. Close condition satisfied; row
+  moves to CLOSED (re-open trigger: any later full-suite exit != 0 on
+  manifest_court).
+- **NEW-5 POSH-2 gate decision: still pending** (2026-11-02). Honest
+  typed GATE FAIL, batch min=23.22/med=23.35/max=23.43 ns/frame = 2.3x
+  (lane-posh-02-batch.md:29-32); release-only gate, debug build is a
+  LOUDSKIP (:38). Close = operator gate-change receipt (R1 precedent)
+  or repair to <=10 ns with flip court. Dispatch named DOD-12's
+  package: no lane-dod-12*.md receipt on disk (ls exit 1) -- decision
+  remains UNVERIFIED until that receipt lands.
+- **AX-family registration gap (disclosed by DFX-6)**: DFX-6's census
+  over the defect/audit corpus found ZERO AX rows registered in this
+  register or release-blockers -- gap disclosed, not self-registered
+  (lane-dfx-06-rollup.md:21-22). This append is the registration
+  corrective: AX legs live in lanes/ax-* receipts (AX-0 GO through
+  AX-9 NO-GO, lane-ax-09:8-11) and tc-10-open-recensus.md NEW-3/NEW-4,
+  not as register rows until now.

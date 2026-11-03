@@ -102,6 +102,15 @@ fn median(sorted: &[f64]) -> f64 {
 }
 
 fn main() {
+    // R10 zero-tax typed-refusal arm (child-native, belt-and-suspenders
+    // over the runner-level C4 gate, lane-gap-04): zero-tax must NOT be
+    // conflated with this bin's `CSCB_MUTATE=1` bitflip mutation.
+    if env::var("CSCB_MUTATE").as_deref() == Ok("zero-tax") {
+        eprintln!(
+            "ANDON: cscb_c7_receipt_sealing typed-REFUSES CSCB_MUTATE=zero-tax (R10 flip court) -> exit 1"
+        );
+        std::process::exit(1);
+    }
     let debug = cfg!(debug_assertions);
     if debug {
         println!("[C7-DEBUG] phase=boot n={} runs={}", N_RECEIPTS, RUNS);

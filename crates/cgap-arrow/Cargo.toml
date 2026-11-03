@@ -6,15 +6,22 @@ description = "Freestanding Apache Arrow columnar substrate: branch-free kernel 
 repository.workspace = true
 authors.workspace = true
 publish = true
+categories = ['no-std', 'data-structures', 'encoding']
+keywords = ['columnar', 'arrow', 'branchless', 'no_std', 'zerocopy']
 license-file = "../../LICENSE.md"
 
 [features]
-default = []
+default = ["nested-types"]
 std = []
 # Nested/variable-width column types (A2P prune, v26.11.2): timestamps.
-# Default OFF so the embedded/wasm audit surface excludes them. The other
-# prune candidates (varlen/views/runend/slice/c_abi_nested) stay ungated —
-# each has a live dependency edge (batch.rs / audit / integration tests /
+# DEFAULT ON for one cycle (semver remedy, PUB-04 audit: gating `pub mod
+# timestamps` off under default features removed reachable 26.11.1 API
+# = BREAKING). DEPRECATED FOR REMOVAL in the next major — downstream
+# must migrate off the `Timestamp*` re-exports (cgate them explicitly
+# or vendor); when removed, default returns to `[]` and the embedded/
+# wasm audit surface regains its exclusion. The other prune candidates
+# (varlen/views/runend/slice/c_abi_nested) stay ungated — each has a
+# live dependency edge (batch.rs / audit / integration tests /
 # mutation_kills), recorded in the lane receipt.
 nested-types = []
 
@@ -28,3 +35,7 @@ nested-types = []
 cgap-core = { path = "../cgap-core" }
 cgap-gate = { path = "../cgap-gate" }
 cgap-storage = { path = "../cgap-storage" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

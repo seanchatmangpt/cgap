@@ -67,18 +67,18 @@ dependencies = [
 
 [[package]]
 name = "cgap-arrow"
-version = "26.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6d7ed6e02efea427a9781c30a844eca2873e3657c8d2d24b32cf18580f3021"
-
-[[package]]
-name = "cgap-arrow"
 version = "26.11.2"
 dependencies = [
  "cgap-core",
  "cgap-gate",
  "cgap-storage",
 ]
+
+[[package]]
+name = "cgap-arrow"
+version = "26.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b545c6a44ac810ed61edb4a82853c7edb4a36b52ef5cf2ad1ca33f7f4cc9ba9"
 
 [[package]]
 name = "cgap-audit"
@@ -100,13 +100,13 @@ dependencies = [
 
 [[package]]
 name = "cgap-blake3"
-version = "26.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a6e81627183c2ad67d0604cae2e22e2c1b59486be37bb0041080dd2e6b1e0e2"
+version = "26.11.2"
 
 [[package]]
 name = "cgap-blake3"
 version = "26.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9af40005fc0a08622556aca1aa948994ae14eef91fcf8ec8a8a852fc4b774915"
 
 [[package]]
 name = "cgap-bn3"
@@ -201,18 +201,18 @@ dependencies = [
 
 [[package]]
 name = "cgap-git"
-version = "26.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a64205d008c066721c65ba1583db6c1ac618f7c82dac9e65cc9c8b5907b2077"
-
-[[package]]
-name = "cgap-git"
 version = "26.11.2"
 dependencies = [
  "cgap-blake3 26.11.2",
  "cgap-bn3",
  "cgap-parquet 26.11.2",
 ]
+
+[[package]]
+name = "cgap-git"
+version = "26.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10e0f756fefbe36e19006070e4b17963a8a71001d46ce9973a9fbdeb938c9cf6"
 
 [[package]]
 name = "cgap-gpu"
@@ -226,11 +226,11 @@ dependencies = [
 name = "cgap-integration"
 version = "26.11.2"
 dependencies = [
- "cgap-arrow 26.11.1",
+ "cgap-arrow 26.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cgap-audit",
- "cgap-blake3 26.11.1",
- "cgap-git 26.11.1",
- "cgap-parquet 26.11.1",
+ "cgap-blake3 26.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cgap-git 26.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cgap-parquet 26.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -243,16 +243,16 @@ dependencies = [
 
 [[package]]
 name = "cgap-parquet"
-version = "26.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "028649a34bc76401a802ed745fc44b191c11363c25bd6cb7a3d455f8ac31b44c"
-
-[[package]]
-name = "cgap-parquet"
 version = "26.11.2"
 dependencies = [
  "cgap-arrow 26.11.2",
 ]
+
+[[package]]
+name = "cgap-parquet"
+version = "26.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d4aa1e90fe099a7f30c26fdcb47571154c9cb7d2a1a8fec720fb8c005f7368"
 
 [[package]]
 name = "cgap-storage"

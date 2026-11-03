@@ -25,6 +25,21 @@ exit 0 this session at 26.11.2.
 - Bare-metal `riscv32imc-unknown-none-elf` build exit 0, ELF symbol audit
   clean — `waves/a01-finish-receipt.md`.
 
+## Deprecation notice: `nested-types` feature (26.11.2)
+
+The `nested-types` feature (`pub mod timestamps` + the `TimestampMicro`/
+`TimestampMilli`/`TimestampNano`/`TimestampSecond` re-exports) is DEFAULT ON
+for one release cycle as a semver remedy — a v26.11.2 draft moved them behind
+a default-off gate, which would have removed API reachable under 26.11.1
+default features (BREAKING; audit `docs/jira/v26.11.2/audit/
+pub-04-semver-delta.md`).
+
+**This feature is deprecated for removal in the NEXT MAJOR.** Migrate off the
+`Timestamp*` re-exports now (gate them explicitly via
+`features = ["nested-types"]` or inline the timestamp constructors) so the
+major cut that returns `default = []` and drops the module is non-breaking
+for you.
+
 ## Install
 
 ```bash

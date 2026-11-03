@@ -35,9 +35,10 @@ if "$ENGINE" image inspect "$AX_IMAGE" >/dev/null 2>&1; then
     -e COURTS="$COURTS" \
     "$AX_IMAGE" bash -c '
       set -euo pipefail
+      cd /work
       cargo build --release -p cgap-ffi
       mkdir -p /opt/cgap/lib /opt/cgap/include
-      cp /tmp/target-release/libcgap_ffi.so /opt/cgap/lib/ 2>/dev/null || \
+      cp /tmp/target/release/libcgap_ffi.so /opt/cgap/lib/ 2>/dev/null || \
         find /tmp -name "libcgap_ffi.so" -exec cp {} /opt/cgap/lib/ \;
       cp /work/include/*.h /opt/cgap/include/
       mkdir -p /go-cache /tmp/go-build

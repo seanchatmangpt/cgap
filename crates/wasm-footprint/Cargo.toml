@@ -6,6 +6,8 @@ description = "no_std cdylib wrapper supplying the wasm link glue (panic handler
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]
 publish = true # P3-10 guard flip (2026-11-01): path deps converted to registry deps
+categories = ['no-std', 'wasm']
+keywords = ['wasm', 'wasip1', 'footprint', 'no_std', 'cdylib']
 license-file = "../../LICENSE.md"
 
 [lib]
@@ -37,3 +39,7 @@ opt-level = 3
 # this crate its own workspace root, so a build from inside this directory is
 # self-contained: crate-local Cargo.lock and crate-local target/ dir.
 [workspace]
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]

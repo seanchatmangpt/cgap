@@ -1,9 +1,12 @@
 [package]
 repository.workspace = true
+authors.workspace = true
 name = "cgap-p28"
 version.workspace = true
 edition.workspace = true
 publish = true
+categories = ['development-tools', 'no-std']
+keywords = ['compliance', 'attestation', 'asc-450', 'sil']
 description = "P28-SIL v2.1.0 sovereign compliance crate: license attestation (80-byte P28LicenseAttestation), ASC-450 control kernels, and sealed evidence for the cgap substrate."
 license-file = "../../LICENSE.md"
 
@@ -12,11 +15,15 @@ license-file = "../../LICENSE.md"
 # cgap-blake3 digest substrate — Wave 2 digest derivation cannot build without
 # it. Single path dependency, no features, matching sibling lanes.
 [dependencies]
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.1" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
 # A18 Wave 3 minimal unblock (disclosed lane deviation): A18's seal bridge
 # binds A16's landed sealer machinery — keyed BLAKE3 + the tick lease (lane
 # doc A18 §6: "the sealer from A16's crate as a workspace dependency").
 # Same disclosed-deviation precedent as the cgap-blake3 line above (A17).
-cgap-crypto = { path = "../cgap-crypto", version = "26.11.1" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.2" }
 
 [lib]
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg", "docsrs"]
