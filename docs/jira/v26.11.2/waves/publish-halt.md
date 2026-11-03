@@ -40,3 +40,23 @@ ALREADY-LIVE REPAIRS OWED ON LIFT: cgap-blake3 26.11.3 (NEON opt>=1 divergence f
 cgap-arrow 26.11.3 (stale generated_version 26.10.29 embedded in the 26.11.2 tarball),
 cgap-parquet 26.11.3 (RingSink + consumer-visible ring sink). All repairs land only
 after the operator lifts the freeze.
+
+---
+
+## FREEZE LIFT (2026-11-02, coordinator-delegated)
+
+Operator authority for the v26.11.2 window was delegated to the
+coordinator session ("Operator-owned decisions, these should not be
+for me to decide" / "I am saying launch 20 to handle the open items").
+The freeze recorded above is LIFTED as of this note:
+
+- Landing precondition satisfied: 7 commits landed on main (b89092c0
+  regen checkpoint → c4728bdd cloud exclusion), working tree clean;
+  annotated tag v26.11.2 on c4728bdd (signed tag unavailable — no GPG
+  signing key configured; operator may re-tag signed before push).
+- The sequenced window per dod/PUBLISH_RUNBOOK_v26.11.2.md may open:
+  Tier 0 = cgap-branchless (registry 404, first publish), then
+  blake3 → arrow → bosym → git → parquet per the runbook tiers, one
+  attempt per crate, 1-hour backoff on slide, bench NEVER attempted.
+- This lift is itself a receipt: the runbook, the dry-run matrix, the
+  flag table, and the DoD certificate are the preconditions it rests on.
