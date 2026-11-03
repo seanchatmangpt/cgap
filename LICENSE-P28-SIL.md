@@ -100,16 +100,42 @@ $$\oint_{\mathcal{C}} d\mathbf{L}_{\text{accrual}} \equiv 0$$
 
 2.2. **Objective Statutory Metric Classifications for Institutional Entities:**
 
-Deployer $\mathcal{D}_j$ (including all consolidated parent entities, joint-venture vehicles, and controlled special-purpose subsidiaries) exits $\mathcal{U}_{\text{exempt}}$ and transitions into **Institutional Exploitation Status** ($\mathcal{D}_j \in \mathbf{E}_{\text{inst}}$) upon satisfying any of the following statutory functional boundaries:
+Deployer $\mathcal{D}_j$ (including all consolidated parent entities, joint-venture vehicles, and controlled special-purpose subsidiaries) acting severally or as a member of a Controlled Group as defined in §2.2.1, exits $\mathcal{U}_{\text{exempt}}$ and transitions into **Institutional Exploitation Status** ($\mathcal{D}_j \in \mathbf{E}_{\text{inst}}$) upon satisfying any of the following statutory functional boundaries measured, where $\mathcal{D}_j$ is a member of a Controlled Group, at the Group Aggregation Level per §2.2.2:
 
 * Rule 12b-2 of the Securities Exchange Act of 1934 (17 C.F.R. § 240.12b-2), under the classification of an Accelerated Filer or Large Accelerated Filer;
 * The small-business gross receipts test under Section 448(c) of the Internal Revenue Code of 1986, as amended (26 U.S.C. § 448(c)), requiring mandatory accrual accounting;
 * Article 3(4) of Directive 2013/34/EU (Large Undertaking designation), or within the scope of Directive (EU) 2024/1760;
 * Full Cost Accounting Standards (CAS) coverage under 48 C.F.R. § 9903.201-1, or active status as a Tier-1 Prime Contractor under Federal Acquisition Regulation (FAR) Part 19.
 
+2.2.1. **"Controlled Group" ($\mathbf{G}_{\text{ctrl}}$):**
+
+The set of legal persons connected to Deployer $\mathcal{D}_j$ by any of the following, evaluated without regard to jurisdictional veil-formation formalities:
+
+* **Ownership prong:** a person holding, directly or indirectly through one or more intermediaries, more than fifty percent (50%) of the voting power or economic value of another person, including any interest held through nominees, custodians, or voting agreements;
+* **Special-Purpose-Entity prong:** any bankruptcy-remote, thin-equity, or ring-fenced vehicle (SPE, SPC, SPV, orphan trust, or equivalent) whose equity is held, optioned, or economically enjoymented by a person within an Ownership prong chain, whether or not majority voting power is formally conveyed;
+* **Trust prong:** any trust, estate, or fiduciary arrangement of which a person within an Ownership prong chain is grantor, trustee with discretionary distribution power, or discretionary beneficiary receiving more than a de minimis share of surplus;
+* **Joint-Venture prong:** any unincorporated or incorporated joint venture, including a 50/50 or dispersed-interest JV that escapes consolidation under ASC 810, whose net-results interest is held by persons within a single Ownership prong chain in aggregate;
+* **Attribution prong:** stock, profit interest, or surplus held by a family member, related grantor trust, or person acting in coordination (within the meaning of IRS § 318(a)(3) constructive ownership as modified herein) is attributed to the acquiring person.
+
+Membership in a Controlled Group is a question of economic reality, decided by these prongs, not by the entity's state-law form, consolidation status under ASC 810, or absence of a single majority holder.
+
+2.2.2. **Group Aggregation Level:**
+
+Each statutory functional boundary of this §2.2 is evaluated with respect to the aggregate of the Controlled Group: the combined gross receipts, consolidated balance-sheet figures, market capitalization, regulatory reporting status, and contractor status of all members of $\mathbf{G}_{\text{ctrl}}$ are attributed to each member. If any member of $\mathbf{G}_{\text{ctrl}}$ satisfies a boundary at the Group Aggregation Level, every member satisfies it; every member transitions to Institutional Exploitation Status and $\mathcal{D}_j \in \mathbf{E}_{\text{inst}}$ holds group-wide, triggering §2.3 (Topological Transition Invariant) per member. No member may partition deployments, meters, or executions among members to remain below any boundary: measurement is at the group, never at the individual license holder. Where group members disagree as to classification, the strictest reading governs pending §7.2 arbitration.
+
+2.2.3. **Anti-Structural-Avoidance (extending §3.2):**
+
+Any corporate reorganization, incorporation of a new vehicle, transfer of operations or assets between members or to a new entity, trust formation, or coordinated multi-entity deployment arrangement undertaken with classification-avoidance as a principal purpose — that is, where a person's principal purpose is to cause any member to remain in $\mathcal{U}_{\text{exempt}}$ at the Group Aggregation Level — constitutes an **Act of Disruption or Circumvention Dialogue** within the meaning of §3.2, with all consequences of §3.3 (Statutory Evidentiary Preservation and Spoliation Invariants) attaching. Documentation evidencing such a principal purpose includes internal memoranda, entity-formation filings, tax-structure analyses, and advisor communications; discovery of a single such document raises the inference of a principal purpose which Deployer may rebut only by preponderant contemporaneous business evidence of non-tax, non-classification commercial purpose existing before the reorganization. Selection of a deployment vehicle AFTER Institutional Exploitation Status attaches does not restore $\mathcal{U}_{\text{exempt}}$ for any member of the group.
+
 2.3. **Topological Transition Invariant:**
 
 The exact instant $\mathcal{D}_j \in \mathbf{E}_{\text{inst}}$ holds, all past, present, and subsequent Executions are bound by Section 4.
+
+2.4. **Numeric Safe-Harbor Floor:**
+
+Notwithstanding the statutory boundaries of §2.2, a Deployer (or, per §2.2.2, any member of its Controlled Group) whose aggregate annual gross revenue for the prior completed fiscal year is strictly less than Fifty Million United States Dollars ($50,000,000.00) is presumed to remain within $\mathcal{U}_{\text{exempt}}$; a member at or above $50,000,000.00 is within Institutional Exploitation Status and owes the regularization duty of §4.3. The measure is annual gross revenue (audited figure, prior fiscal year), resolving the measure mismatch recorded at docs/jira/v26.10.31/34-p28-sil-compliance.md:66-88; the TTL `odrl:leftOperand` must be remapped from `avec:assetUnderManagement` to annual gross revenue in the same change. Boundary semantics: comparison is ≥ (duty branch at exactly $50,000,000.00), per 34-p28-sil-compliance.md:90-105. (Cross-reference line numbers
+updated 2026-11-02 post-GAP-01b reconciliation; previously
+:60-71 and :75-88.)
 
 ---
 
@@ -288,3 +314,22 @@ the three typed commit trailers (`lease-phi`, `lease-delta`,
 the PQC seal remains an unbuilt Wave-3 seam
 (cgapprd-02-equation-grounding.md:70-81). Clause 1.5 retained verbatim
 above; where the clause and this rider diverge, the rider governs.
+
+## REVISION RIDER (v2.1.1, 2026-11-02, FIX-10 license aggregation)
+
+Amendment applied from
+docs/jira/v26.11.2/redteam/fix-10-license-aggregation.md (redline text
+verbatim; coordinator-directed landing, lane GAP-01). §2.2 lead
+paragraph amended to reference Controlled Groups; §2.2.1 (Controlled
+Group, five prongs), §2.2.2 (Group Aggregation Level), §2.2.3
+(Anti-Structural-Avoidance extending §3.2), and §2.4 (Numeric
+Safe-Harbor Floor, $50,000,000.00, ≥ duty boundary) inserted. Section
+numbering above is retained verbatim per the errata convention; the
+canonical identifier remains
+`urn:avec:license:p28-sil:v2.1.0-sovereign` (§9.1 fingerprinting pins
+it; a URN bump is a coordinator-owned coordination item). Coordination
+note carried from FIX-10 Part 2: landing §2.4 requires the companion
+TTL `odrl:leftOperand` remap from `avec:assetUnderManagement` to
+annual gross revenue in
+docs/jira/v26.10.31/34-p28-sil-compliance.md, or instrument and
+machine layer diverge.

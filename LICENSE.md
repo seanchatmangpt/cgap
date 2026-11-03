@@ -10,8 +10,10 @@ identified by URN (§9 of the instrument).
 [LICENSE-P28-SIL.md](LICENSE-P28-SIL.md) (P28-SIL v2.1.0,
 `urn:avec:license:p28-sil:v2.1.0-sovereign`): the evidentiary license
 that replaces litigation with cryptographic execution receipts
-(BLAKE3 turnstile proofs in the Git Packfile v2 ledger), the $50M
-universal safe harbor, the covenant not to sue upon commercial
+(BLAKE3 turnstile proofs in the Git Packfile v2 ledger), the
+$50,000,000.00 annual gross revenue safe-harbor floor per
+LICENSE-P28-SIL.md §2.4 (group-aggregated per §2.2.1-2.2.3,
+v2.1.1), the covenant not to sue upon commercial
 regularization, and ASC 450 / SOX 302/404 accounting enforcement.
 
 Identify the instrument as `LicenseRef-P28-SIL-2.1.0` or
