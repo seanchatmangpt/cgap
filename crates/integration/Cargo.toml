@@ -7,7 +7,7 @@ edition = "2021"
 description = "Cross-crate integration tests: C-ABI roundtrip, alignment law, format-code table, varlen/views roundtrips."
 license-file = "../../LICENSE.md"
 publish = true # P3-10 guard flip (2026-11-01): registry-only dep surface
-categories = ['development-tools', 'testing']
+categories = ['development-tools']
 keywords = ['integration', 'roundtrip', 'cabi', 'wire-parity']
 
 # cgap-arrow is consumed ONLY by tests/ (dev-dep below); declaring it in
