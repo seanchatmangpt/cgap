@@ -179,6 +179,78 @@ Every cell filled; no silent-missing. Receipt slots are
 | G7-FLIP | verify_ost_design_around.py | claim / prior-art merge | 3 loud | w3-g7-court |
 | G8-FLIP | purrdf stardf scripts | remove one mapping | 2 loud | w3-g8-court |
 
-Standing: this file is a corpus definition, not a run receipt. Courts are UNVERIFIED
-until their eight-step receipts land in the named wave slots. Line cites are as-of
-2026-11-01 on-disk tree.
+## 6. Wave-added courts (reconciled 2026-11-02, lane RW-05)
+
+The wave landed test-binary courts beyond the §2/§3 L/G roster. §5's
+13-row flip summary is the L1-L5 + G1-G8 roster ONLY — it is not the
+campaign court count. XC-05's conformance-kit exporter inventoried **91
+courts** at its run (81 cargo-test targets, 5 corpus-doc entries, 5
+gate-mode entries; `lanes/lane-xc05-conformance-kit-exporter.md:30,34`) —
+superseded (historical). X-05's audit regenerated the exporter
+(conformance_kit_export byte-identical across two runs) and counted
+**95 courts** (85 cargo-test targets + 5 corpus-doc + 5 gate-mode); the
++4 delta vs XC-05 is the wave's post-XC-05 courts. All 15 §6 wave
+courts verified present and present in the manifest
+(`lanes/lane-x05-court-corpus-audit.md`; receipt pending on disk at
+this edit — lane X-05FIX, 2026-11-02).
+The §6 entries below carry one-line descriptions with the owning
+receipt; subjects are cited file:line from the on-disk tree at
+reconciliation time.
+
+- `cgap-git/tests/breach_regression_court.rs` — breach-of-the-week
+  regression tollgate; each red-NN confirmed breach pins a named arm.
+  Receipt: `lanes/lane-r14-breach-regression-court.md`.
+- `cgap-gate/tests/penstock_corpus_court.rs` — malformed-corpus
+  differential court over penstock ingress (5 courts, exit 0).
+  Receipt: `lanes/lane-rc12-penstock-corpus-court.md`.
+- `cgap-git/tests/quota_alloc_purity_court.rs` — alloc purity across
+  quota refusal paths (red-09/red-14 hardening). Receipt:
+  `lanes/lane-rc14-quota-alloc-purity.md`.
+- `cgap-storage/tests/media_loss_recovery_court.rs` — whole-media-loss
+  DR over real `std::fs` media (6 courts). Receipt:
+  `lanes/lane-rc06-media-loss-dr-court.md`.
+- `cgap-storage/tests/journal_fault_matrix_court.rs` — derived
+  fault-class matrix over the journal (3 courts). Receipt:
+  `lanes/lane-rc07-journal-fault-matrix.md`.
+- `cgap-bn3/tests/capacity_bound_court.rs` — red-12 SRAM capacity pins
+  over bn3 state tables (3 courts). Receipt:
+  `lanes/lane-rc03-bn3-capacity-bound.md`.
+- `cgap-p28/tests/attestation_mac_court.rs` — keyed-MAC attestation
+  courts over the 80 B P28 attestation (4 tests). Receipt:
+  `lanes/lane-rc04-attestation-mac.md`.
+- `cgap-ffi/tests/stats_block_court.rs` — stats-block layout (size
+  120 / align 8, 15 pinned offsets) + sandbox mutation court (5
+  tests). Receipt: `lanes/lane-rc05-stats-block.md`.
+- `cgap-git/tests/ref_store_reentrancy_court.rs` — reentrancy courts
+  over the real reserve path (5 courts; mutation battery exit 101).
+  Receipt: `lanes/lane-rc01-ref-store-reentrancy.md`.
+- `cgap-git/tests/ref_store_width_arms_court.rs` — width-gated atomic
+  arm courts (5 legs, exit 0). Receipt:
+  `lanes/lane-rc02-ref-store-width-arms.md`.
+- `cgap-git/tests/andon_liveness_court.rs` — andon liveness over
+  ingress/egress escalation (5 tests post-ADV-12; 2 witnessed mutant
+  flips). Receipts: `lanes/lane-fix04-andon-quota.md` (owner) +
+  `lanes/lane-r-adv12fix-quota-repair.md` (3→5 expansion).
+- `cgap-git/tests/pack_demux_poison_court.rs` — F1/F2 poison closure
+  over pack_demux surplus/trailing arms (3 tests). Receipt:
+  `lanes/lane-fix05-pack-demux-poison.md`.
+- `cgap-ocel2/tests/tamper_court.rs` — ocel2 tamper falsifier court
+  (5 tests). Receipt: `lanes/lane-ocel01-cgap-ocel2-adapter.md`.
+- `cgap-ocel2/tests/roundtrip_court.rs` — column-projection roundtrip
+  chain-linkage court. Receipt:
+  `lanes/lane-ocel01-cgap-ocel2-adapter.md`.
+- `cgap-fleet-ops/tests/courts.rs` — fleet-ops lifecycle / refusal /
+  SLO / predicate courts (4 tests; mutation flips). Receipt:
+  `lanes/lane-rc13-fleet-ops.md`.
+
+Standing of §6 entries: each carries its owning receipt's command+exit
+run at that lane's session; this file does not re-run them — cells are
+as receipted, UNVERIFIED here until re-read at use time per repo law.
+Line cites are as-of the 2026-11-02 on-disk tree.
+
+## 7. Standing (supersedes the §5 tail note)
+
+This file remains a corpus definition, not a run receipt. §5 courts are
+UNVERIFIED until their eight-step receipts land in the named wave
+slots. §6 wave courts are receipt-backed per the table above. Line
+cites as-of 2026-11-01 (§2/§3/§5) and 2026-11-02 (§6) on-disk tree.

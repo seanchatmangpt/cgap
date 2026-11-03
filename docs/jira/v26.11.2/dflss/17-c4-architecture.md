@@ -145,11 +145,13 @@ the inner full-word comparison retains its own cost; `semi_join_masks`
 ## Ingress performance claim (migrated, correction 3)
 
 The full L1 chain is **[MEASURED] 10.20 ns/frame fastest (10.30
-median)** at 1,048,576 frames, divan, receipt
+median)** at 1,048,576 frames, divan, quiet host, receipt
 `waves/w3-l1-ingress.md:63,69-70`, registered in
-`11-measured-claims.md:26,27`. The <15 ns/frame target is MET by that
-number; any sub-10 ns claim is [TARGET] until measured under
-`06-bench-protocol.md`.
+`11-measured-claims.md:29` (row 5). The <15 ns/frame target is MET by
+that number on the quiet host only; contended divergence registered as
+row 28 of `11-measured-claims.md:52` (124.06 ns/frame slowest under
+combined bw+cpu load). Any sub-10 ns claim is [TARGET] until measured
+under `06-bench-protocol.md`.
 
 ## Honest-notes register (mandatory)
 

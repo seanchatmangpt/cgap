@@ -10,6 +10,32 @@ both via `git ls-files | xargs wc -c`.
 - GGEN-projected: 73 files, 109,885 bytes = 1.20% machinery share.
 - Largest residue: docs/jira prose 3,162,488 B (34.5%); hand-written crate rs ~4,078,900 B;
   scripts gates 590,104 B.
+
+## Freshness addendum (re-measured 2026-11-02, lane RW-06)
+
+The 2026-11-01 baseline above stays pinned to `waves/g1k-05-machinery-share-audit.md`
+and is NOT re-derived here — the machinery-share classification itself was not
+re-run, so the 1.20% share figure is UNVERIFIED for today's tree. Absolute
+census re-measured this session (method: `git ls-files` counts + `wc -c`/
+`os.path.getsize` totals, run this session):
+
+- Total tracked: 1,716 files, 14,261,546 B (was 903 files / 9,156,129 B —
+  the tree grew ~5.1 MB, mostly docs/jira: 6,110,372 B now vs 3,162,488 B at
+  baseline).
+- Live bench surface: `crates/bench/benches/` now 19 files (15 at baseline;
+  +mctq_consolidation.rs and others this wave). Ladder item 4's "15 files"
+  is stale; the registry should census at use time, not cite 15.
+- `docs/jira/**/waves/**`: 339 tracked files (doc named 414 at its measure
+  time — use the current count).
+- scripts/: 877,494 B (was 590,104 B); hand-written crate rs (crates/**/src/**):
+  3,903,678 B (was ~4,078,900 B — approximate at baseline, exact now).
+- `crates/cli/src/custom_handlers.rs`: 5,279 B + 3 tracked sibling files in
+  `custom_handlers/` (38,743 B, siblings only; seam total = 44,022 B) —
+  end-state seam figure stands (baseline named 36,920 B).
+
+Consequence: ladder item 3's "~34% from campaign docs" projection is stale
+arithmetic on the new denominator; treat all ladder shares as TARGET until
+re-derived from a fresh G1K-5-style classification.
 - Correction to the lane's report: the live bench surface is
   `crates/bench/benches/` (15 tracked files incl. the five chains-* benches); the repo-root
   `benches/` is an empty 0-file directory (the lane's `git ls-files` census counted the root

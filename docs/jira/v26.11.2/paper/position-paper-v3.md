@@ -204,7 +204,7 @@ UNMEASURED ([TARGET-v26.11.2]).
 | S1 enclave OEMs | Binary footprint | 28,679 B pre-link OBJECT, 87.5% of the 32,768 B budget | MEASURED (receipt: ../waves/w3-t3-silicon.md:36,50; subject class named: object, NOT linked ELF) |
 | S1 enclave OEMs | Linked-ELF ceiling 131,072 B / <115 KiB target | no linked-ELF receipt this campaign | UNMEASURED [TARGET-v26.11.2] (receipt: ../15-ctq-tree.md:36-38) |
 | S1 enclave OEMs | 0 alloc/panic symbols | 0/0 defined, arrow + blake3 + parquet | MEASURED (receipt: ../waves/w3-t3-silicon.md:56-62) |
-| S2 real-time | Frame ingress ns/frame | 10.20 fastest / 10.30 median, <15 ns target MET | MEASURED (receipt: ../waves/w3-l1-ingress.md:63,69-70) |
+| S2 real-time | Frame ingress ns/frame | 10.20 fastest / 10.30 median, <15 ns target MET (quiet host, divan fastest/median; contended divergence row 28: 124.06 ns/frame slowest) | MEASURED (scoped; receipt: ../waves/w3-l1-ingress.md:63,69-70; ../11-measured-claims.md rows 5/28) |
 | S2 real-time | Commit us/tx, ring path | 1.05-1.07 us/tx vs 45.8 recorded baseline, <4 us/tx MET | MEASURED (receipt: ../15-ctq-tree.md:52-55; ../waves/a3-ring-sink.md) |
 | S2 real-time | 0 blr / 0 br xN / 0 brk census | 0/0/0, direct bl only | MEASURED (receipt: ../waves/w3-t2-asm-census.md:23-29) |
 | S3 agentic AI | Closure facts/s/core | unmeasured; RDFox never executed; comparison arm = published 2-6.1M facts/s envelope | UNMEASURED [TARGET-v26.11.2] (receipt: ../11-measured-claims.md:26 row 26; ../06-bench-protocol.md:109-120) |

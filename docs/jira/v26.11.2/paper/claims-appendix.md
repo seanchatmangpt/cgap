@@ -27,7 +27,7 @@ absent from that table or derived from its cited receipts.
 | Q14 (s4.5) | rle_decode_direct | 49.95 us / 0 B max alloc | ../../v26.11.1/waves/bench-parquet-receipt.md:77 |
 | Q15 (s4.5) | bit_unpack rate | 6.05B values/s | ../../v26.11.1/waves/paper-finalize.md:88-90 (compendium figure carried via v2) |
 | Q16 (s5.1) | Pre-link object footprint | 28,679 B, 87.5% of 32,768 B | ../waves/w3-t3-silicon.md:36,50 |
-| Q17 (s5.1) | Ingress chain | 10.20 fastest / 10.30 median ns/frame | ../waves/w3-l1-ingress.md:63,69-70 |
+| Q17 (s5.1) | Ingress chain | 10.20 fastest / 10.30 median ns/frame (quiet host, divan fastest/median; contended divergence row 28: 124.06 ns/frame slowest) | ../waves/w3-l1-ingress.md:63,69-70; ../11-measured-claims.md rows 5/28 |
 | Q18 (s5.1) | Ring commit | 1.05-1.07 us/tx vs 45.8 baseline | ../15-ctq-tree.md:52-55; ../waves/a3-ring-sink.md |
 | Q19 (s5.1) | Asm census | 0 blr / 0 br xN / 0 brk | ../waves/w3-t2-asm-census.md:23-29 |
 | Q20 (s5.1) | Court flips L1/L2/L5 | exit 101 x3 | ../11-measured-claims.md:44-46 rows 23-25 |

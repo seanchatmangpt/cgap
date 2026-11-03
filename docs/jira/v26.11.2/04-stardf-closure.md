@@ -220,3 +220,15 @@ runs). Divergences recorded: build-baseline.md absent; license gate
 exists-but-broken (not "never-written"); workflow.js at repo-root
 workflows/ not arrow/workflows/; 392 riscv error count UNVERIFIED;
 contract path arrow-relative vs ticket's legacy layout.
+
+Quantitative sweep (lane RW-03, 2026-11-02, vs the exclusive numeric
+registry docs/jira/v26.11.2/11-measured-claims.md): this spec carries
+NO campaign perf/footprint figures — the registry-scoped rows (10.20
+ns/frame quiet-host ingress, row-28 contention divergence, 36,048 B
+subject-scoped footprint, bn3 6,520,984 B REFUSED, row-29
+"constant-time" UNSUPPORTED) do not appear here, so nothing to
+rewrite. Remaining numbers are counts of on-disk artifacts (11 missing
+typedefs, 13 TypeDefinitions / 5264-line contract, 10-vs-10 disjoint
+golden digests, 128 AbiFunction) each already bound to its witnessed
+receipt; the 392-error riscv count remains DISPATCH-CLAIMED/UNVERIFIED
+per (e) above and is never quoted as a fact.

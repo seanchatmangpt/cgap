@@ -203,24 +203,42 @@ avec:Kernel_WASM32_SIMD128 a avec:HardwareKernel ;
 
 ### ---------- P28 ODRL policy ----------
 
+<!-- AMENDMENT (2026-11-02, lane I-11): the two safe-harbor/duty
+     odrl:leftOperand values below were remapped from
+     avec:assetUnderManagement (AUM) to avec:annualGrossRevenue per
+     LICENSE-P28-SIL.md section 2.4 (Numeric Safe-Harbor Floor, v2.1.1
+     rider) and its section 2.2.2 Group Aggregation Level semantics.
+     Amendment-of-Record:
+     docs/jira/v26.10.31/34-p28-sil-compliance.md ("Amendment note
+     (2026-11-02)"). Prior operand values are retained verbatim in the
+     errata/history note at the foot of this section (ERRATA-never-rewrite). -->
+
 avec:SovereignInvariantPolicy_v1 a odrl:Policy ;
     odrl:permission [
         a odrl:Permission ;
         odrl:action odrl:use ;
         odrl:constraint [
             a odrl:Constraint ;
-            odrl:leftOperand avec:assetUnderManagement ;
+            # AMENDMENT 2026-11-02 (lane I-11): was avec:assetUnderManagement;
+            # remapped per instrument section 2.4.
+            odrl:leftOperand avec:annualGrossRevenue ;
             odrl:operator odrl:lt ;
             odrl:rightOperand "50000000"^^xsd:decimal ;
             odrl:unit <https://avec.chatman.dev/unit/USD>
         ] ;
-        rdfs:comment "Safe harbor: AUM below $50M may use without regularization duty."
+        rdfs:comment "Safe harbor: annual gross revenue (audited figure, prior
+            fiscal year) strictly below $50,000,000.00 USD; measured at the
+            Group Aggregation Level per instrument section 2.2.2 — a member
+            of a Controlled Group is measured on combined group figures."
     ] , [
         a odrl:Permission ;
         odrl:action odrl:use ;
         odrl:constraint [
             a odrl:Constraint ;
-            odrl:leftOperand avec:assetUnderManagement ;
+            # AMENDMENT 2026-11-02 (lane I-11): was avec:assetUnderManagement;
+            # remapped per instrument section 2.4. Boundary stays >=:
+            # duty branch fires at exactly $50,000,000.00.
+            odrl:leftOperand avec:annualGrossRevenue ;
             odrl:operator odrl:gte ;
             odrl:rightOperand "50000000"^^xsd:decimal ;
             odrl:unit <https://avec.chatman.dev/unit/USD>
@@ -236,6 +254,37 @@ avec:SovereignInvariantPolicy_v1 a odrl:Policy ;
         odrl:action avec:emitTelemetryLog ;
         rdfs:comment "EU AI Act Art 12/14/62: log emission duty for high-risk system telemetry."
     ] .
+
+<!-- CLOSED note (E-08 demand, 2026-11-02, lane I-11): the pending
+     measure-mismatch reconcile item in
+     docs/jira/v26.10.31/34-p28-sil-compliance.md is CLOSED by this
+     remap. The machine layer (this TTL) and the instrument
+     (LICENSE-P28-SIL.md section 2.4, inserted by the v2.1.1 rider,
+     lane GAP-01: docs/jira/v26.11.2/lanes/lane-gap01-license-amendment.md)
+     now pin the identical measure — annual gross revenue (audited
+     figure, prior completed fiscal year) — with identical boundary
+     semantics (>= ; duty branch at exactly $50,000,000.00, per
+     34-p28-sil-compliance.md boundary-value pinning). This note is the
+     Amendment-of-Record witness for the remap; the compliance doc's
+     "the TTL operand remap itself is still pending" state is hereby
+     superseded. -->
+
+<!-- HISTORY (ERRATA-never-rewrite; superseded 2026-11-02): both
+     odrl:leftOperand values at former lines 212/223 read
+     `avec:assetUnderManagement`, with safe-harbor comment
+     "Safe harbor: AUM below $50M may use without regularization duty."
+     Retained verbatim here; see the AMENDMENT block above. -->
+
+avec:annualGrossRevenue a odrl:LeftOperand , owl:NamedIndividual ;
+    rdfs:label "Annual gross revenue (USD)" ;
+    rdfs:comment "Aggregate annual gross revenue for the prior completed
+        fiscal year (audited figure), per LICENSE-P28-SIL.md section 2.4.
+        At the Group Aggregation Level (section 2.2.2) the combined
+        figures of all section 2.2.1 Controlled Group members are
+        attributed to each member; no member may partition deployments,
+        meters, or executions to stay below the $50,000,000.00 boundary
+        (section 2.2.3 anti-avoidance imports section 3.3 spoliation
+        invariants)." .
 
 avec:SettlementLatencyConstraint a odrl:Constraint ;
     odrl:leftOperand avec:settlementLatencyNs ;

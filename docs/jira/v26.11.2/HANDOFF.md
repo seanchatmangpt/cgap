@@ -27,7 +27,11 @@ waves/v2-07-census.md (139 landed-ALIVE / 11 landed-PARTIAL /
   urllib against crates.io: HTTP 200 x6 + fibo/cloud + storage flip);
   coord-publish-record.md (five kernels, exit 0 x5, one invocation
   each, W2-1 independent witness). RESTART-NOW.md records 18/22 —
-  the census's storage flip postdates it; 19/22 is current.
+  the census's storage flip postdates it; 19/22 was current at
+  census time, now superseded by PUB-02b
+  (audit/pub-02-flag-table-rederivation.md, 2026-11-02): 23/23
+  members explicit, 20 publish-true / 3 publish-false, 19/20
+  registry-exist.
 ## 2. GATE-STATUS TABLE (G1-G8, on-disk names per 01-release-gates.md)
 
 Standing re-read this session; evidence pointers are file:line on disk
@@ -56,8 +60,11 @@ table.
   dispatch; PRD lines are campaign prose. [Registered divergence]
 - **D-2 Published count**: RESTART-NOW.md records 18/22; HANDOFF SS1
   F3 and 01-release-gates.md:27,32 record 19/22 (the census storage
-  flip postdates RESTART-NOW). 19/22 is current; PRD HEAD says 18/22
-  of 22 published [TARGET-v26.11.2: 19/22].
+  flip postdates RESTART-NOW); both are now superseded by PUB-02b
+  (`audit/pub-02-flag-table-rederivation.md`, 2026-11-02): 23/23
+  members explicit, 20 publish-true / 3 publish-false, 19/20
+  registry-exist (branchless + integration 404-pending). PRD HEAD
+  says 18/22 of 22 published [SUPERSEDED by PUB-02b].
 - **D-3 sovereign.rs line span**: 02-pareto-levers.md:92 cites
   `sovereign.rs:706-730`; PRD 00-ard-prd.md:43 cites `:706-724`. On
   disk the File::create call site sits inside 706-730 (call site at
@@ -200,3 +207,75 @@ is included.]
   waves/ as of this session) — loud, not silent.
 - **Publishes**: FROZEN (unchanged from SS4; operator lift required).
   Loop terminal condition stays BLOCKED on that lift.
+
+## 7. Session-state refresh (lane HANDOFF-01, 2026-11-02)
+
+Cold-start summary; every cite re-read on disk this session.
+Supersedes the 2026-11-01 rows above only where explicitly noted.
+
+### 7.1 Where things stand
+
+- **All waves landed**: red, hardening, corrosion (adversarial FA1-11),
+  tollgate, DoD, charter — receipts on disk under audit/, closure/,
+  hardening/, countermeasures/, convergence/, exhaustive/, explore/,
+  repairs/, mega-bench/, lanes/, waves/, dflss/.
+- **Prepublish reconciliation GREEN**: workspace build exit 0; per-crate
+  tests exit 0 (ffi/git/storage/bn3/p28); gate battery 4/4 + self-check
+  8/8 exit 0; riscv designed-flip pair 101/0
+  (`audit/prepublish-reconciliation.md`, command table re-read).
+- **Publish freeze FROZEN-BY-OPERATOR**: no publish attempt authorized
+  until the operator lifts it (`audit/prepublish-state.md:8-14`,
+  `waves/publish-halt.md`). 8 crates published at 26.11.2 pre-halt;
+  7 dry-run-READY; 3 publish-false.
+- **DoD certificate: PENDING**. The coordinator dispatch names "FS-18";
+  zero on-disk referent carries that ID (grep'd, per
+  `GOAL-LOOP.md` terminal-state block). Nearest landed carriers:
+  `audit/dod-18-ledger-fold.md` (143 lane-dir entries folded) and
+  `audit/dod-19-shipgate-final.md` (SPEC; coordinator table-update
+  commit owed). FS-15 likewise has no disk referent.
+
+### 7.2 Cold-start reading order
+
+A restart session reads, in order:
+
+1. `docs/jira/v26.11.2/audit/prepublish-state.md` — authoritative
+   pre-publish state (I-15); records, never lifts, the freeze.
+2. `docs/jira/v26.11.2/dod/PUBLISH_RUNBOOK_v26.11.2.md` — operator
+   command sequence; a PLAN, not an authorization.
+3. `docs/jira/v26.11.2/dflss/00-dflss-master-dossier.md` — campaign
+   charter/measure baseline.
+4. `docs/jira/v26.11.3-forward-backlog.md` — WRONG PATH as printed;
+   correct on-disk path is
+   `docs/jira/v26.11.2/dod/v26.11.3-forward-backlog.md` — the
+   v26.11.3 entry point (DOD-13 ledger, P-07..P-10 plans + OPT-01..05).
+
+### 7.3 Outstanding coordinator-owned items
+
+1. **Commit landing** — every in-flight wave diff committed via
+   `git commit -F <file>`. The dispatch cites
+   `dod/COMMIT_MSG_v26.11.2.txt`; that file does NOT exist on disk
+   (checked this session). Message must be written fresh or its
+   on-disk path corrected. Divergence recorded.
+2. **DoD certificate artifact** ("FS-18" in dispatch; no disk
+   referent) — coordinator to name the artifact explicitly.
+3. **Signed tag** — no v26.11.2 tag exists yet; coordinator-owned.
+4. **Freeze lift** — operator-only; prepublish-state.md records,
+   never lifts.
+5. **CLAUDE.md hunks** — apply, in order, the kit at
+   `dod/claude-md-handoff.patch.md` (AWAITING-COORDINATOR-LANDING;
+   every before-line byte-verified against CLAUDE.md this session
+   per its header).
+6. **URN decision** — frozen pins (license URN
+   `urn:avec:license:p28-sil:v2.1.0-sovereign`) untouchable per
+   operator order (`GOAL-LOOP.md:65`); any URN change is an
+   operator decision, not a lane act.
+
+### 7.4 v26.11.3 entry point
+
+`docs/jira/v26.11.2/dod/v26.11.3-forward-backlog.md` (DOD-13 ledger):
+consolidates P-07..P-10 plans (commit-leg receipt wiring, interop
+charters, branchless verification, certification legs) plus OPT-01..05
+discoveries and non-code riders. Every deferred item carries scope,
+blast radius, court design, and a v26.11.2 non-blocking statement with
+a cite re-read on disk. This ledger is the first read for any
+v26.11.3 dispatch.

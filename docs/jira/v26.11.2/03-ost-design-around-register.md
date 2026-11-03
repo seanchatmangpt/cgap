@@ -16,7 +16,7 @@ DIFFERENT, not a paraphrase of the claim.
 
 | # | Patent | OST patented mechanism | v26.11.2 design-around (distinct mechanism) | Refused alternative |
 |---|--------|------------------------|---------------------------------------------|---------------------|
-| 1 | US 10,817,467 | shared-memory CAS over snapshot state | immutable columnar append-only ring commits — a pre-leased 64 KiB ring sink with rotation drain to a pre-opened spill handle, typed RunOverrun refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding every commit | any CAS/lock-based snapshot merge |
+| 1 | US 10,817,467 | shared-memory CAS over snapshot state | immutable columnar append-only ring commits — a pre-leased 64 KiB ring sink (CAP = 65,536 B, mmap_writer.rs:775; capacity counts BYTES here, never lanes) with rotation drain to a pre-opened spill handle, typed RunOverrun refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding every commit | any CAS/lock-based snapshot merge |
 | 2 | US 11,216,456 | runtime tuple-binding propagation | compile-time PLNF cardinality + vertical bit-slice masks; bounds fixed before execution | runtime sideways information passing |
 | 3 | US 11,409,698 | runtime subquery continuation frames | stratified semi-naive bit-matrix cascades in caller-leased scratch; no continuation frames | runtime subquery continuation |
 | 4 | US 11,645,278 | runtime topology switching | branchless register unification + static instruction schedule (R0..=R255 ABI) | dynamic topology dispatch |
@@ -34,21 +34,23 @@ mechanism).
    SINGLE ring; partition-sealed delta pages are a further
    refinement, not claimed.
    New design-around wording (register row 1): immutable columnar
-   append-only ring commits — a pre-leased 64 KiB ring sink with
-   rotation drain to a pre-opened spill handle, typed RunOverrun
+   append-only ring commits — a pre-leased 64 KiB ring sink (CAP =
+   65,536 B, mmap_writer.rs:775) with rotation drain to a pre-opened spill handle, typed RunOverrun
    refusal, plus a fail-closed BLAKE3 hash-chain receipt log binding
    every commit.
-   Landed cites (marker greps verified this session): RingSink
+   Landed cites (marker greps verified this session; line cites
+   re-verified 2026-11-02 lane RW-03): RingSink
    (9 hits), drain_to_spill (2 hits), RunOverrun (30 hits) at
-   crates/cgap-parquet/src/mmap_writer.rs:721-842 (RingSink;
-   drain_to_spill :781-802; RunOverrun :829-842); BLAKE3 hash-chain
-   receipt leg prev_hash+BLAKE3 link
-   (crates/cgap-ffi/src/receipt_chain.rs:34-76).
+   crates/cgap-parquet/src/mmap_writer.rs:721-860 (RingSink :721;
+   drain_to_spill :828; typed RunOverrun refusals in the drain body
+   at :843, :851); BLAKE3 hash-chain receipt leg prev_hash field +
+   BLAKE3 link fn
+   (crates/cgap-ffi/src/receipt_chain.rs:51-57, :117-120).
    Single-writer enforcement (FA9FIX, added 2026-11-02 lane C13):
    typed pre-IO concurrent-writer denial CGAP_ERR_CONCURRENT_WRITER_DENIED
    = 0x4347_0006 (crates/cgap-ffi/src/sovereign.rs:87, spill_gate
    Claim::Denied before any spill IO, sovereign.rs:758-764); race
-   court crates/cgap-ffi/tests/fa9_commit_gating.rs (226 lines,
+   court crates/cgap-ffi/tests/fa9_commit_gating.rs (606 lines,
    register pin + spill_gate race; the formerly unenforced
    single-writer premise of this row is now mechanically enforced).
    Courts re-witnessed:
@@ -80,6 +82,13 @@ mechanism).
    compile-time PLNF cardinality component is a NAMED OPEN ITEM, not
    part of the DISTINCT claim. Gate: DISTINCT-MECHANISM (exit 0 on
    this row, run 2026-11-02).
+   Doctrine note (lane RW-03, 2026-11-02): no register row rests on
+   claimed unconstructability of any mechanism — the moat is landed
+   distinct mechanism, never "cannot be built". The AHDCLT
+   compute-kernel half ("technically unconstructable") is
+   RETIRED-REFUTED per docs/jira/v26.10.31/16-ahdclt.md:3-4,13
+   (REVISED status, 2026-11-02; RED-01 clean-room rebuild) and must
+   not be cited as a design-around assumption.
    Underlying statement evidence on record: stardf SIP-ALT
    (/Users/sac/stardf/arrow/docs/ost/sip-alt.md) cites
    "NOT-practiced: US 11,216,456 / US 11,409,698 claim classes" via
@@ -87,29 +96,29 @@ mechanism).
    count tables.
 3. US 11,409,698 — LANDED 2026-11-02 (lane G7R). Cite:
    crates/cgap-bn3/src/unify.rs. Mechanism evidence: static
-   RuleCompiler rule-to-register compilation (unify.rs:469-531),
-   semi-join bit-matrix cascades (`semi_join_masks`, unify.rs:783;
-   per-row survival mask, unify.rs:665) over caller-leased probe
-   scratch (unify.rs:650, JoinProbeScratch). No continuation frames
+   RuleCompiler rule-to-register compilation (unify.rs:553-563),
+   semi-join bit-matrix cascades (`semi_join_masks`, unify.rs:914;
+   per-row survival mask, unify.rs:744) over caller-leased probe
+   scratch (unify.rs:740, JoinProbeScratch). No continuation frames
    (negative-surface run 2026-11-01 lane W2-7: 0 mechanism hits; the
-   sole src hit unify.rs:1688 is a `///` doc-comment "Generator"
+   sole src hit unify.rs:1887 is a `///` doc-comment "Generator"
    mention, classified non-mechanism and disclosed in
    ost_report.json). Note: the register's design-around wording says
    "stratified"; the landed cascade is semi-naive delta-round strata
-   (crates/cgap-storage/src/closure.rs:94 semi_naive_closure) — the
+   (crates/cgap-storage/src/closure.rs:114 semi_naive_closure) — the
    strata mapping is per-delta-round, disclosed here. Gate verdict
    DISTINCT-MECHANISM (exit 0 on this row, run 2026-11-02).
 4. US 11,645,278 — implementation evidence on disk, re-checked
    2026-11-01: crates/cgap-bn3/src/unify.rs (lane A12, v26.11.1
-   waves 9-10): register-file ABI R0..=R255 (unify.rs:100,169),
+   waves 9-10): register-file ABI R0..=R255 (unify.rs:155, :486),
    Wave 2 branchless-selection kernel, typed
-   UnifyError::RegisterOverflow (unify.rs:191). Negative-surface
+   UnifyError::RegisterOverflow (unify.rs:246). Negative-surface
    run 2026-11-01 (lane W2-7): `grep -rnE 'dyn |dyn\b|Box<dyn|
    topology|Topology|switch|dispatch' crates/cgap-bn3/src/` →
    0 `topology` hits; sole `dyn` hit is an error-trait upcast in a
-   sigil test (sigil.rs:757, `&dyn core::error::Error`) — not
-   dynamic topology dispatch; builtins.rs:497 states "No `dyn`, no
-   `fn` values"; all other hits are the compile-time `dispatch`
+   sigil test (sigil.rs:773, `&dyn core::error::Error`) — not
+   dynamic topology dispatch; builtins.rs:497-498 states "No `dyn`,
+   no `fn` values"; all other hits are the compile-time `dispatch`
    match — the design-around itself. Verdict: DISTINCT-MECHANISM.
 
 ### errc-backlog + dia-5 scout cross-check
@@ -134,6 +143,17 @@ mechanism).
 - Written 2026-11-01 by V2-PATENT (court-auditor); evidence greps
   and row updates this session by lane W2-7 (receipt
   waves/w2-07-ost-greps.md), repo /Users/sac/cgap, branch main.
+- Standing (updated 2026-11-02, lane RW-03): quantitative sweep of
+  this file + 04-stardf-closure.md against the exclusive numeric
+  registry (11-measured-claims.md). Registry-scoped perf figures
+  (10.20 ns/frame quiet-host row 5 / row 28 contention divergence;
+  36,048 B subject-scoped + bn3 6,520,984 B REFUSED footprint rows;
+  row 29 "constant-time" UNSUPPORTED) do NOT appear in either file —
+  nothing to rewrite on those; only stale line cites + the bytes-vs-
+  lanes scope qualifier needed repair. All file:line cites in rows
+  1-4 re-verified on disk this session (see diffs above); AHDCLT
+  doctrine note added (row 2 block). No numbers invented; UNVERIFIED
+  never rounded up.
 - Standing (updated 2026-11-02, lane G7F): row 1 LANDED (re-scoped
   to the single-ring design-around per operator order — RingSink +
   drain_to_spill + RunOverrun in mmap_writer.rs:721-842, BLAKE3

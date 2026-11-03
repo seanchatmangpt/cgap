@@ -185,3 +185,70 @@ The per-lane stitch index (AX-0..AX-9: standing, load-bearing fact,
 PENDING peers) lives in the landing receipt
 `../lanes/lane-ax-10-index.md`, the machine-checkable companion to
 this charter.
+
+## Executive charter overlay (DF-01, 2026-11-02)
+
+Landed by lane DF-01 (DFLSS Define). Merged below the AX-family
+charter; the AX content above is untouched and remains canonical for
+AX-0..AX-10. This overlay states the campaign thesis and the waste
+framing the red-team synthesis (`../redteam/red-20-hardened-survivor-synthesis.md`)
+now constrains.
+
+### Blue River Dam thesis (framing prose — no measured claim)
+
+The substrate is engineered as a dam: a fixed, typed, fail-closed
+spillway (ingress ring -> pack demux -> sealed commit) holds a
+pressure front (unbounded external frame rate) behind a bounded,
+statically-sized structure. The 36,048 B gated baseline subject and
+the hard `NA_MAX_*` consts are the dam wall; the typed refusals
+(`FrameTooLarge`/`Overflow`/`BN3_ENCLAVE_REFUSED`) are the spillway
+gates. The dam does not flex — it refuses. This is framing, not a
+measured claim: it names no number and carries no receipt of its own;
+every number it gestures at is owned by the CTQ register
+(`02-voc-ctq-matrix.md`).
+
+### Muda / Muri / Mura framing
+
+Working inventory anchored to `../audit/tps-07-kaizen-backlog.md:8-46`
+(the only on-disk Muda/Muri/Mura referent):
+
+- **Muda** (waste): unreceipted narration that outruns the tree —
+  the 13-row UNSUPPORTED register (red-20 §2) is the standing muda
+  ledger. Each narrated-without-referent row is waste re-produced at
+  every citation.
+- **Muri** (overburden): claims loaded past measured capacity — the
+  10 ns USL against an 85 ns/call measured membrane floor
+  (`10-ax-control-plan.md:27`, AX-GATE-03). [CLOSED 2026-11-02] The
+  red-12 SRAM arm of this cell is closed: the bn3 static-state
+  overburden (6,520,984 B = 49.75x the 131,072 B ceiling) is now
+  REFUSED at admission, not standing — `verify_cscb_sram.py --subject
+  bn3` exits 1 with `BN3_ENCLAVE_REFUSED` (FIX-02:
+  `../lanes/lane-fix02-bn3-sram-gate.md:38-44`), and the engine
+  carries the typed runtime bound `CapacityExceeded { required_bytes,
+  ceiling_bytes }` with a mutation-flipped court (RC-03:
+  `../lanes/lane-rc03-bn3-capacity-bound.md:40-60`; NA_MAX_MATCHES
+  2048→4096 flip witnessed, `2 failed`). The remaining open Muri
+  claim is the 10 ns USL vs 85 ns membrane floor.
+- **Mura** (unevenness): scoping inconsistency — the same surface
+  measured quiet-host (10.20 ns/frame, claims row 5) and contended
+  (124.06 ns/frame slowest, row 28) reported without its scope is
+  unevenness between cells of the same register.
+
+### Tripartite language verdict
+
+"Tripartite" (Tranche/Tripartite Agreement deal-structure language)
+has NO contract referent: UNSUPPORTED per red-20 §2 row 2
+(`redteam/red-05-declaratory-judgment-complaint.md:16-23` — grep
+`tripartite|tranche` hits only unrelated wave labels). Any dossier
+prose reading "Tripartite" is architectural/deal narrative, NOT
+executed legal text. It must never be cited as an instrument.
+
+### Charter fences (DF-01 overlay)
+
+- The AX charter above is untouched; its claim ceiling still binds
+  AX prose. This overlay binds only Define-phase commercial prose.
+- Every number this overlay names cites an on-disk receipt or a
+  `11-measured-claims.md` row; no new measurement is claimed here.
+- Anti-vacuity for the overlay: landing it changes no gate; the flip
+  surface is citation audit — any path:line above failing to resolve
+  invalidates the overlay (all cites re-read from disk this session).

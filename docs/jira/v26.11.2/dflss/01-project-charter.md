@@ -34,11 +34,11 @@ disk disagree, disk wins and the divergence is recorded in the receipt.
 |---|------|---------|--------|--------|
 | D1 | Zero heap allocation on ingress | cscb_c4_alloc window | 0 allocs / 0 bytes | VERIFIED |
 | D2 | Ingress latency | batch64-amortized p99 | <= 10.0 ns/frame | VERIFIED-CONDITIONAL |
-| D3 | Kernel SRAM surface | verify_cscb_sram.py | <= 131,072 B | VERIFIED (36,048 B) |
+| D3 | Kernel SRAM surface | verify_cscb_sram.py | <= 131,072 B | VERIFIED (36,048 B; subject-scoped: blake3+branchless gated slice; bn3 REFUSED at admission — red-12/FIX-02) |
 | D4 | Receipt seal rate | cscb_c7 median vs floor | >= 1,000,000/s | VERIFIED (~3.89M/s) |
 | D1 | Zero heap allocation on ingress | cscb_c4 window | 0 allocs / 0 B | VERIFIED |
 | D2 | Ingress latency | batch64 p99 | <= 10 ns/frame | VERIFIED-COND |
-| D3 | Kernel SRAM surface | sram gate | <= 131,072 B | VERIFIED (36,048 B) |
+| D3 | Kernel SRAM surface | sram gate | <= 131,072 B | VERIFIED (36,048 B; subject-scoped: blake3+branchless gated slice; bn3 REFUSED at admission — red-12/FIX-02) |
 
 ## Tollgates (lane scope)
 

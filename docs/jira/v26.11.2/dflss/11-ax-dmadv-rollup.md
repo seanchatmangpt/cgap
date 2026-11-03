@@ -27,7 +27,11 @@ Receipt: `../lanes/lane-dfx-06-rollup.md`.
 - darwin-vs-linux delta tables: PUBLISHED, two of them — latency
   `../lanes/lane-ax-05-latency.md` W4 (cgo floor 73-85 -> 154 ns/call,
   single admit 182.7-185.6 -> 306.9-313.1 ns, batch 179-181 ->
-  239-448 ns/frame, timer witness 41 ns identical) and shm
+  239-448 ns/frame, timer witness 41 ns identical) — AMBIENT CAVEAT
+  (lane A-05): load context not recorded at measurement time; figures
+  are lane-receipt-cited, no CONTENTION-SUSPECT witness; consume under
+  `dflss/06-control-plan.md:151-164`; register pointer row 31 D1. The
+  shm
   `../lanes/lane-ax-06-shm.md` W4 (mmap read +1-3%, pread -15%,
   allocs 0 both arms).
 - Alloc columns: darwin steady-state 1.0 allocs/op 24 B/op (view

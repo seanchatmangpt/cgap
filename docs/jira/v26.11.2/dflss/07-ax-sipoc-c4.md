@@ -19,7 +19,7 @@ LOCAL PATH (gate W4: GO).
 | go 1.23.4 darwin/arm64; cargo 1.101.0-nightly | Go courts + Rust FFI dylib builds | `lane-ax-00-gate.md:23-24` |
 | Local corpus generator (`courts/interop-chicago/corpus/gen.go`) | deterministic corpora from frozen seed | `corpus/gen.go` |
 | AX Workspace/Task manifests (5 Task yaml + workspace-cgap.yaml) | DRAFT-UNRUN court definitions | `courts/ax-testbed/manifests/`; `lane-ax-02-manifests.md` |
-| 11-symbol C-ABI surface (`libcgap_ffi.dylib`, 615,552 B) | real FFI collaborators for the Go courts | `lane-ipc-00-ground-truth.md` W3 (nm -gU) |
+| C-ABI surface, 12/12 symbols as of XC-01 (`libcgap_ffi.dylib`) | real FFI collaborators for the Go courts | `lane-xc01-ffi-surface-truth.md`; `lane-ipc-00-ground-truth.md` W3 |
 | ax-testbed Dockerfile (digest-pinned two-stage) | image definition, ax-task-runner @ b82f57ee | `courts/ax-testbed/Dockerfile` |
 
 ## Section 2 - Inputs
@@ -28,8 +28,14 @@ LOCAL PATH (gate W4: GO).
 |---|---|---|
 | Task manifests (vendor schema UNVERIFIED — ax CLI absent, exit 127) | ax.io/v1alpha1 vendor material, UNVERIFIED | `lane-ax-00-gate.md:36-38,73-76` |
 | Corpus seed `0xA20C_0FFE_E5A7_E000` | frozen corpus seed (never conflate with SplitMix64 multiplier `0xBF58_476D_1CE4_E5B9`) | `cgap-parquet/src/bitslice.rs:687-699` |
-| 11-symbol FFI table | lane-ipc-00 nm -gU export table | `lane-ipc-00-ground-truth.md:22-36` |
+| FFI export table | lane-ipc-00 nm -gU table (11 then; 12/12 as of XC-01) | `lane-ipc-00-ground-truth.md:22-36`; see note below |
 | ax-task-runner pin b82f57ee | git ls-remote, witnessed lane AX-1 provenance comment | `courts/ax-testbed/Dockerfile:2-5` |
+
+> FFI-census note (2026-11-02): the 11-symbol count was the nm -gU census at
+> lane-ipc-00 time. As of `lanes/lane-xc01-ffi-surface-truth.md` the fresh-dylib
+> census is 12/12 (cgap_stats_snapshot added by lane RC-05; `nm -gU` exit 0,
+> "PASS: 12 exported cgap_* symbols == 12 header prototypes"). "11 symbols"
+> elsewhere in this file is historical-as-of-IPC-0, not current truth.
 
 ## Section 3 - Process (actual, 3 stages)
 
@@ -37,7 +43,7 @@ LOCAL PATH (gate W4: GO).
 |---|---|---|---|---|
 | PX-1 | Image build | `docker build -f courts/ax-testbed/Dockerfile` (digest-pinned, two-stage) | build exit + pinned-digest echo | build must exit 0 or fail-closed |
 | PX-2 | Container exec | `docker run` LOCAL exec mode (NOT k8s exec, NOT ax apply) | per-court docker run | exit 0/1/2/3 law |
-| PX-3 | Court verdict + delta | Go courts bind the 11-symbol surface; darwin-vs-linux delta tables | go test arms | delta tables PENDING until AX-4..6 container arms run |
+| PX-3 | Court verdict + delta | Go courts bind the C-ABI surface (12/12 as of XC-01); darwin-vs-linux delta tables | go test arms | delta tables PENDING until AX-4..6 container arms run |
 
 Explicitly NOT the process: "AX Provisioning gVisor Sandbox" — no
 cluster endpoint (gate cmd #3 exit 1, conn refused), no gVisor witnessed
@@ -73,7 +79,7 @@ anywhere in the tree; sandbox class UNVERIFIED.
  +-------------------------------+   +--------------------------+
  | ax-testbed image              |   | libcgap_ffi.dylib        |
  | (DRAFT until AX-1 build run;  |   | (REAL, 615,552 B,        |
- |  Dockerfile landed,           |   |  nm -gU = 11 symbols)    |
+ |  Dockerfile landed,           |   |  nm -gU 12/12 (XC-01))   |
  |  digest pins witnessed in     |   +-----------+--------------+
  |  Dockerfile comments)         |               |
  +---------------+---------------+               | dlopen / cgo
@@ -90,7 +96,7 @@ anywhere in the tree; sandbox class UNVERIFIED.
  |         shm_linux.go, shm_linux_test.go)                 |
  |  cmd/seal_receipt (main.go + receipt-template.md)        |
  +----------------------------+-----------------------------+
-                              | binds (11-symbol C-ABI)
+                              | binds (C-ABI, 12/12 XC-01)
                               v
  +----------------------------------------------------------+
  | cgap-ffi sovereign surface:                              |

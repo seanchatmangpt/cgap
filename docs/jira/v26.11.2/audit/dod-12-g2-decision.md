@@ -21,9 +21,15 @@ receipt).
 - Threshold met without a flip witness -> receipt line
   `VACUOUS: L<n> threshold met with no flip court`, exit 3.
 GAP-07 measured rollup (five levels):
-- L1: MET (11.04 ns/frame fastest @1M) — VACUOUS per gate law
+- L1: MET (11.04 ns/frame fastest @1M — QUIET-HOST scope per
+  `redteam/red-10-timing-jitter-exploit.md`; R-15 re-witnessed quiet
+  legs 10.26-10.65 ns/f, redteam/fix-18 W2) — VACUOUS per gate law
   (8 named-class flip attempts, none flipped; transcripted).
-- L2: NOT MET (23.13 ms @1M vs <10 ms; 2.31x over).
+- L2: NOT MET (23.13 ms @1M vs <10 ms; 2.31x over) — chain_ram
+  lane figure; consolidated row 9 = 42.58 ms governs; 23.13 vs
+  42.58 same-surface 1.84x divergence registered, unreconciled —
+  UNVERIFIED-FOR-PAPER (`11-measured-claims.md` row 9;
+  `../dflss/02-voc-ctq-matrix.md:252-265`).
 - L3: CLOSED by repair-06 (78.3x @1M, <75 ms MET) — out of scope.
 - L4: PARTIAL — MET @256 (0.786 us/tx, vacuous-per-law),
   NOT MET @4096 (9.35 us/tx).
@@ -51,7 +57,10 @@ or retire. That is this package.
 
 ### L1 — ingress frames, <15 ns/frame
 
-Measured: ingress_chain @1M fastest 11.04 ns/f / median 11.76 (GAP-07);
+Measured: ingress_chain @1M fastest 11.04 ns/f / median 11.76 (GAP-07;
+QUIET-HOST scope — under combined bw+cpu contention the slowest column
+crosses 124.06 ns/f, red-10 row 28; R-15 re-witnessed the quiet legs at
+10.26-10.65 ns/f fastest, redteam/fix-18 W2, all guards green);
 fresh independent run tps-01: penstock admission 7.35 ns/f fastest /
 8.13 median, full chain 10.70 fastest / 11.80 median. Verdict on disk:
 MET but VACUOUS — 8 attempts, all <15 ns/f (best mutant 12.44 ns/f),
@@ -79,10 +88,14 @@ a new mutation class, not a new gate.
 ### L2 — 1M-row parquet scan, <10 ms @1M
 
 Measured: chain_ram @1M fastest 23.13 ms / median 23.32 (2.31x over);
-@65,536 1.426 ms. Sandbox == shared tree within noise.
+@65,536 1.426 ms. Sandbox == shared tree within noise. QUALIFIER:
+chain_ram lane figure; consolidated row 9 = 42.58 ms governs; 23.13
+vs 42.58 same-surface 1.84x divergence registered, unreconciled —
+UNVERIFIED-FOR-PAPER (`11-measured-claims.md` row 9).
 - (a) Repair: a 2.31x gap on a zero-alloc scan kernel that shows NO
   movement under two per-byte black_box mutants (23.19 / 23.23 ms vs
-  23.13 baseline) says the kernel is at its shape limit, not its
+  23.13 baseline — itself UNVERIFIED-FOR-PAPER vs row 9's 42.58 ms
+  governing figure) says the kernel is at its shape limit, not its
   tuning limit. Closing 13 ms needs a new kernel shape (different
   blocking / SIMD layout), not tuning. Additionally the board's hot-fn
   attribution has DRIFTED: fnv1a64_seeded is off the chain_ram hot
@@ -90,7 +103,8 @@ Measured: chain_ram @1M fastest 23.13 ms / median 23.32 (2.31x over);
   repair planning would target the wrong function. Est. scope: LARGE,
   unbounded — new shape + attribution re-derivation.
 - (b) Gate change (MV-5): DECIDED_BUDGET_MS = 25.0 (covers fastest
-  23.13 + noise margin, min-of-N law like MV-5), ASPIRATIONAL_MS =
+  23.13 [lane figure, UNVERIFIED-FOR-PAPER; row 9 = 42.58 governs] +
+  noise margin, min-of-N law like MV-5), ASPIRATIONAL_MS =
   10.0 retained loudly (2.3x shortfall printed every run). Receipt
   cites the GAP-07 distribution + MV-5 precedent. Est. scope: one
   const pair + receipt; small.
@@ -138,7 +152,10 @@ lines). No gate may be decided on the confounded distribution.
 ### L5 — governance chain, <1.45 us/row
 
 Measured: governance_chain_fused_per_row @65,536 fastest 200.2 ms =
-3.055 us/row (2.1x over); control governance_chain_per_row = 155.2 ms
+3.055 us/row (2.1x over; R-15 re-witnessed the L5-family on 2026-11-02
+at 3.086 fastest / 3.123 median us/row, +1.5% fastest / +1.3% median —
+redteam/fix-18 W5; no contention guard exists on chains-seal, disclosed
+there); control governance_chain_per_row = 155.2 ms
 = 2.368 us/row. Fused is a 29% REGRESSION vs its own control on this
 host (corroborates W3-L5). Flip WITNESSED: injected redundant per-row
 crypto in fused_row (asc450.rs:968) moved the number +8.3% (216.0 vs
@@ -252,13 +269,16 @@ lane window is NOT a sign.
     (no subsumers found for any G2 level).
 
     L1: threshold 15 ns/frame STANDS, NOT re-scoped — two independent
-    distributions meet it (GAP-07 11.04 ns/f; tps-01 10.70-11.80).
+    distributions meet it (GAP-07 11.04 ns/f; tps-01 10.70-11.80),
+    quiet-host scope (red-10 row 28 registers the contended divergence;
+    R-15 re-witnessed the quiet legs 10.26-10.65 ns/f, fix-18 W2).
     Vacuity repaired via the G2-M2 SEMANTICS-FLIP court (dod-12 §3):
     golden digest over chain_frame lane folds, stage2 lane-drop mutant
     must flip, mirror-leg survivor = loud attribution finding.
     Bench-local, ~30 lines, no kernel edit.
     L2: gate re-scoped per MV-5: DECIDED_BUDGET_MS = 25.0 on the
-    GAP-07 distribution (fastest 23.13 / median 23.32), ASPIRATIONAL
+    GAP-07 distribution (fastest 23.13 / median 23.32 — lane figure,
+    UNVERIFIED-FOR-PAPER vs row 9's governing 42.58 ms), ASPIRATIONAL
     10 ms retained loudly (2.3x shortfall printed every run). No
     kernel work ordered: two named-class mutants moved the number by
     zero, the shape is at its limit on this host, and the board's
@@ -274,7 +294,8 @@ lane window is NOT a sign.
     near 9.35 us/tx -> MV-5 (decided 10.0, aspirational 4.0 loud).
     No gate is decided on a confounded distribution.
     L5: the 29% fused-vs-control regression is RECEIPTED as a measured
-    finding (GAP-07 flip table; corroborates W3-L5). The fused arm is
+    finding (GAP-07 flip table; corroborates W3-L5; R-15 re-witnessed
+    3.086/3.123 us/row within +1.5%, fix-18 W5). The fused arm is
     RETIRED with governance_chain_per_row as named subsumer. The
     control is gated via MV-5: DECIDED 3.2 us/row, ASPIRATIONAL
     1.45 us/row retained loudly (2.1x shortfall printed every run).

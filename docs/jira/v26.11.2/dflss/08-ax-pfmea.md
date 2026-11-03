@@ -90,3 +90,59 @@ state, checked this session; PENDING courts are named, never assumed run.
 - receipt_lint strict summary crash (04:18) remains open; GAP-05's
   landed rule class (lane-gap-05-receipt-lint.md) is the later state
   and is what this matrix cites.
+- fix-09 manifest cross-refs, corrected against disk (re-read
+  2026-11-02, this lane): (a) the chain link law
+  `BLAKE3(prev_hash || block || license)` lives at
+  `crates/cgap-ffi/src/receipt_chain.rs:117-121` (`fn link`) — the
+  manifest's ":104-106" referent is the `receipts()` accessor, stale
+  (manifest errata at fix-09-wire-constant-manifest.md:118-123 names
+  :104-106; superseded by this read). (b) `trap.rs` is
+  `crates/cgap-p28/src/trap.rs` (`ERR_P28_SPOLIATION = 0x5032_38FF`
+  at :36); cgap-ffi's pin is `sovereign.rs:90`. No fix-09 dispatch
+  text is amended by this lane — corrections recorded here per the
+  ERRATA-never-rewrite law.
+
+## 4. Counter-hardening design (DF-04, 2026-11-02)
+
+Extends this PFMEA with the design response to the RED wave
+(`redteam/red-20-hardened-survivor-synthesis.md` §1, 18 breach rows).
+Two registers: §4.1 technical poka-yoke, §4.2 legal/governance
+redesign. Per-item status vocabulary:
+
+- LANDED-CODE: the code change is on disk in the shared tree this
+  session (verified by reading it); a fix-NN receipt may or may not
+  exist yet.
+- REGISTERED-DESIGN: the repair is designed and registered (redline
+  text or named edit) but NOT yet applied to its subject on disk.
+- WITNESSED-RUN: this lane ran the artifact this session with exit
+  codes captured.
+
+### 4.1 Technical poka-yoke (six items)
+
+| # | Item | Status | Design + on-disk evidence |
+|---|---|---|---|
+| PY-1 | Lease identity: spill-gate path aliasing (red-13 B6) | LANDED-CODE | Registry key derived from `fs::canonicalize` (`crates/cgap-ffi/src/sovereign.rs` `canonical_key` :898-949; claim keying `fnv1a(&canonical_key(path))` at :945), collapsing `dir/./x`/symlink aliases into one lease; racer denied typed before IO. Court arm `fa9_alias_race_denied` (`crates/cgap-ffi/tests/fa9_commit_gating.rs:261`, re-read this session). FIX-07 compile-freeze unblock disclosed in-file (sovereign.rs:900-902) and in lane-fix07-ffi-surface.md:57-64. red-13 finding: `redteam/red-13-receipt-desync-exploit.md:27-56`. fix-01 receipt NOW ON DISK: `lanes/lane-fix01-fa9-alias-rekey.md` (ALIVE, sha256-pinned subject, court + flips) — prior "receipt pending" superseded. |
+| PY-2 | SRAM capacity: bn3 outside every SRAM claim (red-12 B8) | LANDED-CODE + WITNESSED-RUN | `scripts/verify_cscb_sram.py` parses NA_MAX_* consts from `crates/cgap-bn3/src/noalloc.rs` (`parse_na_consts` :158), builds a static capacity model (`bn3_capacity_table` :174-204), cross-checks against red-12 host size_of pins (BN3_PIN_MATCHES/ENGINE_BYTES :67-68, pin checks :196-203, drift = typed refuse), and charges the 131,072 B envelope (:206-218). This lane ran `python3 scripts/verify_cscb_sram.py --subject bn3` — exit 1, `BN3_ENCLAVE_REFUSED: 6,520,984 B > 131,072 B (49.75x)` — the gate SEES the engine and refuses loud. Anti-vacuity mutation `--mutate bn3-pin` registered (:377-385, halved NA_MAX_MATCHES must trip the pin check). fix-02 receipts NOW ON DISK: `lanes/lane-fix02-bn3-sram-gate.md` + `lanes/fix02.alive`; RC-03 added the ENGINE-side init-time bound (`lanes/lane-rc03-bn3-capacity-bound.md`, ALIVE: court exit 0, mutation flip, gate fence re-run exit 1 refusal + exit 0 baseline). |
+| PY-3 | Demux poison-tail: post-trailer absorption (red-09 F1/F2) | LANDED-CODE + WITNESSED-RUN | `DemuxError::TrailingBytes(u64)` typed refusal (`crates/cgap-git/src/pack_demux.rs:77`, fired :379, observable `trailing_poison()` :270); surplus guard refuses `ObjectSurplus{seen,declared}` (:85, close_record guard :454) — F2's guard is a typed invariant arm, public-API surplus refused via TrailingBytes. F1 and F2 flip courts BOTH witnessed: mutations m1/m3 exit 101, sha256-exact restores (`lanes/lane-fix05-pack-demux-poison.md`, ALIVE, :48-56) — prior "fix-05 receipt not on disk" superseded. |
+| PY-4 | Refusal quota/backoff: free class-101 flood (red-14 B15) | LANDED-CODE-REPAIRED + WITNESSED-RUN | `RefusalQuota` observational seam (`crates/cgap-git/src/ingress_ring.rs` + egress twin, `DEFAULT_MAX_REFUSALS = 4_096`, `CLEAN_ADMISSIONS_TO_CLEAR: u32 = 1024` named consts), wired into push/pop refusal paths: window trip at 4,096; escalation LEVEL-TRIGGERED — `tripped` survives admitted frames (ADV-12 spoiler-1 repair) and clears only via `acknowledge()` or 1024 consecutive clean admissions; `window_refusals` saturating_add at `u32::MAX` (ADV-12 spoiler-2 repair, no debug panic / release wrap); `total_refusals` wrapping_add; NEVER gates admission (a flood cannot wedge the ring) — red-14's rate-limit seam for any future host mapping `andon_exit_class` to `process::exit`. Repair mutants 4/4 FLIP witnessed (M1-M4 both twins, self-clear revert + `+=` revert; `lanes/lane-r-adv12fix-quota-repair.md` §3, ALIVE). Independent F-03 re-verify (2026-11-02): andon 5 passed + purity 1 passed exit 0; /tmp probe exit 0 — ring-level flood -> 1 admit -> `tripped()` still true, 1023/1024 hysteresis boundary exact, saturation + ack pinned. OBSERVATIONAL residual stays: throttle obligation remains with the host. Prior edge-triggered row (fix-04-era, `lanes/lane-fix04-andon-quota.md` :41-42 mutants) superseded by the level-triggered repair. |
+| PY-5 | Single-core atomic fallback (red-11 B7) | LANDED-CODE-REPAIRED (execution-reentrancy leg REGISTERED) | `SealRegister::reserve` (`crates/cgap-git/src/ref_store.rs:321-330`) is the indivisible check-and-increment: ceiling guard `c < bound` lives INSIDE the `fetch_update` closure; full counter yields None -> typed `CounterExhausted`, wrap-to-0 impossible by construction. `stamp` (:283-311) calls `reserve` (:302); slot copy + chain fold happen AFTER the reservation (:306-309) — a reentrant observer sees a reserved lease, never a duplicated one. `Counter::fetch_add` (the unguarded RMW) removed. ARM SELECTION CORRECTED (slide repair, `lanes/lane-r-adv11fix-implcell-slide.md`, ALIVE): the floating nightly's `target_has_atomic` slide moved riscv32imc onto implcell; the ladder now REFUSES LOUD (typed compile_error naming `implcell_critical_provided` and "no CAS-capable atomic") until firmware binds the critical section via `RUSTFLAGS="--cfg implcell_critical_provided"` — the prior row premise `riscv32imc=impl32` is STALE and superseded. Independently re-verified this session (lane F-01): rv32imc no-opt-in build exit 101 with the typed refusal; opt-in build exit 0; host build exit 0; `ref_store_width_arms_court` 8/8 exit 0. implcell `critical` seam context: RC-01, made `pub(crate)` by RC-02's SLA unblock — disclosed in BOTH receipts (lanes/lane-rc01-...md:63-78, lane-rc02-...md:63-76). Execution-reentrancy court FLIP witnessed: reverted unguarded-RMW shape -> exit 101 (C1+C2+C5 red), restore -> 0 (`lanes/lane-rc01-ref-store-reentrancy.md` W3/W5, ALIVE). Width-arm compile witnesses: impl32/impl16/implcell mirrors + `compile_error` gate compile on host + riscv32imc (`lanes/lane-rc02-ref-store-width-arms.md`, ALIVE, courts w1-w5 exit 0 incl. 2 anti-vacuity flips). RESIDUAL, kept explicit: impl16/implcell arms are compile-witnessed only — NOT execution-reentrancy-court-certified (host=impl64; rv32imc=implcell, opt-in-bound; no court executes those arms' RMW). That leg stays REGISTERED; firmware critical-section binding + interrupt-safe RMW on rv32imc still owed (`redteam/red-11-riscv-reentrancy-corruption.md:96-103`). |
+| PY-6 | FFI contract: header vs export surface (red-03 §1/§2) | LANDED-CODE + WITNESSED-RUN | Frozen slot surface mirrored into `include/cgap.h` (11 prototypes incl. `cgap_i32_batch` :193, `cgap_p28_invariant_check` :214; re-read this session) and gated by `scripts/ffi_surface_gate.py` (cdylib exports vs header prototypes 1:1, fail-closed exits 0/1/2/3). This lane ran `--self-check`: exit 0; baseline 11==11, and three mutation legs FLIPPED (fake prototype exit 1, dropped prototype exit 1, hostile 1-symbol shim dylib exit 1) with sha256-exact restores witnessed — the court is non-vacuous. fix-07 receipt NOW ON DISK: `lanes/lane-fix07-ffi-surface.md` (ALIVE; discloses its sovereign.rs:898-912 SLA unblock, cited under PY-1). |
+
+### 4.2 Legal/governance redesign (four items)
+
+| # | Item | Status | Design + on-disk evidence |
+|---|---|---|---|
+| LG-1 | Revenue-aggregation clause (red-04 B2) | REGISTERED-DESIGN (redline text only) | fix-10 supplies the full redline: Controlled-Group definition with five prongs (fix-10 §1b, §2.2.1), Group Aggregation Level (§2.2.2, "measurement is at the group, never at the individual license holder"), Anti-Structural-Avoidance (§2.2.3), numeric $50M floor §2.4 (fix-10 Part 2, with TTL operand remap coordination note fix-10:164-167). ALL THREE RED-04 attack structures trip per fix-10 Part 3 — as designed text. The license edit is COORDINATOR-OWNED (fix-10 header: "this lane owns NO license file"); LICENSE-P28-SIL.md is NOT amended on disk today — do not cite the instrument as amended. Landing court spec registered: delete §2.2.1 in a /tmp sandbox, structure-trip checks must flip TRIPPED→ESCAPES (fix-10:219-224). |
+| LG-2 | Covenant/evidentiary repair register (red-05/06/08 B1/B3/B4) | REGISTERED-DESIGN (redline text only) | fix-11 consolidates R1-R10: covenant→condition restructure (R1), prospective-only §2.3 (R2, S-triage: concedes back-epoch revenue), presumptions→verification mechanics (R3), notice-and-demand replacing the ASC 450 mandate + SOX deletion (R4), privilege override deletion (R5), assent gate + privity rebind (R6, small-code), reciprocal covenant (R7), confidentiality/grantback (R8), arbitration-scope widening (R9), tariff-symbol definitions (R10, mandatory). Unfixable-without-changing-the-deal set named (fix-11:274-278). License text NOT edited on disk; rider/ERRATA pattern per LICENSE-P28-SIL.md:279-290 (fix-11:5-8). |
+| LG-3 | AHDCLT pivot | LANDED (RETIRED-REFUTED on disk) | `docs/jira/v26.10.31/16-ahdclt.md:3-4` Status REVISED (2026-11-02): compute-kernel half of Pillar 1 RETIRED-REFUTED (fired falsifier RED-01, cited :20-25); Pillar 2 anti-LLM tripwires RETIRED-REFUTED (:80-84). No "unconstructable" or "tripwire" claim may be cited forward (:31-33). Surviving moat: state-chaining + adversarial courts + C-ABI integration cost (:35-44). Cite the pivot as LANDED; the retired claims are dead, not weakened. |
+| LG-4 | Landing protocol for the license edit | REGISTERED-DESIGN | Sequence: coordinator lands LG-1+LG-2 redlines into LICENSE-P28-SIL.md (single edit, ERRATA pattern, not silent rewrite), then runs the fix-10 sandbox mutation court (delete §2.2.1 → trip checks must flip) and a TTL operand remap (fix-10:164-167) in the SAME transition, or instrument and machine layer diverge in the opposite direction. fix-10/11 produced diff text only; no license file edit is claimed or has occurred. |
+
+Fence law: this is a docs-only lane; no code, gates, or courts were
+edited. Fences that could regress: the two WITNESSED-RUN artifacts
+were executed read-only (gate self-check restores verified
+sha256-exact by the gate itself, output above); `verify_cscb_sram.py
+--subject bn3` runs the gate's own read paths and mutates nothing in
+the shared tree. Prior matrix rows A1-A5/C1-C5 and their scores are
+unchanged by this addition; the ranking mutation (§ Anti-vacuity)
+still applies to the new rows — deleting a PY/LG citation deletes the
+status claim it grounds.

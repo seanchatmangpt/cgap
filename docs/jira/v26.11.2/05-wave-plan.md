@@ -119,6 +119,92 @@ disjoint file ownership. Total concurrent peak: 7.
 
 ## Standing
 
-Plan authored this session; all wave gates are UNVERIFIED until their
-receipts cite command+exit runs. This file is the plan of record;
-`waves/v2-05-wave-plan.md` carries the execution receipt.
+Plan authored this session; `waves/v2-05-wave-plan.md` carries the
+execution receipt. Per-lever standing re-read from receipts
+2026-11-02 (lane RW-04 sweep; numbers live in
+`11-measured-claims.md`, the exclusive numeric source):
+
+- L1 ingress (<15 ns/frame): MET on quiet host — 10.20 fastest /
+  10.30 median ns/frame (`waves/w3-l1-ingress.md:63,69-70`).
+  Registered divergence under combined contention (median 19.03,
+  >50 ns bar crossed at slowest 124.06):
+  `waves/redteam/red-10-timing-jitter-exploit.md:43-66`.
+  Court flip witnessed (`w3-l1-ingress.md:75-83`).
+- L2 SWAR FNV (<10 ms @1M): NOT MET — 42.58-43.1 ms measured;
+  chain-share attribution refuted
+  (`waves/w3-l2-swar-fnv.md:26-28,61-63`). Court flip witnessed
+  (`w3-l2-swar-fnv.md:38-42`).
+- L3 PLNF semi-join (<75 ms @1M): NOT MET (LANDED-NOT-MET) — radix
+  leg 1.648 s fastest @1M, 0.97-0.98x vs nested baseline; dominant
+  residual is the per-chunk candidate walk outside the probe
+  (`waves/w5-l3-remeasure.md:23-33,37-49`). Courts 7/7 exit 0
+  (`w5-l3-remeasure.md:58-62`).
+- L4 ring sink (<4 us/tx): MET at the stage level — 0.755-0.834
+  us/tx fastest (drifted +28-42% vs prior 0.589-0.603, typed);
+  chain-level 6.19-6.33 us/tx remains >4 us/tx, typed BLOCKED via
+  `waves/p2-receipts-ring-receipt-chain.md:62-66`
+  (`waves/w5-ring-rewitness.md:36-58`). Lease-edge refusal code
+  65,376/0x43470004 re-witnessed byte-identically.
+- L5 fused ASC450 (<1.45 us/row): FAILED-BY-MEASUREMENT — 3.04 vs
+  2.37 us/row control; emission crypto, not span walk, dominates
+  (`waves/w3-l5-fused.md:38-42`; attribution row:
+  `11-measured-claims.md` #13). Court flip witnessed
+  (`w3-l5-fused.md:44-52`).
+
+V2-A sweep items and V2-C items: publish is FROZEN-BY-OPERATOR
+(`waves/publish-halt.md:1-5`); 8 crates live-verified at 26.11.2
+before the halt (`publish-halt.md:6-17`), 7 dry-run-READY, 2 BLOCKED
+(cgap-ffi pending parquet re-publish; wasm-footprint host-link),
+3 already-live repairs owed on lift (`publish-halt.md:31-42`).
+MW4 like-for-like bench remains TARGET — RDFox never executed;
+zero measured facts/s at consolidation (`11-measured-claims.md:26,66-67`).
+QEMU no_std paint and position-paper grounding status: UNVERIFIED
+by this sweep (no receipt cited here re-read this session).
+
+## Standing refresh (2026-11-02, lane GOAL-01)
+
+RW-04's Standing block above stands unmodified (ERRATA-never-
+rewrite on its cites; its per-lever numbers remain the record).
+Refresh, re-read from disk this session:
+
+Per-lever standing UNCHANGED — no new receipt re-measures any
+lever:
+
+- L1, L2, L3, L4, L5 statuses and citations above are current
+  as of this read; publish-side receipts (PUB-01, PUB-02b, PUB-03,
+  PUBLISH_RUNBOOK, prepublish docs) touch no lever measurement.
+  The C-10 reconciliation re-ran the full gate battery (4/4 +
+  self-check 8/8, `audit/prepublish-reconciliation.md`) — gates,
+  not levers.
+
+Publish window preconditions: receipt-complete EXCEPT the freeze
+lift (FROZEN-BY-OPERATOR, `waves/publish-halt.md`, unchanged on
+disk) and the coordinator commit landing (clean-tree rule,
+`audit/prepublish-state.md` §2). Details:
+`audit/pub-01-dry-run-matrix.md` (16/20 package-OK, 4
+BLOCKED-DEP-ORDER: cgap, cgap-gate, cgap-ffi, cgap-integration),
+`dod/PUBLISH_RUNBOOK_v26.11.2.md` (tier-ordered sequence,
+preconditions §1).
+
+Microbenchmark promotions row 39/40: NOT added. The dispatch
+conditioned the pointer on PROMO-01 having landed at read time;
+no PROMO-01 receipt exists on disk (`docs/jira/v26.11.2/lanes/`
+contains `lane-r16-mctq-promotion.md` only; zero files cite
+PROMO-01 or a 39/40 row). Loud absence, not a silent skip — the
+pointer lands with PROMO-01's receipt.
+
+DoD certificate ("FS-18" per dispatch): no on-disk referent
+carries that ID (grep zero hits under docs/jira/v26.11.2/ this
+session). Nearest landed carriers: `audit/dod-18-ledger-fold.md`
+(ledger fold, standing-as-receipted) and
+`audit/dod-19-shipgate-final.md` (ship-gate table SPEC awaiting
+the coordinator commit). Divergence recorded in the GOAL-LOOP.md
+refresh block and the lane receipt.
+
+PROMO-01 pointer (appended on coordinator follow-up, same lane):
+LANDED — claims §6.1 rows 39/40 (82.24 GB/s BN3
+statement_scan_24b, ~460 ns P28 attestation verify;
+consolidation-addendum, doubly witnessed F-06+FS-02) are
+registered in `11-measured-claims.md`, receipted at
+`lanes/lane-promo01-claims-promotion.md`. The loud absence this
+block recorded for PROMO-01/row 39-40 is SUPERSEDED.

@@ -33,11 +33,11 @@ figure) instead of receivable facts.
 | G1 | .text ceiling | linker ASSERT | <= 131,072 B | [TARGET-v26.11.2] |
 | G1a | Arrow object ceiling | llvm-size -A | 28,679 B / 32,768 | MEASURED |
 | G1b | Parquet object baseline | llvm-size -A | 55,711 B pre-link | UNVERIFIED-BY-RECEIPT |
-| G2 | Zero heap allocation | nm alloc symbols | 0 alloc, 0 panic | MEASURED |
+| G2 | Zero heap allocation | nm alloc symbols | 0 alloc, 0 panic (ring/demux ingress path; bn3 fixpoint allocates — scoped OUT per red-09:74-78) | MEASURED (SCOPED) |
 | G3 | 0 blr / 0 brk kernels | objdump census | 0 blr, 0 br xN, 0 brk | PARTIAL (1 blr) |
 | G4 | Ingress latency | per-frame hot loop | < 15 ns/frame | [TARGET-v26.11.2] |
 | G5 | Commit latency | per-tx FFI ring | < 4 us/tx | MET (0.589-0.603) |
-| G5a | Escalation law | skip-not-pay replay | hold at 10.20 ns/frame | RECEIPTED |
+| G5a | Escalation law | skip-not-pay replay | hold at 10.20 ns/frame (quiet host; divergence row 28) | RECEIPTED |
 | G6 | Throughput | facts per second per core | >= 1,000,000 | [TARGET-v26.11.2] |
 
 Goal receipt notes (paths relative to `docs/jira/v26.11.2/` unless prefixed
@@ -50,7 +50,9 @@ Goal receipt notes (paths relative to `docs/jira/v26.11.2/` unless prefixed
 - G3: `waves/p2-asm-0blr-census.md:37` — the one blr sits in
   `unify_to_fixpoint_opt`.
 - G5: `waves/a3-ring-sink.md:34-36` — 150.7 us @256 and 2.472 ms @4096.
-- G5a: `waves/p2-penstock-escalation-law.md:32` — 10.20 ns/frame, 10.1x.
+- G5a: `waves/p2-penstock-escalation-law.md:32` — 10.20 ns/frame, 10.1x
+  (quiet host, divan fastest/median, `11-measured-claims.md` rows 5/28;
+  contended divergence 124.06 ns/frame slowest, row 28).
 
 ## Scope
 

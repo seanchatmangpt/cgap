@@ -162,8 +162,9 @@ All targets are TARGETs until a v26.11.2 bench receipt re-measures them
 | lever | measured | target | floor |
 |---|---|---|---|
 | L1 ingress | 102.7 ns/frame | <15 ns/frame | >=6.8x |
-| L1 re-measure 2026-11-01 (W3-L1, receipt `waves/w3-l1-ingress.md`): two-stage escalation landed (FrameView prefilter/escalate, ESCALATE_MASK row-6 family, stage3_escalated + stage_prefilter_fold legs); ingress_chain 10.69 ms @1M = 10.20 ns/frame fastest (median 10.30) — <15 ns/frame MET, 10.1x vs >=6.8x floor; gates 11+3 courts exit 0 both profiles; escalate-always-true mutant FLIPPED, restore sha256-exact. Digest leg vacuous-zero (escalated subset empty on this corpus — receipt-recorded). | | | |
-| L1 reclassification 2026-11-01 (P2-PENSTOCK, receipt `waves/w4-p3-escalation-corpus.md`): ESCALATE_MASK (penstock.rs:271, 0x00F0 on header byte 5) is the SAME predicate as stage-1's FLAG_RESERVED_MASK (frame.rs:38, 0xF0) over all 256 flag values — escalated-AND-chain-admitted is structurally impossible, so L1's 10.20 ns/frame (10.1x) is **skip-not-pay**: the digest stage is a prefilter fold ALWAYS on chain-admitted frames, and the escalated BLAKE3 leg is permanently vacuous at chain level (law, not corpus). LeverStatus -> LANDED-skip-not-pay. Repair requires an A04 §6.3 wire-law amendment (split the reserved family; A19 register candidate) — recorded UNBUILT, out of lane ownership. | | | |
+| L1 re-measure 2026-11-01 (W3-L1, receipt `waves/w3-l1-ingress.md`): two-stage escalation landed (FrameView prefilter/escalate, ESCALATE_MASK row-6 family, stage3_escalated + stage_prefilter_fold legs); ingress_chain 10.69 ms @1M = 10.20 ns/frame fastest (median 10.30) — <15 ns/frame MET on quiet host (divan fastest/median; contended divergence registered `11-measured-claims.md` row 28: 124.06 ns/frame slowest under combined bw+cpu), 10.1x vs >=6.8x floor; gates 11+3 courts exit 0 both profiles; escalate-always-true mutant FLIPPED, restore sha256-exact. Digest leg vacuous-zero (escalated subset empty on this corpus — receipt-recorded). | | | |
+| L1 reclassification 2026-11-01 (P2-PENSTOCK, receipt `waves/w4-p3-escalation-corpus.md`): ESCALATE_MASK (penstock.rs:271, 0x00F0 on header byte 5) is the SAME predicate as stage-1's FLAG_RESERVED_MASK (frame.rs:38, 0xF0) over all 256 flag values — escalated-AND-chain-admitted is structurally impossible, so L1's 10.20 ns/frame (10.1x; quiet host, claims rows 5/28) is
+**skip-not-pay**: the digest stage is a prefilter fold ALWAYS on chain-admitted frames, and the escalated BLAKE3 leg is permanently vacuous at chain level (law, not corpus). LeverStatus -> LANDED-skip-not-pay. Repair requires an A04 §6.3 wire-law amendment (split the reserved family; A19 register candidate) — recorded UNBUILT, out of lane ownership. | | | |
 | L2 parquet | 41.54 ms @ 1M | <10 ms @ 1M | >=5x |
 | L2 re-measure 2026-11-01 (W3-L2, receipt `waves/w3-l2-swar-fnv.md`): SWAR FNV landed + equity green (222 tests exit 0), chain_ram/chain_file @1M 42.7-43.1 ms mean — chain did NOT move; <10 ms target NOT met by this lever (chain 24.02 ms measured this lane; FNV share smaller than planned). | | | |
 | L2 re-attribution 2026-11-02 (P2-PARETO, receipt `waves/p2-pareto-reattribution.md`): fused `SealDigests` single-sweep seal (6 FNV states, 1 body pass vs 3) landed byte-exact; chain_ram 24.02 -> 23.21 ms @1M (-3.4%), seal_arm 17.22 -> 16.34 ms; 223 cgap-parquet tests exit 0; mutation FLIPPED (2 seal courts FAIL), sha256-exact restore; <10 ms target NOT met — dominant stage is now the writer encode path (`encode_hybrid_into`, mmap_writer.rs), recorded as the next lever target. | | | |
@@ -181,3 +182,42 @@ restore. A lever whose court cannot flip is FAIL; every skip is
 loud. Perf numbers are TARGETs until a v26.11.2 bench receipt
 re-measures them with the stated method.
 
+
+## Optimization pathway (lane DOD-08, 2026-11-02)
+
+Attribution input: OPT-03 dose-response curve (receipt
+`bench-validate/opt-03-channel-curve.md`, 7 legs exit 0, hot-ambient
+scoped). The fastest column is dose-invariant on BOTH channels
+(10.67-12.18 ns/frame, max +13.8% at bw6) while the tail loses up to
+4.1x (cpu16 slowest 52.65 ns/frame). Family ranking follows the
+measurement, not intuition:
+
+| rank | pathway | targets | basis | class |
+|---|---|---|---|---|
+| OP-1 | TAIL ISOLATION (QoS-class scheduling, critical-section pinning, tail-latency guard escalation) — outranks bandwidth reduction | the 4.1x tail (row 28 124.06-class losses; cpu16 52.65 slowest) | OPT-03 §5 (`bench-validate/opt-03-channel-curve.md`): bandwidth reduction cannot recover 124.06-class losses because the fastest column it protects is already intact at every dose | TARGET (v26.11.3-candidate); row 28 stays REGISTERED DIVERGENCE |
+| OP-2 | BANDWIDTH REDUCTION (payload compression, digest narrow-widening) — second | only the +13.8% fastest drift + median drift | OPT-03 bw ladder: knee between bw2->bw4 (slowest 14.27 -> 27.00); pays nothing above the knee for the tail | TARGET |
+| OP-3 | GUARD THIRD CHANNEL: common-mode/uniform-shift detector — the max/min-ratio ceiling registered BLIND to the bw6 common-mode slowdown (leg 4: 0 SUSPECT markers while fastest degraded +13.8%); rides F-08/adv-15 wiring | the blind spot, not a perf number | OPT-03 §3.2/§5 leg-4 datum; both directions of the guard witnessed same session (quiet legs 1.03/1.50, 1.01/1.40 vs 4 flips) | TARGET (guard drift, lane-rc11 follow-up) |
+
+Corroboration 2026-11-02 (FS-02, receipt
+`bench-validate/bench-03-drift-check.md`): second independent lane
+CONFIRMS register rows 30/31/31a/32 in-band or favorably-drifted
+(rows 31/31a favorable drift now two-lane: admit 105.04-108.67 vs
+XC-04's 112.48-125.12; floor 0.356-0.368 vs 0.38-0.41). The OP rows
+above cite NONE of those stations directly (their coupling is row 28
++ §5 #33-37), so no OP-row basis changes; recorded here because the
+same receipt's radix datapoint (radix:nested 5.81x @65536, again
+below the M-L3-1 10x gate) independently corroborates L3's
+LANDED-NOT-MET attribution — the dominant cost sits outside the
+probe, reinforcing OP-1's measure-before-promote court plan.
+
+Corresponding discovery rows: `11-measured-claims.md` §5 (#33-37).
+Row-8's <15 ns/frame quiet-host scope is load-bearing: it fails at
+cpu16 (median 16.52) — any OP-1 lever must re-scope that row, not
+silently rely on it.
+
+Court plan: an OP-3 guard third-channel must flip on an injected
+uniform-shift fixture (all legs degraded, no per-leg ratio excursion)
+and stay quiet on a genuinely-unperturbed leg; a court that cannot
+flip is FAIL. OP-1/OP-2 levers measure with the existing divan method
++ CONTENTION-SUSPECT guard before any target promotion. All rows
+TARGET until re-measured.

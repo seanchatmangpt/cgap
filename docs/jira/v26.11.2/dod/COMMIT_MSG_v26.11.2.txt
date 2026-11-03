@@ -1,0 +1,90 @@
+feat(v26.11.2): starDF campaign integration — red-team, hardening, corrosion,
+tollgates, DoD closure
+
+The v26.11.2 starDF campaign lands as a single audited integration over
+main 7f7ccdf7. Execution chain: 20-lane red-team (red-01..red-20) ->
+hardening wave -> corrosion wave (adv-*) -> tollgate fix/rc lanes ->
+DoD closure (dod-01..dod-20). Every file in this diff is claimed by a
+receipt under docs/jira/v26.11.2/{lanes,waves,redteam,dod,audit}/;
+the full per-file census and staging plan is
+docs/jira/v26.11.2/lanes/lane-fs15-staging-plan.md.
+
+WAVE SUMMARY
+============
+
+RED-TEAM (20 lanes, redteam/red-01..red-20): adversarial attacks against the
+sovereign substrate — cleanroom bypass, LLM extraction, FFI shim decoupling,
+alloc-sentry breach, riscv reentrancy, SRAM overflow, receipt desync, andon
+DoS, PII reconstruction, hardware tamper, hardened-survivor synthesis. Each
+red-* receipt names its exploit shape and its closure lane.
+
+HARDENING: fixes for every confirmed breach (redteam/fix-09..fix-19) —
+spill-gate canonical re-key (FIX-01, closes red-13), bn3 SRAM gate (FIX-02),
+andon/quota (FIX-04), pack-demux poison (FIX-05), FFI surface truth
+(FIX-07/XC-01, 12/12 exported symbols == header prototypes), receipt-desync
+(FIX-08). Corrosion lanes (redteam/corrosion/adv-*) then attacked the fixes
+themselves; residual attacks (adv-05/09/10/11/12 fixes) closed by r-adv*fix
+lanes.
+
+TOLLGATES: rc-01..rc-14 regression courts — ref-store reentrancy + width
+arms, bn3 capacity bound, attestation MAC, stats block, media-loss DR,
+journal fault matrix, zero-string debris, receipt lint keycrash, sram gate
+pyright, contention guard, penstock corpus, fleet-ops, quota alloc purity.
+New court files under crates/*/tests/ plus two new crates (cgap-fleet-ops,
+cgap-ocel2) and the cgap-ffi stats block.
+
+DOD CLOSURE: dod-01..dod-20 — SPDX/license hygiene (DOD-01/FIX-01),
+branchless publish flag, arrow semver, ref-store riscv32imc no_std fix,
+core no_std, changelog, manifest/pin unification, claims freeze, docsrs,
+architecture doc, R10 closure, attr-wire closure (DOD-15), compendium,
+station-300 gate execution, shipgate final (audit/dod-19-shipgate-final.md),
+claim-sweep verdict (dod-16), BOM receipt (dod-12).
+
+BREACH LEDGER
+=============
+Confirmed and closed this campaign (per redteam/fix-19-corpus-audit.md,
+re-verified 2026-11-02; verdicts STANDS/FIXED from its table, §1):
+
+- red-12 SRAM overflow — BREACH-CONFIRMED -> FIXED (FIX-02 bn3 SRAM gate;
+  reproducer re-run green, fix-19 §2.2).
+- red-13 receipt desync / fa9 path-alias — BREACH-CONFIRMED -> FIXED
+  (FIX-01 canonical re-key; racer 20000/20000 denied, fix-19 §2.1).
+- red-11 riscv reentrancy — BREACH-CONFIRMED -> STANDS with the
+  reentrancy-unsafe arm OPEN and UNVERIFIED-flagged (red-11:93);
+  regression courts rc01/rc02 pin the taken arms.
+- red-14 andon DoS — PARTIAL breach -> FIX-04 seam landed, court
+  andon_liveness_court green.
+- red-01 cleanroom bypass (legal-layer BREACH, constructability) and the
+  remaining red-* rows STAND as filed; no verdict was rewritten by this
+  integration. Full 20-row table: redteam/fix-19-corpus-audit.md §1.
+
+RECEIPT INDEX
+=============
+
+- Lanes (200+ receipts): docs/jira/v26.11.2/lanes/ (lane-*.md; self-
+  receipting dod/ artifacts in docs/jira/v26.11.2/dod/).
+- Waves: docs/jira/v26.11.2/waves/ (census, commit plans
+  w-commitplan{,-v2}.md, hardening-family receipts).
+- Red-team corpus + breach ledger: docs/jira/v26.11.2/redteam/
+  (red-01..red-20, fix-09..fix-19, corrosion/adv-*).
+- DoD seal: docs/jira/v26.11.2/dod/ (dod-01..dod-17b, PUBLISH_RUNBOOK,
+  retained-evidence-ledger.md, SHA256SUMS.manifest,
+  v26.11.3-forward-backlog.md, this message).
+- Audit: docs/jira/v26.11.2/audit/ (pub-01 dry-run matrix, pub-02 flag
+  table, pub-09 supply chain, dod-19 shipgate final, release-blockers).
+- Bench validation: docs/jira/v26.11.2/bench-validate/ (bench-01..05,
+  opt-03).
+- Staging plan + per-file census: lanes/lane-fs15-staging-plan.md
+  (supersedes waves/w-commitplan-v2.md ordering for this integration;
+  six-commit explicit-path sequence, no `git add -A` anywhere).
+- Defense-in-depth gates: boundary_gate.py, zero_string_gate.py,
+  ffi_surface_gate.py, gate_battery.py, receipt_lint.py — fail-closed,
+  each with a non-vacuity self-check.
+
+Coordinator execution notes (NOT part of the commit body):
+- Commit with: git commit -F docs/jira/v26.11.2/dod/COMMIT_MSG_v26.11.2.txt
+- Stage per lanes/lane-fs15-staging-plan.md Commits 0-5; never git add -A.
+- Pre-commit gates: cargo build --workspace; cargo test -p cgap-court;
+  make gate0; python3 scripts/boundary_gate.py; zero_string_gate --self-check.
+- NEVER commit: libae8_dbg.rmeta, crates/cgap-branchless/wrapper_riscv32imc.o,
+  crates/cgap-fleet-ops/target/, *.alive sentinels, /tmp leases.

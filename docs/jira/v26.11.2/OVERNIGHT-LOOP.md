@@ -41,11 +41,12 @@ surface; 00-ard-prd.md §4 one-liners are the intent.
 
 ### V2-A — finish the v26.11.1 tail (FIRST; blocks V2-B)
 
-Publish state, census-current per `waves/v2-07-census.md`: 19/22
-cgap-family crates registry-verified PUBLISHED at 26.11.1 (17 of the
-v4 table + fibo + cloud; cgap-integration still HTTP 404 with its
-structural blocker cleared). RESTART-NOW.md's 18/22 census is
-SUPERSEDED (its own header says so, 2026-11-01). Remaining:
+Publish state, census-current per `waves/v2-07-census.md` as superseded by
+PUB-02b (`audit/pub-02-flag-table-rederivation.md`, 2026-11-02; refreshed table
+01-release-gates.md:325-351): 23/23 members explicit, 20 true / 3 false
+(bench collision, beam, court); 19/20 registry-exist (cgap-branchless and
+cgap-integration 404-pending, first-publish candidates). Prior
+"19/22 published" and "18/22 census" figures are superseded.
 
 1. cgap-integration publish: ONE invocation, sequenced post-window;
    stop-on-slide + 1hr backoff (§4 publish law).
@@ -120,8 +121,9 @@ per gate). The loop runs each gate first-hand, exit recorded. Exit-code
 contract: 0 pass / 1 fail / 2 subject missing / 3 loud skip. Mutations
 only in /tmp sandbox copies, sha256 fail-closed restore. Order:
 
-1. G1-PUBLISH — release_check over the 19/22 publishable set
-   (court/cli lawfully delisted, beam guarded); version must read
+1. G1-PUBLISH — release_check over the 20/23 publishable set
+   (bench/beam/court publish = false per PUB-02b, audit/pub-02-flag-table-rederivation.md);
+   version must read
    26.11.2 (observed 26.11.1 on disk — gate self-fails until the bump).
 2. G2-PARETO — five lever thresholds (L1 <15ns/frame, L2 <10ms@1M,
    L3 >20x@1M, L4 <4us/tx, L5 <1.45us/row), each with a witnessed
@@ -192,7 +194,8 @@ claim done with any cell unrendered or any gate unwitnessed.
   the 265 dirty cgap paths + 30 stardf paths; coordinator executes
   AFTER wave close; zero git writes by lanes.
 - `RESTART-NOW.md` — session-kill recovery: publish census 18/22 is
-  SUPERSEDED (see §2-A; census-current 19/22 per v2-07);
+  SUPERSEDED (see §2-A; publish state is PUB-02b-current: 23/23 explicit,
+  20 true / 3 false, per audit/pub-02-flag-table-rederivation.md);
   cgap-integration owes ONE invocation (publish-
   ready; stop-on-slide + 1hr backoff per §4); lawful non-publishes =
   court/beam/cli/bench.

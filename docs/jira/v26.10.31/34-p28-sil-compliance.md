@@ -55,7 +55,13 @@ missing any of the four is not evidence of usage under P28-SIL and is a defect
 The normative policy is `avec:SovereignInvariantPolicy_v1` in
 19-ontology-ttl.md. This document is the human-operational reading; where the
 two disagree, the TTL wins and this doc gets a reconcile entry. Two
-must-reconcile items exist today.
+must-reconcile items exist today. **Amendment note (2026-11-02):** the
+instrument was amended in place (REVISION RIDER v2.1.1,
+`docs/jira/v26.11.2/lanes/lane-gap01-license-amendment.md`) to add
+§2.2.1-§2.2.3 (Controlled Group / aggregation / anti-avoidance) and
+§2.4 (Numeric Safe-Harbor Floor, $50,000,000.00). The reconciliation
+entries below are updated accordingly; the TTL operand remap itself
+(19-ontology-ttl.md) is still pending.
 
 ### Must-Reconcile: Threshold Measure Mismatch
 
@@ -69,6 +75,17 @@ undefined and the safe harbor is ambiguous for entities where the two diverge
 **Resolution rule proposed**: pin **annual gross revenue** (audited figure,
 prior fiscal year) as the `odrl:leftOperand`, because it is uniformly reported
 and auditable, and remap the TTL operand accordingly.
+
+**Amendment note (2026-11-02):** the proposal above is now instrument law.
+LICENSE-P28-SIL.md §2.4 (inserted by the v2.1.1 rider) states verbatim that
+the measure is annual gross revenue (audited figure, prior fiscal year) and
+directs the TTL remap. Until
+[`19-ontology-ttl.md`](19-ontology-ttl.md) remaps
+`avec:assetUnderManagement` → annual gross revenue, the human layer (this
+doc + instrument §2.4) and the machine layer disagree in the opposite
+direction from before: previously the figure lived in TTL-only; now the
+figure lives in instrument-only while the TTL still reads AUM. The
+proposed semantics were adopted without change.
 
 ### Must-Reconcile: Boundary-Value Pinning
 
@@ -86,6 +103,30 @@ and the SHACL negative test suite (19-ontology-ttl.md, next-step candidates)
 must include a `$50,000,000.00 exactly` boundary case that trips REFUSAL on
 the permission branch. This item stays open only until the measure mismatch
 above is resolved.
+
+**Amendment note (2026-11-02):** instrument §2.4 now carries the figure and
+confirms the identical boundary semantics ("comparison is ≥ (duty branch at
+exactly $50,000,000.00)", quoting this doc). The "$50M in TTL only, not
+instrument" state recorded by FIX-10
+(`docs/jira/v26.11.2/redteam/fix-10-license-aggregation.md:123-125`) is
+**superseded-by-amendment (2026-11-02)** — history retained above. New
+aggregation duties the amended instrument places on the TTL/duty layer:
+
+- Classification operands are evaluated at the **Group Aggregation Level**
+  (§2.2.2): group-wide classification per §2.2.2 — the combined gross
+  receipts and balance-sheet figures of all §2.2.1 Controlled Group members
+  are attributed to each member; if any member satisfies the boundary at
+  the group level, every member satisfies it.
+- The regularization duty branch triggers **per member** (each member
+  transitions and triggers §2.3 individually).
+- No member may partition deployments, meters, or executions among members
+  to stay below the boundary — a meter/deployment partition ban the
+  machine layer's `Asc450Meter`-style per-entity metering must refuse.
+- Disagreement among members resolves to the strictest reading pending
+  §7.2 arbitration.
+- §2.2.3 extends §3.2: a reorganization with classification-avoidance as
+  principal purpose imports §3.3 spoliation invariants — future dispute
+  tests must include a restructure-with-receipts-intact case.
 
 ## EU AI Act Mapping Summary
 
@@ -107,10 +148,10 @@ quoted as certified compliance in any customer-facing material.
 
 | Item | Status | Note |
 | --- | --- | --- |
-| Canonical P28-SIL license text | OPEN | No canonical license file location is pinned in-repo. Candidate: `LICENSES/P28-SIL.md` at repo root. |
+| Canonical P28-SIL license text | CLOSED (2026-10-31) | Superseded: `LICENSE-P28-SIL.md` pinned at repo root; see "Instrument of Record" below. |
 | Regularization receipt format | OPEN | Only the minimum schema above is pinned; full format (signing key, issuer identity, covenant scope) unspecified. |
 | Dispute-test status | NONE | No dispute test exists; none has been run. |
-| Threshold measure (AUM vs annual gross revenue) | OPEN | Must-reconcile with 19-ontology-ttl.md. |
+| Threshold measure (AUM vs annual gross revenue) | AMENDED (2026-11-02) | Instrument §2.4 pins annual gross revenue; TTL remap (19-ontology-ttl.md, 209/220) still OPEN. |
 | Risk-register linkage | OPEN | Superseded note removed: 33-risk-register.md exists and is the register of record; this table is a summary cross-referencing it. |
 
 ## DFMEA Summary
@@ -131,9 +172,12 @@ record — its DFMEA rows supersede this summary).
 Standing: PARTIAL. No receipt has been issued under P28-SIL; no dispute test
 exists. Updated: the ODRL policy HAS been SHACL-validated —
 receipts/gate-shacl-v3.md ALIVE (exit 0; validate_ontology.sh, anti-vacuity
-mutant rejected). Still open: the threshold measure (AUM vs annual gross
-revenue) remains unreconciled — 19-ontology-ttl.md still uses
+mutant rejected). Still open: the threshold measure remains unreconciled
+at the machine layer — 19-ontology-ttl.md still uses
 `avec:assetUnderManagement` as `odrl:leftOperand` at lines 209 and 220.
+**Superseded-by-amendment note (2026-11-02):** the instrument now pins
+the measure (§2.4, v2.1.1 rider); the remaining work is the mechanical
+TTL operand remap only, not a semantic decision.
 
 ## See Also
 
@@ -149,3 +193,36 @@ LICENSE.md carries the MIT code base + P28-SIL execution overlay
 (graphlaw dual structure); workspace SPDX is MIT. The AUM-vs-revenue
 measure reconciliation and the N-14 ODRL boundary-corpus items remain
 the open items on this doc.
+
+### Amendment of Record (v2.1.1 rider, 2026-11-02)
+
+The instrument was amended in place by lane GAP-01
+(`docs/jira/v26.11.2/lanes/lane-gap01-license-amendment.md`), applying
+FIX-10: §2.2.1 (Controlled Group, five prongs), §2.2.2 (Group
+Aggregation Level), §2.2.3 (Anti-Structural-Avoidance), §2.4 (Numeric
+Safe-Harbor Floor, $50,000,000.00). REVISION RIDER appended at
+LICENSE-P28-SIL.md:316. Canonical URN retained
+(`urn:avec:license:p28-sil:v2.1.0-sovereign`); the URN-bump question is
+coordinator-owned (see lane-gap01b receipt). Landing court: the five
+FIX-10 structure-trip checks were executed as a mutation court against
+a /tmp sandbox copy (§2.2.1 deleted) — 5/5 flipped TRIPPED→ESCAPES,
+exit 0; receipt:
+`docs/jira/v26.11.2/lanes/lane-gap01b-ttl-reconciliation.md`.
+
+**Errata note on instrument §2.4 cross-cites (2026-11-02, lane I-12):**
+the §2.4 Numeric Safe-Harbor Floor text inserted into
+LICENSE-P28-SIL.md cites this document's pre-GAP-01b line numbers. The
+cites carry stale line numbers but resolve correctly under the current
+file (this doc grew when the two 2026-11-02 amendment notes landed).
+Current mapping: §2.4's "34-p28-sil-compliance.md:60-71" (measure
+mismatch) -> :66-88, heading "Must-Reconcile: Threshold Measure
+Mismatch" at :66, 2026-11-02 amendment note at :79-88; §2.4's
+"34-p28-sil-compliance.md:75-88" (>= boundary semantics) -> :90-105,
+heading "Must-Reconcile: Boundary-Value Pinning" at :90, the >= pin at
+:98-100. The instrument itself is coordinator-sensitive and was NOT edited;
+this note is the errata of record. Instrument text:
+LICENSE-P28-SIL.md:134-136 (§2.4). Cross-receipts:
+docs/jira/v26.11.2/lanes/lane-gap01-license-amendment.md (I-12 errata),
+docs/jira/v26.11.2/lanes/lane-gap01b-ttl-reconciliation.md (I-12
+errata), docs/jira/v26.11.2/redteam/fix-11-covenant-repair-register.md
+(I-12 ERRATA section, full cite-refresh table).

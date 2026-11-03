@@ -303,3 +303,78 @@ BLOCKED:
 - verify_ost_design_around.py: absent from both repos.
 - /Users/sac/purrdf exists; purrdf/scripts lacks
   stardf_f1_census.py / stardf_golden.py / kd_flip.py.
+
+---
+
+## G1-PUBLISH flag table — refreshed re-derivation (2026-11-02)
+
+Evidence receipt: `docs/jira/v26.11.2/audit/pub-02-flag-table-rederivation.md`
+(PUB-02; zero-memory re-derivation: cargo metadata, on-disk grep of
+`publish` flags, 23 sequential crates.io API GETs with mandatory UA).
+ERRATA (superseded, history retained): the G1 block above carries
+"Gate set = 19/22 workspace members" (:27) and "19/22 crates
+publishable set" (:32). Both figures are stale by drift — fresh
+derivation is 23 members, 20 publish-true / 3 publish-false. Drift
+sources: cgap-fibo/cgap-cloud are members living under `ontologies/`
+(not `crates/`), and cgap-branchless flipped to `publish = true` by
+DOD-02 (`lanes/lane-dod-02-branchless-pub.md`). The CLAUDE.md figure
+"12/23 explicit, 9 true / 3 false" is likewise superseded by
+23/23 explicit. The stale text above is retained verbatim per
+ERRATA-never-rewrite law; this table governs.
+
+### Member table (23/23 explicit: 20 true / 3 false)
+
+| # | crate | flag | registry | max_version |
+|---|-------|------|----------|-------------|
+| 1 | cgap | true | exists | 26.11.2 |
+| 2 | cgap-arrow | true | exists | 26.11.2 |
+| 3 | cgap-core | true | exists | 26.11.2 |
+| 4 | cgap-blake3 | true | exists | 26.11.2 |
+| 5 | cgap-gate | true | exists | 26.11.2 |
+| 6 | cgap-branchless | true | 404-pending | registry-absent (DOD-02 first-publish) |
+| 7 | cgap-storage | true | exists | 26.11.2 |
+| 8 | cgap-git | true | exists | 26.11.2 |
+| 9 | cgap-bn3 | true | exists | 26.11.2 |
+| 10 | cgap-parquet | true | exists | 26.11.2 |
+| 11 | cgap-p28 | true | exists | 26.11.2 |
+| 12 | cgap-crypto | true | exists | 26.11.2 |
+| 13 | cgap-ffi | true | exists | 26.11.1 (lag) |
+| 14 | cgap-audit | true | exists | 26.11.1 (lag) |
+| 15 | cgap-beam | false | 404 | (moot: publish=false) |
+| 16 | cgap-gpu | true | exists | 26.11.1 (lag) |
+| 17 | bench | false | collision | 1.1.0, ours-not (bench-rs, 2021) |
+| 18 | cgap-integration | true | 404-pending | registry-absent |
+| 19 | cgap-bont | true | exists | 26.11.2 |
+| 20 | cgap-bosym | true | exists | 26.11.2 |
+| 21 | cgap-court | false | 404 | (moot: publish=false) |
+| 22 | cgap-fibo | true | exists | 26.11.1 (lag) |
+| 23 | cgap-cloud | true | exists | 26.11.1 (lag) |
+
+Registry reads are HTTP codes from the PUB-02 session (2026-11-02);
+five members at 26.11.1 are pre-version-bump publications (expected
+pre-publish-wave lag, not defects). Note on cgap-integration: flag
+read from `crates/integration/Cargo.toml:8` (dir name ≠ pkg name).
+
+### Non-member (standalone) crates — 2026-11-02
+
+| crate | flag | registry |
+|-------|------|----------|
+| cgap-verification | false (by design) | not read (publish=false, moot) |
+| csct | false (by design) | not read (publish=false, moot) |
+| cli | false (by design) | not read (publish=false, moot) |
+| cgap-fleet-ops | false (by design) | not read (publish=false, moot) |
+| cgap-ocel2 | false (by design) | not read (publish=false, moot) |
+| wasm-footprint | true | UNVERIFIED-registry (no read performed) |
+
+wasm-footprint is a publish=true non-member outside the 23-member
+gate set — a live first-publish candidate the prior table omitted
+(PUB-02 W5). Its registry state carries no HTTP read; it is
+UNVERIFIED, never rounded up. The five publish=false standalone
+crates are delisted by design, per the PUB-02 disk reads.
+
+Standing: ALIVE (2026-11-02) — every member-table cell re-verified
+against `audit/pub-02-flag-table-rederivation.md` this session;
+cgap-integration flag additionally re-read from disk
+(`crates/integration/Cargo.toml:8`, `grep -n "^publish"`, exit 0)
+after the PUB-02 W4 annotation typo was found. This lane owns only
+this file; no other tree file was edited; no git commands run.

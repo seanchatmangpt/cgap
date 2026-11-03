@@ -36,7 +36,7 @@ Fresh measured tables this session (audit-ledger.md, SEED-A
 | FA10 max-consumer .text | llvm-size 102,389 B (22% headroom under 131,072) | ledger G08 row |
 | C6 retraction | 248.06M (b05) / 323.84M (git-11) facts/s vs 800M — typed FAIL | ledger rows |
 | Commit (G5, prior) | 1.05-1.07 us/tx vs 4 USL — MET | 15-ctq-tree.md:53 |
-| Ingress (G4/G5a, prior) | 10.20 ns/frame fastest vs 15 USL — MET | 15-ctq-tree.md:51 |
+| Ingress (G4/G5a, prior) | 10.20 ns/frame fastest vs 15 USL — MET (quiet host; divergence row 28) | 15-ctq-tree.md:51 |
 | Arrow object (G1a) | 28,679 B pre-link OBJECT (87.5% of 32,768) | 15-ctq-tree.md:28 |
 
 Standing law: the parquet 55,711 B figure is UNVERIFIED-BY-RECEIPT
@@ -206,7 +206,7 @@ failing. ASPIRATIONAL-UNVERIFIED = no witness, no decided gate.
 | S1 zero-heap | VERIFIED | ledger G04/repair rows; charter G2 MEASURED |
 | S1 spoliation 0x5032_38FF | VERIFIED | 15-ctq-tree.md:32-34 |
 | S1 BLAKE3 receipt coverage | VERIFIED | w3-t5-pack-requal 14/14 (as-of-receipt) |
-| S2 ingress ns/frame | VERIFIED | 10.20 vs 15 USL (as-of-receipt; charter G4 [TARGET] satisfied) |
+| S2 ingress ns/frame | VERIFIED | 10.20 vs 15 USL (as-of-receipt; quiet host, claims rows 5/28; charter G4 [TARGET] satisfied) |
 | S2 commit us/tx | VERIFIED | 1.05-1.07 vs 4 USL |
 | S2 0 blr / 0 brk | DEFECT-OPEN | p2-asm-0blr-census.md:37 (1 blr) |
 | S3 throughput >= 1M facts/s | DEFECT-OPEN | R1: 248M/324M vs 800M gate, honest typed FAIL |

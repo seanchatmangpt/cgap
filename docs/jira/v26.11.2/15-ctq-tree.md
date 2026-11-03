@@ -49,7 +49,10 @@ latency; no hidden indirection on the hot path.
 | Indirection-free hot path | blr/brk in asm census | 0/0 | 0 blr / 0 brk | 0 (hard) |
 
 Measurement cites: #5/#8 (`waves/w3-l1-ingress.md:63,69-70` - 10.20
-fastest / 10.30 median, <15 target MET, MEASURED);
+fastest / 10.30 median, <15 target MET, MEASURED; quiet host, divan
+fastest/median columns — contended divergence registered as
+`11-measured-claims.md` row 28, 124.06 ns/frame slowest under
+combined bw+cpu);
 `02-pareto-levers.md:172` + `waves/a3-ring-sink.md` (`stage_commit_parquet`
 269.1 us @256 / 4.368 ms @4096 = 1.05-1.07 us/tx vs 45.8 recorded,
 <4 us/tx MET, MEASURED); #14 (`waves/w3-t2-asm-census.md:23-29` - 0 blr /

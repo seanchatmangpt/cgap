@@ -8,8 +8,10 @@ waves/v2-17-ard-landing.md.
 
 **CGAP** is a deterministic, bare-metal-capable columnar execution, state-admission, and
 cryptographic attestation substrate. It is engineered to serve as an embedded Personal
-Data Engine and sovereign state machine for edge silicon, secure enclaves,
-microcontrollers, and deterministic high-throughput hosts.
+Data Engine and sovereign state machine for edge silicon, microcontrollers, and
+deterministic high-throughput hosts. (Fix-13, 2026-11-02: "secure
+enclaves" removed per red-18 §3.1 — no TEE/TrustZone/SGX referent
+exists in crates/; see §7 Hardware Trust Posture.)
 
 While legacy semantic reasoning engines rely on heap-allocated, pointer-heavy object
 graphs, dynamic virtual dispatch, and atomic lock contention, CGAP operates strictly over
@@ -28,7 +30,11 @@ the highest-value market for symbolic reasoning is not cloud-hosted triple store
 traditional engines require megabytes of runtime footprint, operating-system heap
 allocators, and multi-threaded compare-and-swap synchronization. CGAP captures the
 embedded and sovereign computing tier where those engines cannot execute: sub-32 KB Flash
-environments, zero-allocation real-time loops, and hardware-attested execution pipelines.
+environments, zero-allocation real-time loops, and tamper-evident software-attested
+execution pipelines. (Fix-13, 2026-11-02: "hardware-attested" corrected per red-18 §3.3 —
+the only attestation is software BLAKE3, keyless and unsigned,
+cgap-p28/src/attestation.rs:271,313-319; hardware attestation is a §7 design target with
+no referent yet.)
 
 ### 2.2 Strict Ecosystem Separation
 
@@ -47,6 +53,10 @@ experimental bloat:
 
 * **P1 — Two-Stage Fail-Closed Admission Penstock:** All inbound frames must pass a
   constant-time, branchless header inspection before invoking cryptographic digest
+  (QUALIFIER, X-04FIX 2026-11-02: "constant-time" is UNSUPPORTED — no measured claim
+  asserts it; BR3 rejected the branch-free dispatch item because typed-refusal branches
+  are lawful — `docs/jira/v26.11.2/11-measured-claims.md` row 29. Requirement of
+  record: branchless fast path with fail-closed typed refusals, not constant-time.)
   computation. Invalid magic numbers, unaligned frames, unlicensed binary schemas, or
   malformed flags must be rejected immediately in Stage 1. Only frames admitted with
   explicit escalation indicators trigger Stage 2 full payload hashing.
@@ -173,3 +183,95 @@ render, BLAKE3 classical, PQC seal an unbuilt Wave-3 seam
 (cgapprd-02-equation-grounding.md:70-81). The line is retained
 unedited; this errata supersedes it (rewrite text of record:
 cgapprd-02-equation-grounding.md:66+).
+
+---
+
+## Risk: Market Adoption (first-adoption funnel) — 2026-11-02, FIX-16
+
+**Objection (BREACH-CONFIRMED, scoped).** RED-19
+(`redteam/red-19-market-inertia-defense.md:55-71,89-102`) confirms the
+first-adoption funnel breach: mainstream enterprise buyers rationally
+prioritize SOC2/FedRAMP posture, vendor indemnity, and procurement
+checkboxes over substrate efficiency, so the efficiency wedge (this doc
+:23-31) is not what a mainstream buyer purchases on. The repo's own
+compliance model concedes the mechanism: "org/legal process is not
+compressible by evidence quality" — SOC 2 observation windows, CC lab
+queues, CMVP queues are calendar-bound
+(`docs/audit/models/11_security_compliance_and_certification.md:51`,
+pricing at :25-28). The ASC 450/SOX embedded-licensing deterrence moat
+(`REVENUE_GENERATION_COMPENDIUM.md:144,375`) defends PAYMENT and
+RETENTION, not first ADOPTION. The objection survives intact for the
+mainstream procurement funnel.
+
+**Mitigation (registered).** Segment selection: the S4
+high-assurance market, where calendar-bound certification is already
+the customer's home workflow, not an adoption barrier. The demand
+generator is the cgap-court High-Assurance Certification Package —
+DO-178C (avionics), ISO 26262 (automotive), Common Criteria auditor
+sales (`REVENUE_GENERATION_COMPENDIUM.md:267`) — priced at
+$200,000/yr for regulated aerospace, defense, medical, and financial
+auditors (`REVENUE_GENERATION_COMPENDIUM.md:431`). In this segment the
+compliance calendar is the customer's existing process and the
+court/receipt evidence stack compresses the developer-side evidence
+phase (compliance model :40-48), while the deterrence moat covers
+post-adoption regularity. Mainstream SOC2-procurement first adoption
+remains UNCLAIMED — no on-disk artifact asserts it (RED-19 :119-121).
+
+**Residual risk.** Open. The high-assurance segment is a niche; TAM
+above it is conceded to compliance-postured incumbents until either
+(a) the certification calendar elapses (6-18 mo,
+`11_security_compliance_and_certification.md:25-28`) or (b) a
+distribution partner carries the indemnity/posture. This subsection
+registers the scoping; it does not claim the mainstream funnel is won.
+
+{"lane":"FIX-16","files_written":
+["docs/jira/v26.11.2/12-ard-prd-cgap.md (Market Adoption Risk subsection, appended)"],
+"commands":["read red-19 + compliance model + compendium:267,431 (exits 0)"],
+"courts_run":[],"standing":"ALIVE","divergences":[]}
+
+---
+
+## 7. Hardware Trust Posture & Design Targets (Fix-13, 2026-11-02, per
+red-18-hardware-tamper-vectors.md)
+
+### 7.1 Honest posture (what exists today)
+
+The substrate provides **tamper-EVIDENT** integrity only: hash-chained
+receipts and an 80-byte software attestation bound by BLAKE3
+(`cgap_blake3::hash`, cgap-p28/src/attestation.rs:271,313-319),
+fail-closed via CGAP_ERR_P28_SPOLIATION 0x5032_38FF
+(cgap-p28/src/trap.rs:36). The attestation is unsigned, keyless, and
+fully cloneable — any attacker who reads flash once can recompute a
+valid block (red-18 §3.3, BREACH-CONFIRMED). There is NO hardware root
+of trust, NO TEE/enclave, NO memory encryption on disk. Every physical-
+layer defense is absent by omission, not by waiver (red-18 §3.4).
+
+### 7.2 Design targets — TARGET-WITH-NO-REFERENT-YET, not existing
+capability
+
+To close the four physical vectors of red-18, the following are DESIGN
+TARGETS ONLY. None has a referent in crates/ today; each lands as a
+future work order with its own court before this document may cite it
+as capability.
+
+1. **DICE/TPM measured boot** (closes red-18 §3.4 supply-chain
+   interdiction): a hardware RoT measures each boot stage into PCR-like
+   registers; the P28 attestation chains to a measured-boot digest, so
+   a modified image cannot self-attest.
+2. **Memory encryption / scrub-on-reset** (closes §3.1 cold-boot /
+   DRAM bus): SRAM/DRAM contents encrypted at the bus or scrubbed on
+   every reset and lease teardown; no plaintext key material resident
+   in bulk memory.
+3. **Voltage-glitch hardening** (closes §3.2 PD glitching): brownout/
+   glitch detectors plus redundancy (dual-rail monitor or TMR on the
+   P28 validate branch), so logical fail-closedness survives a glitched
+   comparison.
+4. **OTP-fused device key** (closes §3.3 cloning): an asymmetric
+   attestation signature (Ed25519-class) over the 80-byte layout with
+   the public key fused in OTP — the device keeps the private key off
+   the image, making flash-read cloning insufficient.
+
+Gate: a §7.2 item may be reworded as capability only when a court in
+crates/ demonstrates its referent failing closed under a named
+mutation (anti-vacuity law, §5.1). Until then, red-18's
+BREACH-CONFIRMED grades stand.

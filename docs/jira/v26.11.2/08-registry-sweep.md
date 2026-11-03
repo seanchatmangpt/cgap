@@ -57,6 +57,38 @@ UNPUBLISHED (404, PASS vs publish=false guard); bench/beam/court/cli DELISTED ro
 Sweep wrote docs/jira/v26.11.2/waves/registry-sweep-table.json into the tree (script has
 no output-path flag; write disclosed).
 
+## 1a. PUB-02 re-derivation supersedes §1 cells (2026-11-02)
+
+`audit/pub-02-flag-table-rederivation.md` (landed; zero-memory
+re-derivation, ALIVE per its §"Standing": cargo metadata exit 0, grep
+exits 0, 23 curl GETs with HTTP codes recorded) SUPERSEDES the §1 cell
+table's registry-state column as-of its session. Key deltas, cited
+from that receipt — do not re-quote §1 rows without this overlay:
+
+- Membership: **23 members** (fibo + cloud under `ontologies/` are
+  members), not 22; cli remains a delisted 24th standalone row.
+- Flags: **23/23 explicit, 20 true / 3 false** (false: bench, beam,
+  court). SUPERSEDES both the root CLAUDE.md "12/23 explicit, 9 true /
+  3 false" figure and `01-release-gates.md:32` "19/22" (both stale).
+- Registry: **13 members at 26.11.2**, 5 at 26.11.1 (ffi, audit, gpu,
+  fibo, cloud), **cgap-branchless HTTP 404** (registry-absent;
+  DOD-02 first-publish candidate, not yet published).
+- The W-SWEEP note's "cgap-blake3 only member at max 26.11.2; 17
+  REGISTERED-DIVERGENCE" is therefore stale: most divergence rows
+  closed between that run and PUB-02.
+- bench collision confirmed from the response body (id=bench,
+  max 1.1.0, AlexanderThaller/bench-rs, 2021) — moot under
+  publish=false.
+- One UNVERIFIED cell in PUB-02: wasm-footprint registry state (no
+  read performed; non-member with `publish = true`). Never rounds up.
+- Non-member standalone crates all `publish = false` on disk:
+  cgap-verification, csct, cli, cgap-fleet-ops, cgap-ocel2
+  (PUB-02 §W3, each with file:line evidence).
+
+This file's §1 table rows stay on disk as provenance (v2-07 census
+era); PUB-02 is the current-truth layer. The §2 sweep compiler
+re-verifies every cell each run either way.
+
 ## 2. Coverage-compiler design
 
 Implementation home: `scripts/registry_sweep.py` (fail-closed, exit

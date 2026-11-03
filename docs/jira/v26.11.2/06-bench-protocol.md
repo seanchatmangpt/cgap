@@ -174,6 +174,25 @@ facts at fixpoint — wall time alone never produces the number.
 - Any unit mismatch voids the receipt; the number stays [TARGET-v26.11.2] until re-measured
   with correct units.
 
+## §8 Contention-marker consumption law (ADV-09-R2 closure, R-ADV09FIX)
+
+- A run whose stderr carries the `CONTENTION-SUSPECT:` marker is
+  REJECTED for quiet-host-scoped claims: it must not be quoted against
+  `11-measured-claims.md` rows 5/6/7/8, and any claims-file row citing
+  a marked run is VOID.
+- Mechanism: the host-noise detector in
+  `crates/bench/benches/chains-ingress.rs:716-802` (guard contract
+  comment :716-719, `CONTENTION_MARK` const :745, emission at :802 and
+  :854). The same pattern is copied into
+  `crates/bench/benches/mctq_consolidation.rs:31,65,98`.
+- Enforcement is PROCEDURAL today (receipt-lint / consumer discipline
+  per this section): no machine gate yet greps bench stderr. A machine
+  gate (post-receipt `grep CONTENTION-SUSPECT` over the receipted
+  stderr, fail-closed) is a TARGET row until it exists with a receipt.
+- Consumers of any claims-file row must state the marker check was
+  clean; a receipt that does not disclose the marker check on a
+  quiet-host-scoped row is incomplete.
+
 ## JSON footer
 
 ```json

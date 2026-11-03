@@ -26,7 +26,7 @@ cross-multiplied)
 | closure pairs/s @ N=65536 (229376 pairs) | 11280787 | pairs/s | Instant harness=false, min of 4 | p1-closure-closure.md |
 | closure pairs/s @ N=1048576 (16252928 pairs) | 4987591 | pairs/s | same | p1-closure-closure.md |
 | dred retract speedup @10/50/90% churn | 1.60x / 3.66x / 4.85x | ratio | min-of-30 wall-clock, oracle/retract ratio only | p1-dred-retraction-antijoin.md |
-| penstock L1 frame digest | 10.20 | ns/frame | predicate identity 256/256, skip-not-pay | p2-penstock-escalation-law.md, w4-p3-escalation-corpus.md |
+| penstock L1 frame digest | 10.20 | ns/frame | predicate identity 256/256, skip-not-pay; quiet host, divan fastest/median (claims row 5); contended divergence row 28 (124.06 ns/frame slowest) | p2-penstock-escalation-law.md, w4-p3-escalation-corpus.md, 11-measured-claims.md rows 5/28 |
 | L1 chain speedup | 10.1x | ratio | same | p2-penstock-escalation-law.md |
 | cgap-gate .text (riscv32imc, audit profile) | 940 | B | llvm-size -A, ELF objects | p2-footprint-flash-ladder.md |
 | cgap-arrow wasm32 CODE | 85411 | B | llvm-size -A | p2-footprint-flash-ladder.md |

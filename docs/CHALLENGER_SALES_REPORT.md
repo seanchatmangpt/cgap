@@ -18,23 +18,45 @@ Conventional enterprise data engines, stream processors, and audit systems are h
 ### The CGAP Challenger Alternative
 **CGAP (Common Graph & Attestation Platform)** replaces conventional software conventions with a **sovereign, hardware-aligned systems architecture**:
 - **Zero-Intermediate-Heap Allocation:** Pure zero-alloc data manipulation guarantees zero GC pressure and flat, sub-millisecond p99 latencies.
-- **Branchless Predicate & Stream Compaction:** In-register bit manipulation and NEON/AVX SIMD shuffle instructions replace conditional branches with deterministic, constant-time execution.
+- **Branchless Predicate & Stream Compaction:** In-register bit manipulation and NEON/AVX SIMD shuffle instructions replace conditional branches with deterministic, branch-free
+execution ("constant-time" is UNSUPPORTED — no measured claim asserts it;
+register row 29, `docs/jira/v26.11.2/11-measured-claims.md`).
 - **Vertical Bit-Slicing (BitWeaving):** Columns are stored across bit-planes, allowing analytical queries to prune 64-lane blocks by inspecting only the 2–3 most significant bits.
-- **Cryptographic Wire-Speed Integrity:** Constant-time ladder searches and wide-SIMD BLAKE3 tree hashing deliver integrity verification at memory-bus speeds (>10 GB/s).
+- **Cryptographic Wire-Speed Integrity:** Branch-free ladder searches
+  (mechanism descriptor — "constant-time" is UNSUPPORTED, register row 29,
+  `docs/jira/v26.11.2/11-measured-claims.md`) and wide-SIMD BLAKE3 tree
+  hashing deliver integrity verification at memory-bus speeds (>10 GB/s —
+  UNSOURCED: no row in `11-measured-claims.md`; nearest receipted figure is
+  `challenger_crypto` 461.8 MB/s tree digest, compendium §11).
 
 ---
 
 ## 2. Head-to-Head Challenger Benchmark Matrix
 
-The following table reflects live empirical measurements recorded on hardware using the pinned **Divan v0.1.21** benchmark harness. Every metric is ground truth, asserting final system states under the Chicago testing discipline.
+The following table reflects live empirical measurements recorded on hardware using the pinned **Divan v0.1.21** benchmark harness.
+
+> **Scope banner (X-04FIX, 2026-11-02):** metrics below are **quiet-host** divan
+> measurements from the v26.11.1 F2 receipts (Apple M3 Max) — not valid
+> unqualified under contention (register row 28,
+> `docs/jira/v26.11.2/11-measured-claims.md`: L1 ingress slowest hits 124.06 ns
+> @1M = 12.2x the quiet-host claim under combined cache+CPU load). The
+> **82.24 GB/s** figure is BN3-internal isolated-scan throughput, not
+> end-to-end chain throughput (`bench-chains-bn3.md:37`: 80.32 GB/s isolated /
+> 12.3 GB/s chain); it has no v26.11.2 register row and is therefore
+> **UNVERIFIED-WITHOUT-METHOD** for that register — receipted at
+> `docs/jira/v26.11.1/waves/bench-bn3-receipt.md:45,69` on this host class
+> only. "Constant-time" wording carries no measured claim (register row 29,
+> UNSUPPORTED). Ground truth = receipted-at-source, never unscoped.
 
 | Benchmark Domain | Incumbent Conventional Practice | CGAP Sovereign Challenger | Incumbent Latency / Cost | CGAP Challenger Latency / Cost | Empirical Advantage / Speedup |
 |---|---|---|---|---|---|
 | **Vertical Bit-Slice Query** | Horizontal scalar scan (`lo <= x && x <= hi`) | Vertical BitSlice MSB-first pruned scan (`cgap-parquet::bitslice`) | **3.957 µs** (4,096 rows) | **973.5 ns** (4,096 rows) | **4.06x faster throughput** |
 | **Stream Compaction (50% entropy)** | Conditional write loop: `if (valid) { out[w++] = x; }` | Branchless shift-mask compaction (`cgap-parquet::stream_compact`) | **2.494 ns** / batch (branch mispredict stalls) | **2.819 ns** / batch (flat deterministic) | **Zero branch stalls**, deterministic latency |
-| **Arrow Quad Filtering** | Branchy record comparison loop | Branchless constant-time SIMD filter (`cgap-arrow::predicates`) | **10.83 µs** (16k quads) | **7.874 µs** (16k quads) | **~27% latency reduction**, side-channel immune |
+| **Arrow Quad Filtering** | Branchy record comparison loop | Branchless constant-time SIMD filter (`cgap-arrow::predicates`) | **10.83 µs** (16k quads) | **7.874 µs** (16k quads) | **~27% latency reduction**; side-channel immunity claim UNSUPPORTED
+  (register row 29, `docs/jira/v26.11.2/11-measured-claims.md` — no
+  measured claim asserts it; mechanism is branch-free code shape) |
 | **Parquet RLE Page Decode** | Staged vector allocation (`Vec<u32>`) | Direct-into-caller decode (`cgap-parquet::rle`) | **63.28 µs** (1 alloc / 262.1 KB) | **49.95 µs** (**0 allocs / 0 B**) | **100% Heap & GC Immunity**, +27% speedup |
-| **Logical Scan & Unification** | Dynamic graph AST traversal | 24B cache-aligned statement scan & join (`cgap-bn3`) | Standard graph engines (<100 MB/s) | **82.24 GB/s** scan; **6.50 ns** / pair join | **82x margin over 1.0 GB/s wire rate** |
+| **Logical Scan & Unification** | Dynamic graph AST traversal | 24B cache-aligned statement scan & join (`cgap-bn3`) | Standard graph engines (**UNSOURCED-BASELINE** — "<100 MB/s" cites no engine or method; deleted as a claim) | **82.24 GB/s** isolated scan (BN3-internal, quiet-host; UNVERIFIED-WITHOUT-METHOD for v26.11.2, receipted `bench-bn3-receipt.md:69`); **6.50 ns** / pair join | **82.2x its own >1.0 GB/s charter target** — a byte-throughput multiple vs the charter target, NOT a wire-rate margin (R4 category-error flag, `docs/jira/v26.11.1/waves/paper-comparison-audit.md:31`); not end-to-end chain throughput (`bench-chains-bn3.md:37`) |
 | **Attestation & Spoliation Audit** | Asymmetric signature verification (RSA/ECDSA) | 640-bit hardware-aligned attestation (`cgap-p28`) | 50–500 µs / check | **~460 ns** / record | **100x–1000x faster compliance auditing** |
 
 ---

@@ -37,6 +37,13 @@ measured-band + headroom, provenance below) and REPORTS the aspirational
 
 ## Baseline result (2026-11-02, this session)
 
+> **SCOPE — ambient/quiet-host caveat (lane A-05, 2026-11-02):** ambient-load
+> state was not recorded at measurement time; the n=30 membrane ns/frame
+> figures carry no CONTENTION-SUSPECT guard witness. Consume under the
+> control-plan quiet-host consumption rule
+> (`dflss/06-control-plan.md:151-164`). Membrane-layer contention
+> discussion register pointer: row 31 D1 (in-process vs cgo).
+
 - n=30, mean 184.294 ns/frame, sigma 1.270, min 181.71, max 187.67.
 - Cpu(decided 250 ns) = **17.252** -> PASS (>= 1.33 floor).
 - Cpu(aspirational 10 ns) = **-45.762** — printed loudly, not gated.

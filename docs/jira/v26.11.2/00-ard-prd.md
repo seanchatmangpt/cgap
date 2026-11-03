@@ -17,6 +17,13 @@ v26.11.2 §1–§6. Repo: /Users/sac/cgap (canonical checkout, branch main).
 - Success is single-sentence falsifiable: the like-for-like materialization bench (§2, R4)
   beats RDFox's published 2–6.1M facts/s envelope on identical workload shape, and all five
   Pareto levers (§3) hit their targets, with receipts in waves/.
+- Standing of that sentence (claims registry `11-measured-claims.md`, re-read 2026-11-02):
+  the cgap MW4 arm is [TARGET], never a claim — RDFox was NOT executed; the campaign's only
+  receipted facts/s figure (addendum row 30) is NOT RDFox-comparable (addendum D2, window
+  1,365 vs 1M). Post-measurement lever standing: L1 met on QUIET HOST ONLY (rows 5/8;
+  contention divergence registered as row 28 — median 19.03, slowest 124.06 ns/frame),
+  L2 NOT MET (row 10), L5 FAILED-BY-MEASUREMENT (row 12), L3/L4 unmeasured (row 27 loud
+  skip). §3's baselines/transcription below remain verbatim; status lives here.
 
 ## §2 The five market-wedge requirements
 
@@ -47,25 +54,49 @@ Verbatim (operator transcription, CHARTER-CGAP-STARDF-v26.11.2 §3):
   ring sink, target <4µs/tx.
 - L5 chains-seal: 2.37µs/row three-way → fused ASC450 into P28 fold, target <1.45µs/row.
 
+Post-measurement status (registry rows, `11-measured-claims.md` §1 — verbatim block above
+is the charter transcription, not result figures): L1 target met quiet-host-only, 10.20
+ns/frame fastest (rows 5/6/8; dispatch's 5.70 ns penstock row NOT reproduced — row 7
+records 7.71 ns); L2 target NOT MET (42.7-43.1 ms vs <10 ms, row 10); L5 target
+FAILED-BY-MEASUREMENT (3.04 fused vs 2.37 unfused µs/row, row 12); L3/L4 no receipt at
+consolidation (row 27 [SKIP]). All figures above remain [TARGET-v26.11.2] class per §2
+preamble; measured counterparts cite the registry, never this block.
+
 ## §4 The EIGHT RELEASE GATES (G1–G8)
 
 Full spec lives in 01-release-gates.md (COMMAND / RECEIPT / FLIP / BLOCKED per gate).
 Gate names + one line each, transcribed from 01-release-gates.md (on-disk definitions):
 
-- G1-PUBLISH: release_check over the 19/22 publishable set (court/cli/bench lawfully
-  delisted, publish = false); workspace version exactly `26.11.2`; FLIP = strip a
+- G1-PUBLISH: release_check over the 20/23 publishable set (bench/beam/court are
+  publish = false; 23/23 members explicit, 20 true / 3 false per
+  audit/pub-02-flag-table-rederivation.md and the refreshed table
+  01-release-gates.md:325-351); workspace version exactly `26.11.2`; FLIP = strip a
   crate's `description` in a /tmp sandbox, gate must FAIL; sha256 fail-closed restore.
+  Count scope note: prior "19/22 published" registry state was UNVERIFIED (guarded table
+  01-release-gates.md:28-32) and "19/22" as publishable-set is superseded by PUB-02b
+  (audit/pub-02-flag-table-rederivation.md, 2026-11-02); the set is 20/23.
 - G2-PARETO: all five Pareto levers measured by the named bench targets with flip
   witnesses per level — L1 < 15 ns/frame, L2 < 10 ms @ 1M rows, L3 > 20x @ 1M,
   L4 < 4 us/tx, L5 < 1.45 us/row; a level met with no flip witness is
   `VACUOUS: L<n> threshold met with no flip court` and exit 3.
-- G3-MAT-BENCH: like-for-like materialization closure bench — > 50M closure facts/s/core,
+  Post-measurement (registry §1): L1 met quiet-host-only (rows 5/8; divergence row 28),
+  L2 NOT MET (row 10), L5 FAILED-BY-MEASUREMENT (row 12), L3/L4 unmeasured (row 27) —
+  G2 cannot pass today; UNVERIFIED-FOR-PAPER until L3/L4 land receipts.
+- G3-MAT-BENCH: like-for-like materialization closure bench — > 50M closure facts/s/core
+  [TARGET-v26.11.2 — registry row 26: RDFox NOT executed, cgap arm unmeasured; the
+  comparison arm is a published-envelope citation, and rows 5-#10 are CATEGORY-ERROR if
+  comparison arm is a published-envelope citation, and rows 5-10 are CATEGORY-ERROR if
+  ever quoted against facts/s per registry §2].
   single-core, RDFox 2–6.1M facts/s baseline named with source + machine/method lines
   for both sides; FLIP = mutate the closure kernel to skip one derivation rule.
 - G4-DRED: DRED churn court (paper-dred.md is prose, not a bench) — 90% churn workload,
   < 3.0 ns/batch, < 0.15 ns entropy variance across >= 9 batches with per-batch numbers,
   > 15M facts/s; FLIP = skip the entropy recompute, variance gate must flip.
-- G5-SILICON: riscv32imc footprint — flash < 32,768 B, SRAM + stack < 4,096 B,
+  UNVERIFIED-FOR-PAPER: no register row covers any G4 figure (registry §1 rows 1-32 have
+  no DRED entry; paper-dred.md is prose, not a bench — missing referent, never quote).
+- G5-SILICON: riscv32imc footprint — flash < 32,768 B, SRAM + stack < 4,096 B
+  [TARGET; nearest receipted figure is row 15's 28,679 B — a PRE-LINK audit-profile
+  OBJECT, not linked ELF; repo law: footprint truth is linked ELF only],
   0 alloc/panic symbols (symbol_gate.py), QEMU stack-paint high-water recorded;
   FLIP = inject an alloc symbol or panic site in a /tmp copy, gate must FAIL.
 - G6-NO-DF: zero `datafusion` matches (comments included) across both repos' manifests,

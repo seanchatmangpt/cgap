@@ -32,7 +32,7 @@ Traditional enterprise software monetization is structurally broken. Open-core m
 Rather than relying on sales representatives chasing procurement departments or brittle license-key servers that engineers can comment out, CGAP embeds its monetization, evidentiary accounting, and statutory compliance directly into the **wire-to-memory data layout, cryptographic state transitions, and corporate balance-sheet reporting obligations** of the deployer:
 
 1. **Zero-Friction Developer Acquisition (The Wedge):**
-   Developers adopt `cgap`, `cgap-arrow`, `cgap-parquet`, `cgap-git`, and `cgap-blake3` via `cargo add` because they deliver **4.06x to 82.24x empirical speedups**, **0-byte hot-path heap allocations (100% GC immunity)**, and **branchless constant-time determinism** that conventional libraries cannot match. Under the **Universal Safe Harbor ($\mathcal{U}_{\text{exempt}}$)**, non-institutional developers enjoy perpetual, royalty-free usage.
+   Developers adopt `cgap`, `cgap-arrow`, `cgap-parquet`, `cgap-git`, and `cgap-blake3` via `cargo add` because they deliver receipted quiet-host bench speedups (v26.11.1 F2 receipts: 4.06x BitSlice range-scan; 82.24 GB/s is a byte-throughput figure, NOT a speedup multiple — GB/s is never a multiple of facts/s per `06-bench-protocol.md` §7), **0-byte hot-path heap allocations (100% GC immunity)**, and **branch-free determinism** ("constant-time" is UNSUPPORTED — no measured claim asserts it; register row 29, `docs/jira/v26.11.2/11-measured-claims.md`). Under the **Universal Safe Harbor ($\mathcal{U}_{\text{exempt}}$)**, non-institutional developers enjoy perpetual, royalty-free usage.
 2. **Autonomous Institutional Trigger ($\mathbf{E}_{\text{inst}}$):**
    The exact instant the software is deployed within an **Institutional Entity** (any SEC Rule 12b-2 Accelerated/Large Accelerated Filer, IRC § 448(c) accrual-mandated corporation, EU Directive 2013/34/EU Large Undertaking, or FAR/CAS Prime Contractor), the topological boundary transitions automatically.
 3. **Cryptographic Metering & Balance-Sheet Accrual (`cgap-p28::asc450`):**
@@ -50,7 +50,7 @@ Rather than relying on sales representatives chasing procurement departments or 
 flowchart TD
     subgraph Wedge ["1. Developer & Performance Wedge"]
         Dev["cargo add cgap / cgap-parquet / cgap-arrow"]
-        Perf["4.06x BitSlice Scan | 82.2 GB/s BN3 | 0-Alloc RLE"]
+        Perf["4.06x BitSlice Scan | 82.2 GB/s BN3 (quiet-host) | 0-Alloc RLE"]
         SafeHarbor["Universal Safe Harbor (U_exempt: $0 Royalty)"]
     end
 
@@ -112,7 +112,10 @@ CGAP enforces a strict **AM $\to$ FM (Frequency/Phase Modulation) Diode**:
 - Inside the runtime kernel (`cgap-core`, `cgap-arrow`, `cgap-parquet`, `cgap-bn3`, `cgap-gate`, `cgap-p28`), **zero strings exist**. Enforced mechanically by `scripts/zero_string_gate.py` and `scripts/boundary_gate.py --strings`, `strings_admitted` is strictly `0` across all 15 covered kernel crates.
 
 **Commercial Consequence:**
-1. **Unmatched Performance Density:** Operating purely on fixed-width 64-bit `SlotId`s, 24-byte `Bn3Statement`s, and 64-byte `Quad64`s allows CGAP to run at **82.24 GB/s** in-register speeds.
+1. **Unmatched Performance Density:** Operating purely on fixed-width 64-bit `SlotId`s, 24-byte `Bn3Statement`s, and 64-byte `Quad64`s allows CGAP to run at **82.24 GB/s** in-register speeds (quiet-host divan,
+v26.11.1 F2-13 receipt; byte-counter figure — no row in the v26.11.2
+claims register: UNVERIFIED-WITHOUT-METHOD there, and NOT a facts/s
+multiple per §7 unit law).
 2. **Vendor Lock-In via O-ABI Coordinate Space:** Once an enterprise maps its financial instruments (`cgap-fibo`) or cloud infrastructure (`cgap-cloud`) into CGAP's collision-checked `.oabi` `SlotId` coordinate space, CGAP becomes the canonical, high-speed binary ABI of the enterprise's entire data plane.
 
 ---
@@ -127,11 +130,21 @@ The file [`LICENSE-P28-SIL.md`](file:///Users/sac/cgap/LICENSE-P28-SIL.md) (`urn
   $$\oint_{\mathcal{C}} d\mathbf{L}_{\text{accrual}} \equiv 0$$
   This guarantees zero friction for viral bottom-up developer adoption, benchmark reproduction, and ecosystem proliferation.
 - **Mode 2: Institutional Exploitation Status ($\mathcal{D}_j \in \mathbf{E}_{\text{inst}}$ — Section 2.2):**
-  A deployer (including parent companies, JVs, and subsidiaries) automatically exits Safe Harbor and enters Institutional Exploitation Status the instant it satisfies **any** of four objective statutory criteria:
+  A deployer (including parent companies, JVs, and subsidiaries) automatically exits Safe Harbor and enters Institutional Exploitation Status the instant it satisfies **any** of four objective statutory criteria, evaluated at the **Controlled Group** level per §2.2.1-2.2.2 (group aggregation; strictest reading governs):
   1. **SEC Reporting Entities:** Classified as an *Accelerated Filer* or *Large Accelerated Filer* under Rule 12b-2 of the Securities Exchange Act of 1934 (17 C.F.R. § 240.12b-2) — i.e., public companies with $\ge \$75\text{M}$ public float.
   2. **IRC § 448(c) Gross Receipts Threshold:** Exceeds the small-business gross receipts test under 26 U.S.C. § 448(c) requiring mandatory accrual accounting ($\sim \$30\text{M}$ average annual gross receipts).
   3. **European Union Large Undertakings:** Satisfies Article 3(4) of Directive 2013/34/EU or falls within Directive (EU) 2024/1760 (Corporate Sustainability Due Diligence Directive).
   4. **Defense & Federal Prime Contractors:** Subject to Full Cost Accounting Standards (CAS) under 48 C.F.R. § 9903.201-1 or active status as a Tier-1 Prime Contractor under FAR Part 19.
+- **Numeric Safe-Harbor Floor (Section 2.4, v2.1.1 rider):**
+  Notwithstanding the §2.2 boundaries, a Deployer whose aggregate annual
+  gross revenue for the prior completed fiscal year is **strictly less
+  than $50,000,000.00** is presumed to remain within $\mathcal{U}_{\text{exempt}}$; at or
+  above $50,000,000.00 the §4.3 regularization duty attaches (≥ duty
+  boundary). This is a **gross-revenue floor**, distinct from the code's
+  `DEFAULT_SAFE_HARBOR_CEILING_CENTS = 5_000_000_000` ($50M accrued-liability
+  **ceiling**, `asc450.rs:74`) — floor and ceiling are different instruments;
+  do not conflate. (Cites: `LICENSE-P28-SIL.md` §2.2.1-2.4; REVISION RIDER
+  v2.1.1, 2026-11-02, FIX-10 license aggregation.)
 
 ### 3.2 Self-Authenticating Evidentiary Jurisprudence (FRE 803(6), 902(13), 902(14))
 In conventional software audits, vendors spend millions on third-party accounting firms (Deloitte, PwC, KPMG) to haggle over server logs that customers claim are inaccurate or incomplete.
@@ -179,7 +192,7 @@ Every 128-byte `CgapFrameHeader` ([`crates/cgap-core/src/frame.rs`](file:///User
 - **Version & Lineage Flags:** Enforces root-vs-derived lineage popcount laws and reserved-bit zero masks.
 - **Safe-Harbor Ceiling (`safe_harbor_ceiling_cents`):** 64-bit integer pinned to `SAFE_HARBOR_CEILING_MAX_CENTS = 5_000_000_000` ($50,000,000.00 in cents). Any record declaring a ceiling above this statutory bound is immediately refused (`CeilingExceeded`).
 - **Instrument & Parent-Wire BLAKE3 Digests:** Cryptographically binds the attestation to the exact license instrument span and parent state transition.
-- **Hardware Verification Speed:** Measured via Divan in [`crates/bench/benches/seal.rs`](file:///Users/sac/cgap/crates/bench/benches/seal.rs) at **~459–460 nanoseconds per 80-byte record** (2.17 million verifications/second/core), with **Gate 4** proving that **629 of 640 possible single-bit flips** are deterministically refused (the remaining 11 being documented payload-opaque bits under D-A17-1) and **2,516 of 2,560 hostile mutations trigger immediate `SIGABRT` hardware traps** (`trap.rs`).
+- **Hardware Verification Speed:** Measured via Divan in [`crates/bench/benches/seal.rs`](file:///Users/sac/cgap/crates/bench/benches/seal.rs) at **~459–460 nanoseconds per 80-byte record** (2.17 million verifications/second/core; quiet-host, v26.11.1 seal-bench receipt — no row in the v26.11.2 claims register: UNVERIFIED-WITHOUT-METHOD for that register), with **Gate 4** proving that **629 of 640 possible single-bit flips** are deterministically refused (the remaining 11 being documented payload-opaque bits under D-A17-1) and **2,516 of 2,560 hostile mutations trigger immediate `SIGABRT` hardware traps** (`trap.rs`).
 
 ### 4.2 The ASC 450-20 / SOX 404 Liability Meter (`crates/cgap-p28/src/asc450.rs` — Lane A18)
 Implemented in [`crates/cgap-p28/src/asc450.rs`](file:///Users/sac/cgap/crates/cgap-p28/src/asc450.rs) (2,244 lines, 36/36 courts passing), `Asc450Meter` is the in-memory financial accounting register:
@@ -209,7 +222,7 @@ Implemented in [`crates/cgap-crypto/src/lease.rs`](file:///Users/sac/cgap/crates
   Encapsulates `lease_id` (16 bytes), `issued_root` (32-byte cryptographic root key provisioned upon enterprise contract execution), `tick_ceiling` ($\kappa_{\text{reductions}}$, the paid execution quota), and `current_tick` (monotonic counter).
 - **`seal_unsealed(delta: DeltaS, lease: &mut Lease) -> UnsealedReceipt`:**
   Every state transition $\Delta S$ consumes a tick from the `Lease` and produces an `UnsealedReceipt` (`UNSEALED_RECEIPT_LEN`) containing the keyed BLAKE3 proof.
-- **Speed:** Measured in [`crates/bench/benches/seal.rs`](file:///Users/sac/cgap/crates/bench/benches/seal.rs) at **~835 nanoseconds per full seal + verify round-trip** (1.19 million leased transactions/second/core).
+- **Speed:** Measured in [`crates/bench/benches/seal.rs`](file:///Users/sac/cgap/crates/bench/benches/seal.rs) at **~835 nanoseconds per full seal + verify round-trip** (1.19 million leased transactions/second/core; quiet-host, v26.11.1 seal-bench receipt — UNVERIFIED-WITHOUT-METHOD for the v26.11.2 claims register).
 
 ---
 
@@ -218,14 +231,17 @@ Implemented in [`crates/cgap-crypto/src/lease.rs`](file:///Users/sac/cgap/crates
 Every crate in the `/Users/sac/cgap` workspace maps to a specific commercial tier in the CGAP revenue architecture.
 
 ### Tier 1: The Open-Distribution Acquisition Funnel (5 Published Crates on Crates.io)
-These five crates are version-locked at `26.11.1` (verified in [`docs/jira/v26.11.1/waves/f3-01-version-lock.md`](file:///Users/sac/cgap/docs/jira/v26.11.1/waves/f3-01-version-lock.md)) and serve as the top-of-funnel developer distribution mechanism:
+These five crates are version-locked at `26.11.1` (verified in [`docs/jira/v26.11.1/waves/f3-01-version-lock.md`](file:///Users/sac/cgap/docs/jira/v26.11.1/waves/f3-01-version-lock.md)) and serve as the top-of-funnel developer distribution mechanism. (Registry-truth count of published cgap crates is **9** at 26.11.1, live crates.io API sampled 2026-11-02 — see README "Crates"; this tier names the 5 kernel-crate top-of-funnel subset, not the full published set.):
 
 | Crate | Path | Technical Capability | Commercial Role |
 |---|---|---|---|
 | **`cgap-blake3`** | [`crates/cgap-blake3`](file:///Users/sac/cgap/crates/cgap-blake3/src/lib.rs) | Zero-alloc, `#![no_std]` BLAKE3 engine with 4-way NEON / wide-SIMD tree hashing (`hash_wide_simd`, `hash_many_simd_x2`). | Cryptographic root of trust for all SlotIds, frame digests, and P28 receipts. |
 | **`cgap-arrow`** | [`crates/cgap-arrow`](file:///Users/sac/cgap/crates/cgap-arrow/src/lib.rs) | `#![no_std]` zero-dep in-memory columnar substrate: 64B-aligned `Quad64`, AoS$\to$SoA `transpose`, branchless `filter_quads_eq`, `ChaseLev` lock-free deque, `MmuArena`, Arrow C Data Interface (`c_abi`), bitmask popcount slab (`seal_with_mask`). | Replaces heavy Apache Arrow-rs dependencies in latency-critical Rust shops; embeds CGAP layout pins. |
-| **`cgap-parquet`** | [`crates/cgap-parquet`](file:///Users/sac/cgap/crates/cgap-parquet/src/lib.rs) | Zero-intermediate-heap Parquet persistence: `rle::decode_into` (0 allocs), `bitslice` vertical BitWeaving range scan (4.06x speedup), `stream_compact` branchless NEON compaction, `ffor` frame-of-reference, `oblivious` constant-time gather, `mmap_writer` (100k rows in 516.8 µs, 80B P28 footer). | High-throughput storage wedge; every written Parquet footer carries the 80-byte `ATTESTATION_LEN` P28 framing pin. |
-| **`cgap-git`** | [`crates/cgap-git`](file:///Users/sac/cgap/crates/cgap-git/src/lib.rs) | Sovereign Git packfile v2 & idx v2 engine (`pack_write`, `idx_read`), constant-time `ladder_search` over 20B OIDs, pure-Rust `deflate`/`inflate`, 17-hash Merkle `dag` lineage proofs (`commit_blocks`, `verify_lineage`). | Captures supply-chain, CI/CD, and content-addressed ledger workloads. |
+| **`cgap-parquet`** | [`crates/cgap-parquet`](file:///Users/sac/cgap/crates/cgap-parquet/src/lib.rs) | Zero-intermediate-heap Parquet persistence: `rle::decode_into` (0 allocs), `bitslice` vertical BitWeaving range scan (4.06x speedup), `stream_compact` branchless NEON compaction, `ffor` frame-of-reference, `oblivious` branch-free gather ("constant-time"
+is UNSUPPORTED — register row 29, `docs/jira/v26.11.2/11-measured-claims.md`), `mmap_writer` (100k rows in 516.8 µs, 80B P28 footer). | High-throughput storage wedge; every written Parquet footer carries the 80-byte `ATTESTATION_LEN` P28 framing pin. |
+| **`cgap-git`** | [`crates/cgap-git`](file:///Users/sac/cgap/crates/cgap-git/src/lib.rs) | Sovereign Git packfile v2 & idx v2 engine (`pack_write`, `idx_read`), branch-free `ladder_search` over 20B OIDs ("constant-time"
+is UNSUPPORTED — register row 29, `docs/jira/v26.11.2/11-measured-claims.md`),
+pure-Rust `deflate`/`inflate`, 17-hash Merkle `dag` lineage proofs (`commit_blocks`, `verify_lineage`). | Captures supply-chain, CI/CD, and content-addressed ledger workloads. |
 | **`cgap`** | [`crates/cgap`](file:///Users/sac/cgap/crates/cgap/src/lib.rs) | Umbrella facade re-exporting the 4 kernel crates at exact version pins (`=26.11.1`). | Single-line `cargo add cgap` entry point for enterprise developers. |
 
 ### Tier 2: Sovereign Core, Penstock Gate & Bare-Metal XIP Membrane
@@ -244,7 +260,10 @@ Sold as the **CGAP Neuro-Symbolic & Deductive Reasoning Engine SKU**:
 
 | Crate | Path | Technical Capability | Commercial Role |
 |---|---|---|---|
-| **`cgap-bn3`** | [`crates/cgap-bn3`](file:///Users/sac/cgap/crates/cgap-bn3/src/lib.rs) | Binary N3 deductive reasoner: 24-byte cache-aligned `Bn3Statement` `arena` (**82.24 GB/s** scan), SIMD 2-atom join `unify` (**6.50 ns/pair**), branchless register `builtins` (**3.12 ns/eval**, 0 indirect jumps `blr`/`br`), and fixpoint `project`. | Replaces slow RDF/SPARQL/OWL/Prolog engines with line-rate deterministic reasoning for AI guardrails and policy enforcement. |
+| **`cgap-bn3`** | [`crates/cgap-bn3`](file:///Users/sac/cgap/crates/cgap-bn3/src/lib.rs) | Binary N3 deductive reasoner: 24-byte cache-aligned `Bn3Statement` `arena` (**82.24 GB/s** isolated-scan, quiet-host divan — BN3-internal
+only, not chain throughput; UNVERIFIED-WITHOUT-METHOD for v26.11.2,
+receipted `docs/jira/v26.11.1/waves/bench-bn3-receipt.md:45,69`; see
+§6 scope banner), SIMD 2-atom join `unify` (**6.50 ns/pair**), branchless register `builtins` (**3.12 ns/eval**, 0 indirect jumps `blr`/`br`), and fixpoint `project`. | Replaces slow RDF/SPARQL/OWL/Prolog engines with line-rate deterministic reasoning for AI guardrails and policy enforcement. |
 | **`cgap-bont`** | [`crates/cgap-bont`](file:///Users/sac/cgap/crates/cgap-bont/src/lib.rs) | Binary Ontology (`.oabi` v1) container loader, collision-checked 64-bit `SlotId` BLAKE3 generator (`primitives.rs`), and closed-world SHACL-to-bitmask compiler (`shacl_compiler.rs`) validating shape constraints via single-instruction bitwise masks (`validate_presence`). | Compiles enterprise governance schemas and RDF ontologies into sub-nanosecond bitmask instructions. |
 | **`cgap-bosym`** | [`crates/cgap-bosym`](file:///Users/sac/cgap/crates/cgap-bosym/src/lib.rs) | Zero-string binary symbol `slab` and token register (`scripts/zero_string_gate.py`). | Guarantees complete elimination of string-parsing attack surfaces (`strings_admitted: 0`). |
 
@@ -274,6 +293,20 @@ In the **Challenger Sale** methodology, enterprise deals are won by **Teaching f
 
 Below is the complete synthesis of all **8 Divan benchmark suites** in `crates/bench/benches/` (`ingress.rs`, `parquet.rs`, `bn3.rs`, `seal.rs`, `challenger_parquet.rs`, `challenger_arrow.rs`, `challenger_git.rs`, `challenger_crypto.rs`), executed on Apple M3 Max (16 cores, 48 GB RAM, timer precision 41 ns).
 
+> **Scope banner (RW-02, 2026-11-02):** every §6.1 figure is a
+> **quiet-host** divan measurement from the v26.11.1 F2 receipts on the
+> named M3 Max subject. It is NOT valid unqualified under contention
+> (`redteam/red-10-timing-jitter-exploit.md`: L1 ingress fastest degrades
+> +14.8% bw-only, and slowest hits 124.06 ns @1M = 12.2x the 10.20 ns
+> quiet-host claim under combined cache+CPU load — register row 28,
+> `docs/jira/v26.11.2/11-measured-claims.md`). Figures below that have no
+> row in the v26.11.2 exclusive claims table carry
+> **UNVERIFIED-WITHOUT-METHOD** for that register: receipted at v26.11.1
+> on this host class, never consolidated by the v26.11.2 method of
+> record (`06-bench-protocol.md` §6/§7). Rows that DO have a register row
+> are cited inline. GB/s and ns/frame are byte/frame counters — never
+> convertible to facts/s or comparable to RDFox figures (§7 unit law).
+
 ### 6.1 Master Hardware Measurement Table
 
 | Suite / File | Benchmark Function | Workload Size ($N$) | Incumbent Baseline | CGAP Challenger (Fastest) | CGAP Challenger (Median) | Heap Allocations | Commercial Proof & Speedup |
@@ -283,15 +316,17 @@ Below is the complete synthesis of all **8 Divan benchmark suites** in `crates/b
 | `challenger_arrow` | `arrow_filter_cgap_branchless` vs `incumbent_branchy` | 16,384 quads (65,536 `u32`s) | 10.83 µs (fastest) / 11.20 µs (median) / 23.45 µs (slowest) | **7.874 µs** | **7.957 µs** (11.08 µs slowest) | **0 B** | **27.3% lower latency** & **2.1x tighter tail latency** (slowest) |
 | `parquet` (F2-12) | `rle_decode_direct` vs `rle_decode_staged` | 65,536 lanes (`u32`) | 63.28 µs (1 alloc / **262.1 KB** per iter) | **49.95 µs** | **51.22 µs** | **0 allocs / 0 B** (every column) | **100% GC immunity** + **26.7% faster** than staging `Vec` |
 | `parquet` (F2-12) | `bit_unpack` (SWAR widths 1, 2, 4, 8) | 65,536 lanes | Multi-pass scalar unpack | **10.83 µs** (1b) / **11.70 µs** (2b) / **11.91 µs** (4b) / **14.74 µs** (8b) | 10.91–15.04 µs | **0 B** (median) | Up to **6.05 billion values/sec/core** unpacked in-register |
-| `bn3` (F2-13) | `statement_scan_24b` | 65,536 (1.57 MB) & 1,048,576 (25.1 MB) | $> 1.0\text{ GB/s}$ charter target | **82.24 GB/s** (64k) / **78.94 GB/s** (1M) | 80.40 GB/s / 76.14 GB/s | **0 B** | **82.2x over target**; saturates L2/L3 cache bandwidth |
+| `bn3` (F2-13) | `statement_scan_24b` | 65,536 (1.57 MB) & 1,048,576 (25.1 MB) | $> 1.0\text{ GB/s}$ charter target | **82.24 GB/s** (64k) / **78.94 GB/s** (1M) — isolated BN3 scan, quiet-host divan; UNVERIFIED-WITHOUT-METHOD for v26.11.2 (receipted `bench-bn3-receipt.md:45,69`; see §6 scope banner) | 80.40 GB/s / 76.14 GB/s | **0 B** | **82.2x over target**; saturates L2/L3 cache bandwidth |
 | `bn3` (F2-13) | `unify_join_2atom_pairs` | 4,096 pairs ($N=1024$) & 65,536 pairs ($N=64\text{k}$) | $< 1,000\text{ ns/pair}$ target | **6.499 ns/pair** (1k) / **94.36 ns/pair** (64k) | 6.58 ns / 95.44 ns | **0 B** | **153x faster** than sub-µs target; **153.8M joins/sec/core** |
 | `bn3` (F2-13) | `builtin_dispatch_hot_arms_65k` | 65,536 evaluations (`gt`, `sum`, `min`, `assert`) | Indirect vtable/closure dispatch | **204.2 µs** (**3.116 ns/eval**) | 210.1 µs | **0 B** | **320.9M rule evaluations/sec/core**; 0 indirect branch instructions |
-| `ingress` (F2-11) | `a14_penstock_admission` | 1,048,576 & 10,485,760 frames | Software API gateway ($\sim 50\text{ µs}$) | **7.71 ns/frame receipted** (1M) / **7.35 ns/frame fresh** (10M) | 8.13 ns | **0 B** | **136.1M frames/sec/core** (derived from 7.35 fresh) full 6-row security & P28 admission — Errata 2 |
+| `ingress` (F2-11) | `a14_penstock_admission` | 1,048,576 & 10,485,760 frames | Software API gateway ($\sim 50\text{ µs}$) | **7.71 ns/frame receipted** (1M; register row 7, MEASURED) / **7.35 ns/frame fresh** (10M) | 8.13 ns | **0 B** | **136.1M frames/sec/core** (derived from 7.35 fresh) full 6-row security & P28 admission — Errata 2 |
 | `ingress` (F2-11) | `cgap_admit_frame` (A04) | 1,024 / 65,536 / 1,048,576 frames | Standard deserialization | **1.99 ns** (1k) / **3.64 ns** (64k) / **5.18 ns** (1M) | 2.07–5.21 ns | **0 B** | **501.8M frames/sec/core** at L1-resident burst |
 | `seal` (F2-14) | `p28_attestation_verify` | 1,024 & 65,536 records (80 B / 640-bit) | Asymmetric ECDSA/RSA ($\sim 100\text{ µs}$) | **459.8 ns/record** (1k) / **459.1 ns/record** (64k) | 461.6 ns | **0 B** | **2.17M 640-bit spoliation & license checks/sec/core** |
 | `seal` (F2-14) | `crypto_seal_verify_roundtrip` | 1,024 & 65,536 receipts | External KMS/HSM roundtrip | **834.5 ns/receipt** (1k) / **837.5 ns/receipt** (64k) | 838.9 ns | **0 B** | **1.19M cryptographic lease receipts minted & verified/sec/core** |
 | `seal` (F2-14) | `ffi_rust_boundary_pair_roundtrip` | 1,024 & 65,536 pairs | JNI / Python Ctypes / gRPC bridge | **137.6 ns/pair** (1k) / **137.1 ns/pair** (64k) | 138.5 ns | **0 B** | **7.29M sovereign C-ABI admit+verify calls/sec/core** |
-| `challenger_git` | `git_oid_lookup_cgap_ladder_search` vs `binary_search` | 4,096 sorted 20-byte Git OIDs | 24.76 ns (branchy, timing side-channel) | **309.2 ns** (constant-time full sweep) | 314.4 ns | **0 B** | **100% Constant-Time Side-Channel Immunity** (`0` data-dependent branches) |
+| `challenger_git` | `git_oid_lookup_cgap_ladder_search` vs `binary_search` | 4,096 sorted 20-byte Git OIDs | 24.76 ns (branchy, timing side-channel) | **309.2 ns** (branch-free full sweep; "constant-time" UNSUPPORTED —
+  register row 29, `docs/jira/v26.11.2/11-measured-claims.md`) | 314.4 ns | **0 B** | **Side-channel immunity
+  UNSUPPORTED** (row 29; demonstrated mechanism: `0` data-dependent branches) |
 
 ### 6.2 Anti-Vacuity Verification (`f2-15-bench-flips.md`)
 In enterprise technical diligence, skeptical prospect engineers often suspect that vendor benchmarks are rigged or dead-code-eliminated by the compiler. CGAP defeats this objection pre-emptively via **F2-15 Anti-Vacuity Mutation Courts**:
@@ -305,10 +340,10 @@ Every benchmark suite was subjected to a deliberate structural degradation in an
 
 ### 6.3 Enterprise CFO Cloud Consolidation & TCO ROI Model
 When presenting to a Fortune 500 CIO or VP of Infrastructure running a 500-node Apache Spark / Presto / Trino / JVM / Python analytics and compliance cluster on AWS (`c6i.8xlarge` at ~$1,100/month/node = **$6.6M/year compute spend**):
-- **4.06x BitSlice Query Speedup + 26.7% Direct RLE Speedup:** Reduces required CPU core-hours for columnar filtering and decoding by **>75%**.
-- **0-Byte Heap Allocation (`rle_decode_direct` = 0 B):** Eliminates the 30–40% RAM headroom over-provisioning typically required to prevent JVM/Go garbage collection thrashing and OOM kills.
-- **82.24 GB/s BN3 Reasoning & 460 ns P28 Auditing:** Replaces entire microservices tiers dedicated to policy evaluation (OPA/Rego) and audit logging (Kafka + Elasticsearch) with an in-process zero-copy library taking **< 1 microsecond per transaction**.
-- **Net Hard-Dollar Cloud Savings:** **$4.5M–$5.2M/year** in direct AWS/GCP EC2 and memory savings, easily justifying a **$1.0M/year CGAP Enterprise Execution Lease** (a **4.5x–5.2x immediate net ROI** for the customer).
+- **TARGET — >75% core-hour reduction** (from 4.06x BitSlice + 26.7% RLE speedups): NOT YET MEASURED end-to-end. Per `docs/jira/v26.11.2/02-pareto-levers.md:9-10`, all lever targets are **TARGETs** until re-measured by the method of record; absent from the exclusive claims table (`docs/jira/v26.11.2/11-measured-claims.md:3-8`).
+- **TARGET — 30–40% RAM headroom eliminated** (0-byte heap): NOT YET MEASURED. The 30–40% JVM/Go GC headroom is a runtime property eliminated by substitution, not entailed by the (real, MEASURED) 0-alloc rows.
+- **82.24 GB/s BN3 Reasoning & 460 ns P28 Auditing:** Replaces entire microservices tiers dedicated to policy evaluation (OPA/Rego) and audit logging (Kafka + Elasticsearch) with an in-process zero-copy library taking **< 1 microsecond per transaction** (both figures quiet-host bench receipts; UNVERIFIED-WITHOUT-METHOD for the v26.11.2 claims register).
+- **TARGET — $4.5M–$5.2M/year net savings, 4.5x–5.2x ROI:** NOT YET MEASURED; no dollar figure may be quoted until a bridging measurement exists. **Economic-truncation caveat:** byte-reduction ≠ dollar-reduction — (1) minimum cluster/warehouse billing (Snowflake per-credit minimums, Databricks cluster floors) truncates the byte→dollar transfer below the size cutover; (2) ingestion-based licensing (Datadog-class, per host/GB) is insensitive to compute-latency and heap levers; (3) egress is a function of bytes on the wire, which no §6.1 lever reduces. Per `redteam/red-17-cloud-savings-fallacy.md` (2026-11-02).
 
 ---
 
@@ -332,6 +367,15 @@ Under [`docs/jira/v26.11.1/dflss/phase-3-analyze-doe.md`](file:///Users/sac/cgap
 When an enterprise customer performs technical due diligence on v26.11.1, CGAP provides an unprecedented **cryptographically receipted engineering audit trail** ([`docs/jira/v26.11.1/waves/v26111-campaign-ledger.md`](file:///Users/sac/cgap/docs/jira/v26.11.1/waves/v26111-campaign-ledger.md) and post-gap closures `gap-1-sovereign.md`, `gate-1-workspace.md`, `r10-gate3.md`, `r12-bench-tmp.md`, `r13-quad64.md`, `r14-pin-final.md`).
 
 ### 8.1 The Five Definition of Done (DoD) Gates — All Verified GREEN / ALIVE
+
+> Scope (RW-02, 2026-11-02): gate standings below are the v26.11.1
+> `dod-five-gates.md` verdicts as-of-date (receipt-cited, re-read at use
+> time). The v26.11.2 starDF campaign register
+> (`docs/jira/v26.11.2/11-measured-claims.md`) governs for any figure
+> reused in the current campaign's paper. GATE-5's 30,157 B figure is an
+> **rlib/audit-profile measurement**, not linked-ELF truth; the linked
+> ELF production-section figure is 150/65,536 B flash (README, per
+> `gate-5-silicon.md`).
 
 | Gate | Name | Standing | Verified Empirical Evidence |
 |---|---|---|---|
@@ -383,7 +427,12 @@ Target Personas: **Chief Architect, VP of Data Engineering, Head of Quantitative
   Present the live Divan tables from [`docs/CHALLENGER_SALES_REPORT.md`](file:///Users/sac/cgap/docs/CHALLENGER_SALES_REPORT.md):
   - **973.5 ns vs 3.957 µs (4.06x speedup)** using Vertical BitSlice MSB pruning.
   - **0 bytes allocated (`0 allocs / 0 B`)** in `rle_decode_direct` vs 262.1 KB/iter in standard staged decoders.
-  - **82.24 GB/s** deductive rule scanning in `cgap-bn3` and **1,000,000 process conformance events verified in < 1.7 seconds** in `cgap-audit`.
+  - **82.24 GB/s** deductive rule scanning in `cgap-bn3` (X-04FIX 2026-11-02 scope:
+    quiet-host divan, BN3-internal
+    isolated scan — receipted `docs/jira/v26.11.1/waves/bench-bn3-receipt.md:45,69`;
+    no v26.11.2 register row, UNVERIFIED-WITHOUT-METHOD for that register; not
+    end-to-end chain throughput per `bench-chains-bn3.md:37`) and **1,000,000 process
+    conformance events verified in < 1.7 seconds** in `cgap-audit`.
 - **Step 3 — The Solution (Sovereign Drop-In):**
   Via `cgap-ffi` (`include/cgap.h`), `cgap-arrow::c_abi` (Arrow C Data Interface parity proven against PyArrow), and `cgap-beam` (Erlang/Elixir NIF shared-memory ring), the customer can drop CGAP into their existing Python, C++, Rust, or Elixir pipeline in an afternoon without rewriting their application tier.
 
@@ -414,7 +463,7 @@ Calibrated to the cryptographic `Lease` (`cgap-crypto::lease::Lease`) and `tick_
 
 ### 10.2 Revenue Line 2: ASC 450 Harmonic Regularization & Settlement Certificates ($\mathbf{\Sigma}_{\text{regularized}}$)
 When an Institutional Entity discovers unleased CGAP usage in production (via internal audit, SBOM scan, or `SignedProof` `"A450"` emission):
-- **Standard Accrued Liability Rate:** Metered via `Asc450Meter` up to the $50,000,000 (`5_000_000_000` cents) statutory safe-harbor ceiling per deployment epoch.
+- **Standard Accrued Liability Rate:** Metered via `Asc450Meter` up to the $50,000,000 (`5_000_000_000` cents) statutory safe-harbor **ceiling** per deployment epoch (`DEFAULT_SAFE_HARBOR_CEILING_CENTS`, `asc450.rs:74`; frozen against A17's `SAFE_HARBOR_CEILING_MAX_CENTS`, `attestation.rs:58`). Distinct from LICENSE §2.4's gross-revenue safe-harbor **floor** ($50M annual gross revenue; §2.2.1-2.4 + v2.1.1 rider) — do not conflate floor with ceiling.
 - **Harmonic Regularization Conversion Offer (P28-SIL Section 4.3):**
   If the enterprise proactively approaches CGAP prior to formal dispute notice, CGAP waives retrospective penalty multipliers and extinguishes the entire accrued ASC 450 balance-sheet contingency upon:
   1. Execution of a **3-year non-cancellable Enterprise Sovereign Lease** ($1.95M–$7.5M TCV), plus
@@ -435,14 +484,14 @@ High-margin data-plane add-ons billed annually alongside the base Execution Leas
 
 ## 11. Summary of Verified Commands & Repository Standing
 
-Every technical, architectural, and performance claim in this compendium is grounded in live, first-hand execution against `/Users/sac/cgap`:
+Every technical, architectural, and performance claim in this compendium is grounded in live, first-hand execution against `/Users/sac/cgap` (as-of-date v26.11.1 receipts; re-read receipt-cited counts from disk at use time — a recalled count is stale by default):
 
 ```text
 1. cargo test --workspace                                      -> exit 0 (All unit, integration, 1M-row stress, and sovereign XIP courts PASS)
 2. cargo check --benches                                       -> exit 0 (All 9 Divan benchmark targets compile cleanly)
 3. cargo bench -p bench --bench challenger_parquet             -> exit 0 (973.5 ns vs 3.957 µs [4.06x]; 2.819 ns flat branchless compaction)
 4. cargo bench -p bench --bench challenger_arrow               -> exit 0 (7.874 µs vs 10.83 µs [-27.3% latency])
-5. cargo bench -p bench --bench challenger_git                 -> exit 0 (309.2 ns constant-time OID ladder search)
+5. cargo bench -p bench --bench challenger_git                 -> exit 0 (309.2 ns branch-free OID ladder search; "constant-time" is UNSUPPORTED — register row 29, `docs/jira/v26.11.2/11-measured-claims.md`)
 6. cargo bench -p bench --bench challenger_crypto              -> exit 0 (461.8 MB/s sustained tree digest)
 7. python3.11 scripts/boundary_gate.py --deps                  -> exit 0 (E=0 runtime externals across 15 covered crates)
 8. python3.11 scripts/boundary_gate.py --strings               -> exit 0 (0 hits across 15 covered crates; scanned=108, hits=0)

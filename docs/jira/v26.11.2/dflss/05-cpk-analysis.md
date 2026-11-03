@@ -64,7 +64,10 @@ kernel and input are unchanged since 0539fc7f.
 
 For CTQ-02 (frame ingress cost, `../15-ctq-tree.md` Section 3: USL 15 ns
 /ns-per-frame, measured 10.20-10.30 ns MEASURED in
-`../waves/w3-l1-ingress.md:63,69-70`): the gauge is BATCH=64 frames
+`../waves/w3-l1-ingress.md:63,69-70`; quiet host, divan fastest/median
+columns — contended divergence registered `../11-measured-claims.md`
+row 28, 124.06 ns/frame slowest under combined bw+cpu): the gauge is
+BATCH=64 frames
 amortized over one Instant pair, not per-frame timing. Literal per-frame
 Instant timing on macOS cannot resolve a 10 ns quantity: clock overhead
 is ~40 ns, i.e. the instrument exceeds the measured quantity ~4x and

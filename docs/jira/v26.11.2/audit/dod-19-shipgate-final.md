@@ -46,7 +46,8 @@ lines modified (PRD-10's insert-only relocation is the precedent).
 - Residual ASPIRATIONAL-UNVERIFIED cell:
   `MV-5 vs GAP-04 append conflict (tc-10 §2); unblock:
   coordinator conflict-resolution append — one register row
-  of record, later timestamp wins (MV-5 precedent)`
+  of record, later timestamp wins (MV-5 precedent,
+  lanes/lane-mv-05-sla-reconcile.md)`
 - Note: A2's "mechanical env-set both directions" is witnessed;
   tc-10's narrowed reading (some children ignore zero-tax) keeps
   the residue loud until the coordinator append lands.
@@ -54,10 +55,17 @@ lines modified (PRD-10's insert-only relocation is the precedent).
 ### P2 measured perf under mutation
 
 - Landed evidence: GAP-07 rollup (lane-gap-07:156-166): L1 MET but
-  VACUOUS per gate law (8 flip attempts, transcripted); L2 NOT MET
-  23.13 ms vs <10 ms; L3 CLOSED (repair-06, cited); L4 PARTIAL
-  (MET@256 vacuous-per-law / NOT MET@4096 9.35 us/tx); L5 NOT MET
-  3.055 us/row, flip witnessed +8.3%.
+  VACUOUS per gate law (8 flip attempts, transcripted; quiet-host
+  scope per red-10, R-15 re-witnessed 10.26-10.65 ns/f, fix-18 W2);
+  L2 NOT MET
+  23.13 ms vs <10 ms (chain_ram lane figure; consolidated row 9 =
+  42.58 ms governs; 23.13 vs 42.58 same-surface 1.84x divergence
+  registered, unreconciled — UNVERIFIED-FOR-PAPER, row 9 of
+  `../11-measured-claims.md`); L3 CLOSED (repair-06, cited); L4 PARTIAL
+  (MET@256 vacuous-per-law / NOT MET@4096 9.35 us/tx, LOAD-CONFOUNDED
+  per GAP-07, quiet re-measure ordered); L5 NOT MET
+  3.055 us/row, flip witnessed +8.3% (R-15 re-witnessed L5-family
+  3.086/3.123 us/row, +1.5%, fix-18 W5).
 - Status: OPEN.
 - Exact cell text (status column):
   `OPEN — L1 VACUOUS, L2/L5 NOT MET, L4 PARTIAL (GAP-07 rollup,
@@ -67,10 +75,12 @@ lines modified (PRD-10's insert-only relocation is the precedent).
   DOD-12 rules repair-to-threshold with flips OR operator
   gate-change receipts + divan2receipt successor (chains-*
   parse exit 1) + L1 flip court. Do NOT round up.`
-- DOD-12 dependency: dod-12-g2-decision.md is ABSENT on disk.
-  P2 cannot flip to COVERED before DOD-12 lands either verdict.
-  This is the plan's hard perf-honesty gate (ship-plan §D verdict
-  "critical path A10/A11" resolves here).
+- DOD-12 dependency: as of 2026-11-02 (this sweep), dod-12-g2-decision.md
+  is LANDED on disk (R-DODFIX qualified its 23.13 figure). P2 still
+  cannot flip to COVERED until DOD-12's verdicts are executed (the
+  rollup lanes it names), not merely decided. This is the plan's hard
+  perf-honesty gate (ship-plan §D verdict "critical path A10/A11"
+  resolves here).
 
 ### P3 fail-closed gates
 
@@ -267,10 +277,10 @@ cgap-gate re-dry-run clean (pub-02 verdict, verbatim).
 
 ## 4. Cross-lane closure dependencies (named, with disk state)
 
-- DOD-12 (R4 decision): UNLANDED — dod-12-g2-decision.md absent.
-  Blocks P2 and the §D verdict's critical path. Unblock named
-  in the P2 residual cell; either verdict unblocks (repair
-  path or gate-change path), neither is assumed.
+- DOD-12 (R4 decision): LANDED as of 2026-11-02 —
+  dod-12-g2-decision.md on disk (was UNLANDED at spec time).
+  Still gates P2 until its verdicts are executed; either path
+  (repair or gate-change) unblocks, neither is assumed.
 - DOD-01 (SPDX court): LANDED ALIVE — lane-dod-01-spdx.md;
   cgap-core exit 0, anti-vacuity mutation flips 101.
   P6 carries it; no open dependency.
@@ -281,7 +291,8 @@ cgap-gate re-dry-run clean (pub-02 verdict, verbatim).
   law as DOD-05: closure requires the receipt or retirement
   append; absent = PENDING (the ledger's own rule, TPS-8 §2).
 - R10 append conflict (GAP-04:81 vs release-blockers:248-255):
-  coordinator-owned; later-timestamp-wins per tc-10 §2; P1's
+  coordinator-owned; later-timestamp-wins per tc-10 §2 and the MV-5
+  precedent receipt (lanes/lane-mv-05-sla-reconcile.md); P1's
   COVERED stands on the flip witness, the conflict stays loud
   in P1's residual cell.
 - NEW-5 (POSH-2 23.35 ns gate decision): honest typed FAIL

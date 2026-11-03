@@ -84,7 +84,11 @@ crates/cgap-git ingress_ring + admission_gate, R8 W1 clause 2.)
   malformed flags must be rejected immediately in Stage 1. Only frames admitted with
   explicit escalation indicators trigger Stage 2 full payload hashing.
   (STAYS per R9. Receipts: fresh verify_disassembly_invariants.py exit 0 incl. binary
-  mutant, R1; lanes/lane-g01-scan-branchless.md:3; lane-g02:118-121.)
+  mutant, R1; lanes/lane-g01-scan-branchless.md:3; lane-g02:118-121.
+  QUALIFIER, X-04FIX 2026-11-02: "constant-time" is UNSUPPORTED — no measured claim
+  asserts it; BR3 rejected the branch-free dispatch item because typed-refusal branches
+  are lawful — `docs/jira/v26.11.2/11-measured-claims.md` row 29. Requirement of
+  record: branchless fast path with fail-closed typed refusals, not constant-time.)
 
 * **P2 — Fixed-Width Columnar Representation:** All entities and relations are represented
   at runtime as 64-bit fixed-width identifiers derived from deterministic cryptographic

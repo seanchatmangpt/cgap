@@ -19,7 +19,7 @@ the named commands + receipts. Nearest on-disk registers:
 | mmap zero-copy darwin | receipt-cited | 4.52-4.54 ns/op (lane-ax-06:70) | RECEIPT-CITED |
 | mmap zero-copy container | receipt-cited | 4.574-4.656 ns/op (lane-ax-06:70) | RECEIPT-CITED |
 | penstock admission ns/frame | cargo bench chains-ingress stage_penstock_admission exit 0, 100 samples @1M | fastest 7.35 ns/frame; median 8.13; receipted 7.71 reproduces within drift | RE-DERIVED; manual 5.70 FAILED |
-| ingress chain ns/frame | same fresh run | fastest 10.70; median 11.80; receipted 10.20/10.30 — drift, <15 target MET | RE-DERIVED; 10.20 DRIFTED |
+| ingress chain ns/frame | same fresh run | fastest 10.70; median 11.80; receipted 10.20/10.30 (quiet host, claims row 5; contended divergence row 28: 124.06 ns/frame slowest) — drift, <15 target MET on quiet host | RE-DERIVED; 10.20 DRIFTED |
 | <15 ns/frame target | same | 10.70 < 15 — MET on fresh numbers | CONFIRMED |
 | 10.1x vs P3-16 baseline | fresh 10.70 vs 102.7 | 9.6x fresh (10.1x receipted) | DRIFTED |
 
@@ -30,8 +30,10 @@ the named commands + receipts. Nearest on-disk registers:
    (w3-l1-ingress.md:64,71-72, already recorded NOT-reproduced);
    fresh 7.35 fastest. Must not be quoted as measured.
 2. "10.20 ns/frame ingress (10.30 median)" — receipted figure stands
-   (w3-l1-ingress.md) but fresh = 10.70/11.80. Drift, not
-   refutation; target met; 10.1x -> 9.6x fresh.
+   (w3-l1-ingress.md; quiet host, divan fastest/median, claims row 5;
+   contended divergence row 28: 124.06 ns/frame slowest under
+   combined bw+cpu) but fresh = 10.70/11.80. Drift, not
+   refutation; target met on quiet host; 10.1x -> 9.6x fresh.
 3. audit/README.md blocker 8 — STALE (fresh standalone exit 0, full
    AE4 court CLEAN).
 

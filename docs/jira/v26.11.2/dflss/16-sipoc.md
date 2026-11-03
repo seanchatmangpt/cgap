@@ -35,7 +35,7 @@ of record is `06-bench-protocol.md`.
 
 | Stage | Name | Real module | Court name | Gate |
 |---|---|---|---|---|
-| P1 | Ingress (SWAR scan) | `cgap-core/src/dma_ring.rs` + `cgap-branchless/src/scan.rs` | `cgap-core/tests/unit_dma_ring.rs`, `cgap-branchless/tests/scan_courts.rs` | <15 ns/frame [TARGET]; chain MEASURED 10.20 ns/frame (`waves/w3-l1-ingress.md:63`) |
+| P1 | Ingress (SWAR scan) | `cgap-core/src/dma_ring.rs` + `cgap-branchless/src/scan.rs` | `cgap-core/tests/unit_dma_ring.rs`, `cgap-branchless/tests/scan_courts.rs` | <15 ns/frame [TARGET]; chain MEASURED 10.20 ns/frame quiet host (`waves/w3-l1-ingress.md:63`; claims rows 5/28) |
 | P2 | Radix fixpoint unify | `cgap-bn3/src/unify.rs:840` (`RADIX_BUCKETS=4096`) | `cgap-bn3/tests/bgp_hop_courts.rs`, `lever_courts.rs` | >=1M facts/s [TARGET-v26.11.2] |
 | P3 | DRed retract | `cgap-storage/src/dred.rs` | `cgap-storage/tests/dred_cascade.rs`, `dred_swar_wire.rs` | closure fixed-point identity, typed retracts |
 | P4 | Receipt seal | `csct/src/receipt.rs` + `cgap-blake3` digest | `csct/tests/csct_pipeline_court.rs`, `csct_coverage_court.rs` | byte-stable receipts; blake3 digest in every receipt |
@@ -55,7 +55,7 @@ riscv32imc audit profile <= 32,768 B (object MEASURED 28,679 B,
 
 | Output | Accepting stage / customer | Class |
 |---|---|---|
-| Admitted frame stream | P2 | MEASURED (10.20 ns/frame chain) |
+| Admitted frame stream | P2 | MEASURED (10.20 ns/frame chain, quiet host; divergence row 28) |
 | Derived closure facts | P3 | [TARGET-v26.11.2] facts/s |
 | Typed retracts (DRed cascade) | P4 | court class (`dred_cascade.rs`) |
 | Sealed blocks + BLAKE3 receipts | P5 | court class (`csct_pipeline_court.rs`) |

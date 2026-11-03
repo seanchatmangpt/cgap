@@ -35,6 +35,8 @@ structure. The M=1 invariant holds across the full lifecycle. Settlement complet
   writes no custom serialization, operates no database cluster.
 - **Autonomous Agent Engineer** — deploys deterministic, constant-time admission gates inside
   sealed boundaries with no GC pauses.
+  (HISTORICAL MARKER, X-04FIX 2026-11-02: superseded v26.10.31 PRD prose; "constant-time"
+  is UNSUPPORTED per `docs/jira/v26.11.2/11-measured-claims.md` row 29.)
 - **Chief Risk Officer / General Counsel** — obtains non-repudiable audit satisfying EU AI Act
   Articles 12, 14, and 62 without multi-million-dollar warehouse subscriptions.
 

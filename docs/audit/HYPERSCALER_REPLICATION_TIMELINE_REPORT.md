@@ -255,11 +255,58 @@ load — so the human drag fractions do not transfer (AU9:79-80).
 5. **Bounded evidence coverage.** Budget gate proves entry surface only;
    "the engine fits" is probe-derived (AU3 §1). Gate quotas cover 4/24
    crates; flip counts are receipt-grep, not machine-aggregated (AU7 §4).
+6. **The deployed-ops floor rises, not falls (RED-16 finding 2, kept;
+   remediation status per FIX-14).** The coordination-substrate claim
+   survives RED-16 only as an ENGINEERING-coordination headcount
+   reduction (O(n) hub-and-spoke); it is not an ops-headcount claim and
+   RED-16 found the "zero-headcount / SRE-excision" term UNSUPPORTED
+   (zero on-disk referents, red-16 §1). For a deployed bare-metal/edge
+   fleet the ops floor INCREASES: operators must read hash-chained
+   receipts, run gate0 replay, and interpret CGAP status codes.
+   Remediation referents are PARTIAL as of 2026-11-02 (fix-14, re-read
+   from disk this session; artifacts verified present):
+   - RC-05 runtime telemetry: `crates/cgap-ffi/src/stats.rs` landed
+     (`CgasStatsBlock` 120 B repr(C) + CRC, `cgap_stats_snapshot`
+     pull-based C-ABI getter, 5/5 courts green per
+     `lanes/lane-rc05-stats-block.md`) — but ring-owner integration is
+     DOCUMENTED-NOT-WIRED (fix-14 §A1 Status), so detection is
+     available at the ABI seam and not yet driven by kernel events.
+     Any "zero telemetry" phrasing is therefore stale: current state
+     is PARTIAL, not absent.
+   - RC-13 fleet ops: `crates/cgap-fleet-ops/` landed standalone
+     (`publish = false`; RMA state machine, hash-chained transition
+     log, `slo.rs` host-side alert predicates + bounded `poll_until`,
+     4 courts green, 2 mutation flips per
+     `lanes/lane-rc13-fleet-ops.md`) — but `SloSource` is a read-only
+     seam with no kernel feed wired and R-A3.1 device identity is not
+     minted in cgap-ffi yet (fix-14 §A3/§A6 Status).
+   - S-04b DR arm: typed kernel-side DATA_LOSS verdict landed
+     (`RecoveryVerdict::DataLoss` + `recover_loss_classified`,
+     atomic_commit.rs:1076-1096) with c6/c7 media-loss court legs green
+     (`cargo test -p cgap-storage --test media_loss_recovery_court`,
+     6 passed / 0 failed, per `lanes/lane-rc06-media-loss-dr-court.md`)
+     — but receipt-replay postmortem wiring (R-A2.2 tail), the
+     operator restore runbook, and the R-A2.4 ratio-fence restore
+     budget remain unmeasured (fix-14 §A2 Status errata).
+7. **Every dollar figure on disk is unmeasured.** This report carries
+   no dollar claims; the figures circulating elsewhere ($4M-$8M/yr SRE,
+   $2M-$6M integrator, $1.5M-$3M compliance; compendium §6.3's
+   $4.5M-$5.2M/yr savings + 4.5x-5.2x ROI) have no measured referent:
+   none appears in 11-measured-claims.md §1, and red-17 grades the
+   compendium rows BREACH-CONFIRMED (red-17:100-101, pricing-mechanics
+   fallacy + claim-hygiene arm). They are modeled assumptions, not
+   measurements, and must not be quoted as numbers.
 
 **Verdict** (ANALYSIS): a hyperscaler replicating the artifact should
 budget 50-123 PY of effort at AU7 rigor, 20-23 months build, 12-30
 months certification tail — Scenario C realistically >30 months or
-descoped. But the faster replication path is not headcount; it is
+descoped. All four figures above are MODEL-ASSUMPTION/ANALYSIS
+envelope outputs of named models (COCOMO II.2000 inputs, AU8/AU9/AU11
+multipliers), not measurements; no dollar figure appears anywhere in
+this report (see §6 item 7). The headcount statement survives RED-16
+only in its scoped form: the coordination substrate reduces
+ENGINEERING coordination headcount; the DEPLOYED-ops floor rises
+(§6 item 6). But the faster replication path is not headcount; it is
 adopting the coordination substrate (single checkout, ownership
 partition, receipt law, anti-vacuity gates), which is a fixed
 one-time authoring cost plus one saturated coordinator, and which no
@@ -288,3 +335,29 @@ cannot easily buy.
   models/12_legal_and_patent_clearance.md (74),
   models/13_architectural_missteps_and_rework.md (25).
 - Write of this file, then on-disk byte verification via wc/grep below.
+
+### Lane RW-07 addendum (2026-11-02)
+
+- Read in full: docs/jira/v26.11.2/11-measured-claims.md (132 ln incl.
+  §4 M-CTQ addendum), redteam/red-16-headcount-paradox-audit.md (92 ln),
+  redteam/red-17-cloud-savings-fallacy.md (110 ln),
+  redteam/fix-14-ops-requirements.md (228 ln), and
+  docs/audit/metrics/04_deductive_engine_and_joins.md (90 ln) to verify
+  §3.4 perf cites (exit 0 each).
+- On-disk verification of PARTIAL referents: ls over
+  crates/cgap-ffi/src/stats.rs, crates/cgap-fleet-ops/src/slo.rs,
+  crates/cgap-storage/tests/media_loss_recovery_court.rs — all present
+  (exit 0); lanes/lane-rc05-stats-block.md, lane-rc13-fleet-ops.md,
+  lane-rc06-media-loss-dr-court.md all present.
+- Edits this session: §6 new items 6 (deployed-ops floor, PARTIAL
+  referents) and 7 (dollar figures unmeasured); Verdict paragraph
+  MODEL-ASSUMPTION fence + RED-16 honest split. No pre-existing figures
+  altered: §1-§5 envelope numbers already carry AU8/AU9/AU11
+  MODEL-ASSUMPTION labels and §3.4 perf rows already carry scope +
+  UNVERIFIED fence labels matching metrics/04 — re-verified against
+  metrics/04 this session.
+- Divergence from dispatch: the $4M-$8M/yr SRE, $2M-$6M integrator, and
+  $1.5M-$3M compliance figures, and any "zero telemetry" claim, DO NOT
+  appear in this report (grep exit 1); they are addressed via new §6
+  item 7 / item 6 rather than in-place rewrites. The dispatch's premise
+  that they were in-file is recorded here per doc-yields law.
