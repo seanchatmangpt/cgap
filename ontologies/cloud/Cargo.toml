@@ -8,6 +8,7 @@ license-file = "../../LICENSE.md"
 # P3-8 publish flip (2026-11-01): was `publish = false`; O-ABI packs are the
 # publish payload.
 publish = true
+exclude = ["RECEIPT.md"] # DOD-05 Finding 2 coordinator call: internal receipt doc (24,963 B) out of the published tarball; mechanical + reversible
 
 # Lane A10 (docs/jira/v26.11.1/lanes/A10-cloud-oabi.md), build/runtime split
 # mirroring A09: the `#![no_std]` facade (src/lib.rs) itself uses NO
