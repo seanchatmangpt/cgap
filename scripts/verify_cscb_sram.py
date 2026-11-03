@@ -36,6 +36,7 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import NoReturn
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -51,7 +52,21 @@ SUBPROCESS_TIMEOUT_S = 600
 DEPENDENCY_CRATES = {
     "cgap-blake3": os.path.join(REPO, "crates", "cgap-blake3"),
     "cgap-branchless": os.path.join(REPO, "crates", "cgap-branchless"),
+    "cgap-bn3": os.path.join(REPO, "crates", "cgap-bn3"),
 }
+# RED-12 closure (lane FIX-02, 2026-11-02): cgap-bn3 is a GATED subject.
+# Its noalloc state tables are statically charged against the envelope;
+# see BN3_SOURCE / bn3_capacity_table below.
+BN3_SOURCE = os.path.join(REPO, "crates", "cgap-bn3", "src", "noalloc.rs")
+
+# Ground-truth pins: host `size_of` values witnessed in
+# docs/jira/v26.11.2/redteam/red-12-sram-overflow-exploit.md:61-65
+# (cd /tmp/red12 && cargo run --release, exit 0). If the noalloc consts
+# drift, the static table diverges from these pins and the gate REFUSES
+# rather than charging a stale model.
+BN3_PIN_MATCHES_BYTES = 2162696   # size_of::<NaMatches>()
+BN3_PIN_ENGINE_BYTES = 4358288    # size_of::<NaEngine>()
+
 TARGET = "riscv32imc-unknown-none-elf"
 CALLER_ROOT = "/tmp/cscb-sram-caller"
 TARGET_ROOT = "/tmp/cscb-sram-target"
@@ -84,12 +99,15 @@ if LLVM_SIZE:
         LLVM_OBJDUMP = _sib
 
 
-def fail(msg, code=EXIT_OVERFLOW):
+def fail(msg, code=EXIT_OVERFLOW) -> NoReturn:
+    # NoReturn annotation (lane RC-10): sys.exit is NoReturn, so type
+    # checkers can narrow `proc` after a fail() in an except block.
+    # Behavior unchanged — sys.exit raises SystemExit exactly as before.
     print("GATE REFUSED: %s" % msg, file=sys.stderr)
     sys.exit(code)
 
 
-def skip(msg):
+def skip(msg) -> NoReturn:
     print("[SKIP] %s" % msg, file=sys.stderr)
     sys.exit(EXIT_SKIP)
 
@@ -128,6 +146,79 @@ def size_elf_sram(path):
         fail("no .text/.rodata/.data/.bss section in llvm-size -A for %s"
              % path)
     return total
+
+
+# --- cgap-bn3 static capacity/charge table (RED-12 closure) ---------------------
+
+_NA_CONST_RE = re.compile(
+    r"^pub\s+const\s+NA_MAX_(CONSTS|VARS|ATOMS|MATCHES|ROWS)\s*:\s*usize"
+    r"\s*=\s*(\d+);", re.M)
+
+
+def parse_na_consts(path=BN3_SOURCE):
+    """Statically read the NA_MAX_* capacity consts from noalloc.rs.
+    Sizes are parsed from the source of truth, never hardcoded here.
+    Missing file/consts = typed gate failure (fail-closed)."""
+    if not os.path.isfile(path):
+        fail("MISSING SUBJECT: cgap-bn3 source %s" % path, EXIT_MISSING)
+    src = open(path, encoding="utf-8").read()
+    found = {m.group(1): int(m.group(2)) for m in _NA_CONST_RE.finditer(src)}
+    need = {"CONSTS", "VARS", "ATOMS", "MATCHES", "ROWS"}
+    missing = need - set(found)
+    if missing:
+        fail("bn3 capacity table unparsable: NA_MAX_%s not found in %s"
+             % (",".join(sorted(missing)), path))
+    return found
+
+
+def bn3_capacity_table(consts):
+    """Static byte model of the noalloc state tables
+    (crates/cgap-bn3/src/noalloc.rs:99-161):
+
+      NaMatches = len:usize
+                + rows: [[u32; NA_MAX_ATOMS]; NA_MAX_MATCHES]
+                + vars: [[u64; NA_MAX_VARS]; NA_MAX_MATCHES]
+      NaEngine  = cur/nxt double buffers (2x the rows+vars planes)
+                + bound: [bool; NA_MAX_VARS]
+                + radix_rows: [u32; NA_MAX_ROWS]
+
+    Capacities are topology-INDEPENDENT consts: the buffers are sized
+    for the worst topology at construction (red-12 W4), so the charge is
+    the full-const model — an 8-atom cyclic join within every bound
+    still charges this. Cross-checked against the red-12 host size_of
+    pins; divergence = typed refusal, never a stale charge."""
+    matches_bytes = 8 + 4 * consts["ATOMS"] * consts["MATCHES"] \
+                      + 8 * consts["VARS"] * consts["MATCHES"]
+    engine_bytes = (2 * (4 * consts["ATOMS"] * consts["MATCHES"]
+                         + 8 * consts["VARS"] * consts["MATCHES"])
+                    + 2 * 8  # cur_len + nxt_len: usize
+                    + consts["VARS"] + 4 * consts["ROWS"])
+    if matches_bytes != BN3_PIN_MATCHES_BYTES:
+        fail("bn3 capacity table DIVERGED from red-12 size_of pin: "
+             "static NaMatches %d B != pinned %d B (consts drifted?)"
+             % (matches_bytes, BN3_PIN_MATCHES_BYTES))
+    if engine_bytes != BN3_PIN_ENGINE_BYTES:
+        fail("bn3 capacity table DIVERGED from red-12 size_of pin: "
+             "static NaEngine %d B != pinned %d B (consts drifted?)"
+             % (engine_bytes, BN3_PIN_ENGINE_BYTES))
+    return {"matches": matches_bytes, "engine": engine_bytes,
+            "total": matches_bytes + engine_bytes}
+
+
+def bn3_enclave_verdict(charge):
+    """Typed verdict on admitting the bn3 noalloc state tables into the
+    128 KiB enclave. Over ceiling = loud typed gate failure (exit 1),
+    never a silent pass — the red-12 surface gap is closed."""
+    if charge["total"] > SRAM_BUDGET:
+        print("BN3_ENCLAVE_REFUSED: static noalloc state-table charge "
+              "%d B (NaMatches %d B + NaEngine %d B) > %d B hard bound "
+              "(%.2fx ceiling; red-12 topology). Admitting "
+              "NaEngine+NaMatches into the SRAM enclave is a typed gate "
+              "failure." % (charge["total"], charge["matches"],
+                            charge["engine"], SRAM_BUDGET,
+                            charge["total"] / SRAM_BUDGET), file=sys.stderr)
+        return False
+    return True
 
 
 _CALLER_MAIN = '''#![no_std]
@@ -283,9 +374,20 @@ def toolchain_record():
 def main():
     ap = argparse.ArgumentParser(
         description="lane B04 physical SRAM budget inspector (128 KiB)")
-    ap.add_argument("--mutate", choices=["sram-bloat"], default=None,
-                    help="anti-vacuity: same caller + static [u8;100000] "
-                         "MUST overflow (exit 1); a pass is VACUOUS GATE")
+    ap.add_argument("--mutate", choices=["sram-bloat", "bn3-pin"],
+                    default=None,
+                    help="anti-vacuity: sram-bloat = same caller + static "
+                         "[u8;100000] MUST overflow (exit 1); bn3-pin = "
+                         "sandboxed NA_MAX_MATCHES drift MUST trip the "
+                         "red-12 size_of pin check (exit 1). A pass is "
+                         "VACUOUS GATE.")
+    ap.add_argument("--subject", choices=["baseline", "bn3"],
+                    default="baseline",
+                    help="baseline = blake3+branchless linked-ELF witness; "
+                         "bn3 = static cgap-bn3 noalloc state-table charge "
+                         "against the envelope (typed refusal over ceiling)")
+    ap.add_argument("--bn3-source", default=BN3_SOURCE,
+                    help=argparse.SUPPRESS)  # court seam: sandboxed source
     args = ap.parse_args()
 
     if LLVM_SIZE is None:
@@ -298,6 +400,53 @@ def main():
     cargo_ver, rustc_ver, tgt_state = toolchain_record()
     print("toolchain: %s | %s | target %s: %s"
           % (cargo_ver, rustc_ver, TARGET, tgt_state))
+
+    consts = parse_na_consts(args.bn3_source)
+    charge = bn3_capacity_table(consts)
+    print("bn3 capacity table (static, from %s): NA_MAX_ATOMS=%d "
+          "NA_MAX_MATCHES=%d NA_MAX_VARS=%d NA_MAX_ROWS=%d -> "
+          "NaMatches %d B + NaEngine %d B = %d B"
+          % (args.bn3_source, consts["ATOMS"], consts["MATCHES"],
+             consts["VARS"], consts["ROWS"], charge["matches"],
+             charge["engine"], charge["total"]))
+
+    if args.subject == "bn3":
+        # RED-12 closure: bn3 as an enclave subject is charged statically.
+        ok = bn3_enclave_verdict(charge)
+        if ok:
+            print("BN3 subject: %d B <= %d B — in ceiling (headroom %d B)"
+                  % (charge["total"], SRAM_BUDGET,
+                     SRAM_BUDGET - charge["total"]))
+        sys.exit(EXIT_PASS if ok else EXIT_OVERFLOW)
+
+    if args.mutate == "bn3-pin":
+        # Anti-vacuity for the TABLE: a sandboxed capacity drift must
+        # trip the red-12 size_of pin cross-check (exit 1, DIVERGED).
+        # Run against a /tmp copy with NA_MAX_MATCHES halved.
+        root = "/tmp/cscb-sram-bn3-pin"
+        os.makedirs(root, exist_ok=True)
+        mutated = os.path.join(root, "noalloc.rs")
+        src = open(BN3_SOURCE, encoding="utf-8").read()
+        mutated_src, n = re.subn(r"pub const NA_MAX_MATCHES: usize = 2048;",
+                                 "pub const NA_MAX_MATCHES: usize = 1024;",
+                                 src)
+        if n != 1:
+            fail("bn3-pin court could not inject the NA_MAX_MATCHES "
+                 "mutation (subn=%d) — VACUOUS COURT" % n)
+        open(mutated, "w", encoding="utf-8").write(mutated_src)
+        probe = subprocess.run(
+            [sys.executable, os.path.abspath(__file__),
+             "--subject", "bn3", "--bn3-source", mutated],
+            capture_output=True, text=True)
+        if probe.returncode == 0:
+            print("VACUOUS GATE: bn3-pin mutant PASSED — the capacity "
+                  "table cannot see a 2x NA_MAX_MATCHES drift",
+                  file=sys.stderr)
+            sys.exit(EXIT_OVERFLOW)
+        print("MUTATE COURT: bn3-pin mutant refused (exit %d): %s"
+              % (probe.returncode,
+                 (probe.stderr or probe.stdout).strip().splitlines()[-1]))
+        sys.exit(EXIT_PASS)
 
     if args.mutate == "sram-bloat":
         blob = "static CSCB_MUTANT_SRAM: [u8; %d] = [7u8; %d];\n" % (
@@ -344,6 +493,10 @@ def main():
     print("SRAM GATE: %d B <= %d B — csct/branchless kernel surface fits "
           "the physical envelope (minimum entry surface; headroom %d B)"
           % (size, SRAM_BUDGET, SRAM_BUDGET - size))
+    print("bn3 enclave surface (report-only here, gate under --subject "
+          "bn3): static state-table charge %d B — in ceiling: %s"
+          % (charge["total"], "yes" if charge["total"] <= SRAM_BUDGET
+             else "NO — admission REFUSED (typed gate failure, exit 1)"))
     sys.exit(EXIT_PASS)
 
 

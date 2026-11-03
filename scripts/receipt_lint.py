@@ -11,6 +11,13 @@ or the exact token [TARGET-v26.11.2]. Otherwise:
 Exit codes: 0 clean (or census findings without --strict) / 1 findings
 under --strict, or VACUOUS self-check / 2 fail-closed (zero docs,
 unreadable file, internal exception) / 3 loud skip. Stdlib-only.
+
+Lane RC-09: the strict arm is typed, never a KeyError crash. A scan
+finding lacking a required key ("rule"/"file"/"reason") becomes a loud
+MISSING-RULE-KEY row naming the file + the missing key: exit 1 under
+--strict (STRICT-FAIL cites RECEIPT-LINT-MISSING-KEY), loud row only
+under default mode (no crash). KEY-CRASH court in --self-check flips
+both arms; a guard-stripped /tmp copy must fail the court.
 """
 import argparse
 import json
@@ -523,6 +530,129 @@ def apply_fixes(struct_findings, root, dry_run=True):
     return moved, planned
 
 
+def normalize_finding_keys(findings, struct):
+    """RC-09: every finding lacking a required key becomes a loud typed
+    MISSING-RULE-KEY row (appended to struct so --strict exits 1 citing
+    RECEIPT-LINT-MISSING-KEY). Returns the typed rows; never raises."""
+    required = ("rule", "file", "reason")
+    rows = []
+    for f in list(findings) + list(struct):
+        missing = [k for k in required if k not in f]
+        if not missing:
+            continue
+        rows.append({
+            "rule": "RECEIPT-LINT-MISSING-KEY",
+            "file": f.get("file", "<unknown>"),
+            "line": f.get("line", 0),
+            "snippet": "",
+            "reason": "finding lacks required key(s) %s — typed refusal, "
+                      "not a KeyError crash"
+                      % ",".join("'%s'" % k for k in missing),
+        })
+    return rows
+
+
+def key_crash_court():
+    """RC-09 anti-vacuity arm: (1) a scan emitting a finding without a
+    'rule' key must yield a typed MISSING-RULE-KEY row naming the file +
+    key under --strict (exit 1, NO traceback); (2) the same mutated /tmp
+    script copy with the normalize guard stripped must FAIL this court
+    (no typed row == vacuous guard); (3) a complete fixture still exits
+    0. All fixtures and mutated copies live in /tmp; the shared tree is
+    never mutated."""
+    import shutil
+    import tempfile
+    import subprocess
+    tmp = tempfile.mkdtemp(prefix="receipt_lint_keycrash_")
+    try:
+        root = os.path.join(tmp, "repo")
+        waves = os.path.join(root, "waves")
+        os.makedirs(waves)
+        # Malformed-finding fixture: dangling cite -> DOC-RECEIPT-002.
+        with open(os.path.join(waves, "fixture.md"), "w") as f:
+            f.write("# fixture\n\nStanding: ALIVE (2026-11-02).\n\n"
+                    "See waves/w9-nope-missing.md for proof.\n")
+        # Complete fixture root: only w-ref.md (honest header, receipted).
+        good = os.path.join(tmp, "good")
+        gwaves = os.path.join(good, "waves")
+        os.makedirs(gwaves)
+        with open(os.path.join(gwaves, "w-ref.md"), "w") as f:
+            f.write("# w-ref\n\nStanding: ALIVE (2026-11-02).\n\n"
+                    "substantive receipt body line here\n")
+
+        def run(script, root_arg, extra=()):
+            return subprocess.run(
+                [sys.executable, script, "--root", root_arg,
+                 "--dir", "waves"] + list(extra),
+                capture_output=True, text=True)
+
+        real = os.path.abspath(__file__)
+        # Arm 3: complete fixture -> strict exit 0 (typed PASS).
+        p = run(real, good, ["--strict"])
+        if p.returncode != 0 or "Traceback" in p.stderr:
+            sys.stderr.write("VACUOUS GATE: complete fixture failed "
+                             "--strict rc=%d %s\n" % (p.returncode,
+                                                      p.stderr[-200:]))
+            return 1
+        # Arm 1: mutate a /tmp copy so a scan emits a finding WITHOUT the
+        # 'rule' key — the real script must answer with a typed
+        # MISSING-RULE-KEY row naming the file + key, never a traceback.
+        mut = os.path.join(tmp, "mutated.py")
+        src = open(real, "r").read()
+        m1 = src.replace('"rule": "DOC-RECEIPT-002"',
+                         '"x-rule": "DOC-RECEIPT-002"')
+        if m1 == src:
+            sys.stderr.write("VACUOUS GATE: mutation 1 (drop rule key) "
+                             "is a no-op\n")
+            return 1
+        with open(mut, "w") as f:
+            f.write(m1)
+        p = run(mut, root, ["--strict"])
+        if "Traceback" in p.stderr:
+            sys.stderr.write("VACUOUS GATE: strict arm crashed with "
+                             "KeyError instead of typed refusal\n")
+            return 1
+        if p.returncode != 1 or "RECEIPT-LINT-MISSING-KEY" not in p.stderr \
+                or "fixture.md" not in p.stdout + p.stderr \
+                or "'rule'" not in p.stdout + p.stderr:
+            sys.stderr.write("VACUOUS GATE: missing-key finding not typed "
+                             "(rc=%d stderr=%r out=%r)\n"
+                             % (p.returncode, p.stderr[-200:],
+                                p.stdout[-200:]))
+            return 1
+        # Default mode: loud row, no crash, no strict exit.
+        p = run(mut, root)
+        if "Traceback" in p.stderr or "RECEIPT-LINT-MISSING-KEY" \
+                not in p.stdout + p.stderr:
+            sys.stderr.write("VACUOUS GATE: default mode crash or silent "
+                             "missing-key finding\n")
+            return 1
+        # Arm 2 (anti-vacuity): strip the normalize guard from the /tmp
+        # copy — the court must REFUSE (typed row absent == guard strip
+        # undetected would be a vacuous gate).
+        stripped = m1.replace(
+            "missing_key_rows = normalize_finding_keys(findings, struct)",
+            "missing_key_rows = []")
+        if stripped == m1:
+            sys.stderr.write("VACUOUS GATE: guard-strip mutation is a "
+                             "no-op\n")
+            return 1
+        mut2 = os.path.join(tmp, "stripped.py")
+        with open(mut2, "w") as f:
+            f.write(stripped)
+        p = run(mut2, root, ["--strict"])
+        if "RECEIPT-LINT-MISSING-KEY" in p.stderr:
+            sys.stderr.write("VACUOUS GATE: guard-stripped copy still "
+                             "typed — court cannot flip\n")
+            return 1
+        print("RECEIPT-LINT KEY-CRASH: PASS (missing-key finding typed, "
+              "named file+'rule', no traceback; default mode loud row; "
+              "guard-stripped copy refused)")
+        return 0
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def strict_check():
     """DX-4 anti-vacuity arm: a lane receipt with zero exit citations MUST
     fail --strict citing RECEIPT-STRUCT-002; a compliant receipt MUST
@@ -809,6 +939,9 @@ def self_check():
         print("RECEIPT-LINT SELF-CHECK: PASS (bad fixture flagged %s:%d, "
               "receipted fixture clean)" % (found[0]["file"],
                                             found[0]["line"]))
+        rc_key = key_crash_court()
+        if rc_key != 0:
+            return rc_key
         rc_strict = strict_check()
         if rc_strict != 0:
             return rc_strict
@@ -876,8 +1009,10 @@ def main(argv=None):
         if doc_receipt_scope(p):
             struct.extend(doc_receipt_scan(p, root))
             struct.extend(layer_qualifier_scan(p, root))
-    findings.sort(key=lambda f: (f["file"], f["line"]))
-    struct.sort(key=lambda f: (f["rule"], f["file"]))
+    missing_key_rows = normalize_finding_keys(findings, struct)
+    struct.extend(missing_key_rows)
+    findings.sort(key=lambda f: (f.get("file", ""), f.get("line", 0)))
+    struct.sort(key=lambda f: (f.get("rule", ""), f.get("file", "")))
     verdict = VERDICT_FAIL if (findings or struct) else VERDICT_CLEAN
 
     if args.fix or args.dry_run:
@@ -903,25 +1038,27 @@ def main(argv=None):
             "struct_findings": struct,
             "unreceipted_claims": len(findings),
             "struct_counts": {r: sum(1 for f in struct
-                                     if f["rule"] == r)
+                                     if f.get("rule") == r)
                               for r in list(STRUCT_RULES) + list(DOC_RULES)},
             "seed": None,
         }))
     else:
         for f in findings:
             print("UNRECEIPTED-CLAIM %s:%d %s [%s]"
-                  % (f["file"], f["line"], f["snippet"], f["reason"]))
+                  % (f.get("file", "?"), f.get("line", 0),
+                     f.get("snippet", ""), f.get("reason", "")))
         for f in struct:
             print("%s %s [%s]"
-                  % (f["rule"], f["file"], f["reason"]))
+                  % (f.get("rule", ""), f.get("file", ""),
+                     f.get("reason", "")))
         print("RECEIPT-LINT: %s %d claim + %d struct (%d docs scanned)"
               % (verdict, len(findings), len(struct), len(docs)))
 
     if (findings or struct) and args.strict:
         # GAP-05: rule ids are carried on every finding (claim findings are
         # UNRECEIPTED-CLAIM); --strict is a typed exit 1, never a panic.
-        ids = sorted({f["rule"] for f in findings} |
-                     {f["rule"] for f in struct})
+        ids = sorted({f.get("rule", "") for f in findings} |
+                     {f.get("rule", "") for f in struct})
         sys.stderr.write("RECEIPT-LINT: STRICT-FAIL citing %s\n"
                          % ",".join(ids))
         return 1

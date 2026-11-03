@@ -125,6 +125,30 @@ This file was, in the Wave-1 ABI-freeze slice, a fail-closed stub; every
 class below is now implemented. T1-T3 (archive framing courts) live in the
 Rust codec (crates/cgap-bosym/src/slab.rs #[cfg(test)]).
 
+DEBRIS-SKIP REPAIR (v1.4.3, 2026-11-02, lane RC-08; FIX-07 witness): a
+nightly-rustc metadata-link STUB member inside an rlib ar archive (member
+names `lib.rmeta_` / `lib.rmeta-link` — Mach-O/ELF-magic header bytes, no
+readable sections) made macho_sections/elf_or_pe_sections raise
+sections-unreadable, which hard-refused the ENTIRE workspace scan (exit 1,
+witnessed live: `GATE-REFUSED: sections-unreadable .../lib.rmeta_ (objdump
+-h yielded no sections)` over 14 rlibs in target/debug build-layout
+debris). Distinguishing law, explicit in code:
+  - AR-MEMBER DEBRIS (an unreadable SECTION surface INSIDE an rlib under
+    audit) is NOT evidence of a zero-string violation: it is a LOUD SKIP —
+    `[SKIP] <rlib> member=<name> — sectionless metadata-link debris`,
+    counted in skipped_artifacts; a run where every discovered artifact is
+    debris-skipped exits 3 (loud skip, never a fake pass).
+  - UNREADABLE PRIMARY SUBJECT (a discovered bin/cdylib/staticlib/rlib
+    artifact ITSELF, outside any ar member) keeps the typed refusal, now
+    mapped to exit 2 subject-missing ("sections-unreadable" and
+    "section-unreadable" joined SUBJECT_MISSING_CLASSES) — the artifact
+    under audit is a prerequisite, not a verdict.
+  Anti-vacuity: the --self-check debris legs (and court T17) build a real
+  fixture: fake debris rlib in a /tmp subject workspace -> cmd_scan exits 3
+  with the loud reason; debris removed -> baseline crate-no-artifacts
+  refusal (exit 2). The debris-skip arm reverts to exit 1 when the
+  try/except is removed (mutation-witnessed in /tmp this session).
+
 `--dep-direction` (DoD 8, wave-4 hardening): the runtime half of the
 dependency-direction proof. Every member crate's compiled artifacts are
 scanned for out-of-band references — the `CGAPBSYM` magic, the canonical
@@ -151,7 +175,7 @@ import tempfile
 from pathlib import Path
 from typing import NoReturn
 
-GATE_VERSION = "1.4.2"
+GATE_VERSION = "1.4.3"
 
 # ---------------------------------------------------------------------------
 # Exit ABI (repo gate contract, CLAUDE.md; lane-12 normalization):
@@ -181,6 +205,14 @@ SUBJECT_MISSING_CLASSES = frozenset({
     "execution-crate-no-artifacts",
     "artifact-vanished",
     "tool-missing",
+    # RC-08 (v1.4.3): an unreadable PRIMARY subject (the discovered
+    # bin/cdylib/staticlib/rlib artifact itself, outside any ar member) is
+    # a missing prerequisite, not a content verdict -> exit 2. AR-member
+    # debris of the same class is converted to a loud skip upstream
+    # (scan_artifact / dep_dir_scan_artifact), so this mapping never
+    # applies to rlib-internal metadata stubs.
+    "sections-unreadable",
+    "section-unreadable",
 })
 
 # ---------------------------------------------------------------------------
@@ -1123,7 +1155,18 @@ def dep_dir_scan_artifact(path: Path) -> dict:
                                       "ar member is not ELF/Mach-O/PE; refusing rather than guessing")
                 mpath = tdpath / name.replace("/", "_")
                 mpath.write_bytes(body)
-                res = _scan_single(mpath, f"{path}::{name}", None, cross_check=False, mode="depdir")
+                try:
+                    res = _scan_single(mpath, f"{path}::{name}", None, cross_check=False, mode="depdir")
+                except GateRefused as e:
+                    # RC-08 (v1.4.3): same debris law as scan_artifact — an
+                    # unreadable rlib member is not evidence of a dep-direction
+                    # violation either; loud skip, never silent.
+                    if e.reason_class in ("sections-unreadable", "section-unreadable"):
+                        print(f"[SKIP] {path} member={name} — sectionless "
+                              "metadata-link debris (unreadable rlib member; "
+                              "not a dep-direction violation)", file=sys.stderr)
+                        continue
+                    raise
                 if res["scanned"]:
                     scanned_members += 1
                     agg["violations"].extend(res["violations"])
@@ -1154,6 +1197,7 @@ def scan_artifact(path: Path, vocab, cross_check: bool = True, mode: str = "voca
         agg = {"scanned": False, "hits": [], "adv": [], "unknown": 0, "allowed": 0, "skip": None,
                "tokens": set()}
         skipped = []
+        debris = []
         scanned_members = 0
         with tempfile.TemporaryDirectory(prefix="a07_ar.") as td:
             tdpath = Path(td)
@@ -1167,7 +1211,21 @@ def scan_artifact(path: Path, vocab, cross_check: bool = True, mode: str = "voca
                                       "ar member is not an object; refusing rather than guessing")
                 mpath = tdpath / name.replace("/", "_")
                 mpath.write_bytes(body)
-                res = _scan_single(mpath, f"{path}::{name}", vocab, cross_check=False)
+                try:
+                    res = _scan_single(mpath, f"{path}::{name}", vocab, cross_check=False)
+                except GateRefused as e:
+                    # RC-08 (v1.4.3): rlib-internal metadata-link debris
+                    # (lib.rmeta_ / lib.rmeta-link stubs: object-format magic
+                    # bytes, zero readable sections). An unreadable rlib
+                    # MEMBER is not evidence of a zero-string violation — a
+                    # loud skip, never a hard refusal and never silent.
+                    if e.reason_class in ("sections-unreadable", "section-unreadable"):
+                        debris.append(name)
+                        print(f"[SKIP] {path} member={name} — sectionless "
+                              "metadata-link debris (unreadable rlib member; "
+                              "not a zero-string violation)", file=sys.stderr)
+                        continue
+                    raise
                 if res["scanned"]:
                     scanned_members += 1
                     agg["hits"].extend(res["hits"])
@@ -1186,6 +1244,12 @@ def scan_artifact(path: Path, vocab, cross_check: bool = True, mode: str = "voca
                     raise GateRefused("extractor-mismatch", f"{path} :: {s}",
                                       "member hit missing from strings(1) over the archive")
         agg["scanned"] = scanned_members > 0
+        # RC-08 (v1.4.3): an rlib whose ONLY members were debris (nothing
+        # observable scanned) is a loud-skipped artifact, never a vacuous
+        # "scanned" row — the exit-3 path requires skipped>0.
+        if debris and scanned_members == 0:
+            agg["skip"] = f"{len(debris)} debris-only member(s); nothing observable scanned"
+            print(f"[SKIP] {path} — {agg['skip']}", file=sys.stderr)
         if skipped:
             print(f"[SKIP] {path} members=({','.join(skipped)}) — rustc metadata member, not an object", file=sys.stderr)
         return agg
@@ -1642,6 +1706,86 @@ def _sha256_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def _run_debris_leg_a(ns, buf) -> int:
+    """Leg A runner: the real cmd_scan end-to-end over the debris fixture.
+    Returns the exit code (refusal -> -1 with the typed class appended to
+    the buffer, so the loud-reason assertion sees it)."""
+    try:
+        return cmd_scan(ns)
+    except GateRefused as e:
+        buf.write(f"GATE-REFUSED {e.reason_class}: {e}")
+        return -1
+
+
+def debris_skip_legs(workdir: Path) -> tuple:
+    """RC-08 (v1.4.3) debris-skip legs (anti-vacuity for the metadata-link
+    debris classification). Chicago: a REAL end-to-end cmd_scan over a
+    /tmp fixture workspace whose only artifact is a fake debris rlib.
+      Leg A (debris present): the debris rlib (ar archive whose single
+        member is a sectionless Mach-O stub — the witnessed nightly-rustc
+        `lib.rmeta_` / `lib.rmeta-link` class) must NOT hard-refuse:
+        cmd_scan exits 3 (loud skip) with the [SKIP] reason on output.
+      Leg B (debris removed): the same workspace with the artifact absent
+        must return to baseline — the crate-no-artifacts refusal
+        (subject-missing, exit 2). Removal restores baseline behavior.
+    Mutation-witness: reverting the try/except in a /tmp copy flips leg A
+    to exit 1 (sections-unreadable refusal) — witnessed this session."""
+    import struct as _struct
+    fxt = Path(tempfile.mkdtemp(prefix="a07debris.", dir=workdir))
+    (fxt / "a07debris" / "src").mkdir(parents=True)
+    (fxt / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["a07debris"]\nresolver = "2"\n', encoding="utf-8")
+    (fxt / "a07debris" / "Cargo.toml").write_text(
+        '[package]\nname = "a07debris"\nversion = "0.1.0"\nedition = "2021"\n\n'
+        '[lib]\ncrate-type = ["rlib"]\n', encoding="utf-8")
+    (fxt / "a07debris" / "src" / "lib.rs").write_text(
+        "pub static A07_DEBRIS_FIXTURE: &[u8] = b\"clean-fixture-bytes\";\n", encoding="utf-8")
+    (fxt / "target" / "debug").mkdir(parents=True)
+    stub = _struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 1, 0, 0, 0, 0)
+    body = b"!<arch>\n" + b"debris_stub.o".ljust(16) + b"0".ljust(12) \
+        + b"0".ljust(6) + b"0".ljust(6) + b"644".ljust(8) + str(len(stub)).ljust(10).encode() \
+        + b"`\n" + stub
+    debris_rlib = fxt / "target" / "debug" / "liba07debris.rlib"
+    debris_rlib.write_bytes(body)
+    vocab_archive = fxt / "vocab.bosym"
+    vocab_archive.write_bytes(bosym_build([(0xA07D, 2, POISON_TOKEN)]))
+    ns = argparse.Namespace(root=fxt, target_dir=fxt / "target",
+                            vocab=str(vocab_archive), profile="debug")
+    buf = io.StringIO()
+    rc = 0
+    # The debris fixture has no cgap-fibo producer artifact, so the
+    # no-dead-entries law would fire before the debris arm is exercised.
+    # Scope the grant table to empty for THIS fixture only, restoring the
+    # live table unconditionally (try/finally) — the law itself is pinned
+    # by T16 arm 5 leg B, untouched here.
+    saved_grants = dict(EMITTER_BINARIES)
+    EMITTER_BINARIES.clear()
+    try:
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            rc = _run_debris_leg_a(ns, buf)
+    finally:
+        EMITTER_BINARIES.clear()
+        EMITTER_BINARIES.update(saved_grants)
+    out = buf.getvalue()
+    ok_a = (rc == 3
+            and "[SKIP]" in out
+            and "metadata-link debris" in out)
+    lines = [f"leg A (debris present): cmd_scan exit={rc} "
+             f"({'LOUD SKIP' if ok_a else 'NOT a loud skip'}); output tail: {out.strip()[-160:]!r}"]
+    debris_rlib.unlink()
+    buf2 = io.StringIO()
+    reason = ""
+    with contextlib.redirect_stdout(buf2), contextlib.redirect_stderr(buf2):
+        try:
+            cmd_scan(ns)
+        except GateRefused as e:
+            reason = e.reason_class
+    ok_b = reason == "crate-no-artifacts"
+    lines.append(f"leg B (debris removed): refusal={reason or 'none'} "
+                 f"({'baseline restored' if ok_b else 'BASELINE BROKEN'})")
+    return ok_a and ok_b, lines
+
+
 def self_check(vocab: dict, workdir: Path) -> tuple:
     """Returns (ok: bool, detail lines). Exit-0 requires BOTH arms:
     poisoned fixture HITs naming the planted token, clean twin does not.
@@ -2023,6 +2167,19 @@ def court_cross_impl(vocab, vocab_source, _workdir):
             "(run the Rust emit court to exercise the cross-language leg)")
 
 
+def court_t17_debris_skip(workdir: Path):
+    """T17 (RC-08, v1.4.3 anti-vacuity for the debris-skip classification):
+    the fake-debris fixture (real end-to-end cmd_scan, /tmp subject dir)
+    must loud-skip (exit 3, [SKIP] reason on output) with the debris
+    present, and return to the baseline crate-no-artifacts refusal when
+    the debris is removed. Flip class: reverting the try/except in a /tmp
+    copy reverts leg A to the sections-unreadable hard refusal (exit 1) —
+    witnessed this session in /tmp/rc08-mutant-copy.py."""
+    ok, lines = debris_skip_legs(workdir)
+    status = "PASS" if ok else "FAIL"
+    return ("T17_debris_skip", status, "; ".join(lines))
+
+
 def court_t16_emitter_exemption(vocab, workdir):
     """T16 (Wave-7 repair court; a07-wave6-audit-receipt.md §5 option (a),
     the A07-owned scan-mode exemption gap; Wave-8 pins added): the producer
@@ -2223,6 +2380,8 @@ def cmd_courts(args) -> int:
                   lambda: court_t15_invalid_utf8_neighbor(vocab, workdir))
         run_court("T16_emitter_exemption",
                   lambda: court_t16_emitter_exemption(vocab, workdir))
+        run_court("T17_debris_skip",
+                  lambda: court_t17_debris_skip(workdir))
         run_court("T5_cross_extractor",
                   lambda: court_t5_cross_extractor(vocab, workdir))
         run_court("T4_poison_probe",
@@ -2258,7 +2417,15 @@ def cmd_self_check(args) -> int:
     for line in lines:
         print(f"SELF-CHECK {line}")
     print(f"SELF-CHECK RESULT {'PASS' if ok else 'FAIL'} vocab={vocab_source}")
-    return 0 if ok else 1
+    # RC-08 (v1.4.3): debris-skip legs — the loud-skip classification must
+    # be end-to-end witnessed, not prose. Fresh workdir: the try/finally
+    # above already removed the poison/clean one.
+    debris_ok, debris_lines = debris_skip_legs(
+        Path(tempfile.mkdtemp(prefix="a07_debris_selfcheck.")))
+    for line in debris_lines:
+        print(f"SELF-CHECK DEBRIS {line}")
+    print(f"SELF-CHECK DEBRIS RESULT {'PASS' if debris_ok else 'FAIL'}")
+    return 0 if (ok and debris_ok) else 1
 
 
 # ---------------------------------------------------------------------------
