@@ -194,8 +194,8 @@ impl Counter {
             () => self.0.fetch_add(1, core::sync::atomic::Ordering::SeqCst) as u64,
             #[cfg(not(target_has_atomic = "8"))]
             () => {
-                let cur = self.0.get();
-                self.0.set(cur.wrapping_add(1));
+                let cur = self.0.get() as u64;
+                self.0.set(cur.wrapping_add(1) as seal_atomic::Prim);
                 cur
             }
         }
@@ -203,7 +203,31 @@ impl Counter {
 
     fn fetch_update<F>(&self, mut f: F) -> Result<u64, u64>
     where
-        F: FnMut(u64) -> Option<u contention_marker,
+        F: FnMut(u64) -> Option<u64>,
+    {
+        match () {
+            #[cfg(target_has_atomic = "8")]
+            () => self
+                .0
+                .fetch_update(
+                    core::sync::atomic::Ordering::SeqCst,
+                    core::sync::atomic::Ordering::SeqCst,
+                    |c| f(c as u64).map(|v| v as seal_atomic::Prim),
+                )
+                .map(|v| v as u64)
+                .map_err(|v| v as u64),
+            #[cfg(not(target_has_atomic = "8"))]
+            () => {
+                let cur = self.0.get() as u64;
+                match f(cur) {
+                    Some(next) => {
+                        self.0.set(next as seal_atomic::Prim);
+                        Ok(cur)
+                    }
+                    None => Err(cur),
+                }
+            }
+        }
     }
 }
 
@@ -255,7 +279,6 @@ impl SealRegister {
     /// CounterExhausted when the ceiling is already reached, and
     /// TableFull-class range refusal when tag would run past the slot.
     pub fn stamp(&mut self, offset: usize, tag: &[u8; 8]) -> Result<u64, Refusal> {
-        use core::sync::atomic::Ordering;
         if offset + 8 > SEAL_SLOT_LEN {
             return Err(Refusal::new(
                 RefusalKind::TableFull,
