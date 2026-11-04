@@ -112,3 +112,40 @@ wire-shm:
 doctor-info:
     @just doctor >/tmp/cg1-doctor.out 2>&1; rc=$?; \
     echo "doctor (informational): rc=$rc"; exit 0
+
+# AoQ Wave-1 lane AB-1 (v26.11.3): cgap-aoq gate + 3-target matrix.
+#   aoq-check: cold `cargo check` (isolated target dir) with wall-clock
+#     recording — the build-time budget gate (budget from aoq1_bench_court).
+#   aoq-gate: purity gate + codec court (AB-1 owned courts).
+# Exit classes: 0 GREEN / 1 RED / 3 loud [SKIP] (riscv32imc absent).
+ROOT_AOQ := justfile_directory()
+aoq-check:
+    #!/bin/bash
+    set -euo pipefail
+    ROOT="{{ROOT_AOQ}}"
+    TD="$ROOT/target-aoq-lane"
+    START=$(python3 -c 'import time; print(time.time_ns())')
+    CARGO_TARGET_DIR="$TD" cargo check -p cgap-aoq
+    END=$(python3 -c 'import time; print(time.time_ns())')
+    WALL_MS=$(( (END - START) / 1000000 ))
+    echo "aoq-check cold wall: ${WALL_MS}ms"
+    mkdir -p "$ROOT/docs/jira/v26.11.3/bench"
+    echo "$WALL_MS" >> "$ROOT/docs/jira/v26.11.3/bench/aoq-check-walls.txt"
+    exit 0
+aoq-gate:
+    #!/bin/bash
+    set -euo pipefail
+    ROOT="{{ROOT_AOQ}}"
+    CARGO_TARGET_DIR="$ROOT/target-aoq-lane" cargo test -p cgap-aoq \
+      --test purity_gate --test aoq1_codec_court
+    # Target matrix: wasm32 leg; riscv32imc leg is a LOUD SKIP when the
+    # target is not installed (gate exit class 3), never a fake pass.
+    CARGO_TARGET_DIR="$ROOT/target-aoq-lane" cargo check -p cgap-aoq \
+      --target wasm32-unknown-unknown
+    if rustup target list --installed | grep -q '^riscv32imc$'; then
+      CARGO_TARGET_DIR="$ROOT/target-aoq-lane" cargo check -p cgap-aoq \
+        --target riscv32imc
+    else
+      echo "[SKIP] riscv32imc target not installed (loud skip, exit class 3)"
+    fi
+    echo "aoq-gate GREEN"

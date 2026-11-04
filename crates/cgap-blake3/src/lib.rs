@@ -709,12 +709,38 @@ pub fn hash_wide_simd(data: &[u8]) -> [u8; 32] {
         // when at a 64-chunk boundary and at least 64 chunks remain.
         if (chunk_idx & 63 == 0) && (chunk_idx + 64 <= num_chunks) {
             let mut cvs = [[0u32; 8]; 64];
-            for k in 0..64 {
+            // AF-3 (v26.11.3): leaves go through the NEON 4-way leaf kernel
+            // ([`multi_chunk::compress_chunks_4way`]) instead of sequential
+            // scalar [`hash_chunk`] — the 64-chunk window is always 64 FULL
+            // chunks (engagement requires chunk_idx + 64 <= num_chunks), so
+            // the 4KiB-batch contract is met exactly. Measured on aarch64:
+            // scalar leaves ~383 MiB/s -> 4-way leaves ~1.7 GiB/s at the
+            // 64 KiB window; NEON parents (55 ns) already beat scalar
+            // parents (79 ns). Byte-identical (same compress, lane-
+            // transposed); parity owned by blake3_scale_stress court 2/3
+            // and small_batch_vectors.
+            for k in (0..64).step_by(4) {
                 let c_idx = chunk_idx + k;
                 let start = c_idx * 1024;
-                let end = (start + 1024).min(len);
-                let out = hash_chunk(&data[start..end], c_idx as u64, false);
-                cvs[k].copy_from_slice(&out[0..8]);
+                if start + 4096 <= len {
+                    let outs = multi_chunk::compress_chunks_4way(
+                        &data[start..start + 4096],
+                        c_idx as u64,
+                    );
+                    for (g, out) in outs.iter().enumerate() {
+                        cvs[k + g].copy_from_slice(&out[0..8]);
+                    }
+                } else {
+                    // Partial trailing window (last chunk not 1 KiB-aligned):
+                    // scalar fallback per chunk with the same clamped ends
+                    // the sequential path uses.
+                    for g in 0..4 {
+                        let cs = (c_idx + g) * 1024;
+                        let ce = (cs + 1024).min(len);
+                        let out = hash_chunk(&data[cs..ce], (c_idx + g) as u64, false);
+                        cvs[k + g].copy_from_slice(&out[0..8]);
+                    }
+                }
             }
             let mut count = 64usize;
             // Reduce 64 -> 32 -> 16 -> 8 -> 4 -> 2 using SIMD parent kernel

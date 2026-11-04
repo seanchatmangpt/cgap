@@ -1,0 +1,26 @@
+//! cgap-aoq — AoQ (Append-only Queue) kernel.
+//!
+//! Registration history (disclosed per fanout SLA law):
+//! - `lib.rs` was absent at AB-7 lane start (AB-1 skeleton ownership);
+//!   AB-7 created it minimally (error only), then AB-6 landed
+//!   header.rs/codec.rs/generated_aoq_header_layout.rs alongside.
+//! - Reconciled by AB-7 (this revision): ALL landed modules registered —
+//!   AB-1 supersedes at integration.
+
+#![no_std]
+#![forbid(unsafe_code)]
+
+// [2026-11-03 AB-7] chain.rs header-agnostic rewrite (R-H1) landed;
+// re-registered by AB-7. Disclosed in ab-7-chain-session.md.
+pub mod chain;
+pub mod aead;
+pub mod codec;
+pub mod error;
+pub mod generated_aoq_header_layout;
+pub mod header;
+pub mod kem;
+// session.rs landed (AB-7, 21:58); registration restored by AB-1.
+pub mod session;
+// AB-8 (PG-A2 wire seam): window verification + 5-segment scatter writer.
+pub mod verify;
+pub mod writer;

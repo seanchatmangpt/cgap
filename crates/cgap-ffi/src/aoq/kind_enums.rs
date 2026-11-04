@@ -34,7 +34,7 @@ impl fmt::Display for AoqUnknownEpoch {
     }
 }
 
-impl std::error::Error for AoqUnknownEpoch {}
+impl core::error::Error for AoqUnknownEpoch {}
 
 impl TryFrom<u16> for AoqEpoch {
     type Error = AoqUnknownEpoch;
@@ -76,7 +76,7 @@ impl fmt::Display for AoqUnknownStreamType {
     }
 }
 
-impl std::error::Error for AoqUnknownStreamType {}
+impl core::error::Error for AoqUnknownStreamType {}
 
 impl TryFrom<u8> for AoqStreamType {
     type Error = AoqUnknownStreamType;

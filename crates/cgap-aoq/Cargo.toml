@@ -1,0 +1,32 @@
+[package]
+name = "cgap-aoq"
+description = "AOQ1 wire-law header kernel: 64-byte envelope, ontology-pinned layout, alloc-free codec"
+version.workspace = true
+license-file.workspace = true
+edition.workspace = true
+publish = true
+
+# Embedded surface: no dependencies, no alloc.
+[dependencies]
+
+[dev-dependencies]
+# AB-8 classification-identity sweep + UDS soak: the sweep pairs cgap-arrow
+# IpcError classes with cgap-aoq AoqError classes on the same windows.
+cgap-arrow = { path = "../cgap-arrow" }
+# AF-1 corridor join court: the REAL kernels (ML-KEM-768, ChaCha20-Poly1305,
+# Shake256) bound to the crate's host seams for the end-to-end corridor.
+cgap-crypto = { path = "../cgap-crypto" }
+# AF-10 G5: composes AB-11's FrameTooLarge typed refusal over a real
+# wire-shm ring segment (standalone workspace crate; path dev-dep only).
+wire-shm = { path = "../wire-shm" }
+# AF-14 CBMQS runner: report integrity gate (G7) hashes the verdict report
+# with the repo's own sovereign BLAKE3. Dev-dep only: the embedded lib
+# surface stays zero-dependency / no_std.
+cgap-blake3 = { path = "../cgap-blake3", features = ["std"] }
+
+# AF-14 CBMQS runner (tests/cbmqs_runner.rs): a harness=false gate whose
+# process exit status IS the verdict (repo exit-record law).
+[[test]]
+name = "cbmqs_runner"
+harness = false
+required-features = []

@@ -64,6 +64,17 @@ pub const CONTINUATION: u32 = 0xFFFF_FFFF;
 pub const EOS: u32 = 0x0000_0000;
 /// Metadata header magic `"IPC1"`.
 pub const MAGIC: u32 = 0x4950_4331;
+/// AOQ1 header magic, `"AOQ1"` (PG-A2 §2 per-magic fork; landed ontology
+/// `packs/aoq-pack/ontology.ttl`). The parse fork below carries the
+/// per-magic law: big-endian header, version 2, FNV-1a32 digest over
+/// `[0x00,0x3C)` stored at `0x3C`, closed epoch enum in the flags-word
+/// position, `body_len` u32 LE + 16-byte tag in the metadata padding.
+pub const AOQ1_MAGIC: u32 = 0x414F_5131;
+/// AOQ1 tag offset in the window (`PREFIX_SIZE + 64 + 4`): the padding
+/// carries `body_len` u32 LE at +0 and the tag at +4.
+pub const AOQ1_TAG_AT: usize = PREFIX_SIZE + 64 + 4;
+/// AOQ1 tag width.
+pub const AOQ1_TAG_BYTES: usize = 16;
 /// Envelope layout version.
 pub const LAYOUT_VERSION: u16 = 1;
 /// Metadata header size: one cache line.
@@ -198,6 +209,16 @@ pub enum IpcError {
     BodyDigestNoRoom {
         /// Alignment requested.
         got: u32,
+    },
+    /// Verified read, AOQ1 magic (PG-A2 §2, AB-8): the metadata padding
+    /// carries no tag (all zero) — the window was not sealed, or it is an
+    /// alignment-8 AOQ1 framing (no padding to carry the tag).
+    TagMissing,
+    /// Verified read, AOQ1 magic: the stored 16-byte tag disagrees with
+    /// `blake3(body)[..16]` recomputed over the carried body.
+    TagMismatch {
+        /// Tag observed in the metadata padding.
+        got: [u8; 16],
     },
 }
 
@@ -375,13 +396,29 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
     }
     let alignment = if meta_span == meta_span_for(8) { 8 } else { 64 };
     let body_at = PREFIX_SIZE + meta_span;
-    if buf.len() < body_at + META_HEADER_SIZE {
+    // Read-ahead minimum (AB-9, AF-4 v26.11.3): demand only the bytes the
+    // gate actually consumes — prefix + the full metadata span (the header
+    // is `buf[8..72]`, and the AOQ1 branch additionally inspects the span's
+    // padding `buf[72..body_at]`), all strictly inside `body_at`. The old
+    // fixed `+ META_HEADER_SIZE` past body start demanded bytes no emitted
+    // window carries for tiny bodies (body+pad < 56): an emit-accepted
+    // window classified `Truncated` on read. Every typed refusal class
+    // stays intact — genuinely truncated windows still classify `Truncated`
+    // here, and shorter-body/missing-EOS windows classify downstream as
+    // `BadBodyLen`/`MissingEos` in `read_with_meta`.
+    if buf.len() < body_at {
         return Err(IpcError::Truncated {
-            needed: body_at + META_HEADER_SIZE,
+            needed: body_at,
             got: buf.len(),
         });
     }
-    let meta = meta_from(&buf[8..72]);
+    let raw = meta_from(&buf[8..72]);
+    // The magic fork is a single LE read: both magics are little-endian
+    // on the wire (AOQ1's landed codec law is LE, reconciled 22:03).
+    if raw.magic == AOQ1_MAGIC {
+        return parse_meta_aoq1(buf, alignment, body_at);
+    }
+    let meta = raw;
     if meta.magic != MAGIC {
         return Err(IpcError::BadMagic { got: meta.magic });
     }
@@ -408,6 +445,63 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
         });
     }
     Ok(ParsedMeta { alignment, body_at, meta })
+}
+
+/// The AOQ1 branch of the [`parse_meta`] magic fork (PG-A2 §2, AB-8):
+/// same gate order as the IPC1 path, per-magic domain values. The AOQ1
+/// header is LITTLE-endian (landed codec law), the digest span is
+/// `[0x00,0x3C)` stored LE at `0x3C`, the flags-word position carries the
+/// closed epoch enum, and the metadata padding carries `body_len` u32 LE
+/// plus the 16-byte tag. Alignment-8 AOQ1 framing has no padding to carry
+/// either — typed [`IpcError::TagMissing`], never a misread.
+fn parse_meta_aoq1(
+    buf: &[u8],
+    alignment: usize,
+    body_at: usize,
+) -> Result<ParsedMeta, IpcError> {
+    if alignment != 64 {
+        return Err(IpcError::TagMissing);
+    }
+    let hb = &buf[8..72];
+    // Digest gate: FNV-1a32 over header bytes [0x00,0x3C), stored LE.
+    let stored = u32::from_le_bytes([hb[60], hb[61], hb[62], hb[63]]);
+    if fnv1a32(&hb[..60]) != stored {
+        return Err(IpcError::HeaderDigestMismatch { got: stored });
+    }
+    // Version gate (LE domain value 2).
+    let version = u16::from_le_bytes([hb[4], hb[5]]);
+    if version != 2 {
+        return Err(IpcError::BadVersion { got: version });
+    }
+    // Flags-position gate: the closed epoch enum {0,1,2,65535}.
+    let epoch = u16::from_le_bytes([hb[6], hb[7]]);
+    if !matches!(epoch, 0 | 1 | 2 | 65535) {
+        return Err(IpcError::BadFlags { got: epoch });
+    }
+    // Pad cleanliness: zero outside the body_len/tag law region.
+    for (i, &b) in buf[72..body_at].iter().enumerate() {
+        if b != 0 && i >= 20 {
+            return Err(IpcError::PadNonZero { at: 72 + i });
+        }
+    }
+    let body_len = u32::from_le_bytes([buf[72], buf[73], buf[74], buf[75]]);
+    let seq = u32::from_le_bytes([hb[20], hb[21], hb[22], hb[23]]);
+    Ok(ParsedMeta {
+        alignment: 64,
+        body_at,
+        meta: MetaHeader {
+            magic: AOQ1_MAGIC,
+            version: 2,
+            flags: epoch,
+            schema_digest: [0; 32],
+            body_len,
+            alignment: 64,
+            seq,
+            reserved0: 0,
+            header_digest: stored,
+            pad_tail: [0; 4],
+        },
+    })
 }
 
 /// Sequence-pair law (G2): a strictly-advancing, wrap-safe successor test
@@ -550,6 +644,23 @@ pub fn read_verified(
         return Err(IpcError::BodyDigestNoRoom { got: p.meta.alignment });
     }
     let (n, meta) = read_with_meta(buf, expected_schema, body_out)?;
+    if meta.magic == AOQ1_MAGIC {
+        // AOQ1 tag gate: stored tag must match blake3(body)[..16] over the
+        // carried body (tamper tier; the tag supersedes the IPC1
+        // 32-byte body digest on this magic).
+        let mut stored = [0u8; AOQ1_TAG_BYTES];
+        stored.copy_from_slice(&buf[AOQ1_TAG_AT..AOQ1_TAG_AT + AOQ1_TAG_BYTES]);
+        if stored == [0u8; AOQ1_TAG_BYTES] {
+            return Err(IpcError::TagMissing);
+        }
+        let digest = crate::blake3::hash(&body_out[..n]);
+        let mut expected = [0u8; AOQ1_TAG_BYTES];
+        expected.copy_from_slice(&digest[..AOQ1_TAG_BYTES]);
+        if stored != expected {
+            return Err(IpcError::TagMismatch { got: stored });
+        }
+        return Ok(n);
+    }
     let stored_slice = &buf[BODY_DIGEST_AT..BODY_DIGEST_AT + 32];
     let mut stored = [0u8; 32];
     stored.copy_from_slice(stored_slice);

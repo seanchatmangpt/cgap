@@ -27,6 +27,10 @@ cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+# AB-4 (PG-A3): RFC 8439 cross-check court — the REAL RustCrypto
+# chacha20poly1305 validates the local donna kernel byte-for-byte, both
+# directions. DEV-ONLY: the lib dependency surface stays zero-dep.
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 
 [package.metadata.docs.rs]
 all-features = true

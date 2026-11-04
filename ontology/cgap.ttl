@@ -11,8 +11,8 @@
 
 av:project a av:Project ;
     rdfs:label "cgap" ;
-    av:version "26.11.2" ;
-    av:releaseDate "2026-10-29" ;
+    av:version "26.11.3" ;
+    av:releaseDate "2026-11-03" ;
     av:ctq1 "SWAR bitmap masking throughput >= 9.0 GiB/s" ;
     av:ctq2 "CC=1 branch audit gate" ;
     av:ctq3 "0 segfaults - mutation court" ;

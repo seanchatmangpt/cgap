@@ -12,5 +12,11 @@ extern crate alloc;
 #[macro_use]
 extern crate std;
 
+pub mod aead;
+pub mod chacha;
 pub mod chatman;
+pub mod fips203;
+pub mod kem;
+pub mod fips202;
 pub mod lease;
+pub mod poly1305;

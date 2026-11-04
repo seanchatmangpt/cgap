@@ -3,10 +3,15 @@ name = "cgap"
 
 [ontology]
 source = "ontology/cgap.ttl"
+# cscb-pack's CBMQS graph merges into the union graph via its [packs] entry
+# below (import paths refuse '..' traversal — FM-CONFIG-003 invalid_path —
+# and no import is needed: a listed pack's own ontology.ttl is composed into
+# the union graph automatically).
 
 [packs]
 cgap-pack = { path = "../ggen-marketplace/packs/cgap-pack" }
 aoq-pack = { path = "../ggen-marketplace/packs/aoq-pack" }
+cscb-pack = { path = "../ggen-marketplace/packs/cscb-pack" }
 
 [templates]
 dir = "gen-templates"

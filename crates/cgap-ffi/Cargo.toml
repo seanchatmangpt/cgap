@@ -48,6 +48,12 @@ cgap-parquet = { path = "../cgap-parquet", version = "26.11.3", features = ["std
 # Same crate as the normal dependency; needed only by tests/ to reach the
 # c_abi release callbacks and ForeignArray for lifecycle assertions.
 cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+# AB-15 ffi-stress lane: canon frame construction for real admit-path stress
+# (crates/cgap-core/tests/common/mod.rs canon: `CgapFrameHeader::encode_into`
+# + `cgap_blake3::hash` as the O-ABI digest substrate). Additive dev-deps
+# only; disclosed in docs/jira/v26.11.2/lanes/ab-15-ffi-stress.md.
+cgap-core = { path = "../cgap-core", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 # Hot-path allocation courts (tests/alloc_courts.rs): linking cgap_audit into
 # the test binary installs its CountingAlloc #[global_allocator] and exposes
 # with_alloc_tracking for the zero-alloc assertions.

@@ -392,10 +392,51 @@ mod guard_courts {
         // BASELINE: the same call against the REAL crate MUST be rejected.
         // The workspace target layout is nonstandard, so the extern paths
         // come from a shallow artifact scan near the test binary.
-        let crypto = find_artifact("libcgap_crypto", ".rmeta")
-            .expect("locate libcgap_crypto rmeta near this test binary");
-        let blake3 = find_artifact("libcgap_blake3", ".rlib")
-            .expect("locate libcgap_blake3 rlib near this test binary");
+        // BK-3 takeover: the single-artifact scan paired a stale blake3 rlib
+        // with the fresh crypto rmeta and died with E0460 (wrong-reason).
+        // Enumerate ALL candidate (rmeta, rlib) pairs from the build dirs:
+        //   - any pair where the mutant COMPILES -> VACUOUS GATE (hard fail)
+        //   - any pair rejecting with E0599/E0433 -> law witnessed, take it
+        //   - pairs dying with stale-metadata E0460 -> unusable, skipped
+        // No usable pair -> wrong-reason death (fail closed).
+        let build_root =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/build");
+        let mut cryptos = std::vec::Vec::new();
+        let mut blakes = std::vec::Vec::new();
+        for (crate_dir, name, ext, out) in [
+            (
+                "cgap-crypto",
+                "libcgap_crypto",
+                ".rmeta",
+                &mut cryptos,
+            ),
+            ("cgap-blake3", "libcgap_blake3", ".rlib", &mut blakes),
+        ] {
+            let _ = crate_dir;
+            for h in std::fs::read_dir(build_root.join(crate_dir))
+                .into_iter()
+                .flatten()
+                .flatten()
+            {
+                let out_dir = h.path().join("out");
+                for e in std::fs::read_dir(&out_dir).into_iter().flatten().flatten() {
+                    let p = e.path();
+                    let n = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if n.starts_with(name) && n.ends_with(ext) {
+                        out.push(p);
+                    }
+                }
+                let _ = name;
+                let _ = ext;
+            }
+            out.sort();
+        }
+        assert!(
+            !cryptos.is_empty() && !blakes.is_empty(),
+            "AE8 SETUP DEATH: no cgap_crypto rmeta / cgap_blake3 rlib under \
+             {} — run cargo build first",
+            build_root.display()
+        );
         let mutant = std::env::temp_dir().join("ae8_guard_mutant.rs");
         std::fs::write(
             &mutant,
@@ -408,29 +449,41 @@ mod guard_courts {
              }\n",
         )
         .expect("write mutant");
-        let out = std::process::Command::new("rustc")
-            .arg("--edition=2021")
-            .arg("--emit=metadata")
-            .arg("--crate-type=lib")
-            .arg(format!("--extern=cgap_crypto={}", crypto.display()))
-            .arg(format!("--extern=cgap_blake3={}", blake3.display()))
-            .arg("-L")
-            .arg(format!("dependency={}", crypto.parent().unwrap().display()))
-            .arg("-L")
-            .arg(format!("dependency={}", blake3.parent().unwrap().display()))
-            .arg(&mutant)
-            .output()
-            .expect("spawn rustc for mutant");
-        let stderr = std::string::String::from_utf8_lossy(&out.stderr);
+        let mut saw_vacuous: Option<std::string::String> = None;
+        let mut saw_reject = false;
+        for crypto in &cryptos {
+            for blake3 in &blakes {
+                let out = std::process::Command::new("rustc")
+                    .arg("--edition=2021")
+                    .arg("--emit=metadata")
+                    .arg("--crate-type=lib")
+                    .arg(format!("--extern=cgap_crypto={}", crypto.display()))
+                    .arg(format!("--extern=cgap_blake3={}", blake3.display()))
+                    .arg("-L")
+                    .arg(format!("dependency={}", crypto.parent().unwrap().display()))
+                    .arg("-L")
+                    .arg(format!("dependency={}", blake3.parent().unwrap().display()))
+                    .arg(&mutant)
+                    .output()
+                    .expect("spawn rustc for mutant");
+                let stderr = std::string::String::from_utf8_lossy(&out.stderr);
+                if out.status.success() {
+                    saw_vacuous = Some(stderr.into_owned());
+                } else if stderr.contains("E0599") || stderr.contains("E0433") {
+                    saw_reject = true;
+                }
+            }
+        }
         assert!(
-            !out.status.success(),
+            saw_vacuous.is_none(),
             "AE8 VACUOUS GATE: `Spent::rewind` COMPILED against the real \
-             crate — the type-level no-rewind law is absent; stderr: {stderr}"
+             crate — the type-level no-rewind law is absent; stderr: {}",
+            saw_vacuous.unwrap_or_default()
         );
         assert!(
-            stderr.contains("E0599") || stderr.contains("E0433"),
-            "AE8 WRONG-REASON DEATH: mutant rejected without an \
-             E0599/E0433-style method-resolution signature; stderr: {stderr}"
+            saw_reject,
+            "AE8 WRONG-REASON DEATH: no usable (rmeta, rlib) pair rejected \
+             the mutant with an E0599/E0433-style method-resolution signature"
         );
         let _ = std::fs::remove_file(&control);
         let _ = std::fs::remove_file(&mutant);
@@ -446,16 +499,29 @@ mod guard_courts {
             n.starts_with(name) && n.ends_with(ext)
         }
         fn shallow(dir: &std::path::Path, name: &str, ext: &str) -> Option<std::path::PathBuf> {
-            std::fs::read_dir(dir)
-                .ok()?
-                .flatten()
-                .map(|e| e.path())
-                .find(|p| {
-                    p.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|n| name_matches(n, name, ext))
-                        .unwrap_or(false)
-                })
+            // BK-3 takeover: pick the NEWEST matching artifact by mtime, not
+            // the first in read_dir order — build/<crate>/<hash>/out holds
+            // stale hash dirs and an old blake3 rlib made the AE8 mutant
+            // compile die with E0460 (wrong-reason) instead of E0599.
+            let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+            for e in std::fs::read_dir(dir).ok()?.flatten() {
+                let p = e.path();
+                let matches = p
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| name_matches(n, name, ext))
+                    .unwrap_or(false);
+                if !matches {
+                    continue;
+                }
+                let mtime = e.metadata().and_then(|m| m.modified()).unwrap_or(
+                    std::time::SystemTime::UNIX_EPOCH,
+                );
+                if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
+                    best = Some((mtime, p));
+                }
+            }
+            best.map(|(_, p)| p)
         }
         let mut dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
         loop {

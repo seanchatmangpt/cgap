@@ -498,19 +498,32 @@ pub extern "C" fn cgap_xip_start() -> ! {
     fn stage_sandbox(dir: &Path) {
         fs::create_dir_all(dir.join("src")).expect("sandbox src dir");
         let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-        for entry in fs::read_dir(&src_dir).expect("src dir readable").flatten() {
-            let p = entry.path();
-            if p.extension().map(|x| x == "rs").unwrap_or(false) {
-                fs::copy(&p, dir.join("src").join(p.file_name().expect("file name")))
-                    .expect("copy sandbox source");
-            }
-        }
+        copy_src_recursive(&src_dir, &dir.join("src"));
         let manifest = FIXTURE_MANIFEST.replace(
             "<ARROW>",
             &repo_root().join("crates/cgap-arrow").display().to_string(),
         );
         fs::write(dir.join("Cargo.toml"), manifest).expect("write sandbox manifest");
         fs::write(dir.join("src/main.rs"), ENTRY_MAIN).expect("write sandbox entry");
+    }
+
+    /// AF-8: recursive sandbox source copy over `src/**/*.rs` — module
+    /// directories (e.g. `src/aoq/`) must land with relative paths preserved
+    /// or the sandbox build dies with E0583 (file not found for module).
+    fn copy_src_recursive(src_root: &std::path::Path, dst_root: &std::path::Path) {
+        std::fs::create_dir_all(dst_root).expect("dst src dir");
+        for entry in std::fs::read_dir(src_root)
+            .expect("src dir readable")
+            .flatten()
+        {
+            let p = entry.path();
+            if p.is_dir() {
+                copy_src_recursive(&p, &dst_root.join(p.file_name().expect("dir name")));
+            } else if p.extension().map(|x| x == "rs").unwrap_or(false) {
+                std::fs::copy(&p, dst_root.join(p.file_name().expect("file name")))
+                    .expect("copy sandbox source");
+            }
+        }
     }
 
     fn cargo_build(dir: &Path, envs: &[(&str, String)]) -> (bool, String) {

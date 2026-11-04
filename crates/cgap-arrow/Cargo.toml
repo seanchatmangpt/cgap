@@ -33,6 +33,11 @@ nested-types = []
 # collaborators at court call sites only — runtime externals stay E=0 because
 # dev-dependencies never compile into the lib target. Same crate-as-dev-dep
 # pattern as cgap-core (cgap-blake3) and cgap-parquet (cgap-arrow).
+# AF-28 macro_manifest_walk (dev-dep only; the embedded lib stays
+# zero-dependency / no_std): the AoqChain receipt surface for the
+# manifest-walk leg. cgap-aoq dev-depends on cgap-arrow — a dev-dep cycle,
+# which cargo permits.
+cgap-aoq = { path = "../cgap-aoq" }
 cgap-core = { path = "../cgap-core" }
 cgap-gate = { path = "../cgap-gate" }
 cgap-storage = { path = "../cgap-storage" }

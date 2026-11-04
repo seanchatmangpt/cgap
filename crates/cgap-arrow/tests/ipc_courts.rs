@@ -526,7 +526,8 @@ fn c11_seam_classification_identity_over_mutated_windows() {
 #[test]
 fn c12_truncated_classifies_truncated_not_body_digest_no_room() {
     let (baseline, body, digest) = sealed_window_with(LAYOUT_VERSION, 0, true);
-    // Cut inside the metadata span: full header needs body_at(128)+64=192
+    // Cut inside the metadata span: the parse gate consumes prefix + the
+    // metadata span (AB-9/AF-4 read-ahead minimum), so it needs body_at(128)
     // window bytes; have 100.
     let cut = 100usize;
     let m = &baseline[..cut];
@@ -534,13 +535,13 @@ fn c12_truncated_classifies_truncated_not_body_digest_no_room() {
     let err = read(m, Some(&digest), &mut out).unwrap_err();
     assert_eq!(
         err,
-        IpcError::Truncated { needed: 192, got: 100 },
+        IpcError::Truncated { needed: 128, got: 100 },
         "read classifies truncation exactly"
     );
     let err = read_verified(m, Some(&digest), &mut out).unwrap_err();
     assert_eq!(
         err,
-        IpcError::Truncated { needed: 192, got: 100 },
+        IpcError::Truncated { needed: 128, got: 100 },
         "read_verified classifies truncation exactly (NOT BodyDigestNoRoom)"
     );
     let _ = (baseline.len(), body.len());

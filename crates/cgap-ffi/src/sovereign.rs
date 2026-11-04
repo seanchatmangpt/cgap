@@ -2049,7 +2049,11 @@ int main() {
         // never count as a workspace production. The skip is proven
         // load-bearing by `ledger_walk_build_root_pollution_court` below.
         let mut files: Vec<PathBuf> = Vec::new();
-        for root in ["crates", "ontologies"] {
+        // AF-8 (disclosed minimal fix): the second root was "ontologies",
+        // a directory that no longer exists — the member dir is
+        // ontology-packs/ (dir rename drift; the Wave-6 pin assert at the
+        // bottom of this court was the failing witness).
+        for root in ["crates", "ontology-packs"] {
             walk(&repo_root().join(root), 0, &mut files);
         }
         assert!(
@@ -3115,6 +3119,25 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         rows
     }
 
+    /// AF-8: recursive sandbox source copy over `src/**/*.rs` — module
+    /// directories (e.g. `src/aoq/`) must land with relative paths preserved
+    /// or the sandbox build dies with E0583 (file not found for module).
+    fn copy_src_recursive(src_root: &std::path::Path, dst_root: &std::path::Path) {
+        std::fs::create_dir_all(dst_root).expect("dst src dir");
+        for entry in std::fs::read_dir(src_root)
+            .expect("src dir readable")
+            .flatten()
+        {
+            let p = entry.path();
+            if p.is_dir() {
+                copy_src_recursive(&p, &dst_root.join(p.file_name().expect("dir name")));
+            } else if p.extension().map(|x| x == "rs").unwrap_or(false) {
+                std::fs::copy(&p, dst_root.join(p.file_name().expect("file name")))
+                    .expect("copy sandbox source");
+            }
+        }
+    }
+
     /// section families: FLASH-resident vs SRAM-resident. For the final ELF
     /// these are the LINKED section sizes (xip.ld places .text/.rodata/.
     /// .oabi/.bn3 in FLASH and .data/.bss in SRAM); for the staticlib
@@ -3318,16 +3341,7 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("src")).expect("sandbox src dir");
         let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-        for entry in std::fs::read_dir(&src_dir)
-            .expect("src dir readable")
-            .flatten()
-        {
-            let p = entry.path();
-            if p.extension().map(|x| x == "rs").unwrap_or(false) {
-                let dst = dir.join("src").join(p.file_name().expect("file name"));
-                std::fs::copy(&p, &dst).expect("copy sandbox source");
-            }
-        }
+        copy_src_recursive(&src_dir, &dir.join("src"));
         // Sandbox manifest: staticlib (the §4 staticlib artifact, CONTEXT
         // row) + rlib (the bin links the crate) + the XIP entry bin.
         std::fs::write(
