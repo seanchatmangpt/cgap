@@ -22,6 +22,7 @@ pub const E2O_DDL: &str = "CREATE TABLE event_object_table (\n  event_id BIGINT 
 pub const OCEL_FLAT_VIEW_DDL: &str = "CREATE VIEW ocel_flat AS\nSELECT e.event_id, e.activity, e.receipt_digest,\n       o.object_id, o.object_type, o.lease_id, x.qualifier\nFROM event_table e\nJOIN event_object_table x ON x.event_id = e.event_id\nJOIN object_table o ON o.object_id = x.object_id;";
 
 /// All four statements, in dependency order, newline-joined.
+#[cfg(test)]
 fn full_ddl() -> String {
     [
         EVENTS_DDL,

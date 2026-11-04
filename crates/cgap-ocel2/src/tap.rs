@@ -39,10 +39,15 @@
 //! gate) — a tampered row log or a tampered chain collapses to the
 //! typed refusal, never a silent pass.
 
+#[cfg(test)]
 use cgap_ffi::aoq_events::AoqEventRow;
+#[cfg(test)]
 use cgap_ffi::receipt_chain::{ReceiptChainRefusal, RingReceiptChain};
+#[cfg(test)]
 use cgap_p28::attestation::P28LicenseAttestation;
+#[cfg(test)]
 use cgap_parquet::footer::SealedBlock;
+#[cfg(test)]
 use cgap_parquet::mmap_writer::{SlabView, StaticPageBuffer};
 
 /// Row byte width — mirrors [`AoqEventRow`] (X6's frozen 64B wire row).
@@ -369,12 +374,6 @@ impl TapSink {
     #[must_use]
     pub(crate) fn len(&self) -> usize {
         self.rows.len()
-    }
-
-    /// True when nothing has been sunk.
-    #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.rows.is_empty()
     }
 
     /// The verbatim row log (replay input).
