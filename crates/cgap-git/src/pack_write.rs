@@ -348,6 +348,12 @@ pub fn build_pack_and_idx(
     GitError,
 > {
     let pack = write_pack_v2(blobs)?;
+    // Min-length guard: a v2 pack is >= 12-byte header + 20-byte trailer.
+    // write_pack_v2 guarantees this by construction; refuse typed rather
+    // than subtract-panic if that invariant ever drifts (fail-closed).
+    if pack.len() < 32 {
+        return Err(GitError::Truncated);
+    }
     let pack_checksum: Oid = pack[pack.len() - 20..].try_into().unwrap();
     let mut entries = Vec::with_capacity(blobs.len());
     let mut off = 12usize;
@@ -522,7 +528,7 @@ pub fn parse_idx_v2(
         return Err(GitError::IdxChecksumMismatch);
     }
     let pack_sum: Oid = idx[idx_sum_end - 40..idx_sum_end - 20].try_into().unwrap();
-    let n_table_end = 8 + 1024;
+    let n_table_end: usize = 8 + 1024;
     let mut fanout = [0u32; 256];
     for i in 0..256 {
         fanout[i] = u32::from_be_bytes(idx[8 + i * 4..8 + i * 4 + 4].try_into().unwrap());
@@ -533,10 +539,15 @@ pub fn parse_idx_v2(
         }
     }
     let n = fanout[255] as usize;
-    let oids_end = n_table_end + 20 * n;
-    let crcs_end = oids_end + 4 * n;
-    let offs_end = crcs_end + 4 * n;
-    if idx.len() < offs_end + 40 {
+    // Section-length law (mirrors IdxV2::parse), computed with checked
+    // arithmetic so a hostile n (u32-attacker-controlled) cannot overflow
+    // usize on 32-bit targets: every section end is Some(_) and within the
+    // buffer, or the whole idx refuses as truncated — never a wrapping
+    // offset, never a slice panic.
+    let oids_end = n_table_end.checked_add(20usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
+    let crcs_end = oids_end.checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
+    let offs_end = crcs_end.checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
+    if idx.len() < offs_end.checked_add(40).ok_or(GitError::Truncated)? {
         return Err(GitError::Truncated);
     }
     let stored_pack_sum: Oid = idx[offs_end..offs_end + 20].try_into().unwrap();
@@ -616,6 +627,26 @@ mod tests {
             s.push_str(&alloc::format!("{:02x}", byte));
         }
         s
+    }
+
+    /// Corrupt-input court (negative leg): a valid-checksum idx whose
+    /// fanout[255] carries a hostile object count refuses typed
+    /// GitError::Truncated at the section-length law — never a wrap, never
+    /// a slice panic (mutant kill: use wrapping arithmetic and a shrunken
+    /// buffer panics in the OID loop instead).
+    #[test]
+    fn hostile_fanout_count_refuses_typed() {
+        let blobs: Vec<Vec<u8>> = (0..4).map(|i| blob_bytes(32, i as u8)).collect();
+        let refs: Vec<&[u8]> = blobs.iter().map(|b| b.as_slice()).collect();
+        let (_, mut idx, _) = build_pack_and_idx(&refs).unwrap();
+        // Tamper fanout[255] (bytes 8+255*4..8+256*4) to u32::MAX, then
+        // re-sign the idx checksum so the section-length law is the gate
+        // that fires, not the checksum.
+        idx[8 + 255 * 4..8 + 256 * 4].copy_from_slice(&u32::MAX.to_be_bytes());
+        let body = idx.len() - 20;
+        let sig = sha1(&idx[..body]);
+        idx[body..].copy_from_slice(&sig);
+        assert_eq!(parse_idx_v2(&idx), Err(GitError::Truncated));
     }
 
     #[test]

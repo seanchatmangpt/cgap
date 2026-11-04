@@ -304,7 +304,7 @@ fn prop_views(rng: &mut Xs) -> usize {
         );
         for (i, e) in expect.iter().enumerate() {
             assert_eq!(
-                vv.row(i),
+                vv.row(i).expect("row"),
                 e.as_slice(),
                 "views: master={MASTER_SEED:#018x} seed={seed:#018x} it={it} i={i} \
                  (inline_seen={inline_seen} foreign_seen={foreign_seen})"

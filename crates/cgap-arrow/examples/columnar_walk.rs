@@ -152,16 +152,16 @@ fn view_walk() {
         let valid = v.validity().is_none_or(|bm| bm.get(i));
         let class = if !valid {
             "null"
-        } else if cgap_arrow::views::is_inline(v.row(i).len() as u32) == 1 {
+        } else if cgap_arrow::views::is_inline(v.row(i).expect("row").len() as u32) == 1 {
             "inline"
         } else {
             "foreign"
         };
-        let s = core::str::from_utf8(v.row(i)).map_or("<invalid utf8>", |s| s);
+        let s = core::str::from_utf8(v.row(i).expect("row")).map_or("<invalid utf8>", |s| s);
         println!(
             "     row {} ({} B, {:7}) = {:?}",
             i,
-            v.row(i).len(),
+            v.row(i).expect("row").len(),
             class,
             s
         );

@@ -58,25 +58,45 @@ impl<'a> IdxV2<'a> {
         self.n == 0
     }
 
-    /// Cumulative object count for first bytes `<= b`.
+    /// Cumulative object count for first bytes `<= b`. Typed refusal when
+    /// `b` exceeds the 256-entry table or the read runs past the buffer
+    /// (hostile input, never a panic — mirrors [`Self::offset`]).
     #[inline]
-    pub fn fanout(&self, b: usize) -> u32 {
+    pub fn fanout(&self, b: usize) -> Result<u32, GitError> {
+        if b >= 256 {
+            return Err(GitError::Truncated);
+        }
         let o = FANOUT_OFF + b * 4;
-        u32::from_be_bytes(self.data[o..o + 4].try_into().expect("fanout slice"))
+        if o + 4 > self.data.len() {
+            return Err(GitError::Truncated);
+        }
+        Ok(u32::from_be_bytes(
+            self.data[o..o + 4].try_into().expect("fanout slice"), // guarded
+        ))
     }
 
-    /// The i-th OID in sorted order.
+    /// The i-th OID in sorted order. Typed refusal when the read runs past
+    /// the buffer (hostile `i`, never a panic — mirrors [`Self::offset`]).
     #[inline]
-    pub fn oid(&self, i: u32) -> Oid {
+    pub fn oid(&self, i: u32) -> Result<Oid, GitError> {
         let o = OID_TABLE_OFF + i as usize * 20;
-        self.data[o..o + 20].try_into().expect("oid slice")
+        if o + 20 > self.data.len() {
+            return Err(GitError::Truncated);
+        }
+        Ok(self.data[o..o + 20].try_into().expect("oid slice")) // guarded
     }
 
-    /// The i-th object's CRC32 of its packed bytes.
+    /// The i-th object's CRC32 of its packed bytes. Typed refusal when the
+    /// read runs past the buffer (hostile `i`, never a panic).
     #[inline]
-    pub fn crc(&self, i: u32) -> u32 {
+    pub fn crc(&self, i: u32) -> Result<u32, GitError> {
         let o = OID_TABLE_OFF + self.n as usize * 20 + i as usize * 4;
-        u32::from_be_bytes(self.data[o..o + 4].try_into().expect("crc slice"))
+        if o + 4 > self.data.len() {
+            return Err(GitError::Truncated);
+        }
+        Ok(u32::from_be_bytes(
+            self.data[o..o + 4].try_into().expect("crc slice"), // guarded
+        ))
     }
 
     /// The i-th object's pack offset. Handles the bit-31 escape into the
@@ -136,8 +156,8 @@ impl<'a> IdxV2<'a> {
     /// the final hit/miss select on the equality mask.
     pub fn lookup(&self, t: &Oid) -> Result<Option<(u32, u64)>, GitError> {
         let b = t[0] as usize;
-        let lo = if b == 0 { 0 } else { self.fanout(b - 1) };
-        let hi = self.fanout(b);
+        let lo = if b == 0 { 0 } else { self.fanout(b - 1)? };
+        let hi = self.fanout(b)?;
         // Malformed idx: fanout must be monotonic across partitions. A
         // non-monotonic table would underflow here (debug panic on external
         // input), so refuse it as a typed error instead.
@@ -163,7 +183,7 @@ impl<'a> IdxV2<'a> {
             let p = base + disp;
             let in_bounds = (p <= n) as u32;
             let probe: Oid = if in_bounds == 1 {
-                self.oid(lo + p - 1)
+                self.oid(lo + p - 1)?
             } else {
                 [0u8; 20]
             };
@@ -182,7 +202,7 @@ impl<'a> IdxV2<'a> {
         let cand: Oid = if part_is_empty {
             [0u8; 20]
         } else {
-            self.oid(idx)
+            self.oid(idx)?
         };
         let eq = ct_eq_oid(&cand, t) & 0u32.wrapping_sub(cand_ok);
         if eq != 0 {
@@ -348,13 +368,13 @@ mod tests {
             }
         }
         // fanout + crc spot checks
-        assert_eq!(idx.fanout(255), 1000);
+        assert_eq!(idx.fanout(255).expect("fanout"), 1000);
         assert_eq!(
-            idx.fanout(0) as usize,
+            idx.fanout(0).expect("fanout") as usize,
             entries.iter().filter(|(o, _)| o[0] == 0).count()
         );
         for i in 0..1000u32 {
-            assert_eq!(idx.crc(i), crc32(&entries[i as usize].0));
+            assert_eq!(idx.crc(i).expect("crc"), crc32(&entries[i as usize].0));
         }
     }
 
@@ -453,6 +473,28 @@ mod tests {
         }
     }
 
+    // ---- corrupt-input courts (negative legs) ----
+
+    /// Hostile fanout index and hostile oid/crc indices refuse typed
+    /// GitError::Truncated, never panic (mutant kill: delete the guards and
+    /// each arm panics on the same input).
+    #[test]
+    fn hostile_accessor_indices_refuse_typed() {
+        let entries = sorted_entries(0xAB_CD, 4, false);
+        let bytes = build_idx_v2(&entries);
+        let idx = IdxV2::parse(&bytes).expect("parse");
+        assert_eq!(idx.fanout(256), Err(GitError::Truncated));
+        assert_eq!(idx.oid(u32::MAX), Err(GitError::Truncated));
+        assert_eq!(idx.crc(u32::MAX), Err(GitError::Truncated));
+        // In-range but past a truncated buffer: parse still passes (the
+        // section-length law only pins 28N+40), a shrunken buffer refuses.
+        let mut cut = bytes.clone();
+        cut.truncate(OID_TABLE_OFF + 4);
+        let idx_cut = IdxV2 { data: &cut, n: 4 };
+        assert_eq!(idx_cut.oid(3), Err(GitError::Truncated));
+        assert_eq!(idx_cut.crc(0), Err(GitError::Truncated));
+    }
+
     #[test]
     fn empty_idx_roundtrip() {
         let bytes = build_idx_v2(&[]);
@@ -482,8 +524,8 @@ mod tests {
             // targets in an empty first-byte partition exit pre-ladder (the
             // part == 0 guard) — the constancy claim covers ladder-entered
             // inputs: hits and non-empty-partition misses
-            if idx.fanout(t[0] as usize)
-                == idx.fanout(t[0] as usize - if t[0] == 0 { 0 } else { 1 })
+            let f = |b: usize| idx.fanout(b).expect("fanout in-range");
+            if f(t[0] as usize) == f(t[0] as usize - if t[0] == 0 { 0 } else { 1 })
             {
                 continue;
             }
@@ -513,7 +555,7 @@ mod tests {
             let (found, found_off) = idx.lookup(&e.oid).expect("within window").expect("hit");
             assert_eq!(found as usize, i, "sorted order preserved");
             assert_eq!(found_off, e.offset as u64);
-            assert_eq!(idx.crc(i as u32), e.crc);
+            assert_eq!(idx.crc(i as u32).expect("crc"), e.crc);
         }
         idx.verify_idx_checksum().expect("idx checksum");
         let _ = pack;

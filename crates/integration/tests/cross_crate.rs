@@ -248,7 +248,7 @@ fn varlen_u32_unicode_empty_null_roundtrip() {
     // Row reads: valid rows exact, null row reads empty payload.
     for (i, r) in rows.iter().enumerate() {
         let expected: &[u8] = if valid[i] { r.as_bytes() } else { b"" };
-        assert_eq!(v.row(i), expected, "row {i} mismatch");
+        assert_eq!(v.row(i).expect("row"), expected, "row {i} mismatch");
     }
 
     // Validity: exact per-row, one null total.
@@ -296,7 +296,7 @@ fn views_inline_foreign_boundary_roundtrip() {
     // row() reads back exactly; the null row reads empty.
     for (i, r) in rows.iter().enumerate() {
         let expected: &[u8] = r.unwrap_or(&[]);
-        assert_eq!(v.row(i), expected, "row {i} mismatch");
+        assert_eq!(v.row(i).expect("row"), expected, "row {i} mismatch");
     }
 
     // Only foreign rows (>12 bytes) land in the variadic data block.

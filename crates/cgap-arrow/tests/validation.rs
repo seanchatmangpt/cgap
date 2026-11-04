@@ -397,7 +397,7 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                 k, i, dlen, pushed_len
             );
             assert_eq!(
-                v.row(i).len(),
+                v.row(i).expect("row").len(),
                 pushed_len,
                 "seed {} row {}: row(i).len() != pushed len",
                 k,
@@ -452,7 +452,7 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                         );
                         // row(i) reads the same bytes back
                         assert_eq!(
-                            v.row(i),
+                            v.row(i).expect("row"),
                             row.as_slice(),
                             "seed {} row {}: row(i) mismatch",
                             k,
@@ -473,7 +473,7 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                         k, i
                     );
                     assert!(
-                        v.row(i).is_empty(),
+                        v.row(i).expect("row").is_empty(),
                         "seed {} row {}: null row payload not empty",
                         k,
                         i

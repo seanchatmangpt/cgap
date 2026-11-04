@@ -326,7 +326,7 @@ fn case5_mixed_three_object_idx_small_boundary_large() {
     let idx = IdxV2::parse(&bytes).expect("parse mixed idx");
     idx.verify_idx_checksum().expect("idx checksum valid");
     assert_eq!(idx.len(), 3);
-    assert_eq!(idx.fanout(255), 3);
+    assert_eq!(idx.fanout(255).expect("fanout"), 3);
     // Escape words only where the offset requires them.
     for (i, (_, off)) in entries.iter().enumerate() {
         let w = small_word(&bytes, n, i);

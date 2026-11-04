@@ -46,6 +46,16 @@ pub use crate::status_band::STATUS_BAND;
 pub enum DictionaryError {
     /// Band table changed size away from the frozen 8-entry law.
     BandSize(usize),
+    /// Hostile offset band: an offset pair violates `start <= end` or
+    /// `36 + end <= values.len()` — attacker u32s, typed refusal, no panic.
+    BandRange {
+        /// Start offset of the offending name (band entry i).
+        start: u32,
+        /// End offset of the offending name (band entry i+1).
+        end: u32,
+        /// Values-buffer byte length the range was checked against.
+        band_len: usize,
+    },
 }
 
 /// The built 3-buffer dictionary array per the import spec:
@@ -133,10 +143,25 @@ pub fn decode_names(dict: &StatusDictionary) -> Result<Vec<&str>, DictionaryErro
     }
     let mut names = Vec::with_capacity(8);
     for i in 0..8 {
-        let start = u32::from_le_bytes(v[i * 4..i * 4 + 4].try_into().unwrap()) as usize;
-        let end = u32::from_le_bytes(v[(i + 1) * 4..(i + 1) * 4 + 4].try_into().unwrap()) as usize;
+        let start = u32::from_le_bytes(v[i * 4..i * 4 + 4].try_into().expect("band word"));
+        let end = u32::from_le_bytes(v[(i + 1) * 4..(i + 1) * 4 + 4].try_into().expect("band word"));
+        // Hostile offsets: refuse typed instead of slicing past the buffer.
+        if start > end || 9 * 4 + end as usize > v.len() {
+            return Err(DictionaryError::BandRange {
+                start,
+                end,
+                band_len: v.len(),
+            });
+        }
         let data_start = 9 * 4;
-        names.push(core::str::from_utf8(&v[data_start + start..data_start + end]).map_err(|_| DictionaryError::BandSize(start))?);
+        names.push(
+            core::str::from_utf8(&v[data_start + start as usize..data_start + end as usize])
+                .map_err(|_| DictionaryError::BandRange {
+                    start,
+                    end,
+                    band_len: v.len(),
+                })?,
+        );
     }
     Ok(names)
 }
@@ -224,5 +249,45 @@ mod tests {
     fn band_size_law_is_typed() {
         assert_eq!(STATUS_BAND.len(), 8);
         assert_eq!(DictionaryError::BandSize(7), DictionaryError::BandSize(7));
+    }
+
+    /// Corrupt-input court (negative leg): hostile offset band where
+    /// entry 1 points past the buffer (and an inverted pair start > end)
+    /// refuses typed — never a slice panic on external input. Mutant kill:
+    /// delete the BandRange guard and the slice panics.
+    #[test]
+    fn hostile_offset_band_refuses_typed() {
+        let dict = build_dictionary().expect("frozen band builds");
+        let band_len = dict.values.as_slice().len();
+
+        // Case A: end runs past the buffer.
+        let mut hostile = StatusDictionary {
+            validity: Buf::new_zeroed(pad64(1)),
+            indices: Buf::new_zeroed(pad64(8 * 4)),
+            values: Buf::new(band_len),
+            name_lengths: [0u32; 8],
+        };
+        hostile.values.as_mut_slice()[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert_eq!(
+            decode_names(&hostile),
+            Err(DictionaryError::BandRange {
+                start: 0,
+                end: u32::MAX,
+                band_len,
+            })
+        );
+
+        // Case B: inverted pair (start > end).
+        hostile.values.as_mut_slice()[0..12].copy_from_slice(&[0u8; 12]);
+        hostile.values.as_mut_slice()[4..8].copy_from_slice(&9u32.to_le_bytes());
+        hostile.values.as_mut_slice()[8..12].copy_from_slice(&2u32.to_le_bytes());
+        assert_eq!(
+            decode_names(&hostile),
+            Err(DictionaryError::BandRange {
+                start: 9,
+                end: 2,
+                band_len,
+            })
+        );
     }
 }

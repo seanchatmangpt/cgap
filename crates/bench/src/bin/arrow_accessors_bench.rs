@@ -239,12 +239,12 @@ fn main() {
         let foreign_i = if foreign_on_zero { 0 } else { 1 };
         let inline_i = if foreign_on_zero { 1 } else { 0 };
         assert_eq!(
-            v.row(foreign_i),
+            v.row(foreign_i).expect("row"),
             &fixed_row::<FOREIGN_W>(foreign_i),
             "{label}: foreign row content"
         );
         assert_eq!(
-            v.row(inline_i),
+            v.row(inline_i).expect("row"),
             &fixed_row::<INLINE_W>(inline_i),
             "{label}: inline row content"
         );
@@ -261,7 +261,7 @@ fn main() {
                 let v: &ViewVec = black_box(&v);
                 let mut acc = 0u8;
                 for i in 0..v.len() {
-                    for &byte in v.row(i) {
+                    for &byte in v.row(i).expect("row") {
                         acc ^= byte;
                     }
                 }

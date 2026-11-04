@@ -124,7 +124,7 @@ fn perf_baseline_git_plane() {
     let probes_before = cgap_git::ladder::debug_probes();
     let t0 = std::time::Instant::now();
     for i in 0..LOOKUPS {
-        let mut t = idx_view.oid(((i * 13) % N as u64) as u32);
+        let mut t = idx_view.oid(((i * 13) % N as u64) as u32).expect("oid");
         if i % 2 == 1 {
             t[19] ^= 0xFF; // miss, same partition
         } else {

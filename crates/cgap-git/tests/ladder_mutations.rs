@@ -169,7 +169,7 @@ fn biggest_bucket(table: &[(Oid, u64)]) -> (usize, u32) {
 /// whatever the table's own offset table says.
 fn assert_hit_self_consistent(idx: &IdxV2, t: &Oid, i: u32, off: u64) {
     assert_eq!(
-        &idx.oid(i),
+        &idx.oid(i).expect("oid"),
         t,
         "FALSE HIT: row {i} bytes != query (ladder eq-mask contract broken)"
     );
@@ -336,8 +336,8 @@ fn fanout_inflation_window_and_inversion_typed_refusals() {
     let (bstar, bucket) = biggest_bucket(&table);
     let bytes = flipped(&base, FANOUT_OFF + bstar * 4 + 1, 0x01); // +2^16
     let idx = IdxV2::parse(&bytes).expect("parse accepts inflated fanout");
-    let lo = if bstar == 0 { 0 } else { idx.fanout(bstar - 1) };
-    let hi = idx.fanout(bstar);
+    let lo = if bstar == 0 { 0 } else { idx.fanout(bstar - 1).expect("fanout") };
+    let hi = idx.fanout(bstar).expect("fanout");
     let part = hi - lo;
     assert_eq!(part, 65_536 + bucket, "inflated partition must be exact");
     assert!(part > LADDER_WINDOW);
@@ -353,8 +353,8 @@ fn fanout_inflation_window_and_inversion_typed_refusals() {
     );
     // non-monotonic case: the byte AFTER the inflated entry sees lo > hi.
     let j = bstar + 1;
-    let lo2 = idx.fanout(j - 1);
-    let hi2 = idx.fanout(j);
+    let lo2 = idx.fanout(j - 1).expect("fanout");
+    let hi2 = idx.fanout(j).expect("fanout");
     assert!(lo2 > hi2, "precondition: fanout inversion at byte {j}");
     let mut probe = [0x42u8; 20];
     probe[0] = j as u8;
@@ -373,15 +373,16 @@ fn fanout_inflation_window_and_inversion_typed_refusals() {
     );
 }
 
-/// M6: DEFECT WITNESS — fanout entry inflated by 4,096 (byte-2 ^= 0x10;
-/// inside the 2^16 window) on a nonempty bucket. The ladder's first
-/// in-bounds probe lands at index lo+4095 >= 1435, past the physical
-/// 1,024-row OID table, and the reader panics with a slice range fault in
-/// release AND debug. Root cause: IdxV2::parse validates size only against
-/// fanout[255]; lookup never clamps probes to the physical table. Pinned so
-/// the fix flips this test red — then replace with the typed guarantee.
+/// M6 (FORMER DEFECT WITNESS, now the typed-guarantee court): fanout entry
+/// inflated by 4,096 (byte-2 ^= 0x10; inside the 2^16 window) on a nonempty
+/// bucket. The ladder's first probe lands past the physical OID table; the
+/// pre-fix reader PANICKED with a slice range fault (release AND debug).
+/// The typed-refusal fix (fanout/oid/crc bounds guards, panic-on-input lane
+/// 2026-11-04) makes lookup refuse as GitError::Truncated instead. This
+/// court pins the new law: in-window inflated fanout is a typed refusal —
+/// never a panic, never a silent wrong answer.
 #[test]
-fn fanout_inflation_within_window_oob_panic_defect_witness() {
+fn fanout_inflation_within_window_typed_refusal() {
     let (base, table) = fixture();
     let (bstar, _) = biggest_bucket(&table);
     let bytes = flipped(&base, FANOUT_OFF + bstar * 4 + 2, 0x10); // +4,096
@@ -395,23 +396,11 @@ fn fanout_inflation_within_window_oob_panic_defect_witness() {
         .find(|(o, _)| o[0] as usize == bstar)
         .expect("bucket nonempty")
         .0;
-    match catch_unwind(AssertUnwindSafe(|| idx.lookup(&t))) {
-        Err(payload) => {
-            let msg = panic_msg(&payload);
-            assert!(
-                msg.contains("out of range for slice"),
-                "expected the OOB slice panic class, got: {msg}"
-            );
-            println!(
-                "RECEIPT oob_witness: bucket={bstar} pinned panic: {msg} \
-                 [DEFECT: idx_read.rs lookup probes unclamped by physical table]"
-            );
-        }
-        Ok(r) => panic!(
-            "DEFECT APPEARS FIXED: lookup returned {r:?} on an in-window inflated fanout. \
-             Update this witness to assert the new typed behavior and flip matrix rows M4/M6."
-        ),
-    }
+    assert_eq!(
+        idx.lookup(&t),
+        Err(GitError::Truncated),
+        "in-window inflated fanout must refuse typed, never panic"
+    );
 }
 
 /// M7: OID table byte corruption. Strict row: lookup NEVER errors and NEVER
@@ -494,7 +483,7 @@ fn oid_swap_sorted_order_violation_lower_bound_terminates() {
         let (left, right) = bytes.split_at_mut(hi_pos);
         left[lo_pos..lo_pos + 20].swap_with_slice(&mut right[0..20]);
         let idx = IdxV2::parse(&bytes).expect("parse must not consult sort order");
-        let rows: Vec<[u8; 20]> = (0..N as u32).map(|i| idx.oid(i)).collect();
+        let rows: Vec<[u8; 20]> = (0..N as u32).map(|i| idx.oid(i).expect("oid")).collect();
         assert!(
             rows.windows(2).any(|w| w[0] > w[1]),
             "swap must invert order"
@@ -587,7 +576,7 @@ fn crc_corruption_invisible_to_lookup() {
                         .try_into()
                         .expect("4"),
                 );
-                assert_eq!(idx.crc(row as u32), want, "crc() must read live bytes");
+                assert_eq!(idx.crc(row as u32).expect("crc"), want, "crc() must read live bytes");
                 if changed {
                     assert_eq!(
                         idx.verify_idx_checksum(),

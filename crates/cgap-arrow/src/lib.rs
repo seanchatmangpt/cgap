@@ -133,7 +133,7 @@ pub use timestamps::{TimestampMicro, TimestampMilli, TimestampNano, TimestampSec
 #[cfg(not(target_os = "none"))]
 pub use varlen::{Varlen, VarlenBuilder};
 #[cfg(not(target_os = "none"))]
-pub use views::{ViewVec, ViewVecBuilder};
+pub use views::{ViewError, ViewVec, ViewVecBuilder};
 
 // v26.11.1 moonshot lanes (coordinator-scaffolded, additive only):
 // slab + bitmask are declared in the embedded-surface block above.

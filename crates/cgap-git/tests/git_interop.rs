@@ -230,7 +230,7 @@ fn direction_a_git_idx_parsed_by_crate_reader() {
             .unwrap_or_else(|e| panic!("ladder lookup errored on git OID {}: {e}", oids[i]))
             .unwrap_or_else(|| panic!("MISS on git-written OID {} present in pack", oids[i]));
         assert_eq!(
-            hex(&idx.oid(found_i)),
+            hex(&idx.oid(found_i).expect("oid")),
             oids[i],
             "ladder returned wrong slot"
         );
@@ -289,9 +289,9 @@ fn direction_a_fanout_total_matches_git_census() {
     // fanout cumulative total = last row == unique object count
     oids.sort();
     oids.dedup();
-    assert_eq!(idx.fanout(255) as usize, oids.len());
+    assert_eq!(idx.fanout(255).expect("fanout") as usize, oids.len());
     assert_eq!(
-        idx.fanout(0) as usize,
+        idx.fanout(0).expect("fanout") as usize,
         oids.iter().filter(|o| o.starts_with("00")).count()
     );
 }
