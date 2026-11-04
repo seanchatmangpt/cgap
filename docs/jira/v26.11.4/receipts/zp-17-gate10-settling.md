@@ -81,3 +81,14 @@ refactor was present as an uncommitted working-tree diff of
 returns zero commits, so the grep-hit at line 228 was the fold itself.
 The measured number 1.26394 µs/link stands unchanged.
 Cross-cite: ggen `/Users/sac/ggen/docs/jira/v26.11.4/receipts/v4-corrected-claims-ledger.md` row 5b and D5's audit.
+
+## ERRATA-2 (2026-11-04)
+
+The ERRATA evidence clause "git log -S 'fn link' returns zero commits"
+is now FALSE. The fold landed as commit `8ccb43d0` ("feat(aoq): chain
+hot-path fold — fn link unifies append/append_verified"); `git log -S
+'fn link'` on /Users/sac/cgap returns `8ccb43d0` (plus later commits),
+so the evidence form has changed from an uncommitted working-tree diff
+to a committed fold. The POST-FOLD attribution conclusion is unchanged
+and strengthened: the measured 1.26394 µs/link remains POST-FOLD, now
+witnessed by a landed commit rather than working-tree state.
