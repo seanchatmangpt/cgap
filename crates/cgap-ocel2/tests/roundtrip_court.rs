@@ -54,10 +54,6 @@ fn fixture(
     (chain, blocks)
 }
 
-fn hex32(d: &[u8; 32]) -> String {
-    d.iter().map(|b| format!("{b:02x}")).collect()
-}
-
 fn unhex(s: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     for i in 0..32 {
