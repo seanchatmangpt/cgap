@@ -35,6 +35,11 @@ wire-shm = { path = "../wire-shm" }
 # with the repo's own sovereign BLAKE3. Dev-dep only: the embedded lib
 # surface stays zero-dependency / no_std.
 cgap-blake3 = { path = "../cgap-blake3", features = ["std"] }
+# Alloc-elimination lane (2026-11-04): the seal->open->parse round-trip
+# alloc census (tests/session_alloc_census.rs) — linking cgap_audit
+# installs CountingAlloc for the test binary and exposes
+# with_alloc_tracking. Dev-dep only: the lib surface stays zero-dep/no_std.
+cgap-audit = { path = "../audit", version = "26.11.3" }
 
 # AF-14 CBMQS runner (tests/cbmqs_runner.rs): a harness=false gate whose
 # process exit status IS the verdict (repo exit-record law).

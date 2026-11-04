@@ -135,6 +135,7 @@ name = "cgap-aoq"
 version = "26.11.3"
 dependencies = [
  "cgap-arrow 26.11.3",
+ "cgap-audit",
  "cgap-blake3 26.11.3",
  "cgap-crypto",
  "wire-shm",
