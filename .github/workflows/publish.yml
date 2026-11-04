@@ -1,0 +1,279 @@
+# publish.yml — crates.io trusted publishing (zero secrets), tag-push keyed.
+#
+# Publish law (cgap CLAUDE.md): ONE attempt per crate per release; human
+# admission edges stay human — this workflow automates the workflow, never
+# the actuation decision: each tier job runs behind a GitHub environment
+# protection rule (publish-tier0/1/2) whose required reviewers the operator
+# wires in the GitHub UI. No registry-token secret is declared anywhere —
+# crates.io trusted publishing (OIDC via id-token: write).
+#
+# DAG encoded from the actual Cargo.toml [dependencies] edges (dev-dependencies
+# excluded — cargo publish strips them). Crates that MUST NOT appear (publish
+# = false / non-publish surface) are excluded from this DAG entirely. CG7
+# may add its CLI crate concurrently — it is deliberately not listed here;
+# add it only as a reviewed follow-up commit.
+#
+# cgap-storage is included even though the runbook list omits it: the umbrella
+# cgap crate carries it as an optional path+version dependency, so it must be
+# on the registry before `cargo publish -p cgap`.
+
+name: publish
+
+on:
+  push:
+    tags: ['v**']
+
+permissions:
+  contents: read
+  id-token: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Tier 0 — kernels. Actual [dependencies] verified empty of cgap crates:
+  # cgap-arrow, cgap-blake3, cgap-git, cgap-parquet.
+  # ---------------------------------------------------------------------
+  arrow:
+    name: publish cgap-arrow
+    runs-on: ubuntu-latest
+    environment: publish-tier0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-arrow --dry-run
+      - name: publish
+        run: cargo publish -p cgap-arrow
+
+  blake3:
+    name: publish cgap-blake3
+    runs-on: ubuntu-latest
+    environment: publish-tier0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-blake3 --dry-run
+      - name: publish
+        run: cargo publish -p cgap-blake3
+
+  git:
+    name: publish cgap-git
+    runs-on: ubuntu-latest
+    environment: publish-tier0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-git --dry-run
+      - name: publish
+        run: cargo publish -p cgap-git
+
+  parquet:
+    name: publish cgap-parquet
+    runs-on: ubuntu-latest
+    environment: publish-tier0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-parquet --dry-run
+      - name: publish
+        run: cargo publish -p cgap-parquet
+
+  # ---------------------------------------------------------------------
+  # Tier 1 — layer 2. Actual edges: crypto/bont/bn3/storage -> blake3;
+  # p28 -> blake3 + crypto; core/gate/branchless/aoq have no real
+  # [dependencies] on other cgap crates (gate's cgap-core edge is dev-only,
+  # so no branchless/gate/core needs edge exists to encode).
+  # ---------------------------------------------------------------------
+  branchless:
+    name: publish cgap-branchless
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-branchless --dry-run
+      - name: publish
+        run: cargo publish -p cgap-branchless
+
+  gate:
+    name: publish cgap-gate
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-gate --dry-run
+      - name: publish
+        run: cargo publish -p cgap-gate
+
+  core:
+    name: publish cgap-core
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-core --dry-run
+      - name: publish
+        run: cargo publish -p cgap-core
+
+  aoq:
+    name: publish cgap-aoq
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-aoq --dry-run
+      - name: publish
+        run: cargo publish -p cgap-aoq
+
+  crypto:
+    needs: [blake3]
+    name: publish cgap-crypto
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-crypto --dry-run
+      - name: publish
+        run: cargo publish -p cgap-crypto
+
+  bont:
+    needs: [blake3]
+    name: publish cgap-bont
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-bont --dry-run
+      - name: publish
+        run: cargo publish -p cgap-bont
+
+  bn3:
+    needs: [blake3]
+    name: publish cgap-bn3
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-bn3 --dry-run
+      - name: publish
+        run: cargo publish -p cgap-bn3
+
+  storage:
+    needs: [blake3]
+    name: publish cgap-storage
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-storage --dry-run
+      - name: publish
+        run: cargo publish -p cgap-storage
+
+  p28:
+    needs: [blake3, crypto]
+    name: publish cgap-p28
+    runs-on: ubuntu-latest
+    environment: publish-tier1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-p28 --dry-run
+      - name: publish
+        run: cargo publish -p cgap-p28
+
+  # ---------------------------------------------------------------------
+  # Tier 2 — membranes. Actual edges: ffi -> arrow,p28,aoq,crypto,core,
+  # gate,bn3,blake3,parquet; gpu -> arrow; audit -> arrow,parquet;
+  # umbrella -> arrow,blake3,git,parquet,gate,p28,branchless,bn3
+  # (+ optional core/storage); integration -> audit (path+version dev-dep
+  # resolved at publish time); wasm-footprint pins arrow/parquet at
+  # exactly 26.11.3, so both must be on the registry first.
+  # ---------------------------------------------------------------------
+  ffi:
+    needs: [arrow, blake3, parquet, gate, core, crypto, p28, bn3, aoq]
+    name: publish cgap-ffi
+    runs-on: ubuntu-latest
+    environment: publish-tier2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-ffi --dry-run
+      - name: publish
+        run: cargo publish -p cgap-ffi
+
+  gpu:
+    needs: [arrow]
+    name: publish cgap-gpu
+    runs-on: ubuntu-latest
+    environment: publish-tier2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-gpu --dry-run
+      - name: publish
+        run: cargo publish -p cgap-gpu
+
+  audit:
+    needs: [arrow, parquet]
+    name: publish cgap-audit
+    runs-on: ubuntu-latest
+    environment: publish-tier2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap-audit --dry-run
+      - name: publish
+        run: cargo publish -p cgap-audit
+
+  umbrella:
+    needs: [arrow, blake3, git, parquet, branchless, gate, core, storage, p28, bn3]
+    name: publish cgap (umbrella)
+    runs-on: ubuntu-latest
+    environment: publish-tier2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry-run gate
+        run: cargo publish -p cgap --dry-run
+      - name: publish
+        run: cargo publish -p cgap
+
+  wasm-footprint:
+    needs: [arrow, parquet]
+    name: publish wasm-footprint
+    runs-on: ubuntu-latest
+    environment: publish-tier2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
+      - name: dry-run gate
+        run: cargo publish --manifest-path crates/wasm-footprint/Cargo.toml --dry-run
+      - name: publish
+        run: cargo publish --manifest-path crates/wasm-footprint/Cargo.toml
