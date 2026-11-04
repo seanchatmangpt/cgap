@@ -8,6 +8,50 @@ transcribed from the v26.10.29 receipt docs (`docs/RECEIPTS.md`,
 `docs/BENCH_FLOORS.json`); conflicts between receipt docs are listed in the
 release notes' Discrepancies section, not reconciled here.
 
+## [26.11.4] - 2026-11-04
+
+v3 wire-law wave. Every number below is transcribed from the session's
+landed receipts (`docs/jira/v26.11.4/receipts/`); UNVERIFIED never rounds
+up and out-of-band results are recorded as measured, not relaxed.
+
+### Added
+
+- Wire law v3 (`wire-law-v3-landing.md`): AEAD emit/open with
+  variable-length AAD (AAD ruling Option b, R-K1 crypto-body ruling,
+  R-1 LE seq preserved), `AOQ1_VERSION 2 -> 3` across the
+  ggen-marketplace aoq-pack ontology + template and the generated
+  kernels, and the confirm-tag Finish law (v2-shaped clients refuse;
+  bm4 soak re-pinned to the v3 body).
+- Forensic receipt engine + census enforcement
+  (`lane1-receipt-engine.md`).
+- Anti-vacuity mutation corpus, witnessed: every corpus leg executed
+  against sandboxed subjects with receipt witnesses, meta-court PASS
+  with meta self-check flip (`lane2-anti-vacuity-mutation-corpus.md`).
+- Flip-ladder pin + statutory export formatter court on a real release
+  sidecar, 7 legs (`lane4-flip-ladder-court.md`).
+
+### Changed
+
+- BLAKE3 ≥256 KiB throughput cliff root-caused and fixed: the
+  kernel-dispatch router never ran the NEON leaf kernels above 64 KiB;
+  now flat ~2.0 GB/s from 16 KB through 1 MB (256 KiB/1 MB were
+  0.45 GB/s scalar) (`br3-blake3-cliff-fix.md`).
+- Chain hot-path POST-FOLD reconfirm: 1.26660 µs/link (bm3, min-of-3,
+  in-band of zp-17's 1.26394 min-of-7). The committed-HEAD reconfirm
+  cell is NOT CONFIRMED — committed lane-start HEADs compile-abort
+  (`bm7-gate10-head-reconfirm.md`); bm6 claims table consolidates the
+  band.
+- Soak re-pin: 1,000,000 verified echo trips over the real
+  `aoq_sidecar` UDS at 55,411 fps under the v3 law (real per-trip AEAD
+  seal+open added; -12.3% vs the pre-v3 63,223 fps is a lawful-work
+  delta, SUPERSEDED not a regression) (`bm4-soak-churn.md`, bm6 row 4a).
+- Go supervisor churn fd/RSS 0-leak re-witnessed under a tighter
+  delta==0 per-cycle law (`bm4-churn.md`, bm6 row 4b); legacy-JSON
+  baseline re-measured ~4548 ns/op, alloc profile exact (bm6 row 5).
+- Build/CI hardening: profile-guard census + purity gate registration
+  (`zp-18-profile-guard-census.md`, `zp-18b-purity-gate-registration.md`)
+  and bench-ledger linearity fence form (`br2-linearity-fence-form.md`).
+
 ## [26.11.3] - 2026-11-03
 
 AoQ Wave-1 campaign release. Every number below is transcribed from the
