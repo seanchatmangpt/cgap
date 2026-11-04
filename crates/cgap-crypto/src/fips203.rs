@@ -175,21 +175,26 @@ pub fn cond_add_q(a: i16) -> i16 {
 // ---------------------------------------------------------------------------
 // ZETAS table (pqcrystals-lineage values, generated + digest-pinned)
 // ---------------------------------------------------------------------------
-/// pqcrystals/PQClean lineage zetas table (centered Montgomery-domain i16).
-/// Layout: `[0]` unused; `[1..=128]` forward NTT twiddles (tree order, read
-/// by ntt); `[129..=256]` the same 128 values in INTT traversal order;
-/// `[257]` = 1441 = f = mont^2/128; `[258]` = -1044 = MONT(1).
-/// Generated from the spec formula and cross-checked entry-by-entry against
-/// the PQClean literal table (court `zetas_table_pqclean_entry_check`); the
-/// pqcrystals/PQClean-lineage zetas table, EXACT PQClean indexing:
-/// `ZETAS[0..=127]` = the 128-entry literal table (zetas[0] is load-bearing
-/// padding; ntt consumes indices 1..=127 per segment, intt 127..=1, basemul
-/// 64..=127). `ZETAS[128..=255]` = the same 128 values in INTT traversal
-/// order (documentation/reftest mirror). `ZETAS[256..=258]` = [1441 (f =
-/// mont^2/128), -1044 (MONT(1) centered), 0].
-/// Generated from the spec formula; cross-checked entry-by-entry against the
-/// PQClean literal table (court `zetas_table_pqclean_entry_check`); blake3-
-/// digest pinned (court `zetas_digest_pin`).
+/// pqcrystals/PQClean-lineage zetas table (centered Montgomery-domain i16),
+/// ONE layout story — the code is the citation:
+///
+/// - `ZETAS[0] = -1044` is load-bearing padding (the literal table's first
+///   value; every table read starts at index 1).
+/// - `ZETAS[1..=127]` = the 128 forward-NTT twiddle values: `ntt` consumes
+///   `ZETAS[k]` for k = 1..=127 ascending (`fips203::ntt`), the INTT consumes
+///   the same segment `ZETAS[k]` for k = 127..=1 descending
+///   (`fips203::intt_tomont`), and `poly_basemul_montgomery` consumes
+///   `ZETAS[64..=127]` — one literal segment, three traversal windows.
+/// - `ZETAS[128..=255]` = the same 128 values in reverse (INTT traversal
+///   mirror; asserted by court `zetas_table_pqclean_entry_check`).
+/// - `ZETAS[256..=258] = [1441, -1044, 0]`: 1441 = f = mont^2/128 (INTT
+///   final scale), -1044 = MONT(1) centered, 0 padding.
+///
+/// Generated in-session from the spec formula (tmp[0]=MONT;
+/// tmp[i]=fqmul(tmp[i-1], MONT*17 mod q); bit-reversed tree; centered
+/// representatives) and cross-checked entry-by-entry against the PQClean
+/// literal table (court `zetas_table_pqclean_entry_check`); blake3-digest
+/// pinned (court `zetas_digest_pin`).
 pub const ZETAS: [i16; 259] = [
     -1044, -758, -359, -1517, 1493, 1422, 287, 202, -171, 622, 1577, 182, 962, -1202, -1474, 1468,
     573, -1325, 264, 383, -829, 1458, -1602, -130, -681, 1017, 732, 608, -1542, 411, -205, -1571,
@@ -303,13 +308,6 @@ pub fn poly_sub(r: &mut [i16; N], a: &[i16; N], b: &[i16; N]) {
     for i in 0..N {
         r[i] = a[i] - b[i];
     }
-
-    /// r += b (no reduction; in-place accumulate form, borrowck-friendly).
-    pub fn poly_add_assign(r: &mut [i16; N], b: &[i16; N]) {
-        for i in 0..N {
-            r[i] = r[i].wrapping_add(b[i]);
-        }
-    }
 }
 
 /// In-place to-Montgomery: r = r * 2^32 mod q.
@@ -320,12 +318,44 @@ pub fn poly_tomont(r: &mut [i16; N]) {
 }
 
 // ---------------------------------------------------------------------------
-// CBD sampling (eta = 2 primary; eta = 3 kept for cross-set parity)
+// CBD sampling (eta = 2 primary for ML-KEM; eta = 4 for ML-DSA parity)
 // ---------------------------------------------------------------------------
 
-/// CBD(eta) from `buf` (eta*256/4 bytes), branchless bit decomposition.
-pub fn poly_cbd(r: &mut [i16; N], buf: &[u8], eta: u8) {
-    debug_assert_eq!(buf.len(), eta as usize * N / 4);
+/// Typed refusal for an unsupported CBD width (replaces the former silent
+/// `_ => ()` zero-fill, which produced all-zero secret polys unpunished).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CbdError {
+    /// No masked decomposition is implemented for this eta (lawful: 2, 4).
+    UnsupportedEta(u8),
+}
+
+impl core::fmt::Display for CbdError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            CbdError::UnsupportedEta(e) => {
+                write!(f, "poly_cbd: unsupported CBD eta {} (lawful: 2, 4)", e)
+            }
+        }
+    }
+}
+
+/// CBD(eta) from `buf` (eta*256/4 bytes), branchless masked decomposition.
+///
+/// One spec law for both widths (FIPS 203/204 SamplePolyCBD, consecutive
+/// per-coefficient bit fields): coefficient i consumes bits 2*eta*i ..
+/// 2*eta*i + 2*eta − 1 of `buf` (LSB-first), the first eta bits are the
+/// a-field and the last eta bits the b-field, r[i] = popcount(a) −
+/// popcount(b).
+///
+/// - eta = 2: a 32-bit word (4 bytes) holds 8 coefficients in nibble i;
+///   `d = (t & 0x5555_5555) + ((t >> 1) & 0x5555_5555)` gives per-nibble
+///   popcounts in 2-bit fields.
+/// - eta = 4: a 32-bit word holds 4 coefficients, one byte each; the
+///   low nibble of byte j is the a-field, the high nibble the b-field.
+///   `d = Σ_shift (t >> shift) & 0x1111_1111` gives per-nibble popcounts in
+///   4-bit fields (popcount ≤ 4 < 16, so fields never collide).
+pub fn poly_cbd(r: &mut [i16; N], buf: &[u8], eta: u8) -> Result<(), CbdError> {
+    debug_assert!(eta != 2 && eta != 4 || buf.len() == eta as usize * N / 4);
     match eta {
         2 => {
             for (i, ch) in buf.chunks_exact(4).enumerate() {
@@ -337,8 +367,25 @@ pub fn poly_cbd(r: &mut [i16; N], buf: &[u8], eta: u8) {
                     r[8 * i + j] = (a as i16) - (b as i16);
                 }
             }
+            Ok(())
         }
-        _ => (),
+        4 => {
+            for (i, ch) in buf.chunks_exact(4).enumerate() {
+                let t = u32::from_le_bytes([ch[0], ch[1], ch[2], ch[3]]);
+                let d = (t & 0x1111_1111)
+                    + ((t >> 1) & 0x1111_1111)
+                    + ((t >> 2) & 0x1111_1111)
+                    + ((t >> 3) & 0x1111_1111);
+                for j in 0..4 {
+                    let byte_d = d >> (8 * j);
+                    let a = byte_d & 0x7; // popcount of low nibble (<= 4)
+                    let b = (byte_d >> 4) & 0x7; // popcount of high nibble
+                    r[4 * i + j] = (a as i16) - (b as i16);
+                }
+            }
+            Ok(())
+        }
+        e => Err(CbdError::UnsupportedEta(e)),
     }
 }
 
@@ -616,7 +663,8 @@ pub fn sample_poly_cbd_prf(seed: &[u8; 32], nonce: u8) -> [i16; N] {
     let mut buf = [0u8; PRF_OUT_ETA];
     prf(&mut buf, seed, nonce);
     let mut p = [0i16; N];
-    poly_cbd(&mut p, &buf, 2);
+    // eta = 2 is the ML-KEM-768 constant; the Err arm is unreachable here.
+    poly_cbd(&mut p, &buf, 2).expect("eta=2 is lawful for ML-KEM CBD");
     p
 }
 

@@ -23,7 +23,8 @@
 use cgap_crypto::chatman::{
     admissions_root, keyed_digest, seal_unsealed, verify_unsealed, DeltaError, DeltaS, DigestError,
     Sealer, Unsealed, UnsealedReceipt, VerifyError, ALGORITHM_ID_UNSEALED, DELTA_DOMAIN_TAG,
-    DELTA_LEN, DIGEST_LEN, KEYED_MAX_INPUT_LEN, RECEIPT_LEN, UNSEALED_RECEIPT_LEN,
+    DELTA_LEN, DIGEST_LEN, KEYED_MAX_INPUT_LEN, RECEIPT_FIXED_PREFIX_LEN, RECEIPT_LEN,
+    SEAL_ML_DSA_65_LEN, UNSEALED_RECEIPT_LEN,
 };
 use cgap_crypto::lease::{Lease, PhiLease, PHI_LEASE_LEN};
 
@@ -616,11 +617,31 @@ fn admissions_root_empty_is_typed_zero() {
     assert_eq!(admissions_root(&[]), [0u8; 32]);
 }
 
-/// Sanity: the Wave-1 ML-DSA-65 shape constant survives untouched (the
-/// Wave-3 target receipt is 2649 B).
+/// Sanity: the Wave-1 ML-DSA-65 shape constants are the FIPS 204 ML-DSA-65
+/// values (the Wave-3 target receipt is 3538 B; seal 3309 B per the
+/// t04:60-76 derivation — 2420/2649 were the ML-DSA-44 rows).
 #[test]
 fn wave3_receipt_shape_constant_unchanged() {
-    assert_eq!(RECEIPT_LEN, 2649);
+    assert_eq!(SEAL_ML_DSA_65_LEN, 3309);
+    assert_eq!(RECEIPT_LEN, 3538);
+    assert_eq!(RECEIPT_LEN, RECEIPT_FIXED_PREFIX_LEN + SEAL_ML_DSA_65_LEN);
+}
+
+/// Anti-vacuity: the size law must actually bite. The runtime mirror of the
+/// in-src `const assert` (48 + 5*256*20/8 + (55+6)) is re-derived here and
+/// asserted against the constant; flipping `SEAL_ML_DSA_65_LEN` to 2420 (the
+/// ML-DSA-44 row) in a /tmp mutation copy breaks BOTH the in-src const assert
+/// (compile error) and this court — the court cannot pass under the mutation.
+#[test]
+fn seal_size_law_matches_fips204_derivation() {
+    let derived: usize = 48 + 5 * 256 * 20 / 8 + (55 + 6);
+    assert_eq!(derived, 3309);
+    assert_eq!(SEAL_ML_DSA_65_LEN, derived);
+    // And the offset math that makes the receipt cohere:
+    assert_eq!(
+        core::mem::offset_of!(cgap_crypto::chatman::Receipt, pqc_seal),
+        229
+    );
 }
 
 // ----------------------------------------------------------------
@@ -750,4 +771,85 @@ fn hostile_receipt_bytes_refused_typed_no_panic() {
         DeltaS::from_bytes(&[0xFFu8; DELTA_LEN]),
         Err(DeltaError::BadDomainTag([0xFFu8; 8]))
     );
+}
+
+// ----------------------------------------------------------------
+// P2 M1 court — keyed_digest_parts: multi-slice input via the same
+// single-chunk keyed engine. Anti-vacuity: a parts-vs-concatenated
+// equivalence court (a part-order-sensitive engine that re-orders or
+// drops part boundaries changes the digest and must flip) + the exact
+// length boundary (1024 accepted / 1025 refused with the TOTAL length
+// reported). Mutation witness (wave7_shim_battery shape): swapping the
+// part append order in keyed_digest_parts flips this court.
+// ----------------------------------------------------------------
+
+/// Parts vs concatenated equivalence, key sensitivity, determinism, and
+/// part-boundary sensitivity over the official key.
+#[test]
+fn keyed_digest_parts_equals_concatenated_and_is_part_order_bound() {
+    use cgap_crypto::chatman::keyed_digest_parts;
+
+    // Equivalence across many part splittings of the same bytes.
+    let data = corpus(300);
+    let k = OFFICIAL_KEY;
+    let whole = keyed_digest(&k, &data).expect("300 B within bound");
+    // 1 part
+    assert_eq!(
+        keyed_digest_parts(&k, &[&data]).expect("within bound"),
+        whole,
+        "single part == whole"
+    );
+    // 2 parts at an interior boundary
+    assert_eq!(
+        keyed_digest_parts(&k, &[&data[..128], &data[128..]]).expect("within bound"),
+        whole,
+        "2 parts == whole"
+    );
+    // 3 parts incl. an empty part (empty part must contribute nothing)
+    assert_eq!(
+        keyed_digest_parts(&k, &[&data[..7], &[], &data[7..]]).expect("within bound"),
+        whole,
+        "3 parts with an empty part == whole"
+    );
+    // Reordering the parts is NOT equivalent (order-sensitive engine).
+    assert_ne!(
+        keyed_digest_parts(&k, &[&data[128..], &data[..128]]).expect("within bound"),
+        whole,
+        "reordered parts must not equal the concatenated digest"
+    );
+    // Key sensitivity + determinism.
+    assert_ne!(
+        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
+        keyed_digest_parts(&[0u8; 32], &[b"a", b"b"]).expect("within bound"),
+        "a different key must derive a different digest"
+    );
+    assert_eq!(
+        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
+        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
+        "deterministic"
+    );
+}
+
+/// Exact length boundary: parts summing to exactly KEYED_MAX_INPUT_LEN
+/// are accepted; one byte more is refused loudly with the TOTAL length
+/// in the typed error (not a per-part length).
+#[test]
+fn keyed_digest_parts_length_boundary_is_the_concatenated_total() {
+    use cgap_crypto::chatman::keyed_digest_parts;
+
+    let a = corpus(KEYED_MAX_INPUT_LEN - 1);
+    let b = [7u8; 1];
+    assert!(
+        keyed_digest_parts(&OFFICIAL_KEY, &[&a, &b]).is_ok(),
+        "exactly {KEYED_MAX_INPUT_LEN} B across parts is within the bound"
+    );
+    let a2 = corpus(KEYED_MAX_INPUT_LEN - 1);
+    let b2 = [7u8; 2];
+    match keyed_digest_parts(&OFFICIAL_KEY, &[&a2, &b2]) {
+        Err(DigestError::InputTooLong { len, max }) => {
+            assert_eq!(len, KEYED_MAX_INPUT_LEN + 1, "total length, not per-part");
+            assert_eq!(max, KEYED_MAX_INPUT_LEN);
+        }
+        other => panic!("1025 B total must refuse loudly, got {other:?}"),
+    }
 }

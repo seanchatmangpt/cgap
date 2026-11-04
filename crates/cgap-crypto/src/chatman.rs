@@ -16,7 +16,7 @@
 //!    `blake3_digest(32)`. The normative concatenation
 //!    `magic || version || DeltaS || Phi_lease || blake3_digest || pqc_seal`
 //!    fixes the constant prefix at `4+1+112+80+32 = 229`; this module pins
-//!    `229 + 2420 = 2649` for the ML-DSA-65 shape (§4).
+//!    `229 + 3309 = 3538` for the ML-DSA-65 shape (§4).
 //! 2. §3.3's `algorithm_id` "2-byte code" names no registry values; the two
 //!    `ALGORITHM_ID_*` constants pin provisional codes (§10 FIPS-drift risk
 //!    calls for a pinned id) pending lane-court ratification.
@@ -51,10 +51,18 @@ pub const DIGEST_LEN: usize = 32;
 /// module-level reconciliation of the doc's "117" figure).
 pub const RECEIPT_FIXED_PREFIX_LEN: usize = 229;
 
-/// ML-DSA-65 (FIPS 204) signature size in bytes: 2420 (§4 candidate table).
-pub const SEAL_ML_DSA_65_LEN: usize = 2420;
-/// Total receipt size for the ML-DSA-65 shape: `229 + 2420` bytes.
-pub const RECEIPT_LEN: usize = 2649;
+/// ML-DSA-65 (FIPS 204) signature size in bytes: 3309.
+///
+/// FIPS 204 derivation (t04:60-76,
+/// `docs/jira/v26.11.1/tickets/t04-ml-dsa-rejection-hints.md`):
+/// `sig = lambda/4 + l*256*(2*log2(gamma1))/8 + (omega + k)`
+/// `   = 48 + 5*256*20/8 + (55+6) = 48 + 3200 + 61 = 3309`.
+/// (2420 is the ML-DSA-44 row — the earlier pin conflated the two sets.)
+/// Size-law standing: VERIFIED-by-derivation, UNVERIFIED-by-KAT until the
+/// Wave-3 mldsa kernel + P5 ACVP KATs land (t03 vector-source law).
+pub const SEAL_ML_DSA_65_LEN: usize = 3309;
+/// Total receipt size for the ML-DSA-65 shape: `229 + 3309` bytes.
+pub const RECEIPT_LEN: usize = 3538;
 
 /// `algorithm_id` for ML-DSA-65 (§4 SELECT) — 2-byte code, PROVISIONAL
 /// registry value (doc names none; pinned so old receipts stay interpretable
@@ -113,7 +121,7 @@ pub struct Receipt {
     /// offset 197, 32 B — BLAKE3 (keyed, key = `issued_root`) over
     /// `DeltaS || Phi_lease` (§3.3).
     pub blake3_digest: [u8; DIGEST_LEN],
-    /// offset 229, 2420 B — ML-DSA-65 signature over
+    /// offset 229, 3309 B — ML-DSA-65 signature over
     /// `blake3_digest || algorithm_id` (§3.3, §4).
     pub pqc_seal: [u8; SEAL_ML_DSA_65_LEN],
 }
@@ -140,6 +148,11 @@ const _: () = assert!(core::mem::offset_of!(Receipt, blake3_digest) == 197);
 const _: () = assert!(core::mem::offset_of!(Receipt, pqc_seal) == 229);
 const _: () = assert!(RECEIPT_LEN == RECEIPT_FIXED_PREFIX_LEN + SEAL_ML_DSA_65_LEN);
 const _: () = assert!(RECEIPT_FIXED_PREFIX_LEN == 4 + 1 + DELTA_LEN + PHI_LEASE_LEN + DIGEST_LEN);
+// Size law (FIPS 204, t04:60-76 derivation): the ML-DSA-65 signature size is
+// forced by the published parameter set — sig = lambda/4 + l*256*(2*log2
+// gamma1)/8 + (omega + k) = 48 + 5*256*20/8 + (55+6) = 3309. A wrong pin
+// (e.g. the ML-DSA-44 row, 2420) fails this compile-time assert.
+const _: () = assert!(SEAL_ML_DSA_65_LEN == 48 + 5 * 256 * 20 / 8 + (55 + 6));
 
 // ---------------------------------------------------------------------------
 // Wave 2 — core engines (§3.3 keyed digest, §3.1 codec, §4 Sealer seam,
@@ -250,6 +263,31 @@ pub fn keyed_digest(key: &[u8; 32], data: &[u8]) -> Result<[u8; DIGEST_LEN], Dig
         cv.copy_from_slice(&out[0..8]);
     }
     unreachable!("num_blocks >= 1 always returns inside the loop")
+}
+
+/// Keyed BLAKE3 over multiple slices, same engine and same single-chunk
+/// bound as [`keyed_digest`]: the parts are defined as their concatenation
+/// (pinned by the parts-vs-concatenated equivalence court), so the padded
+/// single-chunk compression sees identical bytes either way.
+///
+/// # Errors
+/// [`DigestError::InputTooLong`] when the concatenated length exceeds
+/// [`KEYED_MAX_INPUT_LEN`] — loud UNSUPPORTED, never a silent downgrade.
+pub fn keyed_digest_parts(key: &[u8; 32], parts: &[&[u8]]) -> Result<[u8; DIGEST_LEN], DigestError> {
+    let total: usize = parts.iter().map(|p| p.len()).sum();
+    if total > KEYED_MAX_INPUT_LEN {
+        return Err(DigestError::InputTooLong {
+            len: total,
+            max: KEYED_MAX_INPUT_LEN,
+        });
+    }
+    let mut data = [0u8; KEYED_MAX_INPUT_LEN];
+    let mut off = 0;
+    for part in parts {
+        data[off..off + part.len()].copy_from_slice(part);
+        off += part.len();
+    }
+    keyed_digest(key, &data[..total])
 }
 
 impl DeltaS {

@@ -151,7 +151,7 @@ fn pke_encrypt(ek: &[u8; EK_LEN], m: &[u8; 32], r: &[u8; 32], ct: &mut [u8; CT_L
     for i in 0..f3::K {
         e1[i] = f3::sample_poly_cbd_prf(r, (f3::K + i) as u8);
     }
-    let mut e2 = f3::sample_poly_cbd_prf(r, (2 * f3::K) as u8);
+    let e2 = f3::sample_poly_cbd_prf(r, (2 * f3::K) as u8);
 
     // u_j = sum_i A^T[j][i] . y_i  + e1_j   (invntt_tomont then add)
     let mut u = [[0i16; f3::N]; f3::K];
@@ -169,7 +169,7 @@ fn pke_encrypt(ek: &[u8; EK_LEN], m: &[u8; 32], r: &[u8; 32], ct: &mut [u8; CT_L
     }
 
     // v = sum_i t_hat[i] . y_hat[i]  + e2 + m
-    let mut v = [0i16; f3::N];
+    let v: [i16; f3::N];
     {
         let mut acc = [0i16; f3::N];
         let mut prod = [0i16; f3::N];
@@ -188,7 +188,7 @@ fn pke_encrypt(ek: &[u8; EK_LEN], m: &[u8; 32], r: &[u8; 32], ct: &mut [u8; CT_L
     // ct = compress10(u) || compress4(v)
     let mut cb = [0u8; 320];
     for j in 0..f3::K {
-        let mut pj = u[j];
+        let pj = u[j];
         f3::poly_compress10(&mut cb, &pj);
         ct[320 * j..320 * (j + 1)].copy_from_slice(&cb);
     }

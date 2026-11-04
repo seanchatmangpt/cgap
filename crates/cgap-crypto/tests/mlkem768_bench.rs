@@ -23,6 +23,12 @@ fn bench<F: FnMut()>(name: &str, iters: usize, mut f: F) -> f64 {
 
 #[test]
 fn bench_keygen_encaps_decaps() {
+    // ZP-18 profile guard: rekey-cost numbers are only lawful on a release
+    // profile — loud-SKIP (never a fake number) on a dev build.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_keygen_encaps_decaps: {v}");
+        return;
+    }
     let d = [7u8; 32];
     let z = [9u8; 32];
     let mut ek = [0u8; 1184];
@@ -37,14 +43,16 @@ fn bench_keygen_encaps_decaps() {
         let mut ek2 = [0u8; 1184];
         let mut dk2 = [0u8; 2400];
         kem::keygen(&d, &z, &mut ek2, &mut dk2);
+        cgap_aoq::profile_guard::fence((&ek2, &dk2));
     });
     let e = bench("encaps", 10, || {
         let mut c2 = [0u8; 1088];
         let mut s2 = [0u8; 32];
         kem::encaps(&ek, &m, &mut c2, &mut s2);
+        cgap_aoq::profile_guard::fence((&c2, &s2));
     });
     let dec = bench("decaps", 10, || {
-        let _ = kem::decaps(&dk, &ct);
+        cgap_aoq::profile_guard::fence(kem::decaps(&dk, &ct));
     });
     println!(
         "BENCH_SUMMARY keygen={:.2}us encaps={:.2}us decaps={:.2}us",

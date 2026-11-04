@@ -536,7 +536,7 @@ fn finish(
     let restore_ok = before.iter().all(|(k, v)| {
         *v == fs::read(PathBuf::from(MANIFEST).join("src").join(k)).expect("re-read")
     });
-    let mut report = Report {
+    let report = Report {
         rows,
         baselines_ok,
         restore_ok,

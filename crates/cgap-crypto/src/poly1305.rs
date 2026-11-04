@@ -37,11 +37,6 @@ pub struct Poly1305 {
 /// 130-bit, with the RFC 8439 §2.5 clamp (`0x0ffffffc0ffffffc0ffffffc0fffffff`
 /// applied limbwise); `s` (the pad added at finish) = key[16..32].
 pub fn new(key: &[u8; KEY_LEN]) -> Poly1305 {
-    let t0 = u32::from_le_bytes(key[0..4].try_into().expect("4 bytes"));
-    let t1 = u32::from_le_bytes(key[4..8].try_into().expect("4 bytes"));
-    let t2 = u32::from_le_bytes(key[8..12].try_into().expect("4 bytes"));
-    let t3 = u32::from_le_bytes(key[12..16].try_into().expect("4 bytes"));
-
     // Donna-32 limb extraction (byte-offset form, RFC-8439-clamped):
     // limb0 = bits 0-25; limb1 = bits 26-49 with clamp bits 50,51 cleared
     // (mask 0x3ffff03); limb2 mask 0x3ffc0ff; limb3 mask 0x3f03fff; limb4
@@ -84,7 +79,7 @@ pub fn push(state: &mut Poly1305, data: &[u8]) {
         // SLA-minimal unblock (AB-3, disclosed): copy the buffer out to
         // satisfy the borrow checker (block is Copy; bytes identical).
         let block = state.buffer;
-        absorb_block(state, &block, (1 << 24));
+        absorb_block(state, &block, 1 << 24);
         state.leftover = 0;
     }
 
@@ -120,7 +115,7 @@ fn absorb_block(state: &mut Poly1305, block: &[u8], hibit: u32) {
     let s3 = 5 * r[3];
     let s4 = 5 * r[4];
 
-    let mut d0 = h[0] as u64 * r[0] as u64
+    let d0 = h[0] as u64 * r[0] as u64
         + h[1] as u64 * s4 as u64
         + h[2] as u64 * s3 as u64
         + h[3] as u64 * s2 as u64
@@ -154,13 +149,13 @@ fn absorb_block(state: &mut Poly1305, block: &[u8], hibit: u32) {
     let mut h1 = (d1 & LIMB_MASK as u64) as u32;
     d2 += c;
     c = (d2 >> 26) as u64;
-    let mut h2 = (d2 & LIMB_MASK as u64) as u32;
+    let h2 = (d2 & LIMB_MASK as u64) as u32;
     d3 += c;
     c = (d3 >> 26) as u64;
-    let mut h3 = (d3 & LIMB_MASK as u64) as u32;
+    let h3 = (d3 & LIMB_MASK as u64) as u32;
     d4 += c;
     c = (d4 >> 26) as u64;
-    let mut h4 = (d4 & LIMB_MASK as u64) as u32;
+    let h4 = (d4 & LIMB_MASK as u64) as u32;
     h0 += (c * 5) as u32;
     c = (h0 >> 26) as u64;
     h0 &= LIMB_MASK;

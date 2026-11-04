@@ -6,16 +6,7 @@
 //! - PQClean MLKEM512 zetas literal (ntt.c), extracted from ntt.o (offset
 //!   4500) and cross-checked against the spec-generated table.
 //! - FIPS 202 known answers (SHAKE-256("") / SHA3-512("")).
-use cgap_crypto::{fips202, fips203, kem};
-
-fn hx(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{:02x}", x)).collect()
-}
-fn uh(s: &str) -> Vec<u8> {
-    (0..s.len() / 2)
-        .map(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
-        .collect()
-}
+use cgap_crypto::fips203;
 
 // ---------------------------------------------------------------------------
 // zetas table pin

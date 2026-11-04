@@ -92,6 +92,74 @@ fn aead_rfc8439_2_8_2_fixture() {
     // layout is pinned by the cross-check court with the real crate.
 }
 
+/// Promoted-surface mutation court (`mac_tag_var_aad`, un-hidden by the
+/// AAD ruling, Option b): flipping ONE absorbed AAD byte at any length
+/// class MUST diverge the tag, and the untampered input MUST still
+/// reproduce the baseline tag byte-exactly (court not trivially red).
+/// Anti-vacuity: any mac_data change that stops absorbing AAD (or absorbs
+/// it post-pad only) leaves the flipped-byte tag identical to baseline and
+/// flips this court. Covers the RFC §2.8.2 12-byte AAD plus empty, 15,
+/// 16, 17 and 36-byte AAD length classes.
+#[test]
+fn var_aad_aad_byte_flip_diverges_tag() {
+    let mut state: u64 = 0xAAD_5EED_0000_0001;
+    let key = key32(&mut state);
+    let nonce = nonce_from(&mut state);
+    let ct: std::vec::Vec<u8> = (0..64).map(|_| splitmix64(&mut state) as u8).collect();
+
+    for aad_len in [0usize, 12, 15, 16, 17, 36] {
+        let aad: std::vec::Vec<u8> = (0..aad_len).map(|_| splitmix64(&mut state) as u8).collect();
+        let baseline = aead::mac_tag_var_aad(&aad, &ct, &key, &nonce);
+
+        // Untampered replay is deterministic (baseline is real).
+        assert_eq!(
+            aead::mac_tag_var_aad(&aad, &ct, &key, &nonce),
+            baseline,
+            "replay must be deterministic (aad_len {aad_len})"
+        );
+
+        // Non-empty AAD: flip one absorbed byte at each position class —
+        // the tag MUST diverge.
+        if aad_len > 0 {
+            for i in [0usize, aad_len / 2, aad_len - 1] {
+                let mut aad2 = aad.clone();
+                aad2[i] ^= 0x01;
+                let flipped = aead::mac_tag_var_aad(&aad2, &ct, &key, &nonce);
+                assert_ne!(
+                    flipped, baseline,
+                    "one AAD byte flip at {i} (aad_len {aad_len}) must diverge the tag"
+                );
+            }
+        }
+    }
+
+    // RFC 8439 §2.8.2 vector class: a flip on the published 12-byte AAD
+    // must diverge the PUBLISHED tag too (KAT-anchored flip-kill).
+    let aad = unhex("50515253c0c1c2c3c4c5c6c7");
+    let ct842 = unhex(
+        "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d6\
+         3dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b36\
+         92ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc\
+         3ff4def08e4b7a9de576d26586cec64b6116",
+    );
+    let key842: [u8; KEY_LEN] =
+        unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+            .try_into()
+            .expect("32-byte key");
+    let nonce842 = Nonce96::new(0x0000_0007, 0x4746_4544_4342_4140).expect("lawful epoch");
+    let kat: [u8; TAG_LEN] = unhex("1ae10b594f09e26a7e902ecbd0600691")
+        .try_into()
+        .expect("16-byte tag");
+    assert_eq!(aead::mac_tag_var_aad(&aad, &ct842, &key842, &nonce842), kat);
+    let mut aad2 = aad.clone();
+    aad2[5] ^= 0x80;
+    assert_ne!(
+        aead::mac_tag_var_aad(&aad2, &ct842, &key842, &nonce842),
+        kat,
+        "AAD byte flip on the RFC 2.8.2 vector must diverge the published tag"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // RustCrypto cross-check court (Chicago: the REAL chacha20poly1305 crate is
 // the collaborator; byte-identical ct+tag required, both directions).
@@ -404,6 +472,7 @@ fn bench_seal(len: usize) -> f64 {
     for _ in 0..8 {
         let t0 = std::time::Instant::now();
         for _ in 0..inner {
+            cgap_aoq::profile_guard::fence((&pt, &ct, &tag));
             aead::seal_detached(&mut ct, &mut tag, &pt, &aad, &key, &nonce);
         }
         let mbps = (len as f64 * inner as f64) / t0.elapsed().as_secs_f64() / (1024.0 * 1024.0);
@@ -429,6 +498,7 @@ fn bench_open(len: usize) -> f64 {
     for _ in 0..8 {
         let t0 = std::time::Instant::now();
         for _ in 0..inner {
+            cgap_aoq::profile_guard::fence((&ct, &tag));
             let _ = aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce);
         }
         let mbps = (len as f64 * inner as f64) / t0.elapsed().as_secs_f64() / (1024.0 * 1024.0);
@@ -444,6 +514,14 @@ fn bench_open(len: usize) -> f64 {
 /// Prints the full 1KB/64KB/1MB min-of-8 table.
 #[test]
 fn throughput_min_of_n_floor() {
+    // ZP-18 profile guard: the floor was calibrated on a stated profile;
+    // a dev-profile run loud-SKIPs instead of asserting against the wrong
+    // baseline. KAT/correctness courts above are NOT guarded — they are
+    // profile-independent and must run everywhere.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP throughput_min_of_n_floor: {v}");
+        return;
+    }
     for len in [1024usize, 64 * 1024, 1024 * 1024] {
         let s = bench_seal(len);
         let o = bench_open(len);

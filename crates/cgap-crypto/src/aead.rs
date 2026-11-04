@@ -2,7 +2,10 @@
 //! donna Poly1305 ([`crate::poly1305`]), PG-A3 spec.
 //!
 //! Wire shape pinned by PG-A3:
-//! - `AAD_LEN = 36` (fixed AAD width — the AoQ lease/header prefix),
+//! - `AAD_LEN = 36` is a WRAPPER constant (the AoQ lease/header prefix
+//!   width used by [`seal_detached`]/[`open_detached`]), not a wire law —
+//!   the RFC 8439 mac_data layout authenticates AAD of ANY length
+//!   ([`mac_tag_var_aad`], real bound `u32::MAX`),
 //! - `TAG_LEN = 16`,
 //! - [`Nonce96`] is `#[repr(C)] { epoch: u32, counter: u64 }` — 12 bytes,
 //!   size-pinned by const assert; serialized little-endian as
@@ -29,7 +32,11 @@ use crate::poly1305::{self, Poly1305};
 
 /// ChaCha20 key width: 32 bytes.
 pub const KEY_LEN: usize = 32;
-/// Fixed AAD width: 36 bytes (AoQ lease/header prefix).
+/// Wrapper AAD width: 36 bytes (AoQ lease/header prefix). Historical
+/// wrapper width of the pre-promotion fixed-span seal/open pair; retained
+/// as a named constant for FFI/bridge consumers (aoq_bridge `aad: &[u8;
+/// AAD_LEN]` pins), not a wire law — the detached seal/open pair
+/// authenticates variable-length AAD (real protocol bound `u32::MAX`).
 pub const AAD_LEN: usize = 36;
 /// Authenticator tag width: 16 bytes.
 pub const TAG_LEN: usize = 16;
@@ -255,7 +262,7 @@ pub fn seal_detached(
     ciphertext: &mut [u8],
     tag: &mut [u8; TAG_LEN],
     plaintext: &[u8],
-    aad: &[u8; AAD_LEN],
+    aad: &[u8],
     key: &[u8; KEY_LEN],
     nonce: &Nonce96,
 ) {
@@ -282,7 +289,7 @@ pub fn open_detached(
     plaintext: &mut [u8],
     ciphertext: &[u8],
     tag: &[u8; TAG_LEN],
-    aad: &[u8; AAD_LEN],
+    aad: &[u8],
     key: &[u8; KEY_LEN],
     nonce: &Nonce96,
 ) -> Result<(), Mismatch> {
@@ -306,10 +313,15 @@ pub fn open_detached(
     Ok(())
 }
 
-/// `#[doc(hidden)]` fixture seam: MAC over variable-length AAD. Exists so
-/// the RFC 8439 §2.8.2 published vector (12-byte AAD) is drivable exactly;
-/// the production surface pins `AAD_LEN = 36`.
-#[doc(hidden)]
+/// MAC over variable-length AAD (production API). Computes the RFC 8439
+/// §2.8 Poly1305 tag over `aad || pad16(aad) || ct || pad16(ct) ||
+/// len(aad) u64le || len(ct) u64le` for an AAD of ANY length — the
+/// 36-byte `AAD_LEN` is a wrapper constant of the detached seal/open
+/// pair, not a protocol bound (real bound: AAD length fits `u64` in the
+/// length encoding, `u32::MAX` in practice per the RFC's `uint32`
+/// lengths). KAT-proven by the RFC 8439 §2.8.2 published vector
+/// (12-byte AAD) in `tests/aead_courts.rs`; anti-vacuity by the AAD-byte
+/// flip-kill court on this exact surface.
 pub fn mac_tag_var_aad(
     aad: &[u8],
     ct: &[u8],
@@ -320,6 +332,26 @@ pub fn mac_tag_var_aad(
     let mut poly = poly1305::new(&pk);
     absorb_mac_data(&mut poly, aad, ct);
     poly1305::finish(poly)
+}
+
+/// Verify-only open over variable-length AAD: recompute the RFC 8439
+/// §2.8 tag via [`mac_tag_var_aad`] and compare with the folded
+/// constant-time equality — the plaintext-free form of
+/// [`open_detached`] (for receive transitions with no plaintext buffer
+/// at decision time).
+pub fn verify_tag_var_aad(
+    aad: &[u8],
+    ct: &[u8],
+    tag: &[u8; TAG_LEN],
+    key: &[u8; KEY_LEN],
+    nonce: &Nonce96,
+) -> Result<(), Mismatch> {
+    let expected = mac_tag_var_aad(aad, ct, key, nonce);
+    if ct_eq(&expected, tag) {
+        Ok(())
+    } else {
+        Err(Mismatch)
+    }
 }
 
 #[cfg(test)]

@@ -18,5 +18,6 @@ pub mod chatman;
 pub mod fips202;
 pub mod fips203;
 pub mod kem;
+pub mod mldsa;
 pub mod lease;
 pub mod poly1305;
