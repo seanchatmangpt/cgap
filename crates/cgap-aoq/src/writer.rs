@@ -137,7 +137,7 @@ impl AoqWriter {
     /// segment (ZeroProgress law).
     ///
     /// # Errors
-    /// [`AoqError::HeaderTooLong`] when `body` exceeds the u32 `body_len`
+    /// [`AoqError::BufferTooShort`] when `body` exceeds the u32 `body_len`
     /// padding word (documented overflow-class representative).
     #[allow(clippy::missing_panics_doc)] // slicing at pinned consts, never panics
     pub fn frame_segments<'s, 'a>(
@@ -148,7 +148,7 @@ impl AoqWriter {
         body: &'a [u8],
     ) -> Result<Segments<'_, 'a>, AoqError> {
         if body.len() > MAX_BODY_LEN {
-            return Err(AoqError::HeaderTooLong { got: u16::MAX });
+            return Err(AoqError::BufferTooShort { got: u16::MAX });
         }
         let header = AoqHeader::new(epoch, key_id, self.next_ordinal, self.next_seq);
         // Segment 0: prefix (continuation + span).
@@ -189,7 +189,7 @@ impl AoqWriter {
     /// window) and commit. Returns the window length.
     ///
     /// # Errors
-    /// [`AoqError::HeaderTooLong`] when `out` is shorter than the window
+    /// [`AoqError::BufferTooShort`] when `out` is shorter than the window
     /// (refused before ANY byte is written — ZeroProgress law), overflow
     /// class as in [`AoqWriter::frame_segments`].
     pub fn write_window(
@@ -203,7 +203,7 @@ impl AoqWriter {
         let segs = self.frame_segments(epoch, key_id, tag, body)?;
         let total = segs.total_len();
         if out.len() < total {
-            return Err(AoqError::HeaderTooLong { got: u16::MAX });
+            return Err(AoqError::BufferTooShort { got: u16::MAX });
         }
         let mut w = 0usize;
         let put = |dst: &mut [u8], src: &[u8], w: &mut usize| {

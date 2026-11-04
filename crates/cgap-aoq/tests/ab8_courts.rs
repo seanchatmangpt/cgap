@@ -327,7 +327,7 @@ fn a10_write_refusal_zero_progress() {
     let e = w
         .write_window(&mut out, 0, 7, &[0u8; 16], &plain)
         .unwrap_err();
-    assert!(matches!(e, AoqError::HeaderTooLong { .. }), "got {e:?}");
+    assert!(matches!(e, AoqError::BufferTooShort { .. }), "got {e:?}");
     assert_eq!(w.cursor(), (0, 0), "A10: cursor untouched");
     assert_eq!(out, before, "A10: output untouched (exact-needed buffer)");
     // Now with a large-enough buffer: passes and commits exactly once.

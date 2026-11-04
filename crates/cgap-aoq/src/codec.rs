@@ -32,10 +32,10 @@ pub const fn fnv1a32(data: &[u8]) -> u32 {
 /// `[0x00, 0x3C)` and lands at `0x3C`.
 ///
 /// # Errors
-/// [`AoqError::HeaderTooLong`] when `out` is shorter than the envelope.
+/// [`AoqError::BufferTooShort`] when `out` is shorter than the envelope.
 pub fn encode(header: &AoqHeader, out: &mut [u8]) -> Result<(), AoqError> {
     if out.len() < SIZE_BYTES {
-        return Err(AoqError::HeaderTooLong {
+        return Err(AoqError::BufferTooShort {
             got: out.len() as u16,
         });
     }

@@ -201,7 +201,7 @@ fn c5_append_only_no_mutation_on_refusal() {
     c.append(0, b"four").unwrap();
     assert!(matches!(
         c.append(0, b"five"),
-        Err(cgap_aoq::error::AoqError::HeaderTooLong { .. })
+        Err(cgap_aoq::error::AoqError::BufferTooShort { .. })
     ));
 
     // Byte-identity: every record is exactly as it was before refusals.

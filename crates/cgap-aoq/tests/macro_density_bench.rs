@@ -163,7 +163,7 @@ fn af33_density_court() {
                 // Typed slab-full refusal at the 1M-link boundary: reset to
                 // a fresh chain over the same slab (counted, disclosed in
                 // the receipt — the chain is reused, not grown).
-                Err(cgap_aoq::error::AoqError::HeaderTooLong { .. }) => {
+                Err(cgap_aoq::error::AoqError::BufferTooShort { .. }) => {
                     chain = AoqChain::new(Mix32, slab);
                     resets += 1;
                 }

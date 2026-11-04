@@ -211,10 +211,10 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
     /// payload_digest)`.
     ///
     /// Refusals are typed and leave the chain unmutated (slab full ->
-    /// `HeaderTooLong`).
+    /// `BufferTooShort`).
     pub fn append(&mut self, epoch: u16, payload: &[u8]) -> Result<u64, AoqError> {
         if self.len == self.slab.len() {
-            return Err(AoqError::HeaderTooLong {
+            return Err(AoqError::BufferTooShort {
                 got: (self.len + 1).min(u16::MAX as usize) as u16,
             });
         }

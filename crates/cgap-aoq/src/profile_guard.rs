@@ -67,7 +67,10 @@ fn is_release(opt_level: Option<&str>) -> bool {
 /// guard a compile error — the caller pattern from AF-25's G2 loud-SKIP.
 ///
 /// # Examples
-/// ```
+/// ```no_run
+/// // no_run: the example panics by design under the debug-profile
+/// // doctest runner (loud-SKIP is the documented caller contract);
+/// // verification lives in the cfg(test) unit tests below.
 /// use cgap_aoq::profile_guard;
 /// // Loud-SKIP caller pattern: the Result must be handled.
 /// match profile_guard::assert_release() {

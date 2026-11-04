@@ -400,7 +400,7 @@ fn gate_g5_self() -> GateResult {
             Ok(_) => "Ok".to_string(),
             Err(e) => match e {
                 AoqError::HeaderTooShort { .. } => "HeaderTooShort",
-                AoqError::HeaderTooLong { .. } => "HeaderTooLong",
+                AoqError::BufferTooShort { .. } => "BufferTooShort",
                 AoqError::BadMagic { .. } => "BadMagic",
                 AoqError::UnsupportedVersion { .. } => "UnsupportedVersion",
                 AoqError::UnknownEpochWire { .. } => "UnknownEpochWire",

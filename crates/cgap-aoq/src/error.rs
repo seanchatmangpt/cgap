@@ -21,7 +21,7 @@ pub enum AoqError {
     /// Input shorter than the fixed 64-byte envelope.
     HeaderTooShort { got: u16 },
     /// Output buffer shorter than the fixed 64-byte envelope.
-    HeaderTooLong { got: u16 },
+    BufferTooShort { got: u16 },
     /// Leading magic mismatch (`aoq:hf-magic`).
     BadMagic { got: u32 },
     /// Wire version outside the admitted set (`aoq:hf-version`).
@@ -58,7 +58,7 @@ impl AoqError {
     pub const fn class_code(&self) -> u16 {
         match *self {
             Self::HeaderTooShort { .. } => 0x00_01,
-            Self::HeaderTooLong { .. } => 0x00_02,
+            Self::BufferTooShort { .. } => 0x00_02,
             Self::BadMagic { .. } => 0x00_03,
             Self::UnsupportedVersion { .. } => 0x00_04,
             Self::UnknownEpochWire { .. } => 0x00_05,
@@ -76,7 +76,7 @@ impl fmt::Display for AoqError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Self::HeaderTooShort { got } => write!(f, "header too short: {got}B"),
-            Self::HeaderTooLong { got } => write!(f, "header too long: {got}B"),
+            Self::BufferTooShort { got } => write!(f, "buffer too short: {got}B"),
             Self::BadMagic { got } => write!(f, "bad magic: 0x{got:08X}"),
             Self::UnsupportedVersion { got } => write!(f, "unsupported version: {got}"),
             Self::UnknownEpochWire { got } => write!(f, "unknown AOQ epoch on wire: {got}"),

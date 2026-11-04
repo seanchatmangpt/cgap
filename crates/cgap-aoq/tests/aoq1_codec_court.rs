@@ -101,7 +101,7 @@ fn wire_law_refusals_are_typed() {
     let mut small = [0u8; 63];
     assert!(matches!(
         encode(&h, &mut small),
-        Err(AoqError::HeaderTooLong { got: 63 })
+        Err(AoqError::BufferTooShort { got: 63 })
     ));
 
     // Digest byte flip (wire[60..64], not covered — detectable only as a
