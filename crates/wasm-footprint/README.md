@@ -12,7 +12,7 @@ deliberately NOT a root-workspace member.
 - Release profile: `lto = "thin"`, `codegen-units = 1`,
   `panic = "abort"` (abort is what makes the wasm link succeed; the
   publish verify step mirrors it — see Cargo.toml comment).
-- Dependency surface: cgap-arrow, cgap-parquet (registry, 26.11.3 per Cargo.toml);
+- Dependency surface: cgap-arrow, cgap-parquet (registry, 26.11.5 per Cargo.toml);
   cgap-blake3 dev-dep.
 - On-target: `cargo build --target wasm32-wasip1 --release` -> exit 0;
   artifact `target/wasm32-wasip1/release/wasm_footprint.wasm`

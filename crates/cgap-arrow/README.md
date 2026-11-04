@@ -6,8 +6,8 @@ over a sealed slab plane; built to run on host and bare metal.
 
 ## Status
 
-WORKING-26.11.2 — kernel source at workspace version
-26.11.2 (publish law: one attempt per crate, sequenced; prior
+WORKING-26.11.5 — kernel source at workspace version
+26.11.5 (publish law: one attempt per crate, sequenced; prior
 PUBLISHED-26.11.1 record archived under readme-archive/). Census: see
 `docs/jira/v26.11.2/waves/crate-reality/cgap-arrow.md`: full suite
 exit 0 this session at 26.11.2.

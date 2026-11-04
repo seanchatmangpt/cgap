@@ -108,13 +108,16 @@ mc_stage_cargo() {
        "$sb/crates/cgap-blake3/tests/"
     cp "$CGAP_ROOT/crates/cgap-aoq/tests/aoq1_layout_drift_court.rs" \
        "$sb/crates/cgap-aoq/tests/"
-    cat > "$sb/Cargo.toml" <<'TOML'
+    # D95/D105 pattern: derive the sandbox workspace version from the real
+    # root manifest so the court tracks retargets instead of hardcoding.
+    mc_want=$(awk '/^\[workspace\.package\]/{f=1;next} f && $1=="version"{gsub(/[" ]/,"",$3); print $3; exit}' "$CGAP_ROOT/Cargo.toml")
+    cat > "$sb/Cargo.toml" <<TOML
 [workspace]
 members = ["crates/cgap-blake3", "crates/cgap-crypto", "crates/cgap-aoq"]
 resolver = "2"
 
 [workspace.package]
-version = "26.11.3"
+version = "$mc_want"
 edition = "2021"
 rust-version = "1.85"
 license-file = "LICENSE.md"

@@ -3,7 +3,7 @@ defmodule CgapEx.MixProject do
 
   use Mix.Project
 
-  @version "26.11.3"
+  @version "26.11.5"
 
   def project do
     [

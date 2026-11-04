@@ -44,11 +44,11 @@ members = [
 
 [workspace.dependencies]
 # v26.11.3 W6 lane W1: centralized branchless ALU/SWAR mechanics.
-cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.3", default-features = false }
+cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.5", default-features = false }
 
 [workspace.package]
 license-file = "LICENSE.md"
-version = "26.11.3"
+version = "26.11.5"
 edition = "2021"
 # MSRV-02 (DOD-01 F2): workspace-scope MSRV. Matches crates/cli's declared
 # 1.85 (edition-2021-era stable features). Members opt in via

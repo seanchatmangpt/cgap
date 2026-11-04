@@ -226,7 +226,7 @@ jobs:
   # umbrella -> arrow,blake3,git,parquet,gate,p28,branchless,bn3
   # (+ optional core/storage); integration -> audit (path+version dev-dep
   # resolved at publish time); wasm-footprint pins arrow/parquet at
-  # exactly 26.11.3, so both must be on the registry first.
+  # exactly 26.11.5, so both must be on the registry first.
   # ---------------------------------------------------------------------
   ffi:
     needs: [arrow, blake3, parquet, gate, core, crypto, p28, bn3, aoq]

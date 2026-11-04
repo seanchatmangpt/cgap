@@ -8,6 +8,10 @@ transcribed from the v26.10.29 receipt docs (`docs/RECEIPTS.md`,
 `docs/BENCH_FLOORS.json`); conflicts between receipt docs are listed in the
 release notes' Discrepancies section, not reconciled here.
 
+## [26.11.5] - 2026-11-04
+
+Workspace version retarget (SD-4); wave content under [26.11.4].
+
 ## [26.11.4] - 2026-11-04
 
 v3 wire-law wave. Every number below is transcribed from the session's

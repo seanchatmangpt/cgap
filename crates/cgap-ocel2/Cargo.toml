@@ -1,7 +1,7 @@
 [package]
 name = "cgap-ocel2"
 rust-version = "1.85"
-version = "26.11.3"
+version = "26.11.5"
 edition = "2021"
 description = "cgap-to-OCEL 2.0 projection membrane: receipt-chain events, (dev,ino) objects, E2O edges, Arrow-shaped tables + SQL view DDL for pm4py."
 license-file = "../../LICENSE.md" # DOD-01 F3b: "../LICENSE.md" resolved to crates/LICENSE.md (absent)
@@ -15,13 +15,13 @@ publish = false
 # Real collaborators, Chicago law: the projection consumes the REAL chain,
 # REAL sealed blocks, REAL license record, REAL BLAKE3 kernel. Path deps
 # only; no existing file is modified.
-cgap-ffi = { path = "../cgap-ffi", version = "26.11.3" }
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.3", features = ["std"] }
-cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
+cgap-ffi = { path = "../cgap-ffi", version = "26.11.5" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.5" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.5", features = ["std"] }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.5" }
 
 # Chicago court collaborator (tests only): the conformance court drives
 # the REAL 4x5 session machine to mint lawful tap rows.
 [dev-dependencies]
-cgap-aoq = { path = "../cgap-aoq", version = "26.11.3" }
+cgap-aoq = { path = "../cgap-aoq", version = "26.11.5" }
