@@ -64,19 +64,19 @@ dependencies = [
 
 [[package]]
 name = "bench"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-arrow 26.11.3",
- "cgap-blake3 26.11.3",
+ "cgap-arrow 26.11.5",
+ "cgap-blake3 26.11.5",
  "cgap-bn3",
  "cgap-core",
  "cgap-crypto",
  "cgap-ffi",
  "cgap-gate",
- "cgap-git 26.11.3",
+ "cgap-git 26.11.5",
  "cgap-p28",
- "cgap-parquet 26.11.3",
+ "cgap-parquet 26.11.5",
  "cgap-storage",
  "divan",
 ]
@@ -89,10 +89,10 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "cbmqs-cli"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "clap",
 ]
 
@@ -114,29 +114,29 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "cgap"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-arrow 26.11.3",
- "cgap-blake3 26.11.3",
+ "cgap-arrow 26.11.5",
+ "cgap-blake3 26.11.5",
  "cgap-bn3",
  "cgap-branchless",
  "cgap-core",
  "cgap-ffi",
  "cgap-gate",
- "cgap-git 26.11.3",
+ "cgap-git 26.11.5",
  "cgap-p28",
- "cgap-parquet 26.11.3",
+ "cgap-parquet 26.11.5",
  "cgap-storage",
 ]
 
 [[package]]
 name = "cgap-aoq"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-arrow 26.11.3",
+ "cgap-arrow 26.11.5",
  "cgap-audit",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-crypto",
  "wire-shm",
 ]
@@ -149,7 +149,7 @@ checksum = "5b545c6a44ac810ed61edb4a82853c7edb4a36b52ef5cf2ad1ca33f7f4cc9ba9"
 
 [[package]]
 name = "cgap-arrow"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
  "cgap-core",
@@ -159,20 +159,20 @@ dependencies = [
 
 [[package]]
 name = "cgap-audit"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-arrow 26.11.3",
- "cgap-parquet 26.11.3",
+ "cgap-arrow 26.11.5",
+ "cgap-parquet 26.11.5",
 ]
 
 [[package]]
 name = "cgap-beam"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-arrow 26.11.3",
- "cgap-blake3 26.11.3",
- "cgap-git 26.11.3",
- "cgap-parquet 26.11.3",
+ "cgap-arrow 26.11.5",
+ "cgap-blake3 26.11.5",
+ "cgap-git 26.11.5",
+ "cgap-parquet 26.11.5",
 ]
 
 [[package]]
@@ -183,105 +183,105 @@ checksum = "9af40005fc0a08622556aca1aa948994ae14eef91fcf8ec8a8a852fc4b774915"
 
 [[package]]
 name = "cgap-blake3"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
 ]
 
 [[package]]
 name = "cgap-bn3"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
 ]
 
 [[package]]
 name = "cgap-bont"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
 ]
 
 [[package]]
 name = "cgap-bosym"
-version = "26.11.3"
+version = "26.11.5"
 
 [[package]]
 name = "cgap-branchless"
-version = "26.11.3"
+version = "26.11.5"
 
 [[package]]
 name = "cgap-cloud"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-bont",
 ]
 
 [[package]]
 name = "cgap-core"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-audit",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-gate",
 ]
 
 [[package]]
 name = "cgap-court"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-audit",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-bn3",
  "cgap-core",
  "cgap-crypto",
  "cgap-ffi",
  "cgap-gate",
  "cgap-p28",
- "cgap-parquet 26.11.3",
+ "cgap-parquet 26.11.5",
  "cgap-storage",
 ]
 
 [[package]]
 name = "cgap-crypto"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "chacha20poly1305",
  "divan",
 ]
 
 [[package]]
 name = "cgap-ffi"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-arrow 26.11.3",
+ "cgap-arrow 26.11.5",
  "cgap-audit",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-bn3",
  "cgap-core",
  "cgap-crypto",
  "cgap-gate",
  "cgap-p28",
- "cgap-parquet 26.11.3",
+ "cgap-parquet 26.11.5",
 ]
 
 [[package]]
 name = "cgap-fibo"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-bont",
  "cgap-core",
 ]
 
 [[package]]
 name = "cgap-gate"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-branchless",
  "cgap-core",
@@ -295,25 +295,25 @@ checksum = "10e0f756fefbe36e19006070e4b17963a8a71001d46ce9973a9fbdeb938c9cf6"
 
 [[package]]
 name = "cgap-git"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-bn3",
- "cgap-parquet 26.11.3",
+ "cgap-parquet 26.11.5",
 ]
 
 [[package]]
 name = "cgap-gpu"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cc",
- "cgap-arrow 26.11.3",
+ "cgap-arrow 26.11.5",
 ]
 
 [[package]]
 name = "cgap-integration"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
  "cgap-arrow 26.11.2",
@@ -325,9 +325,9 @@ dependencies = [
 
 [[package]]
 name = "cgap-p28"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-blake3 26.11.3",
+ "cgap-blake3 26.11.5",
  "cgap-crypto",
 ]
 
@@ -339,18 +339,18 @@ checksum = "47d4aa1e90fe099a7f30c26fdcb47571154c9cb7d2a1a8fec720fb8c005f7368"
 
 [[package]]
 name = "cgap-parquet"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
- "cgap-arrow 26.11.3",
+ "cgap-arrow 26.11.5",
 ]
 
 [[package]]
 name = "cgap-storage"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
- "cgap-blake3 26.11.3",
- "cgap-git 26.11.3",
+ "cgap-blake3 26.11.5",
+ "cgap-git 26.11.5",
 ]
 
 [[package]]
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "wire-shm"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-aoq",
 ]
