@@ -37,8 +37,18 @@ pub enum AoqError {
     /// Sequence number gap/regression against the caller's cursor.
     SeqGap { expected: u32, got: u32 },
     /// KEM kernel seam: no kernel admitted for this id (host facade only).
+    ///
+    /// Seams-placeholder per the XC-5r census: the KEM kernel seam is
+    /// hand-law (`aoq:KemParam`) and no attack scenario exercises this
+    /// variant yet — it is the typed landing for a not-yet-admitted kernel
+    /// id, not a witnessed refusal path. AB-8 integration owns population.
     KemKernelNotAdmitted { kernel_id: u32 },
     /// AEAD kernel seam: no kernel admitted for this id (host facade only).
+    ///
+    /// Seams-placeholder per the XC-5r census: the AEAD kernel seam is
+    /// hand-law and no attack scenario exercises this variant yet — it is
+    /// the typed landing for a not-yet-admitted kernel id, not a witnessed
+    /// refusal path. AB-8 integration owns population.
     AeadKernelNotAdmitted { kernel_id: u32 },
 }
 

@@ -33,6 +33,7 @@
 //! Modes: default 1M frames (CI-adjacent); 10M via `--ignored`.
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::process::Command;
 use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -458,8 +459,33 @@ fn report(name: &str, r: &TransitResult, stages: &StageNs, timer_floor_ns: f64) 
 }
 
 /// Default: 1M frames, composed pass (timer-free) + timer pass + stages.
+/// Cross-test/process allocator contamination guard (AF-43, same class as
+/// macro_p99_torture): the census allocator is process-global; libtest's
+/// >60s progress reporter allocates in-process, and sibling-court setup
+/// allocations land in the census window. Re-exec this court as its own
+/// process; the parent asserts on the child's real exit status.
+fn census_isolated(child_name: &str) -> bool {
+    if std::env::var_os("AF35_ISOLATED").is_some() {
+        return true;
+    }
+    let exe = std::env::current_exe().expect("current_exe");
+    let status = Command::new(exe)
+        .args(["--exact", child_name, "--test-threads=1"])
+        .env("AF35_ISOLATED", "1")
+        .status()
+        .expect("spawn isolated rerun");
+    assert!(
+        status.success(),
+        "isolated census rerun of {child_name} failed: {status}"
+    );
+    false
+}
+
 #[test]
 fn composed_transit_1m() {
+    if !census_isolated("composed_transit_1m") {
+        return;
+    }
     let n = 1_000_000;
     let timer_floor_ns = measure_timer_floor(200_000);
 

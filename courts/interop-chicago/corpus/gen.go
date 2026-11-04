@@ -17,11 +17,11 @@ import "encoding/binary"
 
 // Seeds and layout constants (frozen; do not vary).
 const (
-	Seed       uint64 = 0xA20C0FFEE5A7E000 // SplitMix64 initial state
-	Multiplier uint64 = 0xBF58476D1CE4E5B9 // SplitMix64 multiplier (internals)
-	Gamma      uint64 = 0x9E3779B97F4A7C15 // SplitMix64 golden gamma
-	FactBytes         = 24                 // 3 x u64 LE per fact
-	FACT_WINDOW       = 1365               // pack_demux::FACT_WINDOW, named coprime stride
+	Seed        uint64 = 0xA20C0FFEE5A7E000 // SplitMix64 initial state
+	Multiplier  uint64 = 0xBF58476D1CE4E5B9 // SplitMix64 multiplier (internals)
+	Gamma       uint64 = 0x9E3779B97F4A7C15 // SplitMix64 golden gamma
+	FactBytes          = 24                 // 3 x u64 LE per fact
+	FACT_WINDOW        = 1365               // pack_demux::FACT_WINDOW, named coprime stride
 )
 
 // SplitMix64 is the canonical PRNG (single u64 state, stepped by Gamma).

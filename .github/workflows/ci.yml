@@ -20,6 +20,14 @@
 #                Measured 2026-10-30: `cargo fmt --check` reports 7390 lines
 #                of drift, so this job is continue-on-error. To promote it to
 #                blocking: land the fmt pass, delete continue-on-error.
+#   deny       — cargo-deny supply-chain gate (XC-5r rec #2). `advisories` is
+#                BLOCKING (kernel crates are zero-external-dep, E=0, so it is
+#                clean today and any advisory is a loud event). `licenses` is
+#                NON-BLOCKING by registered divergence: every cgap workspace
+#                crate uses `license-file = LICENSE.md` (P28-SIL sovereign
+#                license, no SPDX key per lane-A04 DoD), which an SPDX
+#                allowlist cannot express. See deny.toml header and
+#                docs/jira/v26.11.3/receipts/xd-1-deny-toml.md.
 # =============================================================================
 
 name: ci
@@ -135,3 +143,40 @@ jobs:
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets
+
+  deny:
+    name: cargo-deny (advisories blocking; licenses disclosed-gap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      # BLOCKING: kernel crates are zero-external-dep (E=0), so advisories is
+      # clean today; a failure here is a real new dependency/advisory event.
+      - name: cargo deny check advisories
+        run: cargo deny check advisories
+
+      # NON-BLOCKING by registered divergence (see workflow header + receipt).
+      # Annotate loudly either way so the gap is never read as silent.
+      - name: cargo deny check licenses (NON-BLOCKING, P28-SIL has no SPDX key)
+        continue-on-error: true
+        run: cargo deny check licenses
+      - name: licenses gate provenance annotation
+        if: always()
+        run: |
+          if cargo deny check licenses >/dev/null 2>&1; then
+            echo "::notice::licenses check GREEN (unexpected — divergence may be closed; re-check the receipt)."
+          else
+            echo "::warning::licenses check RED by registered divergence (P28-SIL license-file, no SPDX key). Blocking gate is advisories only."
+          fi

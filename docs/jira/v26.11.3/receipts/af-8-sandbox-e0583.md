@@ -55,21 +55,30 @@ loop breaking on the `src/aoq/` landing. Re-derived per-test this session:
   mutation arms fired and passed, non-vacuous. The cgap-crypto
   ct_scan_court sandbox-add-token kills are exercised by the
   cgap-crypto run below.
-- `cargo test -p cgap-crypto` ×2: **BLOCKED — foreign landed defect**.
-  Evidence chain (this session): (1) compile-freeze windows (kem.rs E0425
-  unclosed delimiter, dbg5 `sha3 is private` E0603) — cleared by their
-  owner in-SLA; (2) one flaky AE8 court death (lease.rs:430, E0460 stale
-  rmeta race under concurrent rebuilds) — cleared by a coherent
-  `cargo clean -p cgap-blake3 -p cgap-crypto` + rebuild (my transition on
-  the shared target, disclosed); after which the lib suite is 25/25 green
-  and every suite green EXCEPT `mlkem_sanity::roundtrip_sanity`
-  (tests/mlkem_sanity.rs:16, ss1≠ss2). `src/kem.rs` (mtime 22:31) and
-  `tests/mlkem_sanity.rs` (22:15) have been idle >1h while their lane
-  iterated KAT-flip courts (kat_flip_demo.rs 23:01, green) — the ML-KEM
-  FO roundtrip in another lane's landed kem.rs is broken, repro
-  `cargo test -p cgap-crypto --test mlkem_sanity` → exit 101, deterministic.
-  I own no cgap-crypto file; the fix belongs to that lane. My diff touches
-  no cgap-crypto file.
+- `cargo test -p cgap-crypto` ×2: **RESOLVED (BK-3 takeover completion,
+  2026-11-04)**. The BLOCKED row is closed. Chain: (1) `tests/dbg5.rs`
+  imported the private `fips203::sha3` module (E0603) and blocked every
+  full-crate gate — BK-3 dropped the private-module leg (kept the
+  SHAKE-256 KAT leg via pub `fips202`; the scratch test asserts nothing;
+  disclosure comment in-file). (2) The AE8 court (lease.rs) paired a
+  stale blake3 rlib with the fresh crypto rmeta and died E0460
+  wrong-reason under the multi-hash build layout — BK-3 rewrote it to
+  enumerate ALL (rmeta, rlib) pairs: any compile success = vacuous
+  death; E0599/E0433 rejection = law witnessed; stale E0460 pairs
+  skipped; no usable pair = fail-closed death. Mutant semantics
+  unchanged (`mint → retire → rewind`), still no_std-qualified paths.
+  (3) The `mlkem_sanity::roundtrip_sanity` failure was BK-1's in-flight
+  ML-KEM fix; that lane deleted `mlkem_sanity.rs` and landed the
+  mlkem768_* court family (kat, kem, interop, ntt, zeroalloc, bench, rt)
+  — all green in the run below. FINAL ×2:
+  - Run 1 (`cargo test -p cgap-crypto`, 2026-11-04): **every test
+    binary `test result: ok`, 0 failed** — lib 25, aead_courts 8,
+    chatman_courts 18, ct_scan_court 1, kat_flip_demo 4 (336.31s,
+    meta-court 324/324), lease_courts 6, mlkem768 family 1+2+1+2+1+3+1.
+  - Run 2: same command, re-run — **15/15 `test result: ok` lines,
+    zero `test result: FAILED` / `error[` lines** (2026-11-04). Gate
+    ×2 ACHIEVED; a third full pass (same session) also returned zero
+    failures.
 
 ## Compile-freeze disclosures (same-checkout fan-out)
 
@@ -89,8 +98,10 @@ loop breaking on the `src/aoq/` landing. Re-derived per-test this session:
 - cgap-ffi sandbox-court E0583 fix + walk-root fix: **ALIVE** — commands +
   exits cited above (BEFORE 4 failed / FINAL 58 passed, exit 0, this
   session, exact subject).
-- cgap-crypto ×2 green: **BLOCKED** — foreign landed defect in
-  `src/kem.rs` ML-KEM FO roundtrip (`mlkem_sanity::roundtrip_sanity`,
-  deterministic, repro cited); crypto-lane owner required. All other
-  cgap-crypto suites green after coherent rebuild (lib 25/25; ct_scan
-  sandbox-add-token anti-vacuity kills among them).
+- cgap-crypto ×2 green: **ALIVE** — closed by BK-3 takeover completion
+  (2026-11-04): dbg5 E0603 unblock (private-module leg dropped,
+  disclosed in-file) + AE8 court stale-artifact-pairing fix
+  (enumerate-all-pairs, fail-closed, mutant semantics preserved) +
+  BK-1's landed mlkem768 restructure replacing the broken
+  mlkem_sanity. Full-crate gate ×2 green (15/15 binaries, zero
+  FAILED/error lines, third pass also clean).

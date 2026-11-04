@@ -71,6 +71,69 @@ not relaxed.
   compatibility, workspace version drift, CHANGELOG (this section)
   and threat-model/CLAUDE.md updates.
 
+## [26.11.3] - 2026-11-03
+
+AoQ Wave-1 release. Every claim below cites a landed receipt in
+`docs/jira/v26.11.3/receipts/`; UNVERIFIED never rounds up and
+fail-honest gate results are recorded as failures, not smoothed.
+
+### Added
+
+- `cgap-aoq` crate — AOQ1 wire-law kernel (AoQ Wave-1, lanes AB-1..AB-19,
+  AF-*, RX-*):
+  - 64-byte `#[repr(C)]` `AoqHeader` with closed `Epoch` enum and a
+    compile-time layout court pinning all eight field offsets against the
+    generated layout projection; an ontology drift court parses the LANDED
+    TTL and refuses offset/size/wireKind drift, with an injected-mutation
+    flip witness (ab-6-header.md).
+  - AoqError-typed codec surface; zero-alloc 5-segment scatter writer
+    (ab-8-wire.md); AoqChain hash-chained record ledger with
+    `verify_records` tamper refusal (ab-7-chain-session.md).
+  - Crypto kernels in `cgap-crypto`: FIPS 202 SHAKE-128/256 with empty
+    KATs, ChaCha20-Poly1305 per RFC 8439 §2.5.2, AEAD composition,
+    and ML-KEM-768 (FIPS 203 final; PQClean-lineage ZETAS, branchless
+    Montgomery/Barrett reductions, deterministic keygen/encaps/decaps,
+    decaps infallible-by-type, no RNG in-crate) (ab-2, ab-3, ab-4,
+    ab-5-mlkem.md).
+- CBMQS seven-gate evaluator (`cbmqs_gates.rs`): G1 zero-alloc hot path,
+  G1b slab-rate floor (6.23M/5.40M pushes/s vs 100k/s floor), G2 wire
+  framing fail-honest (measured 717.0/719.7 ns vs 100 ns ceiling —
+  recorded as FAIL, not smoothed), G3 spec-drift, G4 anti-vacuity KATs
+  with flip witnesses, G5 storm soak (13.2M accepts over 50k frames),
+  G6 typed-SKIP, G7 receipt chain with measured per-link cost
+  (af-10-cbmqs.md; runner af-14).
+- Macro torture/bench courts in `cgap-aoq` (macro_p99_torture,
+  macro_defense_mesh, macro_federation_stress, macro_saturation_soak,
+  macro_transit_bench, macro_density_bench, macro_clearing_stress):
+  bimodal heap-storm, stall-walk isolation, cache-stride, 60% tamper
+  inundation with 1.5x refusal-parity fence, supervisor churn — alloc
+  census courts run in per-court isolated child processes
+  (af-26, af-27, af-29, af-32, af-33, af-35).
+- RFC-0089 §6 automated scorecard (sealed JSON table, tamper-detecting
+  seal), certificate, and conformance suites (rx-3, rx-5, rx-2).
+- `cgap-court` and `cgap-branchless` root workspace members (26.11.3
+  lane additions; see root Cargo.toml member comments W3-R4 / W6-B1).
+- `profile_guard` — reusable release-profile detector + anti-DCE fence
+  (rx-4-profile-guard.md).
+- Wire-tier gates: cgap-arrow `parse_meta` seam + 7 new IPC courts
+  (17 total), frame ABI mirror court, zero-"blake3" scan court with
+  sandbox kill witness (cg-1.md).
+- AoQ threat model: `docs/spec/aoq-threat-model.md` (5 assets,
+  blind-routing premise, 4 adversaries, Gap-1 KEM identity binding,
+  5 non-guarantees, OQ-1..5).
+
+### Fixed
+
+- `purity_gate` source-scan registration: `profile_guard.rs` registered
+  in the scanned set; test-only `std::format!` carries a
+  SOURCE-SCAN-EXEMPT marker with justification (AF-43, 2026-11-04).
+- `macro_p99_torture` alloc-census courts (I1/I3/I4) re-exec as isolated
+  child processes under the SERIAL gate: the census allocator is
+  process-global, so the default parallel harness leaked sibling courts'
+  setup allocations into the census window (33MB observed). Parents
+  assert on the child's real exit status; no simulation (AF-43,
+  2026-11-04).
+
 ## [26.11.2] - 2026-11-02
 
 starDF campaign release. Every number below cites its registry row or

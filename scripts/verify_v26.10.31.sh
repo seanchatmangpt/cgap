@@ -133,7 +133,7 @@ fi
 # depend on a stale prebuilt target/); timeout-guard at 5 min, loud skip on
 # timeout so a hung run never silently fails or silently passes.
 CLI_RC=0
-timeout 300 cargo run -q -p cgap-cli --bin verify_v26 > "$TMPDIR_V/cli.out" 2>&1 || CLI_RC=$?
+timeout 300 cargo run -q --manifest-path crates/cli/Cargo.toml --bin verify_v26 > "$TMPDIR_V/cli.out" 2>&1 || CLI_RC=$?
 if [ "$CLI_RC" -eq 0 ]; then
   printf '| `cli-verify` | PASS | 0 |\n' >> "$TABLE"
   printf '%s\n' "cli-verify" >> "$NAMES"

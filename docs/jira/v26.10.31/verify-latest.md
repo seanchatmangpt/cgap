@@ -1,6 +1,6 @@
 # Verify Latest: v26.10.31 (lane I20)
 
-Generated: 2026-11-01T06:07:04Z · HEAD: `fb474a5758adedc0fffeb08f6fc70829d95c3ed7` · host: arm64
+Generated: 2026-11-04T08:28:43Z · HEAD: `f561b5636fe27366810fdb448b58022d14567e85` · host: arm64
 
 ## Gate Summary
 
@@ -9,12 +9,12 @@ Generated: 2026-11-01T06:07:04Z · HEAD: `fb474a5758adedc0fffeb08f6fc70829d95c3e
 | `check-workspace` | PASS | 0 |
 | `test-cgap-arrow` | PASS | 0 |
 | `test-cgap-parquet` | PASS | 0 |
-| `test-cgap-git` | PASS | 0 |
+| `test-cgap-git` | FAIL | 101 |
 | `test-cgap-blake3` | PASS | 0 |
 | `test-integration` | PASS | 0 |
-| `test-cgap-beam` | PASS | 0 |
+| `test-cgap-beam` | FAIL | 101 |
 | `audit-branchless` | PASS | 0 |
-| `cli-verify` | PASS | 0 |
+| `cli-verify` | FAIL | 101 |
 | `test-audit` | PASS | 0 |
 
 ## Evidence Tails (last 12 lines per gate)
@@ -22,18 +22,18 @@ Generated: 2026-11-01T06:07:04Z · HEAD: `fb474a5758adedc0fffeb08f6fc70829d95c3e
 ### check-workspace
 
 ```
-    Checking cgap-beam v26.10.29 (/Users/sac/avec/crates/cgap-beam)
-    Checking cgap-audit v26.10.29 (/Users/sac/avec/crates/audit)
-warning: unused dependency `cgap-arrow`
- --> crates/integration/Cargo.toml:9:1
-  |
-9 | cgap-arrow = { path = "../cgap-arrow" }
-  | ^^^^^^^^^^
-  |
-  = note: `cargo::unused_dependencies` is set to `warn` by default
-help: consider removing the dependency on `cgap-arrow`
-warning: `cgap-integration` (manifest) generated 1 warning
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.48s
+    |         help: remove this `mut`
+
+warning: function `poly_add_assign` is never used
+   --> crates/cgap-crypto/src/fips203.rs:324:8
+    |
+324 | pub fn poly_add_assign(r: &mut [i16; N], b: &[i16; N]) {
+    |        ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `cgap-crypto` (lib) generated 13 warnings (run `cargo fix --lib -p cgap-crypto` to apply 11 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
 ```
 
 ### test-cgap-arrow
@@ -73,29 +73,29 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ### test-cgap-git
 
 ```
-     Running tests/perf_baseline.rs (target/debug/build/cgap-git/11a56c957de38300/out/perf_baseline-11a56c957de38300)
+test case6_offsets_above_2p32_resolve_as_full_64bit ... ok
 
-running 1 test
-test perf_baseline_git_plane ... ignored
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/lineage_workflow.rs (target/debug/build/cgap-git/4624ae3028bbc31b/out/lineage_workflow-4624ae3028bbc31b)
+error: test failed, to rerun pass `-p cgap-git --test lineage_workflow`
 
-   Doc-tests cgap_git
+Caused by:
+  could not execute process `/Users/sac/cgap/target/debug/build/cgap-git/4624ae3028bbc31b/out/lineage_workflow-4624ae3028bbc31b` (never executed)
 
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Caused by:
+  No such file or directory (os error 2)
 ```
 
 ### test-cgap-blake3
 
 ```
-test compress_is_zero_alloc ... ok
 test hash_scalar_64mib_is_zero_alloc ... ok
+test compress_is_zero_alloc ... ok
 test hash_wide_simd_64mib_is_zero_alloc ... ok
 test positive_control_counter_is_live ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.30s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.92s
 
    Doc-tests cgap_blake3
 
@@ -112,7 +112,7 @@ test nested_export_struct_abi_walk_two_children ... ok
 test c_abi_roundtrip_i64_u64_f32_f64_bitwise_and_double_release ... ok
 test neon_vs_portable_mask_bitwise_equality ... ok
 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
 
    Doc-tests cgap_integration
 
@@ -124,18 +124,18 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ### test-cgap-beam
 
 ```
-running 1 test
-test beam_bridge_contract_end_to_end ... ok
+ {init,do_boot,3,[]}]
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
 
-     Running tests/kill_stress.rs (target/debug/build/cgap-beam/b401e028c4dfff82/out/kill_stress-b401e028c4dfff82)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
-running 1 test
-test beam_kill_stress_100_iterations ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+failures:
+    beam_kill_stress_100_iterations
 
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.53s
+
+error: test failed, to rerun pass `-p cgap-beam --test kill_stress`
 ```
 
 ### audit-branchless
@@ -151,20 +151,18 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ### cli-verify
 
 ```
-[verify_v26] FR-04 court using git version 2.51.2
-[verify_v26] battery complete: 7 rows, 0 FAIL, skips=[FR-07]
-{"tool":"verify_v26","rows":[{"id":"FR-01","gate":"size/align (Quad64 64B/64B; Buf 64B-aligned heap)","status":"PASS","evidence":"size_of(Quad64)=64 align_of(Quad64)=64 Buf 143/143 allocs 64B-aligned (sizes 1..=1000 step 7)"},{"id":"FR-02","gate":"layout law (derived from FR-01 + Quad64 wire round-trip ladder spot check)","status":"PASS","evidence":"Quad64 new->to_le_bytes(64B)->from_le_bytes round-trip equal; offsets 0x00/0x04/0x08/0x0C/0x10/0x18/0x1C/0x20 held by build-time asserts in layout.rs"},{"id":"FR-03","gate":"parquet RLE round-trip (rle_encode -> rle_decode)","status":"PASS","evidence":"values=10000 bits=8 encoded=10003B enc_fast=10003B decode_ok=true values_equal=true"},{"id":"FR-04","gate":"git pack write + in-crate parser read + real git fsck/verify-pack/cat-file court","status":"PASS","evidence":"blobs=8 pack_bytes=147 idx_bytes=1296 in_crate_parse=true git=git version 2.51.2 fsck_exit_ok=true verify-pack_exit_ok=true cat-file_exit_ok=true n_objects=8  writer_us=341"},{"id":"FR-06","gate":"blake3 known-answer spot check (empty + abc + 2KiB)","status":"PASS","evidence":"hash(\"\")=af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262 match=true hash(\"abc\")=6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85 match=true hash(<2048B>)=634f590a498b3e29165cd8bd32f30a99a2b0d8949a3d7ce35779b6253d8ca0d5 expected=634f590a498b3e29165cd8bd32f30a99a2b0d8949a3d7ce35779b6253d8ca0d5 match=true oracle=[b3sum(/opt/homebrew/bin/b3sum)=634f590a498b3e29165cd8bd32f30a99a2b0d8949a3d7ce35779b6253d8ca0d5 match=true]"},{"id":"FR-05","gate":"replay/determinism spot check (Quad64 wire re-encode stability)","status":"PASS","evidence":"to_le_bytes->from_le_bytes->to_le_bytes byte-identical (deterministic re-encode)"},{"id":"FR-07","gate":"BEAM interop","status":"SKIP","evidence":"requires a live BEAM (cgap-beam NIF harness); owned by the integration lane, not runnable in this in-process battery"}],"summary":{"total":7,"fail":0,"skips":["FR-07"],"timing_us":{"FR-01":151,"FR-02":3,"FR-03":865,"FR-04":103078,"FR-06":2985,"FR-05":4}},"exit_ok":true}
+error: package(s) `cgap-cli` not found in workspace `/Users/sac/cgap`
 ```
 
 ### test-audit
 
 ```
-test alloc_counter::tests::nested_inner_scope_excludes_outer_allocations ... ok
-test alloc_counter::tests::tracking_is_reset_after_scope ... ok
-test alloc_counter::tests::vec_push_reports_nonzero_count_and_bytes ... ok
-test alloc_counter::tests::multithreaded_totals_add_up ... ok
+test ocel2_slab::tests::a14_dam_court_refusal_precedence_fixed_order ... ok
+test ocel2_slab::tests::a05_power_cut_sweep_every_prefix_and_byte_fail_closed ... ok
+test powl::tests::a20_stress_one_million_rows_powl_verify ... ok
+test ocel2_slab::tests::a20_stress_one_million_rows_append_seal_reopen ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.83s
 
    Doc-tests cgap_audit
 

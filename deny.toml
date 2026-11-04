@@ -1,0 +1,57 @@
+# cargo-deny config for cgap (XC-5r rec #2).
+# Shape mirrors /Users/sac/ggen/deny.toml (template default), trimmed to the
+# two sections wired into CI: advisories + licenses.
+#
+# cgap's kernel crates are zero-external-dependency (E=0), so the advisory
+# check comes back clean. The licenses check FAILS by design: every cgap
+# workspace crate declares `license-file = LICENSE.md` (the P28-SIL sovereign
+# license, deliberately no SPDX key per lane-A04 DoD), which cargo-deny's
+# SPDX allowlist cannot express. CI therefore gates on `advisories` and runs
+# `licenses` with continue-on-error + a loud annotation; see
+# docs/jira/v26.11.3/receipts/xd-1-deny-toml.md for the registered divergence.
+#
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# The path where the advisory databases are cloned/fetched into
+#db-path = "$CARGO_HOME/advisory-dbs"
+# The url(s) of the advisory databases to use
+#db-urls = ["https://github.com/rustsec/advisory-db"]
+# A list of advisory IDs to ignore. Ignored advisories still emit a note.
+ignore = [
+    #"RUSTSEC-0000-0000",
+]
+# If true, use the git executable to fetch the advisory database instead of
+# the built-in git library (helpful for special auth requirements).
+#git-fetch-with-cli = true
+
+[licenses]
+# Explicitly allowed licenses (SPDX short identifiers).
+# https://spdx.org/licenses/
+allow = [
+    "MIT",
+    "Apache-2.0",
+]
+# Confidence threshold for detecting a license from its text.
+confidence-threshold = 0.8
+# Per-crate license exceptions.
+exceptions = [
+    #{ allow = ["Zlib"], crate = "adler32" },
+]
+
+# Some crates don't have easily machine-readable licensing information;
+# add a clarification entry to specify it manually.
+#[[licenses.clarify]]
+#crate = "ring"
+#expression = "MIT AND ISC AND OpenSSL"
+#license-files = [
+    #{ path = "LICENSE", hash = 0xbd0eed23 }
+#]
+
+[licenses.private]
+# Ignore workspace crates that aren't published / only published privately.
+ignore = true
+# Private registries whose crates skip the license check when ignore=true.
+registries = [
+    #"https://sekretz.com/registry/1",
+]

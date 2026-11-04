@@ -20,7 +20,7 @@ const BANNED: [(&str, &str); 9] = [
 ];
 
 /// Registered modules of the lib target (must match src/lib.rs `pub mod`).
-const REGISTERED: [&str; 11] = [
+const REGISTERED: [&str; 12] = [
     "aead.rs",
     "chain.rs",
     "codec.rs",
@@ -30,6 +30,9 @@ const REGISTERED: [&str; 11] = [
     "kem.rs",
     "lib.rs",
     "session.rs",
+    // [AF-43 SLA sync 2026-11-04] profile_guard.rs landed in src/ (registered
+    // in lib.rs by its lane); adding it to the scanned set.
+    "profile_guard.rs",
     // [AB-7 SLA sync 2026-11-03] AB-8 landed verify.rs/writer.rs mid-pass.
     "verify.rs",
     "writer.rs",

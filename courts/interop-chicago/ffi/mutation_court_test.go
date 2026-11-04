@@ -240,7 +240,7 @@ func TestArm4AllocPositiveControl(t *testing.T) {
 			buf := make([]uint64, 16)
 			buf[0] = uint64(j)
 			retained = buf // escapes: heap allocation every iteration
-		_ = retained
+			_ = retained
 		}
 		a1 := sample()
 		if a1 <= a0 {

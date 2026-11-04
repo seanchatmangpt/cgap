@@ -30,16 +30,40 @@ ignored-but-digest-covered on read (IPC1 zero-tail discipline).
 The band is closed — gate 020 refuses any value outside it, and the retired
 band `0x4347_000x` is refused by construction.
 
+XC-5r rec #4 taxonomy split: the band is two disjoint classes, not one.
+
+### Success/lifecycle statuses (FM-AOQ-001..003)
+
+These are *statuses*, not refusals: they report frame lifecycle state and
+never deny a read or write.
+
 | Constant id | Wire value | Label | Meaning |
 |-------------|-----------|-------|---------|
 | FM-AOQ-001 | 0x4347A001 | `OK` | Frame complete, digest verified. |
 | FM-AOQ-002 | 0x4347A002 | `PENDING` | Frame enqueued, not yet committed. |
 | FM-AOQ-003 | 0x4347A003 | `BUSY` | Frame is being processed by a consumer. |
+
+### Refusals (FM-AOQ-004..008)
+
+These deny the operation with a typed cause.
+
+| Constant id | Wire value | Label | Meaning |
+|-------------|-----------|-------|---------|
 | FM-AOQ-004 | 0x4347A004 | `INCOMPLETE_FRAME` | Header present, payload truncated. |
 | FM-AOQ-005 | 0x4347A005 | `DIGEST_MISMATCH` | Recomputed FNV-1a32 over [0x00,0x3C) does not match header_digest. |
 | FM-AOQ-006 | 0x4347A006 | `EPOCH_MISMATCH` | Header epoch is retired or not the active epoch. |
 | FM-AOQ-007 | 0x4347A007 | `KEY_UNKNOWN` | key_id has no entry in the active KEM key table. |
 | FM-AOQ-008 | 0x4347A008 | `EPOCH_RETIRED` | Header epoch is retired; frame readable but not writable. |
+
+### Seams-placeholder kernel refusals (XC-5r census)
+
+`KemKernelNotAdmitted` / `AeadKernelNotAdmitted` in `AoqError`
+(`crates/cgap-aoq/src/error.rs`, class codes 0x00_0A / 0x00_0B) are
+seams-placeholder variants per the XC-5r census: the KEM/AEAD kernel seam
+is hand-law (`aoq:KemParam`, `aoq:seam "hand-law"`) and no attack scenario
+exercises them yet — they are the typed landing for a not-yet-admitted
+kernel id, not witnessed refusal paths. AB-8 integration owns their
+population.
 
 ## Epoch enum (closed, u16)
 

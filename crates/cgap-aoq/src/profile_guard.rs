@@ -169,6 +169,9 @@ mod courts {
     fn violation_displays_reason() {
         if cfg!(debug_assertions) {
             let v = assert_release().unwrap_err();
+            // SOURCE-SCAN-EXEMPT: std:: : test-only Display rendering; std is
+            // linked by the lib-test harness; the no_std lib surface never
+            // touches std.
             let s = std::format!("{v}");
             assert!(s.contains("debug_assertions=true"));
             assert!(

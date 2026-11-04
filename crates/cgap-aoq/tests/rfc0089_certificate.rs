@@ -1,9 +1,12 @@
 //! RFC-0089 §8.4 — CBMQS Qualification Certificate (RX-5, v26.11.3).
 //!
-//! Input: a scorecard verdict table (RX-3's output surface). RX-3's
-//! standalone scorecard artifact has not landed, so this court synthesizes
-//! the table from the landed per-gate courts' verdict shapes
-//! (`Status::{Pass, Fail, Skip}` / `GateOutcome` in cbmqs_gates.rs).
+//! Input: a scorecard verdict table (RX-3's output surface). The gate
+//! rows are DERIVED from the same source RFC §6 (RX-3 scorecard) reads
+//! — the landed AB-14 chain-scale receipt on disk — via
+//! `scorecard_table()`; the certificate can never again mark a gate
+//! PASS where the scorecard's law records UNMET (RX-5 correction,
+//! class-3 hazard: green_table had G7 hardcoded Pass vs RFC §6 G7
+//! MEASURED-UNMET at 25.5202 µs/link vs the 25 µs target).
 //!
 //! Certificate = canonical JSON, BLAKE3-sealed via the landed cgap-blake3
 //! crate. No wall clock (kernel law): `timestamp_source: "NONE"`; identity
@@ -256,11 +259,68 @@ pub fn hex(bytes: &[u8]) -> String {
     s
 }
 
-// ---------------------------------------------------------- green table
+// --------------------------------------------------- scorecard-derived table
 
-/// The landed green table: all seven CBMQS gates PASS, numbers from the
-/// landed receipts (ab-6 86 ns amortized; ab-9 0 B/op; ab-19 12.2M/s).
-fn green_table(run_seq: u64) -> VerdictTable {
+/// AB-14's landed receipt — the SAME on-disk source RFC §6 (the RX-3
+/// scorecard, `rfc0089_scorecard.rs` `gate_g7()` leg B) reads. Single
+/// source of truth: the certificate derives its G7 row from this file,
+/// never from a hand-encoded verdict.
+const AB14_RECEIPT: &str = "/Users/sac/ggen/docs/jira/v26.11.3/receipts/ab-14-chain-scale.md";
+
+/// RFC-0089 §6 G7 target, per-link, at the 50k span (same constant the
+/// scorecard's `gate_g7()` applies to leg B).
+const G7_TARGET_US_PER_LINK: f64 = 25.0;
+
+/// The §6 law applied to the scorecard source: parse AB-14's
+/// "50k span" cost line, derive µs/link over 50,000 links, and map to
+/// the certificate verdict vocabulary. Unreadable/unparsable receipt →
+/// `Skip` (which `issue()` fails closed on — no certificate at all),
+/// mirroring the scorecard's TARGET-UNMEASURED degradation.
+pub fn g7_leg_b_from_receipt(path: &str) -> Verdict {
+    let parse = (|| -> Result<Verdict, String> {
+        let rec =
+            std::fs::read_to_string(path).map_err(|e| format!("receipt unreadable: {e}"))?;
+        let marker = "50k span";
+        let idx = rec
+            .find(marker)
+            .ok_or("receipt no longer carries the '50k span' cost line")?;
+        let tail = &rec[idx + marker.len()..];
+        let num: String = tail
+            .chars()
+            .skip_while(|c| !c.is_ascii_digit() && *c != '.')
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let ms: f64 = num
+            .parse()
+            .map_err(|e| format!("'50k span' value unparsable ('{num}'): {e}"))?;
+        if !(rec.contains("min-of-3") || rec.contains("min of 3")) {
+            return Err("receipt lost its min-of-3 disclosure".into());
+        }
+        let us_per_link = ms * 1000.0 / 50_000.0;
+        if us_per_link <= G7_TARGET_US_PER_LINK {
+            Ok(Verdict::Pass)
+        } else {
+            Ok(Verdict::Fail {
+                why: format!(
+                    "RFC §6 G7 MEASURED-UNMET: receipted 50k-span cost {ms:.2} ms / 50,000 \
+                     = {us_per_link:.4} µs/link > 25 µs/link target (debug profile, min-of-3, \
+                     cgap-ffi RingReceiptChain plane; same source the RX-3 scorecard leg B reads)"
+                ),
+            })
+        }
+    })();
+    match parse {
+        Ok(v) => v,
+        Err(e) => Verdict::Skip { reason: format!("G7 §6 source unmeasurable: {e}") },
+    }
+}
+
+/// The certificate table, derived from the scorecard's §6 source
+/// (AB-14 receipt on disk) — NOT a hand-encoded verdict table. G1–G6
+/// cite the landed receipts (ab-6 86 ns amortized; ab-9 0 B/op;
+/// ab-19 12.2M/s); G7 is computed by the §6 law from AB-14, so a
+/// PASS here can only exist if the scorecard source itself says PASS.
+pub fn scorecard_table(run_seq: u64) -> VerdictTable {
     VerdictTable {
         run_seq,
         gates: vec![
@@ -315,10 +375,15 @@ fn green_table(run_seq: u64) -> VerdictTable {
             },
             GateVerdict {
                 id: "G7",
-                composes: "AB-14/AF-7 receipt chain",
-                verdict: Verdict::Pass,
-                measured: "receipt per frame; chain verify green; per-link cost measured".into(),
-                threshold: "chain verifies AND per-link cost measured",
+                composes: "AB-14/AF-21 receipt chain (§6 scorecard source, leg B binding)",
+                verdict: g7_leg_b_from_receipt(AB14_RECEIPT),
+                measured: match g7_leg_b_from_receipt(AB14_RECEIPT) {
+                    Verdict::Pass => "leg B within 25 µs/link at 50k span (per receipt on disk)"
+                        .into(),
+                    Verdict::Fail { why } => why,
+                    Verdict::Skip { reason } => reason,
+                },
+                threshold: "per-link cost <= 25 µs/link at 50k span",
             },
         ],
     }
@@ -331,26 +396,39 @@ mod courts {
     use super::*;
 
     fn green(run_seq: u64) -> VerdictTable {
-        green_table(run_seq)
+        scorecard_table(run_seq)
     }
 
-    /// Gate 1 — §8.4 PASS certificate on a green run: issues, seals,
-    /// verifies clean, deterministic (no wall clock anywhere).
+    /// Gate 1 — §8.4 certificate on the scorecard-derived table. The
+    /// honest state per RFC §6 (G7 MEASURED-UNMET at 25.5202 µs/link)
+    /// is DISQUALIFIED — the certificate states a fact, never softens.
+    /// Issues, seals, verifies clean, deterministic (no wall clock).
     #[test]
     fn court_pass_certificate_on_green_run() {
         let (cert, seal_hex) = issue(
             &green(7),
-            vec!["docs/jira/v26.11.3/receipts/rx-5-certificate.md".into()],
+            vec!["docs/jira/v26.11.3/receipts/rx-5-correction.md".into()],
         )
         .unwrap();
         assert_eq!(cert.spec, "RFC-0089");
         assert_eq!(cert.timestamp_source, "NONE");
-        assert_eq!(cert.overall, Overall::Pass);
+        // Honest overall: G7 leg B is MEASURED-UNMET in the §6 source.
+        assert_eq!(cert.overall, Overall::Disqualified);
         assert_eq!(cert.run_seq, 7);
         assert_eq!(cert.input_hash, hex(&green(7).content_hash()));
         verify(&cert, &seal_hex).unwrap();
+        // G7 is the named failing gate in the body.
+        let body = certificate_json(&cert);
+        let g7_fail = cert
+            .gates
+            .iter()
+            .find(|g| g.id == "G7")
+            .expect("G7 row must exist");
+        assert!(matches!(g7_fail.verdict, Verdict::Fail { .. }));
+        assert!(body.contains("MEASURED-UNMET"));
+        assert!(body.contains("25.5202"));
         // Determinism: same table AND same receipts → same seal (no clock).
-        let receipts = vec!["docs/jira/v26.11.3/receipts/rx-5-certificate.md".to_string()];
+        let receipts = vec!["docs/jira/v26.11.3/receipts/rx-5-correction.md".to_string()];
         let (_, seal2) = issue(&green(7), receipts).unwrap();
         assert_eq!(seal_hex, seal2);
         // run_seq is load-bearing: seq 8 changes the body → different seal.
@@ -402,7 +480,7 @@ mod courts {
         witnessed += 1;
 
         let mut t3 = cert.clone();
-        t3.overall = Overall::Disqualified;
+        t3.overall = Overall::Pass; // base is honestly Disqualified (G7)
         assert!(verify(&t3, &seal_hex).is_err());
         witnessed += 1;
 

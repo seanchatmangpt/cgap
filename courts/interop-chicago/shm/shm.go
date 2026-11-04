@@ -81,8 +81,8 @@ var ErrCount = errors.New("shm: fact_count exceeds mapped capacity")
 
 // Segment is one MAP_SHARED mmap'd temp-file segment.
 type Segment struct {
-	f   *os.File
-	b   []byte // mapped region, HeaderBytes + facts
+	f    *os.File
+	b    []byte // mapped region, HeaderBytes + facts
 	path string
 }
 
