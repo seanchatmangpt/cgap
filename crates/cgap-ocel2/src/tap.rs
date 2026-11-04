@@ -78,7 +78,8 @@ pub const ACTIVITY_BOUNDARY_POISON: &str = "boundary.poison";
 ///
 /// `Some(to)` for an accepted cell; `None` for a refusal cell.
 #[must_use]
-pub fn lawful_step(from: u8, kind: u8) -> Option<u8> {
+#[cfg(test)]
+pub(crate) fn lawful_step(from: u8, kind: u8) -> Option<u8> {
     match (from, kind) {
         (0, 0) => Some(1), // (HandshakeInit, HandshakeEk) -> HandshakeWait
         (1, 1) => Some(2), // (HandshakeWait, HandshakeFinish) -> Established
@@ -215,6 +216,7 @@ impl core::error::Error for TapRefusal {}
 /// Values lane for a row: the 64 raw bytes as u32 values (each <= 255),
 /// encoded with bits=8 by the real writer. Deterministic in, byte-exact
 /// out.
+#[cfg(test)]
 fn row_values(row: &TapEvent) -> [u32; TAP_ROW_BYTES] {
     let bytes = row.encode();
     core::array::from_fn(|i| u32::from(bytes[i]))
@@ -267,7 +269,8 @@ impl TapEvent {
     /// Consume X6's minted row verbatim (the disclosed cross-lane
     /// contract: fields carry over 1:1; reserved stays zero).
     #[must_use]
-    pub fn from_x6(row: &AoqEventRow) -> Self {
+    #[cfg(test)]
+    pub(crate) fn from_x6(row: &AoqEventRow) -> Self {
         Self {
             ordinal: row.ordinal,
             state: row.state,
@@ -280,7 +283,8 @@ impl TapEvent {
 
     /// Project the row back onto X6's shape (round-trip seam).
     #[must_use]
-    pub fn to_x6(&self) -> AoqEventRow {
+    #[cfg(test)]
+    pub(crate) fn to_x6(&self) -> AoqEventRow {
         AoqEventRow {
             ordinal: self.ordinal,
             state: self.state,
@@ -298,6 +302,7 @@ impl TapEvent {
     ///
     /// # Errors
     /// [`TapRefusal::ResealShape`] if the real writer refuses the slab.
+    #[cfg(test)]
     fn seal_static(&self) -> Result<&'static SealedBlock<'static>, TapRefusal> {
         let values = row_values(self);
         let lanes = [&values[..]];
@@ -317,7 +322,8 @@ impl TapEvent {
     ///
     /// # Errors
     /// [`TapRefusal::ResealShape`] if the real writer refuses the slab.
-    pub fn reseal_bytes(&self) -> Result<Vec<u8>, TapRefusal> {
+    #[cfg(test)]
+    pub(crate) fn reseal_bytes(&self) -> Result<Vec<u8>, TapRefusal> {
         let values = row_values(self);
         let lanes = [&values[..]];
         let slab = SlabView { lanes: &lanes, rows: TAP_ROW_BYTES as u32, bits: 8 };
@@ -337,7 +343,8 @@ impl TapEvent {
 /// live for the sink's lifetime. This is the receipt-chain court fixture
 /// precedent (bounded sidecar, host/test tier) — NOT a hot-path design;
 /// a production sidecar would page blocks to its own storage.
-pub struct TapSink {
+#[cfg(test)]
+pub(crate) struct TapSink {
     /// The sidecar-owned receipt chain (one link per tapped row).
     chain: RingReceiptChain,
     /// The chain-covered sealed blocks (parallel to the row log).
@@ -346,10 +353,11 @@ pub struct TapSink {
     rows: Vec<TapEvent>,
 }
 
+#[cfg(test)]
 impl TapSink {
     /// An empty sink.
     #[must_use]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             chain: RingReceiptChain::new(),
             blocks: Vec::new(),
@@ -359,25 +367,25 @@ impl TapSink {
 
     /// Total rows sunk (= chain length).
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.rows.len()
     }
 
     /// True when nothing has been sunk.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
 
     /// The verbatim row log (replay input).
     #[must_use]
-    pub fn rows(&self) -> &[TapEvent] {
+    pub(crate) fn rows(&self) -> &[TapEvent] {
         &self.rows
     }
 
     /// The chain-covered sealed blocks (parallel to [`TapSink::rows`]).
     #[must_use]
-    pub fn blocks(&self) -> &[&'static SealedBlock<'static>] {
+    pub(crate) fn blocks(&self) -> &[&'static SealedBlock<'static>] {
         &self.blocks
     }
 
@@ -390,7 +398,7 @@ impl TapSink {
     /// [`TapRefusal::Spoliation`] when the chain's append gate refuses
     /// (license or seal verdict), mapped 1:1 from the chain's opaque
     /// refusal class.
-    pub fn append(
+    pub(crate) fn append(
         &mut self,
         row: &TapEvent,
         license: &P28LicenseAttestation,
@@ -416,7 +424,7 @@ impl TapSink {
     ///
     /// # Errors
     /// Typed [`TapRefusal`] — see the purity-law docs on this module.
-    pub fn replay(&self, license: &P28LicenseAttestation) -> Result<(), TapRefusal> {
+    pub(crate) fn replay(&self, license: &P28LicenseAttestation) -> Result<(), TapRefusal> {
         // GATE 1: chain invariant over the live committed bytes.
         match self.chain.verify(&self.blocks, license) {
             Ok(()) => {}

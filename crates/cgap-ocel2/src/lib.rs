@@ -70,6 +70,9 @@ use cgap_ffi::receipt_chain::{ReceiptChainRefusal, RingReceiptChain};
 use cgap_p28::attestation::P28LicenseAttestation;
 use cgap_parquet::footer::SealedBlock;
 
+#[cfg(test)]
+mod conformance_court;
+
 pub mod tap;
 pub mod view;
 

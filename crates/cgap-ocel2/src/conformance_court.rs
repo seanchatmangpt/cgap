@@ -30,12 +30,14 @@
 //! pristine leg itself must fail) was run this session with a
 //! sha256-exact restore; see the lane receipt.
 
+use cgap_aoq::aead::{self, Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{
-    parse_frame, FrameKind, KemSeam, Session, SessionError, CT_BYTES, EK_BYTES,
+    confirm_tag, derive, parse_frame, transcript_tag, CTX_HANDSHAKE, CTX_RECV, FrameKind, KemSeam,
+    Session, SessionError, CT_BYTES, EK_BYTES,
 };
-use cgap_ocel2::tap::{lawful_step, TapEvent, TapRefusal, TapSink};
+use crate::tap::{lawful_step, TapEvent, TapRefusal, TapSink};
 use cgap_p28::attestation::{
     P28LicenseAttestation, ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC,
 };
@@ -127,25 +129,54 @@ fn handshake_frame(ek_bytes: &[u8; EK_BYTES], ordinal: u32, epoch: u16) -> Vec<u
     buf
 }
 
-/// HandshakeFinish frame: ct-echo of the peer's pending ciphertext.
+/// HandshakeFinish frame (v3 wire law, M2a): body = ct echo of the peer's
+/// pending ciphertext (1088B) PLUS the 16B confirm tag binding
+/// `recv_key ‖ transcript ‖ ct_echo` — total wire width
+/// `64 + 1 + 1104` (KD-COVERS: cgap-ocel2 fixture drift, v2-era 1088B
+/// Finish frames refused under the v3 law).
 fn finish_frame(peer_ek: &[u8; EK_BYTES], ordinal: u32, epoch: u16) -> Vec<u8> {
-    let (ct, _) = TestKem.encapsulate(peer_ek).expect("kem");
-    let mut buf = vec![0u8; 64 + 1 + CT_BYTES];
+    let (ct, ss) = TestKem.encapsulate(peer_ek).expect("kem");
+    // Recompute the direction-split recv key the session machine derived
+    // at the Ek step (same deterministic TestKem, same inputs).
+    let transcript = transcript_tag(&TestKem, peer_ek, &ss, epoch);
+    let hs_master = derive(&TestKem, CTX_HANDSHAKE, &ss, peer_ek);
+    let recv_key = TestKem.kdf(&[CTX_RECV, &hs_master]);
+    let tag = confirm_tag(&TestKem, &recv_key, &transcript, &ct);
+    let mut buf = vec![0u8; 64 + 1 + CT_BYTES + 16];
     let h = AoqHeader::new(epoch, 0, ordinal, 0);
     codec::encode(&h, &mut buf).expect("header encode");
     buf[64] = FrameKind::HandshakeFinish.id();
-    buf[65..].copy_from_slice(&ct);
+    buf[65..65 + CT_BYTES].copy_from_slice(&ct);
+    buf[65 + CT_BYTES..].copy_from_slice(&tag);
     buf
 }
 
-/// AppData frame: `[seq LE 4B][payload]` (seq prefix per parse_frame law).
-fn app_frame(seq: u32, ordinal: u32, epoch: u16) -> Vec<u8> {
-    let mut buf = vec![0u8; 64 + 1 + 4 + 8];
+/// AppData frame (v3 AEAD-sealed wire law): body = `[seq LE 4B][ct][tag
+/// 16B]`, sealed under the session's recv_key (the fixture is a self-talk
+/// walk: one session both mints and verifies, so the lawful seal key is
+/// the session's own recv_key), nonce `wire_nonce(ordinal, seq)`, AAD =
+/// the covered span `buf[..69]` — exactly what `verify_appdata` checks.
+fn app_frame(
+    seq: u32,
+    ordinal: u32,
+    epoch: u16,
+    recv_key: &[u8; 32],
+) -> Vec<u8> {
+    // 8-byte plaintext payload (the old fixture's payload width).
+    let payload = seq.to_le_bytes();
+    let mut buf = vec![0u8; 64 + 1 + 4 + payload.len() + TAG_LEN];
     let h = AoqHeader::new(epoch, 0, ordinal, seq);
     codec::encode(&h, &mut buf).expect("header encode");
     buf[64] = FrameKind::AppData.id();
     buf[65..69].copy_from_slice(&seq.to_le_bytes());
-    buf[69..73].copy_from_slice(&seq.to_le_bytes()); // payload
+    let nonce = Nonce96::new(u32::from(epoch), (u64::from(ordinal) << 32) | u64::from(seq))
+        .expect("u16 epoch never widens to the reserved u32 epoch");
+    let (covered, tail) = buf.split_at_mut(69);
+    let (ct, rest) = tail.split_at_mut(payload.len());
+    let (tag_out, _) = rest.split_at_mut(TAG_LEN);
+    let mut tag = [0u8; TAG_LEN];
+    aead::seal_detached(ct, &mut tag, &payload, covered, recv_key, &nonce);
+    tag_out.copy_from_slice(&tag);
     buf
 }
 
@@ -230,7 +261,7 @@ fn lawful_walk() -> TapSink {
 
     // AppData x2 (ordinals 2, 3)
     for seq in 0..2u32 {
-        let wire = app_frame(seq, s.ordinal(), 1);
+        let wire = app_frame(seq, s.ordinal(), 1, &s.recv_key());
         s.step(&parse_frame(&wire).expect("parse")).expect("lawful app step");
         tap_step(&mut sink, &s, FrameKind::AppData, &license);
     }
@@ -241,7 +272,7 @@ fn lawful_walk() -> TapSink {
     tap_step(&mut sink, &s, FrameKind::Rekey, &license);
 
     // AppData (ordinal 5): budget back to 1
-    let wire = app_frame(9, s.ordinal(), 1);
+    let wire = app_frame(9, s.ordinal(), 1, &s.recv_key());
     s.step(&parse_frame(&wire).expect("parse")).expect("lawful app step");
     tap_step(&mut sink, &s, FrameKind::AppData, &license);
 
