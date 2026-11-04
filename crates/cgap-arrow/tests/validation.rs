@@ -108,9 +108,9 @@ fn null_count_matches_pushed_none_count() {
                     _ => 1 + xs.below(220),
                 };
                 let null_permille = match k {
-                    0 => 0,     // empty
-                    1 => 0,     // zero nulls -> validity buffer dropped
-                    2 => 1000,  // all nulls
+                    0 => 0,    // empty
+                    1 => 0,    // zero nulls -> validity buffer dropped
+                    2 => 1000, // all nulls
                     _ => 1 + xs.below(998),
                 };
                 let mut b = PrimitiveBuilder::<$t>::new();
@@ -244,7 +244,12 @@ fn null_slots_carry_zero_bytes() {
         "null_slots_carry_zero_bytes: {} cases, {} null slots byte-checked",
         cases, slots_checked
     );
-    assert!(cases >= 40 && slots_checked >= 40, "case budget: {} cases, {} slots", cases, slots_checked);
+    assert!(
+        cases >= 40 && slots_checked >= 40,
+        "case budget: {} cases, {} slots",
+        cases,
+        slots_checked
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +286,13 @@ fn varlen_offset_ladder_u32_and_u64() {
                 // N+1 entries
                 assert_eq!(off.len(), n + 1, "family {} seed {}", $tag, k);
                 // offsets[0] == 0
-                assert_eq!(off[0].to_u64(), 0, "family {} seed {}: first offset != 0", $tag, k);
+                assert_eq!(
+                    off[0].to_u64(),
+                    0,
+                    "family {} seed {}: first offset != 0",
+                    $tag,
+                    k
+                );
                 // offsets[N] == data len
                 assert_eq!(
                     off[n].to_u64() as usize,
@@ -298,14 +309,9 @@ fn varlen_offset_ladder_u32_and_u64() {
                 for i in 0..n {
                     let diff = (off[i + 1].to_u64() - off[i].to_u64()) as usize;
                     assert_eq!(
-                        diff,
-                        pushed_lens[i],
+                        diff, pushed_lens[i],
                         "family {} seed {} row {}: offset diff {} != pushed len {}",
-                        $tag,
-                        k,
-                        i,
-                        diff,
-                        pushed_lens[i]
+                        $tag, k, i, diff, pushed_lens[i]
                     );
                     assert_eq!(
                         v.row(i).len(),
@@ -359,9 +365,9 @@ fn viewvec_descriptor_law_inline_and_foreign() {
             // Deterministic length bands so every case mixes inline, foreign
             // and null rows: band by row phase.
             let len = match (k + i as u64) % 4 {
-                0 => xs.below(13),        // inline: 0..=12
-                1 => 13 + xs.below(36),   // foreign: 13..=48
-                2 => xs.below(13),        // inline
+                0 => xs.below(13),      // inline: 0..=12
+                1 => 13 + xs.below(36), // foreign: 13..=48
+                2 => xs.below(13),      // inline
                 _ => {
                     pushed.push(None);
                     b.push(None);
@@ -380,7 +386,8 @@ fn viewvec_descriptor_law_inline_and_foreign() {
         for i in 0..pushed.len() {
             let base = i * 16;
             let d = v.views_bytes();
-            let dlen = u32::from_le_bytes(d[base..base + 4].try_into().expect("16-byte view")) as usize;
+            let dlen =
+                u32::from_le_bytes(d[base..base + 4].try_into().expect("16-byte view")) as usize;
             let pushed_len = pushed[i].as_ref().map_or(0, |r| r.len());
 
             // (a) descriptor len field == pushed len == row(i).len()
@@ -424,7 +431,8 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                         saw_foreign = true;
                         // (d) foreign: [buffer_index][offset]; bounds law
                         let off =
-                            u32::from_le_bytes(d[base + 12..base + 16].try_into().expect("offset")) as usize;
+                            u32::from_le_bytes(d[base + 12..base + 16].try_into().expect("offset"))
+                                as usize;
                         assert!(
                             off + dlen <= v.data().len(),
                             "seed {} row {}: foreign offset {} + len {} > data len {}",
@@ -443,14 +451,33 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                             i
                         );
                         // row(i) reads the same bytes back
-                        assert_eq!(v.row(i), row.as_slice(), "seed {} row {}: row(i) mismatch", k, i);
+                        assert_eq!(
+                            v.row(i),
+                            row.as_slice(),
+                            "seed {} row {}: row(i) mismatch",
+                            k,
+                            i
+                        );
                     }
                 }
                 None => {
                     // (e) null rows: zero-length inline descriptor
-                    assert_eq!(dlen, 0, "seed {} row {}: null row descriptor len != 0", k, i);
-                    assert!(inline, "seed {} row {}: null row not inline-classified", k, i);
-                    assert!(v.row(i).is_empty(), "seed {} row {}: null row payload not empty", k, i);
+                    assert_eq!(
+                        dlen, 0,
+                        "seed {} row {}: null row descriptor len != 0",
+                        k, i
+                    );
+                    assert!(
+                        inline,
+                        "seed {} row {}: null row not inline-classified",
+                        k, i
+                    );
+                    assert!(
+                        v.row(i).is_empty(),
+                        "seed {} row {}: null row payload not empty",
+                        k,
+                        i
+                    );
                 }
             }
         }
@@ -480,7 +507,9 @@ fn bitmap_word_tail_mask_law() {
 
     // Fixed edge set around word boundaries (n_bits NOT multiples of 64
     // included), plus seeded random sizes.
-    let mut sizes: Vec<usize> = vec![1, 7, 8, 9, 63, 64, 65, 127, 128, 129, 191, 192, 193, 255, 256, 257];
+    let mut sizes: Vec<usize> = vec![
+        1, 7, 8, 9, 63, 64, 65, 127, 128, 129, 191, 192, 193, 255, 256, 257,
+    ];
     for _ in 0..30 {
         sizes.push(1 + xs.below(400));
     }
@@ -499,7 +528,11 @@ fn bitmap_word_tail_mask_law() {
         for w in 0..bm.words_len() {
             let base = w * 64;
             let live = n_bits.saturating_sub(base).min(64);
-            let live_mask: u64 = if live == 64 { u64::MAX } else { (1u64 << live) - 1 };
+            let live_mask: u64 = if live == 64 {
+                u64::MAX
+            } else {
+                (1u64 << live) - 1
+            };
             assert_eq!(
                 bm.word(w) & !live_mask,
                 0,
@@ -572,6 +605,9 @@ fn scalar_format_codes_match_spec_table() {
         };
     }
     scalar_types!(one_type);
-    println!("scalar_format_codes_match_spec_table: {} types checked", cases);
+    println!(
+        "scalar_format_codes_match_spec_table: {} types checked",
+        cases
+    );
     assert_eq!(cases, 10, "all 10 Scalar types must be checked");
 }

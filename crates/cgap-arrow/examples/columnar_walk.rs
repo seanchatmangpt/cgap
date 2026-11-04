@@ -36,7 +36,10 @@ fn primitive_walk() {
     let arr = b.finish();
 
     println!("     len            = {}", arr.len());
-    println!("     format code    = {:?}", Primitive::<i32>::format_code());
+    println!(
+        "     format code    = {:?}",
+        Primitive::<i32>::format_code()
+    );
     let nulls = arr.validity().map_or(0, Bitmap::null_count);
     println!("     null_count     = {}", nulls);
     println!("     values[0..4]   = {:?}", &arr.values()[..arr.len()]);
@@ -48,10 +51,7 @@ fn primitive_walk() {
         x % 64,
         v % 64
     );
-    println!(
-        "     buffers_aligned_64 = {}",
-        arr.buffers_aligned_64()
-    );
+    println!("     buffers_aligned_64 = {}", arr.buffers_aligned_64());
 }
 
 /// Section 2: SWAR validity+predicate mask over 64 rows (one word).
@@ -214,8 +214,10 @@ fn c_abi_walk() {
     // SAFETY: sole owner; read-only field walk.
     unsafe {
         let a: &ArrowArray = &*ptr;
-        println!("     raw fields: length={} null_count={} offset={} n_buffers={} n_children={}",
-            a.length, a.null_count, a.offset, a.n_buffers, a.n_children);
+        println!(
+            "     raw fields: length={} null_count={} offset={} n_buffers={} n_children={}",
+            a.length, a.null_count, a.offset, a.n_buffers, a.n_children
+        );
     }
 
     println!("     drop ForeignArray -> release #1 (frees owned buffers)");
@@ -233,9 +235,7 @@ fn c_abi_walk() {
                 println!("     release #2: callback WAS set and ran (unexpected after drop #1)");
             }
             None => {
-                println!(
-                    "     release #2: slot NULL (CAS-swapped) -> typed no-op, no double free"
-                );
+                println!("     release #2: slot NULL (CAS-swapped) -> typed no-op, no double free");
             }
         }
         drop(Box::from_raw(ptr)); // free the struct shell itself

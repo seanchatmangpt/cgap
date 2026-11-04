@@ -18,9 +18,8 @@ use cgap_gate::penstock::{CgapFrameHeaderAbi, P28LicenseAttestationAbi};
 
 // Size + align equality: the mirrors are layout-identical to the
 // canonical types.
-const _: () = assert!(
-    core::mem::size_of::<CgapFrameHeaderAbi>() == core::mem::size_of::<CgapFrameHeader>()
-);
+const _: () =
+    assert!(core::mem::size_of::<CgapFrameHeaderAbi>() == core::mem::size_of::<CgapFrameHeader>());
 const _: () = assert!(
     core::mem::align_of::<CgapFrameHeaderAbi>() == core::mem::align_of::<CgapFrameHeader>()
 );

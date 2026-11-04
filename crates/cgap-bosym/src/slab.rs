@@ -181,7 +181,10 @@ const _: () = assert!(
     ".bosym v0 header is 16 bytes (8 magic + 2 version + 2 flags + 4 entry_count)"
 );
 
-const _: () = assert!(ENTRY_PREFIX_SIZE == 14, ".bosym v0 entry prefix is 14 bytes (8 sym_id + 1 kind + 3 reserved + 2 name_len)");
+const _: () = assert!(
+    ENTRY_PREFIX_SIZE == 14,
+    ".bosym v0 entry prefix is 14 bytes (8 sym_id + 1 kind + 3 reserved + 2 name_len)"
+);
 
 const _: () = assert!(SHA16_SIZE == 16 && TRAILER_SIZE == 32);
 
@@ -194,22 +197,47 @@ const _: () = assert!(
     "repr(C) header layout must equal the 16-byte wire header exactly"
 );
 
-const _: () = assert!(align_of::<BosymHeader>() == 4, "header alignment is pinned at 4 (largest field u32)");
+const _: () = assert!(
+    align_of::<BosymHeader>() == 4,
+    "header alignment is pinned at 4 (largest field u32)"
+);
 
-const _: () = assert!(offset_of!(BosymHeader, magic) == 0 && offset_of!(BosymHeader, version) == 8 && offset_of!(BosymHeader, flags) == 10 && offset_of!(BosymHeader, entry_count) == 12);
+const _: () = assert!(
+    offset_of!(BosymHeader, magic) == 0
+        && offset_of!(BosymHeader, version) == 8
+        && offset_of!(BosymHeader, flags) == 10
+        && offset_of!(BosymHeader, entry_count) == 12
+);
 
 const _: () = assert!(
     size_of::<BosymEntryPrefix>() == ENTRY_PREFIX_SIZE,
     "packed prefix layout must equal the 14-byte wire prefix exactly"
 );
 
-const _: () = assert!(align_of::<BosymEntryPrefix>() == 1, "packed prefix has byte alignment on the wire");
+const _: () = assert!(
+    align_of::<BosymEntryPrefix>() == 1,
+    "packed prefix has byte alignment on the wire"
+);
 
-const _: () = assert!(offset_of!(BosymEntryPrefix, sym_id) == 0 && offset_of!(BosymEntryPrefix, kind) == 8 && offset_of!(BosymEntryPrefix, reserved) == 9 && offset_of!(BosymEntryPrefix, name_len) == 12);
+const _: () = assert!(
+    offset_of!(BosymEntryPrefix, sym_id) == 0
+        && offset_of!(BosymEntryPrefix, kind) == 8
+        && offset_of!(BosymEntryPrefix, reserved) == 9
+        && offset_of!(BosymEntryPrefix, name_len) == 12
+);
 
-const _: () = assert!(size_of::<SymbolKind>() == 1, "SymbolKind must stay one wire byte");
+const _: () = assert!(
+    size_of::<SymbolKind>() == 1,
+    "SymbolKind must stay one wire byte"
+);
 
-const _: () = assert!(SymbolKind::ENTITY == SymbolKind::Entity as u8 && SymbolKind::RELATION == SymbolKind::Relation as u8 && SymbolKind::IRI == SymbolKind::Iri as u8 && SymbolKind::LABEL == SymbolKind::Label as u8 && SymbolKind::ANNOTATION == SymbolKind::Annotation as u8);
+const _: () = assert!(
+    SymbolKind::ENTITY == SymbolKind::Entity as u8
+        && SymbolKind::RELATION == SymbolKind::Relation as u8
+        && SymbolKind::IRI == SymbolKind::Iri as u8
+        && SymbolKind::LABEL == SymbolKind::Label as u8
+        && SymbolKind::ANNOTATION == SymbolKind::Annotation as u8
+);
 
 const _: () = assert!(SymbolKind::COUNT == 5 && SymbolKind::MAX == 4);
 
@@ -454,16 +482,23 @@ impl fmt::Display for BosymError {
             BosymError::BadMagic => write!(f, "bad magic (not CGAPBSYM)"),
             BosymError::UnsupportedVersion(v) => write!(f, "unsupported version {v} (v0 reader)"),
             BosymError::UnsupportedFlags(v) => {
-                write!(f, "unsupported flags 0x{v:04x} (v0 requires all flag bits zero)")
+                write!(
+                    f,
+                    "unsupported flags 0x{v:04x} (v0 requires all flag bits zero)"
+                )
             }
             BosymError::ReservedNonZero { index } => {
                 write!(f, "entry {index}: reserved bytes non-zero")
             }
-            BosymError::InvalidKind { index, kind } => write!(f, "entry {index}: invalid kind {kind}"),
+            BosymError::InvalidKind { index, kind } => {
+                write!(f, "entry {index}: invalid kind {kind}")
+            }
             BosymError::NameNotUtf8 { index } => write!(f, "entry {index}: name is not UTF-8"),
             BosymError::Sha16Mismatch { index } => write!(f, "entry {index}: sha16 mismatch"),
             BosymError::TrailerMismatch => write!(f, "trailing sha256 mismatch"),
-            BosymError::TrailingGarbage { extra } => write!(f, "{extra} trailing bytes before sha256"),
+            BosymError::TrailingGarbage { extra } => {
+                write!(f, "{extra} trailing bytes before sha256")
+            }
             BosymError::EntryCountMismatch { declared, found } => {
                 write!(f, "entry_count {declared} but decoded {found} entries")
             }
@@ -707,7 +742,9 @@ pub fn emit_projection(export: &GraphExport, for_crate: &str) -> String {
         export.len(),
         for_crate
     ));
-    out.push_str("// Names are out-of-band in the .bosym archive; this file carries interned IDs only.\n\n");
+    out.push_str(
+        "// Names are out-of-band in the .bosym archive; this file carries interned IDs only.\n\n",
+    );
     for e in export.entries() {
         out.push_str(&format!(
             "/// Interned ID for the out-of-band symbol at index {} (kind {}). See .bosym.\n",
@@ -790,9 +827,8 @@ pub fn extract_fibo_tokens(source: &str) -> Vec<String> {
 /// re-minted through the A06 derivation before any kernel-side consumer
 /// treats it as a SlotId. Name-based gate matching does not read sym_id.
 pub fn fibo_graph_export(fibo_lib_rs: &std::path::Path) -> Result<GraphExport, BosymError> {
-    let source = std::fs::read_to_string(fibo_lib_rs).map_err(|e| {
-        BosymError::GraphExportRead(format!("{}: {e}", fibo_lib_rs.display()))
-    })?;
+    let source = std::fs::read_to_string(fibo_lib_rs)
+        .map_err(|e| BosymError::GraphExportRead(format!("{}: {e}", fibo_lib_rs.display())))?;
     let tokens = extract_fibo_tokens(&source);
     let entries = tokens
         .into_iter()
@@ -944,7 +980,10 @@ mod tests {
     fn t1_round_trip_byte_exact() {
         let entries = fixture_entries();
         let bytes = build_archive(&entries).expect("build");
-        assert_eq!(bytes.len(), HEADER_SIZE + TRAILER_SIZE + entries.iter().map(|e| e.wire_size()).sum::<usize>());
+        assert_eq!(
+            bytes.len(),
+            HEADER_SIZE + TRAILER_SIZE + entries.iter().map(|e| e.wire_size()).sum::<usize>()
+        );
         let parsed = parse_archive(&bytes).expect("parse");
         assert_eq!(parsed.len(), entries.len());
         for (a, b) in parsed.iter().zip(entries.iter()) {
@@ -1018,10 +1057,7 @@ mod tests {
             ]
         );
         let abc = sha256(b"abc");
-        assert_eq!(
-            &abc[..8],
-            &[0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea]
-        );
+        assert_eq!(&abc[..8], &[0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea]);
         assert_eq!(
             &abc[8..16],
             &[0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23]
@@ -1048,14 +1084,38 @@ mod tests {
         // (python3 hashlib) this session, then pinned — never from this
         // implementation's own output.
         let edge_digests: [(&usize, &str); 8] = [
-            (&55, "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318"),
-            (&56, "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a"),
-            (&57, "f13b2d724659eb3bf47f2dd6af1accc87b81f09f59f2b75e5c0bed6589dfe8c6"),
-            (&63, "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34"),
-            (&64, "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"),
-            (&119, "31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb"),
-            (&120, "2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c"),
-            (&200, "c2a908d98f5df987ade41b5fce213067efbcc21ef2240212a41e54b5e7c28ae5"),
+            (
+                &55,
+                "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318",
+            ),
+            (
+                &56,
+                "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a",
+            ),
+            (
+                &57,
+                "f13b2d724659eb3bf47f2dd6af1accc87b81f09f59f2b75e5c0bed6589dfe8c6",
+            ),
+            (
+                &63,
+                "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34",
+            ),
+            (
+                &64,
+                "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb",
+            ),
+            (
+                &119,
+                "31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb",
+            ),
+            (
+                &120,
+                "2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c",
+            ),
+            (
+                &200,
+                "c2a908d98f5df987ade41b5fce213067efbcc21ef2240212a41e54b5e7c28ae5",
+            ),
         ];
         for (len, hex) in edge_digests {
             let msg = vec![0x61u8; *len];
@@ -1334,13 +1394,21 @@ mod tests {
             .map(|p| p.join("ontology-packs/fibo/src/lib.rs"))
             .expect("crate two levels under repo root");
         let export = fibo_graph_export(&fibo_lib).expect("graph export");
-        assert!(export.len() >= 8, "expected the real FIBO vocabulary, got {}", export.len());
+        assert!(
+            export.len() >= 8,
+            "expected the real FIBO vocabulary, got {}",
+            export.len()
+        );
         let bytes = build_archive(export.entries()).expect("build");
         std::fs::write(dir.join("symbols.bosym"), &bytes).expect("write archive");
         // Reader over what we wrote: entry-for-entry identity.
         let read_back = parse_archive(&bytes).expect("parse back");
         assert_eq!(read_back.len(), export.len());
-        eprintln!("EMITTED symbols.bosym entries={} bytes={}", export.len(), bytes.len());
+        eprintln!(
+            "EMITTED symbols.bosym entries={} bytes={}",
+            export.len(),
+            bytes.len()
+        );
     }
 }
 
@@ -1429,7 +1497,9 @@ mod ingress_courts {
             (
                 "too-short".into(),
                 good[..MIN_FRAME_SIZE - 1].to_vec(),
-                IngressDropClass::TooShort { have: MIN_FRAME_SIZE - 1 },
+                IngressDropClass::TooShort {
+                    have: MIN_FRAME_SIZE - 1,
+                },
             ),
             ("bad-magic".into(), bad_magic, IngressDropClass::BadMagic),
             (

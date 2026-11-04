@@ -33,8 +33,8 @@
 //! Modes: default 1M frames (CI-adjacent); 10M via `--ignored`.
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::process::Command;
 use std::hint::black_box;
+use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
@@ -181,7 +181,11 @@ fn build_frames(n: usize) -> &'static mut [[u8; WIRE_BYTES]] {
     let mut header_buf = [0u8; 64];
     let mut frames: Vec<[u8; WIRE_BYTES]> = Vec::with_capacity(n);
     for i in 0..n {
-        let notional = if is_toxic(i) { u64::MAX } else { rng.next() % 1_000 };
+        let notional = if is_toxic(i) {
+            u64::MAX
+        } else {
+            rng.next() % 1_000
+        };
         let key_id = ADMITTED_KEY_ID; // plan: margin-toxic only
         let header = AoqHeader::new(1, key_id, i as u32, (i % INSTRUMENTS) as u32);
         codec::encode(&header, &mut header_buf).expect("bench: lawful header");
@@ -421,18 +425,27 @@ fn report(name: &str, r: &TransitResult, stages: &StageNs, timer_floor_ns: f64) 
             sorted.last().copied().unwrap_or(0)
         );
     }
-    println!("measured timer floor (Instant pair, this machine): {:.1} ns", timer_floor_ns);
+    println!(
+        "measured timer floor (Instant pair, this machine): {:.1} ns",
+        timer_floor_ns
+    );
     println!("\nstage attribution (isolated loops, ns/frame):");
     println!("  gate (raw-wire margin ledger): {:.1}", stages.gate);
     println!("  decode (AB-6 codec):           {:.1}", stages.decode);
     println!("  slab push (AB-19 128B slot):   {:.1}", stages.slab);
     println!("  blake3 raw hash 128B:          {:.1}", stages.hash_raw);
-    println!("  receipt (AB-7 chain append):   {:.1}  (2x blake3 + record write)", stages.receipt_chain);
+    println!(
+        "  receipt (AB-7 chain append):   {:.1}  (2x blake3 + record write)",
+        stages.receipt_chain
+    );
     let summed_min = stages.gate + stages.decode + stages.slab + stages.hash_raw;
     let summed_chain = stages.gate + stages.decode + stages.slab + stages.receipt_chain;
     println!("\ncomposed-vs-summed (dossier additive model uses raw hash):");
     println!("  summed (gate+decode+slab+raw hash): {:.1} ns", summed_min);
-    println!("  summed (gate+decode+slab+chain receipt): {:.1} ns", summed_chain);
+    println!(
+        "  summed (gate+decode+slab+chain receipt): {:.1} ns",
+        summed_chain
+    );
     println!(
         "  composed measured: {:.1} ns  ->  divergence vs summed(raw): {:+.1} ns ({:+.0}%)",
         per_frame,
@@ -443,7 +456,10 @@ fn report(name: &str, r: &TransitResult, stages: &StageNs, timer_floor_ns: f64) 
         "  composed frames/s: {:.0}  (dossier TARGET-UNMEASURED: 3.9M/s @ 253.2 ns)",
         tput
     );
-    println!("  alloc census: {} calls / {} bytes (target 0)", r.alloc_calls, r.alloc_bytes);
+    println!(
+        "  alloc census: {} calls / {} bytes (target 0)",
+        r.alloc_calls, r.alloc_bytes
+    );
     println!("  chain head {:02x?}..., verify_records: OK", &r.head[..4]);
 
     // --- Courts/gates ---
@@ -452,9 +468,17 @@ fn report(name: &str, r: &TransitResult, stages: &StageNs, timer_floor_ns: f64) 
         "toxic margin census drift"
     );
     assert_eq!(r.other_refusals, 0, "unexpected codec refusals");
-    assert_eq!(r.admitted + r.margin_refusals, r.frames, "admit+refuse conservation");
+    assert_eq!(
+        r.admitted + r.margin_refusals,
+        r.frames,
+        "admit+refuse conservation"
+    );
     assert_eq!(r.links, r.admitted, "chain link conservation");
-    assert_eq!(r.alloc_calls, 0, "composed loop allocated {} times", r.alloc_calls);
+    assert_eq!(
+        r.alloc_calls, 0,
+        "composed loop allocated {} times",
+        r.alloc_calls
+    );
     assert_eq!(r.alloc_bytes, 0, "composed loop allocated bytes");
 }
 
@@ -505,7 +529,12 @@ fn composed_transit_1m() {
     };
 
     report("composed 1M frames", &r, &stages, timer_floor_ns);
-    report("composed 1M frames (per-frame timer)", &r_timed, &stages, timer_floor_ns);
+    report(
+        "composed 1M frames (per-frame timer)",
+        &r_timed,
+        &stages,
+        timer_floor_ns,
+    );
 
     // The timed pass must satisfy the same courts.
     assert_eq!(r_timed.margin_refusals, r.margin_refusals);

@@ -19,9 +19,9 @@ use std::process::Command;
 
 use cgap_arrow::layout::{Quad64, QUAD_SIZE};
 use cgap_blake3::hash;
-use cgap_parquet::level_free::{read_page_payload, write_page, LevelFreeType};
 use cgap_git::pack_write::{encode_object_header, git_object_oid, parse_idx_v2, parse_pack_v2};
 use cgap_git::PackBuilder;
+use cgap_parquet::level_free::{read_page_payload, write_page, LevelFreeType};
 
 /// Deterministic pseudo-random quad stream (xorshift64*), so every run of
 /// the test hashes the same batch and the receipt is reproducible.
@@ -115,13 +115,27 @@ impl ColumnSet {
             c.payload.clear();
         }
         for q in quads {
-            self.cols[0].payload.extend_from_slice(&q.s_id.to_le_bytes());
-            self.cols[1].payload.extend_from_slice(&q.p_id.to_le_bytes());
-            self.cols[2].payload.extend_from_slice(&q.o_id.to_le_bytes());
-            self.cols[3].payload.extend_from_slice(&q.g_id.to_le_bytes());
-            self.cols[4].payload.extend_from_slice(&q.t_ns.to_le_bytes());
-            self.cols[5].payload.extend_from_slice(&q.vector_clock.to_le_bytes());
-            self.cols[6].payload.extend_from_slice(&q.policy_mask.to_le_bytes());
+            self.cols[0]
+                .payload
+                .extend_from_slice(&q.s_id.to_le_bytes());
+            self.cols[1]
+                .payload
+                .extend_from_slice(&q.p_id.to_le_bytes());
+            self.cols[2]
+                .payload
+                .extend_from_slice(&q.o_id.to_le_bytes());
+            self.cols[3]
+                .payload
+                .extend_from_slice(&q.g_id.to_le_bytes());
+            self.cols[4]
+                .payload
+                .extend_from_slice(&q.t_ns.to_le_bytes());
+            self.cols[5]
+                .payload
+                .extend_from_slice(&q.vector_clock.to_le_bytes());
+            self.cols[6]
+                .payload
+                .extend_from_slice(&q.policy_mask.to_le_bytes());
             self.cols[7].payload.extend_from_slice(&q.inline_digest);
         }
     }
@@ -146,9 +160,9 @@ fn require_git() -> String {
             out.status.code(),
             String::from_utf8_lossy(&out.stderr)
         ),
-        Err(e) => panic!(
-            "SKIP-REFUSAL: git binary not runnable: {e}. Court cannot run without real git."
-        ),
+        Err(e) => {
+            panic!("SKIP-REFUSAL: git binary not runnable: {e}. Court cannot run without real git.")
+        }
     }
 }
 
@@ -248,8 +262,7 @@ fn admission_e2e_roundtrip_and_receipt() {
     let pages: Vec<(&'static str, Vec<u8>, LevelFreeType)> = project_columns(&quads)
         .into_iter()
         .map(|c| {
-            let page = write_page(c.ty, &c.payload, quads.len())
-                .expect("level-free page write");
+            let page = write_page(c.ty, &c.payload, quads.len()).expect("level-free page write");
             (c.name, page, c.ty)
         })
         .collect();
@@ -261,8 +274,9 @@ fn admission_e2e_roundtrip_and_receipt() {
     for (_name, page, _ty) in &pages {
         builder.push(page);
     }
-    let (pack, idx) =
-        builder.finish().expect("cgap-git PackBuilder finish over the page payloads");
+    let (pack, idx) = builder
+        .finish()
+        .expect("cgap-git PackBuilder finish over the page payloads");
     assert_eq!(builder.len(), 8, "builder carries one blob per page");
 
     // Parse the idx back (independent reader): one entry per page.
@@ -275,7 +289,11 @@ fn admission_e2e_roundtrip_and_receipt() {
     assert_eq!(parsed.len(), 8, "pack must carry one object per page");
     for (obj, (name, page, _)) in parsed.iter().zip(pages.iter()) {
         assert_eq!(obj.obj_type, 3, "{name} packs as a pack-v2 blob (type 3)");
-        assert_eq!(obj.size, page.len() as u64, "{name} header size round-trips");
+        assert_eq!(
+            obj.size,
+            page.len() as u64,
+            "{name} header size round-trips"
+        );
         let hdr_len = encode_object_header(3, obj.size).len();
         let start = obj.offset as usize + hdr_len;
         let next = parsed
@@ -372,7 +390,10 @@ fn admission_e2e_roundtrip_and_receipt() {
     let mut readback = Vec::with_capacity(bytes.len());
     for i in 0..quads.len() {
         let mut row = [0u8; QUAD_SIZE];
-        for (col, off) in u32_cols.iter().zip([0x00usize, 0x04, 0x08, 0x0C, 0x18, 0x1C]) {
+        for (col, off) in u32_cols
+            .iter()
+            .zip([0x00usize, 0x04, 0x08, 0x0C, 0x18, 0x1C])
+        {
             row[off..off + 4].copy_from_slice(&col[i * 4..i * 4 + 4]);
         }
         row[0x10..0x18].copy_from_slice(&t_payload[i * 8..i * 8 + 8]);
@@ -381,7 +402,11 @@ fn admission_e2e_roundtrip_and_receipt() {
     }
 
     assert_eq!(readback, bytes, "round trip must be byte-identical");
-    assert_eq!(hash(&readback), receipt, "receipt must survive the pipeline");
+    assert_eq!(
+        hash(&readback),
+        receipt,
+        "receipt must survive the pipeline"
+    );
 }
 
 #[test]

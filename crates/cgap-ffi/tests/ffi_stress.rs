@@ -30,9 +30,9 @@ use cgap_core::frame::{
 };
 use cgap_ffi::sovereign::{
     cgap_admit_frame, cgap_commit_parquet, cgap_eval_bn3, cgap_verify_p28, CgapAdmitFrameFn,
-    CgapCommitParquetFn, CgapEvalBn3Fn, CgapStatus, CGAP_ERR_CONCURRENT_WRITER_DENIED,
-    CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED, CGAP_ERR_OABI_MISMATCH,
-    CGAP_ERR_SHACL_VIOLATION, CGAP_ERR_P28_SPOLIATION, CGAP_OK, CgapFrameView,
+    CgapCommitParquetFn, CgapEvalBn3Fn, CgapFrameView, CgapStatus,
+    CGAP_ERR_CONCURRENT_WRITER_DENIED, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_LEASE_EXHAUSTED,
+    CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_ERR_SHACL_VIOLATION, CGAP_OK,
 };
 use std::hint::black_box;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -256,11 +256,11 @@ fn one_rule_network() -> Vec<u8> {
 }
 
 fn store_payload() -> Vec<u8> {
-    let cols: [Vec<u64>; 3] = [vec![k(1), k(5), k(9)], vec![k(2), k(2), k(3)], vec![
-        k(100),
-        k(100),
-        k(250),
-    ]];
+    let cols: [Vec<u64>; 3] = [
+        vec![k(1), k(5), k(9)],
+        vec![k(2), k(2), k(3)],
+        vec![k(100), k(100), k(250)],
+    ];
     let mut b = Vec::with_capacity(24 * 3);
     for w in cols.iter().flatten() {
         b.extend_from_slice(&w.to_le_bytes());
@@ -316,7 +316,10 @@ fn status_word_exhaustive_hostile_input_sweep() {
         let mut view = fresh_view();
         let f: CgapAdmitFrameFn = cgap_admit_frame;
         let st = unsafe { f(core::ptr::null(), 0, &mut view) };
-        assert_eq!(st, CGAP_ERR_INVALID_MAGIC, "null bytes refuse INVALID_MAGIC");
+        assert_eq!(
+            st, CGAP_ERR_INVALID_MAGIC,
+            "null bytes refuse INVALID_MAGIC"
+        );
     }
     // Garbage bytes (>= 128 B so the length gate passes; magic flips).
     {
@@ -405,10 +408,8 @@ fn status_word_exhaustive_hostile_input_sweep() {
     // Commit: out-of-domain lane value (> 255) and a null path.
     {
         let tmp = std::env::temp_dir().join(format!("cgap-ab15-shacl-{}", std::process::id()));
-        let cpath = std::ffi::CString::new(
-            tmp.join("shacl.parquet").to_str().expect("utf8 path"),
-        )
-        .expect("cstring");
+        let cpath = std::ffi::CString::new(tmp.join("shacl.parquet").to_str().expect("utf8 path"))
+            .expect("cstring");
         assert_eq!(
             call_commit(&[1, 2, 300], &cpath.as_c_str()),
             CGAP_ERR_SHACL_VIOLATION,

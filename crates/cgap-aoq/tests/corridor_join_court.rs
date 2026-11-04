@@ -31,8 +31,8 @@ use std::os::unix::net::UnixStream;
 
 use cgap_aoq::chain::{AoqChain, AoqChainRecord, ChainDigest};
 use cgap_aoq::error::AoqError;
-use cgap_aoq::verify::{decrypt_in_place, verify_window};
 use cgap_aoq::session::KemSeam;
+use cgap_aoq::verify::{decrypt_in_place, verify_window};
 use cgap_aoq::writer::AoqWriter;
 use cgap_crypto::aead::{self, Nonce96};
 use cgap_crypto::fips202::Shake256;
@@ -76,7 +76,10 @@ impl cgap_aoq::session::KemSeam for MlkemKem {
         &self,
         ek: &[u8; cgap_aoq::session::EK_BYTES],
     ) -> Result<
-        ([u8; cgap_aoq::session::CT_BYTES], [u8; cgap_aoq::session::SS_BYTES]),
+        (
+            [u8; cgap_aoq::session::CT_BYTES],
+            [u8; cgap_aoq::session::SS_BYTES],
+        ),
         cgap_aoq::session::SessionError,
     > {
         // Deterministic encapsulation seed (no RNG in-crate by design).
@@ -102,8 +105,6 @@ impl cgap_aoq::session::KemSeam for MlkemKem {
         shake32(parts)
     }
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Shared corridor constants + helpers
@@ -141,7 +142,10 @@ fn array_body(values: &[i64]) -> Vec<u8> {
 fn arrow_values(iter: usize) -> Vec<i64> {
     let n = 16 + (iter % 8) * 8;
     (0..n)
-        .map(|i| ((i as i64) + 1).wrapping_mul(0x517C_C1B7_2767_6D2F_u64.wrapping_add(iter as u64) as i64))
+        .map(|i| {
+            ((i as i64) + 1)
+                .wrapping_mul(0x517C_C1B7_2767_6D2F_u64.wrapping_add(iter as u64) as i64)
+        })
         .collect()
 }
 
@@ -189,7 +193,8 @@ fn corridor_hop(
     // commit — ZeroProgress law: commit only after the sink accepted all
     // five segments).
     let total = {
-        let segs = writer.frame_segments(EPOCH, KEY_ID, &wire_tag, &ct_body)
+        let segs = writer
+            .frame_segments(EPOCH, KEY_ID, &wire_tag, &ct_body)
             .expect("frame_segments");
         let seg_total = segs.total_len();
         let zero_pad = [0u8; 8192]; // body pad: scatter-your-own-zero-buffer law
@@ -223,9 +228,7 @@ fn corridor_hop(
     // VERIFY (AB-8 window law): the receiver recomputes the tamper-tier tag
     // from the RECEIVED body bytes — this is the gate that must refuse a
     // flipped ciphertext byte.
-    let body_len = u32::from_le_bytes([
-        window[72], window[73], window[74], window[75],
-    ]) as usize;
+    let body_len = u32::from_le_bytes([window[72], window[73], window[74], window[75]]) as usize;
     let expected = wire_tag_for(&window[128..128 + body_len]);
     let vw = verify_window(&window, ordinal, seq, &expected).expect("verify_window");
 
@@ -339,7 +342,14 @@ fn j2_tamper_battery_all_gates_fire() {
     let nonce = Nonce96::new(u32::from(EPOCH), seq as u64).expect("nonce");
     let mut ct = vec![0u8; body.len()];
     let mut tag = [0u8; aead::TAG_LEN];
-    aead::seal_detached(&mut ct, &mut tag, &body, &corridor_aad(ordinal, seq, body.len()), &[7u8; 32], &nonce);
+    aead::seal_detached(
+        &mut ct,
+        &mut tag,
+        &body,
+        &corridor_aad(ordinal, seq, body.len()),
+        &[7u8; 32],
+        &nonce,
+    );
 
     let mut window = vec![0u8; 8 + 120 + ct.len() + pad64(ct.len()) + 8];
     let wire_tag = wire_tag_for(&ct);
@@ -356,7 +366,10 @@ fn j2_tamper_battery_all_gates_fire() {
         w[body_at] ^= 0x01;
         let recomputed = wire_tag_for(&w[body_at..body_at + ct.len()]);
         let err = verify_window(&w, ordinal, seq, &recomputed).expect_err("flip must refuse");
-        assert!(matches!(err, AoqError::DigestMismatch { .. }), "got {err:?}");
+        assert!(
+            matches!(err, AoqError::DigestMismatch { .. }),
+            "got {err:?}"
+        );
     }
 
     // Gate 2: cursor regression -> FrameOrdinalRegression; seq drift ->
@@ -375,7 +388,10 @@ fn j2_tamper_battery_all_gates_fire() {
     {
         let wrong_tag = [0u8; 16];
         let err = verify_window(window, ordinal, seq, &wrong_tag).expect_err("wrong tag");
-        assert!(matches!(err, AoqError::DigestMismatch { .. }), "got {err:?}");
+        assert!(
+            matches!(err, AoqError::DigestMismatch { .. }),
+            "got {err:?}"
+        );
     }
 
     // Gate 4: tampered AEAD tag at open_detached -> Mismatch.
@@ -384,7 +400,12 @@ fn j2_tamper_battery_all_gates_fire() {
         let mut bad_tag = tag;
         bad_tag[0] ^= 0x80;
         let res = cgap_crypto::aead::open_detached(
-            &mut pt, &ct, &bad_tag, &corridor_aad(ordinal, seq, body.len()), &[7u8; 32], &nonce,
+            &mut pt,
+            &ct,
+            &bad_tag,
+            &corridor_aad(ordinal, seq, body.len()),
+            &[7u8; 32],
+            &nonce,
         );
         assert!(res.is_err(), "open_detached must refuse a tampered tag");
     }
@@ -408,7 +429,10 @@ fn j2_tamper_battery_all_gates_fire() {
         let mut w2 = window.to_vec();
         let before = w2.clone();
         let err = decrypt_in_place(&vw, &[], &mut w2).expect_err("short keystream");
-        assert!(matches!(err, AoqError::HeaderTooShort { .. }), "got {err:?}");
+        assert!(
+            matches!(err, AoqError::HeaderTooShort { .. }),
+            "got {err:?}"
+        );
         assert_eq!(w2, before, "window untouched on refusal");
     }
 }

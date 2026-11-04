@@ -22,12 +22,10 @@ use cgap_bn3::builtins::{
     dispatch, BuiltinContext, BuiltinPayload, OP_LOG_ASSERT, OP_MATH_GREATER_THAN, OP_MATH_MIN,
     OP_MATH_SUM, REGISTER_COUNT,
 };
-use cgap_bn3::sigil::{
-    encode_term, BN3_STATEMENT_SIZE, BN3Statement, PAYLOAD_MASK, Sigil,
-};
+use cgap_bn3::sigil::{encode_term, BN3Statement, Sigil, BN3_STATEMENT_SIZE, PAYLOAD_MASK};
 use cgap_bn3::unify::{
-    unify_batch_into, BodyAtom, DEFAULT_CHUNK_ROWS, EvalScratch, MatchSet, Rule, RuleCompiler,
-    StatementColumns,
+    unify_batch_into, BodyAtom, EvalScratch, MatchSet, Rule, RuleCompiler, StatementColumns,
+    DEFAULT_CHUNK_ROWS,
 };
 use divan::counter::BytesCount;
 use divan::{black_box, Bencher};
@@ -100,7 +98,10 @@ fn statement_scan_24b<const N: usize>(b: Bencher) {
             sum = sum.wrapping_add(st.s ^ st.p ^ st.o);
             count += 1;
         }
-        assert_eq!(count, N, "scan closure count (skipped-row mutation flips this)");
+        assert_eq!(
+            count, N,
+            "scan closure count (skipped-row mutation flips this)"
+        );
         black_box(sum);
     });
 }
@@ -163,13 +164,7 @@ fn seed_join_corpus(n: usize) -> (Vec<u64>, Vec<u64>, Vec<u64>, u64, u64) {
 /// equality over the corpus — NO unify code in the oracle path, so the
 /// bench assert is a differential check (register machine vs plain
 /// nested-loop semantics), not a tautology.
-fn oracle_match_count(
-    s_col: &[u64],
-    p_col: &[u64],
-    o_col: &[u64],
-    pa: u64,
-    pb: u64,
-) -> u64 {
+fn oracle_match_count(s_col: &[u64], p_col: &[u64], o_col: &[u64], pa: u64, pb: u64) -> u64 {
     use std::collections::HashMap;
     let mut hist: HashMap<(u64, u64), u64> = HashMap::new();
     for i in 0..s_col.len() {
@@ -234,8 +229,14 @@ fn unify_join_2atom_pairs<const N: usize>(b: Bencher) {
     assert_eq!(compiled.var_count, 2, "join binds exactly two variables");
     let oracle = oracle_match_count(&s_col, &p_col, &o_col, pa, pb);
     let pairs = join_pair_count(&p_col, pa, pb, DEFAULT_CHUNK_ROWS);
-    assert!(oracle > 0, "join oracle empty at N={N}: bench would be vacuous");
-    assert!(pairs > 0, "pair count empty at N={N}: bench would be vacuous");
+    assert!(
+        oracle > 0,
+        "join oracle empty at N={N}: bench would be vacuous"
+    );
+    assert!(
+        pairs > 0,
+        "pair count empty at N={N}: bench would be vacuous"
+    );
     eprintln!(
         "[bn3-bench] unify N={N} parents={} cands={} pairs={pairs} oracle_matches={oracle}",
         join_shape(N).0,
@@ -256,7 +257,10 @@ fn unify_join_2atom_pairs<const N: usize>(b: Bencher) {
         // Binding-count assert: the raw-word oracle predicts the match
         // count exactly; a mutated comparator (binding-alias class,
         // doe-4 SHIM-DOE4) or wrong binding order diverges and flips it.
-        assert_eq!(out.len, oracle as usize, "unify binding count vs raw-word oracle");
+        assert_eq!(
+            out.len, oracle as usize,
+            "unify binding count vs raw-word oracle"
+        );
         assert_eq!(
             out.var_values[0].len(),
             oracle as usize,
@@ -302,8 +306,12 @@ fn builtin_dispatch_hot_arms_65k(b: Bencher) {
     // passed so the dispatch collaborator is real, not stubbed).
     let slab: Vec<u8> = (0..4096).map(|_| sm.next() as u8).collect();
 
-    const OPCODE_CYCLE: [u8; 4] =
-        [OP_MATH_GREATER_THAN, OP_MATH_SUM, OP_MATH_MIN, OP_LOG_ASSERT];
+    const OPCODE_CYCLE: [u8; 4] = [
+        OP_MATH_GREATER_THAN,
+        OP_MATH_SUM,
+        OP_MATH_MIN,
+        OP_LOG_ASSERT,
+    ];
     let mut payloads = Vec::with_capacity(EVALS);
     let mut expected = 0u64;
     for i in 0..EVALS {

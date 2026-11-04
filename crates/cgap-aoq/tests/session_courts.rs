@@ -8,7 +8,7 @@ use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{
     derive, parse_frame, transcript_tag, Frame, FrameKind, KemSeam, Session, SessionError,
-    SessionState, CT_BYTES, CTX_HANDSHAKE, CTX_REKEY, EK_BYTES, REKEY_BUDGET, SS_BYTES,
+    SessionState, CTX_HANDSHAKE, CTX_REKEY, CT_BYTES, EK_BYTES, REKEY_BUDGET, SS_BYTES,
 };
 
 /// Deterministic digest substrate (shared with the chain courts by
@@ -65,11 +65,7 @@ impl KemSeam for TestKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; SS_BYTES], SessionError> {
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], SessionError> {
         if dk.len() != EK_BYTES {
             return Err(SessionError::KemRefused { op: 1 });
         }
@@ -107,14 +103,7 @@ fn ek_of(seed: u8) -> [u8; EK_BYTES] {
 }
 
 /// AOQ1 header + kind + body wire builder (composes codec::encode).
-fn wire(
-    epoch: u16,
-    key_id: u64,
-    ordinal: u32,
-    seq: u32,
-    kind: FrameKind,
-    body: &[u8],
-) -> Vec<u8> {
+fn wire(epoch: u16, key_id: u64, ordinal: u32, seq: u32, kind: FrameKind, body: &[u8]) -> Vec<u8> {
     let mut buf = vec![0u8; 64 + 1 + body.len()];
     let h = AoqHeader::new(epoch, key_id, ordinal, seq);
     codec::encode(&h, &mut buf).unwrap();
@@ -127,13 +116,7 @@ fn ek_frame(epoch: u16, key_id: u64, ordinal: u32, ek: &[u8; EK_BYTES]) -> Vec<u
     wire(epoch, key_id, ordinal, 0, FrameKind::HandshakeEk, ek)
 }
 
-fn fin_frame(
-    epoch: u16,
-    key_id: u64,
-    ordinal: u32,
-    kem: &TestKem,
-    ek: &[u8; EK_BYTES],
-) -> Vec<u8> {
+fn fin_frame(epoch: u16, key_id: u64, ordinal: u32, kem: &TestKem, ek: &[u8; EK_BYTES]) -> Vec<u8> {
     let (ct, _) = kem.encapsulate(ek).unwrap();
     wire(epoch, key_id, ordinal, 0, FrameKind::HandshakeFinish, &ct)
 }
@@ -160,7 +143,6 @@ fn rekey_frame(epoch: u16, ordinal: u32, ek: &[u8; EK_BYTES]) -> Vec<u8> {
     wire(epoch, 7, ordinal, 0, FrameKind::Rekey, ek)
 }
 
-
 /// Step helper: parse (borrowed frame must outlive the call) then step.
 fn step(s: &mut Session<'static, TestKem>, w: &[u8]) -> Result<(), SessionError> {
     let f = parse_frame(w)?;
@@ -183,7 +165,7 @@ fn s1_exhaustive_transition_table() {
                 step(&mut s, &ek_frame(0, 7, 100, &ek_of(1))).unwrap();
             }
             2 => {
-                step(&mut s, &ek_frame(0,7,100,&ek_of(1))).unwrap();
+                step(&mut s, &ek_frame(0, 7, 100, &ek_of(1))).unwrap();
                 step(&mut s, &fin_frame(0, 7, 101, &KEM, &ek_of(1))).unwrap();
             }
             3 => {
@@ -196,9 +178,13 @@ fn s1_exhaustive_transition_table() {
 
     let mut checked = 0usize;
     for state in 0u8..4 {
-        for kind in [FrameKind::HandshakeEk, FrameKind::HandshakeFinish,
-                     FrameKind::AppData, FrameKind::Rekey, FrameKind::Close]
-        {
+        for kind in [
+            FrameKind::HandshakeEk,
+            FrameKind::HandshakeFinish,
+            FrameKind::AppData,
+            FrameKind::Rekey,
+            FrameKind::Close,
+        ] {
             let mut s = mk(state);
             let before = s.fingerprint();
             // Build the wire frame at the session's expected ordinal,
@@ -234,7 +220,10 @@ fn s1_exhaustive_transition_table() {
                     "closed must refuse {kind:?} in state {state}"
                 );
             } else if lawful {
-                assert!(outcome.is_ok(), "lawful cell ({state},{kind:?}) refused: {outcome:?}");
+                assert!(
+                    outcome.is_ok(),
+                    "lawful cell ({state},{kind:?}) refused: {outcome:?}"
+                );
             } else {
                 assert!(
                     matches!(outcome, Err(SessionError::UnexpectedFrame { .. })),
@@ -283,11 +272,25 @@ fn s2_no_mutation_on_refusal_byte_identity() {
             // RETIRED epoch (u16::MAX) refused by construction.
             wire(65535, 7, s.ordinal(), 0, FrameKind::Close, &[]),
             // Wrong ordinal (expected+1).
-            wire(0, 7, s.ordinal().wrapping_add(1), 0, FrameKind::AppData, &app_body(0, b"")),
+            wire(
+                0,
+                7,
+                s.ordinal().wrapping_add(1),
+                0,
+                FrameKind::AppData,
+                &app_body(0, b""),
+            ),
             // Wrong-state: AppData outside 2 (or budget-exhausted).
             app_frame(0, s.ordinal(), 0, b""),
             // Finish outside 1 (refused before any ct check).
-            wire(0, 7, s.ordinal(), 0, FrameKind::HandshakeFinish, &[0u8; CT_BYTES]),
+            wire(
+                0,
+                7,
+                s.ordinal(),
+                0,
+                FrameKind::HandshakeFinish,
+                &[0u8; CT_BYTES],
+            ),
         ];
         for frame_w in &refusal_wires {
             let _ = step(&mut s, frame_w);
@@ -315,10 +318,10 @@ fn s2_no_mutation_on_refusal_byte_identity() {
 fn s3_rekey_budget_counted_not_timed() {
     let mut s = Session::new(&KEM, 0, 7, 0);
     let w = ek_frame(0, 7, 0, &ek_of(1));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     s.step(&f).unwrap();
     let w = fin_frame(0, 7, 1, &KEM, &ek_of(1));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     s.step(&f).unwrap();
 
     for i in 0u32..REKEY_BUDGET {
@@ -330,22 +333,25 @@ fn s3_rekey_budget_counted_not_timed() {
     // Boundary: next AppData refuses; the session is unmuted.
     let before = s.fingerprint();
     let w = app_frame(0, REKEY_BUDGET + 2, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
-        Err(SessionError::RekeyRequired { used: REKEY_BUDGET, budget: REKEY_BUDGET })
+        Err(SessionError::RekeyRequired {
+            used: REKEY_BUDGET,
+            budget: REKEY_BUDGET
+        })
     ));
     assert_eq!(s.fingerprint(), before, "budget refusal does not mutate");
 
     // Accepted rekey resets the counter (two-round derivation, fresh tag).
     let w = rekey_frame(0, REKEY_BUDGET + 2, &ek_of(5));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     s.step(&f).unwrap();
     assert_eq!(s.budget_used(), 0);
     assert_eq!(s.state(), SessionState::Established);
     // Budget restarts counting.
     let w = app_frame(0, REKEY_BUDGET + 3, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_ok());
     assert_eq!(s.budget_used(), 1);
 }
@@ -411,7 +417,9 @@ fn s4_parse_frame_length_law() {
     bad[0] ^= 0xff;
     assert!(matches!(
         parse_frame(&bad),
-        Err(SessionError::Wire(cgap_aoq::error::AoqError::BadMagic { .. }))
+        Err(SessionError::Wire(
+            cgap_aoq::error::AoqError::BadMagic { .. }
+        ))
     ));
 }
 
@@ -460,40 +468,52 @@ fn s6_two_round_kdf() {
 #[test]
 fn s7_epoch_ordinal_wire_law() {
     let mut s = established(0, 0, 1); // ordinal now 2
-    // RETIRED epoch (u16::MAX): refused even with the right ordinal.
+                                      // RETIRED epoch (u16::MAX): refused even with the right ordinal.
     let w = wire(65535, 7, 2, 0, FrameKind::AppData, &app_body(0, b""));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
-        Err(SessionError::EpochMismatch { expected: 0, got: 65535 })
+        Err(SessionError::EpochMismatch {
+            expected: 0,
+            got: 65535
+        })
     ));
     // Wrong epoch (1) refused.
     let w = wire(1, 7, 2, 0, FrameKind::AppData, &app_body(0, b""));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
-        Err(SessionError::EpochMismatch { expected: 0, got: 1 })
+        Err(SessionError::EpochMismatch {
+            expected: 0,
+            got: 1
+        })
     ));
     // Ordinal gap (+1) refused.
     let w = app_frame(0, 4, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
-        Err(SessionError::OrdinalMismatch { expected: 2, got: 4 })
+        Err(SessionError::OrdinalMismatch {
+            expected: 2,
+            got: 4
+        })
     ));
     // Ordinal regression (rewind to 1) refused.
     let w = app_frame(0, 1, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
-        Err(SessionError::OrdinalMismatch { expected: 2, got: 1 })
+        Err(SessionError::OrdinalMismatch {
+            expected: 2,
+            got: 1
+        })
     ));
     // Replay (same ordinal as last accepted) refused.
     let w = app_frame(0, 2, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_ok(), "ordinal 2 IS the expected one"); // consumes
     let w = app_frame(0, 2, 0, b"");
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_err(), "replay of ordinal 2 must refuse");
 }
 
@@ -506,10 +526,10 @@ fn s8_tenk_soak_ordinal_wrap() {
     let start = u32::MAX - 3000;
     let mut s = Session::new(&KEM, 0, 7, start);
     let w = ek_frame(0, 7, start, &ek_of(1));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     s.step(&f).unwrap();
     let w = fin_frame(0, 7, start.wrapping_add(1), &KEM, &ek_of(1));
-        let f = parse_frame(&w).unwrap();
+    let f = parse_frame(&w).unwrap();
     s.step(&f).unwrap();
     assert_eq!(s.state(), SessionState::Established);
 
@@ -520,7 +540,7 @@ fn s8_tenk_soak_ordinal_wrap() {
         // Rekey every REKEY_BUDGET frames (budget is counted, not timed).
         if s.budget_used() == REKEY_BUDGET {
             let w = rekey_frame(0, ordinal, &ek_of((i % 250 + 1) as u8));
-        let f = parse_frame(&w).unwrap();
+            let f = parse_frame(&w).unwrap();
             s.step(&f).unwrap();
             rekeys += 1;
             ordinal = ordinal.wrapping_add(1);

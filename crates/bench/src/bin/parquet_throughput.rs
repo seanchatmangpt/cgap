@@ -78,7 +78,10 @@ fn main() {
     let refs: Vec<&[u8]> = payloads.iter().map(|p| p.as_slice()).collect();
     let file_bytes = write_file(&cols, &refs, ROWS).expect("level_free write_file");
     // Page payload (1 GiB) + PAR1 magic + header bytes + footer.
-    assert!(file_bytes.len() > PAYLOAD, "file must hold the full payload");
+    assert!(
+        file_bytes.len() > PAYLOAD,
+        "file must hold the full payload"
+    );
     let on_disk = file_bytes.len();
 
     let mut path = std::env::temp_dir();

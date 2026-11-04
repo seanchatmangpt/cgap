@@ -74,7 +74,13 @@ fn current_allocs() -> usize {
 /// its own value-equality assert (measured, then fixed, this session).
 fn court_page(lanes: usize) -> (Vec<u32>, Vec<u8>) {
     let values: Vec<u32> = (0..lanes)
-        .map(|i| if i < lanes / 2 { ((i * 7 + 1) & 0xFF) as u32 } else { 42 })
+        .map(|i| {
+            if i < lanes / 2 {
+                ((i * 7 + 1) & 0xFF) as u32
+            } else {
+                42
+            }
+        })
         .collect();
     let page = cgap_parquet::page::write_data_page_v2(&values, 8, lanes as u32);
     (values, page)
@@ -122,7 +128,11 @@ fn decode_page_into_zero_allocations_success_and_error_paths() {
     assert_eq!(n, 2048);
     // sink is the 4096-lane buffer from the first page: only the first
     // 2048 lanes are the run page's decode target.
-    assert_eq!(&sink[..n], run_values.as_slice(), "run lanes must decode exactly");
+    assert_eq!(
+        &sink[..n],
+        run_values.as_slice(),
+        "run lanes must decode exactly"
+    );
     assert!(
         sink[2048..].iter().all(|&x| x == 0),
         "lanes beyond the page's claim must stay zero-filled"
@@ -138,6 +148,9 @@ fn positive_control_counter_is_live() {
     let probe: Vec<u8> = (0..64u8).collect();
     let delta = current_allocs() - before;
     println!("[page-alloc-court] positive-control allocs={delta}");
-    assert!(delta >= 1, "counting allocator counted {delta} allocs for a fresh Vec — court is vacuous");
+    assert!(
+        delta >= 1,
+        "counting allocator counted {delta} allocs for a fresh Vec — court is vacuous"
+    );
     assert_eq!(probe.len(), 64);
 }

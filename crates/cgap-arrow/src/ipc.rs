@@ -444,7 +444,11 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
             got: meta.alignment,
         });
     }
-    Ok(ParsedMeta { alignment, body_at, meta })
+    Ok(ParsedMeta {
+        alignment,
+        body_at,
+        meta,
+    })
 }
 
 /// The AOQ1 branch of the [`parse_meta`] magic fork (PG-A2 §2, AB-8):
@@ -454,11 +458,7 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
 /// closed epoch enum, and the metadata padding carries `body_len` u32 LE
 /// plus the 16-byte tag. Alignment-8 AOQ1 framing has no padding to carry
 /// either — typed [`IpcError::TagMissing`], never a misread.
-fn parse_meta_aoq1(
-    buf: &[u8],
-    alignment: usize,
-    body_at: usize,
-) -> Result<ParsedMeta, IpcError> {
+fn parse_meta_aoq1(buf: &[u8], alignment: usize, body_at: usize) -> Result<ParsedMeta, IpcError> {
     if alignment != 64 {
         return Err(IpcError::TagMissing);
     }
@@ -613,13 +613,11 @@ const BODY_DIGEST_ABSENT: [u8; 32] = [0; 32];
 /// body-corrupted verified window still passes `read` (documented
 /// consumer duty; witness W4, `tests/stream_writev_witness.rs`). Use
 /// [`read_verified`] to refuse corruption at the framing layer.
-pub fn emit_verified(
-    out: &mut [u8],
-    meta: &MetaHeader,
-    body: &[u8],
-) -> Result<usize, IpcError> {
+pub fn emit_verified(out: &mut [u8], meta: &MetaHeader, body: &[u8]) -> Result<usize, IpcError> {
     if meta.alignment != 64 {
-        return Err(IpcError::BodyDigestNoRoom { got: meta.alignment });
+        return Err(IpcError::BodyDigestNoRoom {
+            got: meta.alignment,
+        });
     }
     let n = emit(out, meta, body)?;
     let digest = crate::blake3::hash(body);
@@ -641,7 +639,9 @@ pub fn read_verified(
     // `BodyDigestNoRoom { got: 8 }` the pre-seam alignment guess produced.
     let p = parse_meta(buf)?;
     if p.alignment != 64 {
-        return Err(IpcError::BodyDigestNoRoom { got: p.meta.alignment });
+        return Err(IpcError::BodyDigestNoRoom {
+            got: p.meta.alignment,
+        });
     }
     let (n, meta) = read_with_meta(buf, expected_schema, body_out)?;
     if meta.magic == AOQ1_MAGIC {

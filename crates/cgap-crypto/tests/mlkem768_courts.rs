@@ -6,7 +6,7 @@
 //! - PQClean MLKEM512 zetas literal (ntt.c), extracted from ntt.o (offset
 //!   4500) and cross-checked against the spec-generated table.
 //! - FIPS 202 known answers (SHAKE-256("") / SHA3-512("")).
-use cgap_crypto::{fips203, fips202, kem};
+use cgap_crypto::{fips202, fips203, kem};
 
 fn hx(b: &[u8]) -> String {
     b.iter().map(|x| format!("{:02x}", x)).collect()
@@ -47,7 +47,11 @@ const PQCLEAN_ZETAS_128: [i16; 128] = [
 
 #[test]
 fn zetas_table_pqclean_entry_check() {
-    assert_eq!(&fips203::ZETAS[0..128], &PQCLEAN_ZETAS_128, "ZETAS[0..128] must equal the PQClean literal");
+    assert_eq!(
+        &fips203::ZETAS[0..128],
+        &PQCLEAN_ZETAS_128,
+        "ZETAS[0..128] must equal the PQClean literal"
+    );
     // tail layout: 128..=255 mirrored, 256..=258 = [1441, -1044, 0]
     let rev: Vec<i16> = fips203::ZETAS[0..128].iter().copied().rev().collect();
     assert_eq!(&fips203::ZETAS[128..256], &rev[..]);
@@ -68,5 +72,8 @@ fn zetas_digest_pin() {
     for b in d.iter() {
         hexs.push_str(&format!("{:02x}", b));
     }
-    assert_eq!(hexs, "1225892f302b3678d778c4ff059ca318bd2cd2c25ff98b99f3cada566c4cc4f6");
+    assert_eq!(
+        hexs,
+        "1225892f302b3678d778c4ff059ca318bd2cd2c25ff98b99f3cada566c4cc4f6"
+    );
 }

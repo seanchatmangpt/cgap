@@ -107,7 +107,10 @@ where
 {
     let n = rows.len();
     let nulls = rows.iter().filter(|r| r.is_none()).count();
-    assert!(nulls >= 1, "this walk pins the null-slot laws; feed >= 1 null");
+    assert!(
+        nulls >= 1,
+        "this walk pins the null-slot laws; feed >= 1 null"
+    );
     assert!(n > 0);
 
     // -- arrange: real builder, format code cross-checked against the type's
@@ -344,9 +347,7 @@ fn neon_vs_portable_mask_bitwise_equality() {
 fn nested_export_struct_abi_walk_two_children() {
     // Two real child exports — f64 + u32, distinct types from the in-crate
     // i32/i64 walk — with null rows in each child.
-    let f64_valid = [
-        true, false, true, true, true, true, true, true, false,
-    ];
+    let f64_valid = [true, false, true, true, true, true, true, true, false];
     let f64_rows: [Option<f64>; 9] = [
         Some(0.5),
         None,
@@ -358,9 +359,7 @@ fn nested_export_struct_abi_walk_two_children() {
         Some(7.5),
         None,
     ];
-    let u32_valid = [
-        true, true, true, false, false, true, true, true, true,
-    ];
+    let u32_valid = [true, true, true, false, false, true, true, true, true];
     let u32_rows: [Option<u32>; 9] = [
         Some(10),
         Some(20),
@@ -492,7 +491,10 @@ fn nested_export_struct_abi_walk_two_children() {
         let ps = Box::into_raw(Box::new(schema));
         let g = (*ps).release.expect("parent schema release set");
         g(ps);
-        assert!((*ps).release.is_none(), "parent schema slot swapped to null");
+        assert!(
+            (*ps).release.is_none(),
+            "parent schema slot swapped to null"
+        );
         g(ps); // double: typed no-op
         drop(Box::from_raw(ps));
     }

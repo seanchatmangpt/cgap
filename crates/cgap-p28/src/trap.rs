@@ -115,7 +115,6 @@ pub unsafe extern "C" fn cgap_p28_invariant_check(att: *const u8) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use std::{string::String, vec::Vec};
     use super::*;
     use crate::attestation::test_support::*;
     use crate::attestation::{
@@ -123,6 +122,7 @@ mod tests {
         LICENSE_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     use std::sync::Mutex;
+    use std::{string::String, vec::Vec};
 
     /// A record that passes the intrinsic §5 subset (steps 2-5, 8). The
     /// digest field is not intrinsically checked (step 6 needs context), so

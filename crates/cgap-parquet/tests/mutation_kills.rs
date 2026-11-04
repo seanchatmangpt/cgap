@@ -19,7 +19,10 @@ use cgap_parquet::unpack::{unpack_2bit, unpack_4bit, unpack_8bit};
 /// renders the empty string instead of the Debug text.
 #[test]
 fn display_forwards_to_debug_string() {
-    assert_eq!(ParquetError::UnsupportedBitWidth(3).to_string(), "UnsupportedBitWidth(3)");
+    assert_eq!(
+        ParquetError::UnsupportedBitWidth(3).to_string(),
+        "UnsupportedBitWidth(3)"
+    );
     assert_eq!(ParquetError::UnexpectedEof.to_string(), "UnexpectedEof");
 }
 
@@ -68,9 +71,15 @@ fn golden_bytes_literal_tail_group_count() {
 #[test]
 fn golden_bytes_lane_byte_is_lane_width() {
     // 0x1F has bit 4 set; with bits=4 the lane byte must be 0x0F, not 0x1F.
-    assert_eq!(rle_encode(&[0x1F], 4), vec![4, 3, 0x0F, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(
+        rle_encode(&[0x1F], 4),
+        vec![4, 3, 0x0F, 0, 0, 0, 0, 0, 0, 0]
+    );
     // bits=8 keeps the full byte (wire-consistency, not a kill).
-    assert_eq!(rle_encode(&[0x1F], 8), vec![8, 3, 0x1F, 0, 0, 0, 0, 0, 0, 0]);
+    assert_eq!(
+        rle_encode(&[0x1F], 8),
+        vec![8, 3, 0x1F, 0, 0, 0, 0, 0, 0, 0]
+    );
 }
 
 /// Kills rle.rs:103:59 on a full 8-lane group (groups=1, odd: `| 1` -> `^ 1`
@@ -93,12 +102,24 @@ fn golden_bytes_full_literal_group() {
 fn run_overrun_is_typed_and_exact() {
     // bits=1; header varint 0x14 = 20 -> run_len 10 > budget 4.
     let err = rle_decode(&[0x01, 0x14], &mut [0u32; 4]).unwrap_err();
-    assert_eq!(err, ParquetError::RunOverrun { run_len: 10, budget: 4 });
+    assert_eq!(
+        err,
+        ParquetError::RunOverrun {
+            run_len: 10,
+            budget: 4
+        }
+    );
 
     // Second record overruns (oi = 2): budget must be exactly 6 - 2 = 4.
     // bytes: width=1 | run(2 x value 1) | header 20 (run_len 10).
     let err = rle_decode(&[0x01, 0x04, 0x01, 0x14], &mut [0u32; 6]).unwrap_err();
-    assert_eq!(err, ParquetError::RunOverrun { run_len: 10, budget: 4 });
+    assert_eq!(
+        err,
+        ParquetError::RunOverrun {
+            run_len: 10,
+            budget: 4
+        }
+    );
 }
 
 /// Kills rle.rs:167:99 (`src.len() - pos` -> `+` / `/` in the LiteralOverrun
@@ -108,7 +129,13 @@ fn literal_overrun_is_typed_and_exact() {
     // bits=4; literal header claims 1 group = 8 bytes; 3 bytes remain
     // (available = 5 - 2 = 3).
     let err = rle_decode(&[0x04, 0x03, 0xAA, 0xBB, 0xCC], &mut [0u32; 8]).unwrap_err();
-    assert_eq!(err, ParquetError::LiteralOverrun { claimed: 8, available: 3 });
+    assert_eq!(
+        err,
+        ParquetError::LiteralOverrun {
+            claimed: 8,
+            available: 3
+        }
+    );
 }
 
 /// Kills unpack.rs:30:28 (`si < src.len()` -> `<=`: reads src[len] once the
@@ -190,7 +217,10 @@ fn thrift_display_forwards_to_debug_string() {
 fn thrift_byte_double_skip_bounds_are_exact() {
     // BYTE mid-wire: payload followed by more bytes — `<` would error here.
     let mut pos = 0;
-    assert_eq!(skip_value(&[0xAB, 0xFF, 0x05], &mut pos, ctype::BYTE, 0), Ok(()));
+    assert_eq!(
+        skip_value(&[0xAB, 0xFF, 0x05], &mut pos, ctype::BYTE, 0),
+        Ok(())
+    );
     assert_eq!(pos, 1);
     // BYTE at exact end: payload is the last byte — `==` / `>=` would error.
     let mut pos = 0;
@@ -198,10 +228,7 @@ fn thrift_byte_double_skip_bounds_are_exact() {
     assert_eq!(pos, 1);
     // DOUBLE mid-wire: 8 payload bytes, then a tail byte.
     let mut pos = 0;
-    assert_eq!(
-        skip_value(&[0u8; 9], &mut pos, ctype::DOUBLE, 0),
-        Ok(())
-    );
+    assert_eq!(skip_value(&[0u8; 9], &mut pos, ctype::DOUBLE, 0), Ok(()));
     assert_eq!(pos, 8);
     // DOUBLE at exact end: exactly the 8 payload bytes.
     let mut pos = 0;

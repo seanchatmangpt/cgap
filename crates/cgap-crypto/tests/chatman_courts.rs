@@ -21,10 +21,9 @@
 //! Every run exits 101 under every mutation; zero vacuous courts.
 
 use cgap_crypto::chatman::{
-    admissions_root, keyed_digest, seal_unsealed, verify_unsealed, DeltaError, DeltaS,
-    DigestError, Sealer, Unsealed, UnsealedReceipt, VerifyError, ALGORITHM_ID_UNSEALED,
-    DELTA_DOMAIN_TAG, DELTA_LEN, DIGEST_LEN, KEYED_MAX_INPUT_LEN, RECEIPT_LEN,
-    UNSEALED_RECEIPT_LEN,
+    admissions_root, keyed_digest, seal_unsealed, verify_unsealed, DeltaError, DeltaS, DigestError,
+    Sealer, Unsealed, UnsealedReceipt, VerifyError, ALGORITHM_ID_UNSEALED, DELTA_DOMAIN_TAG,
+    DELTA_LEN, DIGEST_LEN, KEYED_MAX_INPUT_LEN, RECEIPT_LEN, UNSEALED_RECEIPT_LEN,
 };
 use cgap_crypto::lease::{Lease, PhiLease, PHI_LEASE_LEN};
 
@@ -42,12 +41,30 @@ fn corpus(len: usize) -> Vec<u8> {
 /// (`DeltaS || Phi_lease`), filled by `b3sum --keyed` after b3sum matched the
 /// published corpus byte-identically on 0/1/63/64/1024 this session.
 const KEYED_KATS: &[(usize, &str)] = &[
-    (0, "92b2b75604ed3c761f9d6f62392c8a9227ad0ea3f09573e783f1498a4ed60d26"),
-    (1, "6d7878dfff2f485635d39013278ae14f1454b8c0a3a2d34bc1ab38228a80c95b"),
-    (63, "bb1eb5d4afa793c1ebdd9fb08def6c36d10096986ae0cfe148cd101170ce37ae"),
-    (64, "ba8ced36f327700d213f120b1a207a3b8c04330528586f414d09f2f7d9ccb7e6"),
-    (192, "7e39f351b749ca160f515bfb1a934d951eb1373da2cac1ae65618b83694dad12"),
-    (1024, "75c46f6f3d9eb4f55ecaaee480db732e6c2105546f1e675003687c31719c7ba4"),
+    (
+        0,
+        "92b2b75604ed3c761f9d6f62392c8a9227ad0ea3f09573e783f1498a4ed60d26",
+    ),
+    (
+        1,
+        "6d7878dfff2f485635d39013278ae14f1454b8c0a3a2d34bc1ab38228a80c95b",
+    ),
+    (
+        63,
+        "bb1eb5d4afa793c1ebdd9fb08def6c36d10096986ae0cfe148cd101170ce37ae",
+    ),
+    (
+        64,
+        "ba8ced36f327700d213f120b1a207a3b8c04330528586f414d09f2f7d9ccb7e6",
+    ),
+    (
+        192,
+        "7e39f351b749ca160f515bfb1a934d951eb1373da2cac1ae65618b83694dad12",
+    ),
+    (
+        1024,
+        "75c46f6f3d9eb4f55ecaaee480db732e6c2105546f1e675003687c31719c7ba4",
+    ),
 ];
 
 const OFFICIAL_KEY: &[u8; 32] = b"whats the Elvish word for friend";
@@ -83,8 +100,7 @@ fn keyed_digest_second_key_vector() {
 /// mis-hash with a truncated tree.
 #[test]
 fn keyed_digest_rejects_over_single_chunk_loudly() {
-    let err = keyed_digest(OFFICIAL_KEY, &corpus(1025))
-        .expect_err("1025 B must be rejected");
+    let err = keyed_digest(OFFICIAL_KEY, &corpus(1025)).expect_err("1025 B must be rejected");
     assert_eq!(
         err,
         DigestError::InputTooLong {
@@ -144,7 +160,11 @@ fn seal_then_verify_roundtrip() {
     assert_eq!(verify_unsealed(&receipt), Ok(()));
     assert_eq!(receipt.magic, *b"CGRU");
     assert_eq!(receipt.version, 0x00);
-    assert_eq!(lease.current_tick(), 1, "§6: seal is the only tick consumer");
+    assert_eq!(
+        lease.current_tick(),
+        1,
+        "§6: seal is the only tick consumer"
+    );
 }
 
 /// §6 digest coverage, recomputed in-test from the public codec surfaces:
@@ -253,7 +273,11 @@ fn seal_at_exhaustion_traps_in_real_process() {
     }
     let exe = std::env::current_exe().expect("current_exe");
     let output = std::process::Command::new(exe)
-        .args(["seal_at_exhaustion_traps_in_real_process", "--exact", "--nocapture"])
+        .args([
+            "seal_at_exhaustion_traps_in_real_process",
+            "--exact",
+            "--nocapture",
+        ])
         .env("CGAP_A16_CHATMAN_PROBE", "seal_exhaust")
         .output()
         .expect("spawn probe subprocess");
@@ -265,8 +289,7 @@ fn seal_at_exhaustion_traps_in_real_process() {
         status = output.status,
     );
     assert!(
-        stderr.contains("refusing to emit Phi_lease")
-            || stderr.contains("authority EXHAUSTED"),
+        stderr.contains("refusing to emit Phi_lease") || stderr.contains("authority EXHAUSTED"),
         "WRONG-REASON DEATH: probe exited nonzero but its stderr names \
          neither seal-path trap (\"refusing to emit Phi_lease\" / \
          \"authority EXHAUSTED\") — a non-trap panic died instead; \
@@ -287,7 +310,10 @@ fn byte_sweep_court_every_single_byte_flip_fails_verify() {
     let mut lease = Lease::new([7u8; 32], 64, [9u8; 32]);
     let receipt = seal_unsealed(fixture_delta([0x44u8; 32]), &mut lease);
     let pristine = receipt.to_bytes();
-    assert!(verify_bytes(&pristine).is_ok(), "pristine receipt must verify");
+    assert!(
+        verify_bytes(&pristine).is_ok(),
+        "pristine receipt must verify"
+    );
 
     for offset in 0..UNSEALED_RECEIPT_LEN {
         for mask in [0x01u8, 0xFF] {
@@ -345,7 +371,10 @@ fn expected_error_for_flip(
         let tick = u64::from_le_bytes(tick_bytes);
         let ceiling = u64::from_le_bytes(ceiling_bytes);
         if tick >= ceiling {
-            Err(VerifyError::ExhaustedLease { tick, tick_ceiling: ceiling })
+            Err(VerifyError::ExhaustedLease {
+                tick,
+                tick_ceiling: ceiling,
+            })
         } else {
             Err(VerifyError::DigestMismatch)
         }

@@ -70,15 +70,27 @@ mod tests {
         assert_eq!(aoq_status_word("PENDING"), Some(0x4347A002));
         assert_eq!(aoq_status_name(AOQ_STATUS_BUSY), Some("BUSY"));
         assert_eq!(aoq_status_word("BUSY"), Some(0x4347A003));
-        assert_eq!(aoq_status_name(AOQ_STATUS_INCOMPLETE_FRAME), Some("INCOMPLETE_FRAME"));
+        assert_eq!(
+            aoq_status_name(AOQ_STATUS_INCOMPLETE_FRAME),
+            Some("INCOMPLETE_FRAME")
+        );
         assert_eq!(aoq_status_word("INCOMPLETE_FRAME"), Some(0x4347A004));
-        assert_eq!(aoq_status_name(AOQ_STATUS_DIGEST_MISMATCH), Some("DIGEST_MISMATCH"));
+        assert_eq!(
+            aoq_status_name(AOQ_STATUS_DIGEST_MISMATCH),
+            Some("DIGEST_MISMATCH")
+        );
         assert_eq!(aoq_status_word("DIGEST_MISMATCH"), Some(0x4347A005));
-        assert_eq!(aoq_status_name(AOQ_STATUS_EPOCH_MISMATCH), Some("EPOCH_MISMATCH"));
+        assert_eq!(
+            aoq_status_name(AOQ_STATUS_EPOCH_MISMATCH),
+            Some("EPOCH_MISMATCH")
+        );
         assert_eq!(aoq_status_word("EPOCH_MISMATCH"), Some(0x4347A006));
         assert_eq!(aoq_status_name(AOQ_STATUS_KEY_UNKNOWN), Some("KEY_UNKNOWN"));
         assert_eq!(aoq_status_word("KEY_UNKNOWN"), Some(0x4347A007));
-        assert_eq!(aoq_status_name(AOQ_STATUS_EPOCH_RETIRED), Some("EPOCH_RETIRED"));
+        assert_eq!(
+            aoq_status_name(AOQ_STATUS_EPOCH_RETIRED),
+            Some("EPOCH_RETIRED")
+        );
         assert_eq!(aoq_status_word("EPOCH_RETIRED"), Some(0x4347A008));
         // Retired band 0x4347_000x refused by construction.
         assert_eq!(aoq_status_name(0x4347_0001), None);

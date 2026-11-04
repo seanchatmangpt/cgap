@@ -31,8 +31,8 @@ mod egress_ring;
 
 use alloc::vec::Vec;
 use egress_ring::{
-    parse_page, validate_schema, EgressError, StdEgressRing, DESC_ENTRY_BYTES,
-    DESC_TABLE_OFFSET, EGRESS_RING_BYTES,
+    parse_page, validate_schema, EgressError, StdEgressRing, DESC_ENTRY_BYTES, DESC_TABLE_OFFSET,
+    EGRESS_RING_BYTES,
 };
 
 /// Deterministic 32-byte record: four u64 columns at offsets 0/8/16/24.

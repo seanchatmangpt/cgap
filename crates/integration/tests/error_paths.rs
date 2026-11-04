@@ -21,21 +21,21 @@ use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_git::deflate::zlib_compress;
 use cgap_git::deflate::zlib_decompress;
 use cgap_git::idx_read::IdxV2;
-use cgap_git::inflate::{InflateError, inflate, zlib_decode};
+use cgap_git::inflate::{inflate, zlib_decode, InflateError};
 use cgap_git::pack_write::{
-    IdxEntry, MAX_OBJECTS, build_pack_and_idx, encode_object_header, parse_idx_v2, parse_pack_v2,
-    sha1, write_idx_v2, write_pack_v2,
+    build_pack_and_idx, encode_object_header, parse_idx_v2, parse_pack_v2, sha1, write_idx_v2,
+    write_pack_v2, IdxEntry, MAX_OBJECTS,
 };
 use cgap_git::GitError;
 use cgap_parquet::level_free::{
-    LevelFreeError, LevelFreeType, WireSchemaElement, admit_schema, ptype, read_page_payload,
-    repetition, write_page,
+    admit_schema, ptype, read_page_payload, repetition, write_page, LevelFreeError, LevelFreeType,
+    WireSchemaElement,
 };
 use cgap_parquet::rle::ParquetError;
-use cgap_parquet::scan::{FixtureColumn, ParquetFile, PhysType, ScanError, write_fixture_file};
+use cgap_parquet::scan::{write_fixture_file, FixtureColumn, ParquetFile, PhysType, ScanError};
 use cgap_parquet::thrift::{
-    DataPageHeaderV2, PageHeader, ThriftError, ctype, read_page_header, write_binary_field,
-    write_field_header, write_i32_field, write_i64_field, write_page_header,
+    ctype, read_page_header, write_binary_field, write_field_header, write_i32_field,
+    write_i64_field, write_page_header, DataPageHeaderV2, PageHeader, ThriftError,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -57,7 +57,11 @@ fn nanos() -> u128 {
 impl TempFile {
     fn write(name: &str, bytes: &[u8]) -> TempFile {
         let mut p = std::env::temp_dir();
-        p.push(format!("cgap_errpath_{name}_{}_{}", std::process::id(), nanos()));
+        p.push(format!(
+            "cgap_errpath_{name}_{}_{}",
+            std::process::id(),
+            nanos()
+        ));
         std::fs::write(&p, bytes).expect("write court file");
         TempFile { path: p }
     }
@@ -193,7 +197,10 @@ struct BitWriter {
 
 impl BitWriter {
     fn new() -> Self {
-        BitWriter { out: Vec::new(), nbits: 0 }
+        BitWriter {
+            out: Vec::new(),
+            nbits: 0,
+        }
     }
 
     fn push(&mut self, nbits: u32, value: u32) {
@@ -235,7 +242,9 @@ fn dynamic_block_with_single_clen(sym: usize) -> Vec<u8> {
 /// overflow, and the FDICT-zlib refusal that maps onto `BadVarint`.
 #[test]
 fn git_pack_reader_error_paths() {
-    let blob: Vec<u8> = (0..48u32).map(|i| (i.wrapping_mul(7).wrapping_add(1)) as u8).collect();
+    let blob: Vec<u8> = (0..48u32)
+        .map(|i| (i.wrapping_mul(7).wrapping_add(1)) as u8)
+        .collect();
 
     // PackChecksumMismatch: one flipped body byte fails the trailer SHA-1.
     let mut pack = write_pack_v2(&[&blob]).expect("valid pack");
@@ -276,7 +285,9 @@ fn git_pack_reader_error_paths() {
 /// refusal.
 #[test]
 fn git_idx_and_writer_error_paths() {
-    let blob: Vec<u8> = (0..32u32).map(|i| (i.wrapping_mul(11).wrapping_add(5)) as u8).collect();
+    let blob: Vec<u8> = (0..32u32)
+        .map(|i| (i.wrapping_mul(11).wrapping_add(5)) as u8)
+        .collect();
     let (_, idx, _) = build_pack_and_idx(&[&blob]).expect("pack + idx");
 
     // IdxChecksumMismatch: one flipped trailing byte.
@@ -317,7 +328,11 @@ fn git_idx_and_writer_error_paths() {
 
     // OffsetTooLarge: an offset at/above 2^31 is refused by the
     // small-offset-table writer (large-offset table not implemented).
-    let mut entries = vec![IdxEntry { oid: [7u8; 20], offset: 0x8000_0000, crc: 0 }];
+    let mut entries = vec![IdxEntry {
+        oid: [7u8; 20],
+        offset: 0x8000_0000,
+        crc: 0,
+    }];
     assert_eq!(
         write_idx_v2(&mut entries, &[0u8; 20]),
         Err(GitError::OffsetTooLarge)
@@ -407,12 +422,19 @@ fn inflate_dynamic_header_error_paths() {
 fn scan_open_error_paths() {
     // Io: the path does not exist; File::open fails before any mmap.
     let mut missing = std::env::temp_dir();
-    missing.push(format!("cgap_errpath_absent_{}_{}", std::process::id(), nanos()));
+    missing.push(format!(
+        "cgap_errpath_absent_{}_{}",
+        std::process::id(),
+        nanos()
+    ));
     assert_eq!(ParquetFile::open(&missing).map(|_| ()), Err(ScanError::Io));
 
     // EmptyFile: a zero-length file has no footer to map.
     let tmp = TempFile::write("empty", &[]);
-    assert_eq!(ParquetFile::open(&tmp.path).map(|_| ()), Err(ScanError::EmptyFile));
+    assert_eq!(
+        ParquetFile::open(&tmp.path).map(|_| ()),
+        Err(ScanError::EmptyFile)
+    );
 
     let (cols, _) = u32_fixture(8);
     let file = write_fixture_file(&cols, 8);
@@ -517,26 +539,41 @@ fn scan_page_error_paths() {
 /// shape outside the projection, plus page-shape refusals.
 #[test]
 fn level_free_error_paths() {
-    let elem = |name: &[u8], ty: Option<i32>, tlen: Option<i32>, rep: Option<i32>| {
-        WireSchemaElement {
+    let elem =
+        |name: &[u8], ty: Option<i32>, tlen: Option<i32>, rep: Option<i32>| WireSchemaElement {
             field_type: ty,
             type_length: tlen,
             repetition_type: rep,
             name: name.to_vec(),
             num_children: None,
-        }
-    };
+        };
 
     // OptionalField.
     assert_eq!(
-        admit_schema(&[elem(b"opt", Some(ptype::INT32), None, Some(repetition::OPTIONAL))]),
-        Err(LevelFreeError::OptionalField { index: 0, name: b"opt".to_vec() })
+        admit_schema(&[elem(
+            b"opt",
+            Some(ptype::INT32),
+            None,
+            Some(repetition::OPTIONAL)
+        )]),
+        Err(LevelFreeError::OptionalField {
+            index: 0,
+            name: b"opt".to_vec()
+        })
     );
 
     // RepeatedField.
     assert_eq!(
-        admit_schema(&[elem(b"rep", Some(ptype::INT64), None, Some(repetition::REPEATED))]),
-        Err(LevelFreeError::RepeatedField { index: 0, name: b"rep".to_vec() })
+        admit_schema(&[elem(
+            b"rep",
+            Some(ptype::INT64),
+            None,
+            Some(repetition::REPEATED)
+        )]),
+        Err(LevelFreeError::RepeatedField {
+            index: 0,
+            name: b"rep".to_vec()
+        })
     );
 
     // NestedField: a group (no physical type) after the root — refused at
@@ -557,13 +594,25 @@ fn level_free_error_paths() {
     };
     assert_eq!(
         admit_schema(&[root, group]),
-        Err(LevelFreeError::NestedField { index: 1, name: b"grp".to_vec() })
+        Err(LevelFreeError::NestedField {
+            index: 1,
+            name: b"grp".to_vec()
+        })
     );
 
     // UnsupportedType: DOUBLE is outside {INT32, INT64, FLBA(32)}.
     assert!(matches!(
-        admit_schema(&[elem(b"f", Some(ptype::DOUBLE), None, Some(repetition::REQUIRED))]),
-        Err(LevelFreeError::UnsupportedType { index: 0, code: ptype::DOUBLE, .. })
+        admit_schema(&[elem(
+            b"f",
+            Some(ptype::DOUBLE),
+            None,
+            Some(repetition::REQUIRED)
+        )]),
+        Err(LevelFreeError::UnsupportedType {
+            index: 0,
+            code: ptype::DOUBLE,
+            ..
+        })
     ));
 
     // UnsupportedWidth: FLBA(16) is not the admitted width 32.
@@ -574,13 +623,21 @@ fn level_free_error_paths() {
             Some(16),
             Some(repetition::REQUIRED)
         )]),
-        Err(LevelFreeError::UnsupportedWidth { index: 0, length: 16, .. })
+        Err(LevelFreeError::UnsupportedWidth {
+            index: 0,
+            length: 16,
+            ..
+        })
     ));
 
     // UnknownRepetition: code 3 is outside the parquet.thrift range.
     assert!(matches!(
         admit_schema(&[elem(b"u", Some(ptype::INT32), None, Some(3))]),
-        Err(LevelFreeError::UnknownRepetition { index: 0, code: 3, .. })
+        Err(LevelFreeError::UnknownRepetition {
+            index: 0,
+            code: 3,
+            ..
+        })
     ));
 
     // UndecodablePage: a garbage page fails its header parse on read-back.
@@ -592,7 +649,10 @@ fn level_free_error_paths() {
     // PayloadMismatch: 9 rows of u32 declare 36 bytes; 40 offered.
     assert_eq!(
         write_page(LevelFreeType::U32, &[0u8; 40], 9),
-        Err(LevelFreeError::PayloadMismatch { expected: 36, actual: 40 })
+        Err(LevelFreeError::PayloadMismatch {
+            expected: 36,
+            actual: 40
+        })
     );
 }
 
@@ -637,12 +697,17 @@ fn alloc_report_scopes_and_error_path() {
     });
     assert_eq!(_inner_v.len(), 8);
     assert!(inner.count >= 1, "inner scope lost its alloc: {inner:?}");
-    assert!(outer.count > inner.count, "outer {outer:?} vs inner {inner:?}");
+    assert!(
+        outer.count > inner.count,
+        "outer {outer:?} vs inner {inner:?}"
+    );
 
     // Error path is allocation-free: parse_pack_v2 refuses on the trailer
     // checksum BEFORE building the object table, and SHA-1 works on the
     // stack — a typed refusal costs zero allocations.
-    let blob: Vec<u8> = (0..48u32).map(|i| (i.wrapping_mul(7).wrapping_add(1)) as u8).collect();
+    let blob: Vec<u8> = (0..48u32)
+        .map(|i| (i.wrapping_mul(7).wrapping_add(1)) as u8)
+        .collect();
     let mut pack = write_pack_v2(&[&blob]).expect("valid pack");
     pack[15] ^= 0xFF;
     let (res, report) = with_alloc_tracking(|| parse_pack_v2(&pack));

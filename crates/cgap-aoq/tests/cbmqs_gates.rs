@@ -22,9 +22,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::time::Instant;
 
-use cgap_arrow::ipc::{
-    emit, read_with_meta, window_len, LAYOUT_VERSION, MAGIC, MetaHeader,
-};
+use cgap_arrow::ipc::{emit, read_with_meta, window_len, MetaHeader, LAYOUT_VERSION, MAGIC};
 use cgap_arrow::slab::{ArrowRecordSlab, SLOT_PAYLOAD_SIZE};
 use cgap_arrow::stream_writer::{StreamWriter, VectoredSink};
 use cgap_crypto::fips202::{Shake128, Shake256};
@@ -49,15 +47,30 @@ struct GateOutcome {
 }
 
 fn pass(gate: &'static str, composes: &'static str, measured: String) -> GateOutcome {
-    GateOutcome { gate, composes, status: Status::Pass, measured }
+    GateOutcome {
+        gate,
+        composes,
+        status: Status::Pass,
+        measured,
+    }
 }
 
 fn fail(gate: &'static str, composes: &'static str, why: String, measured: String) -> GateOutcome {
-    GateOutcome { gate, composes, status: Status::Fail(why), measured }
+    GateOutcome {
+        gate,
+        composes,
+        status: Status::Fail(why),
+        measured,
+    }
 }
 
 fn skip(gate: &'static str, composes: &'static str, reason: String) -> GateOutcome {
-    GateOutcome { gate, composes, status: Status::Skip(reason), measured: String::new() }
+    GateOutcome {
+        gate,
+        composes,
+        status: Status::Skip(reason),
+        measured: String::new(),
+    }
 }
 
 // --------------------------------------------------------------- helpers
@@ -108,10 +121,7 @@ unsafe impl GlobalAlloc for Counting {
 static GLOBAL: Counting = Counting;
 
 fn alloc_delta() -> (u64, u64) {
-    (
-        ALLOCS.with(|c| c.get()),
-        BYTES.with(|c| c.get()),
-    )
+    (ALLOCS.with(|c| c.get()), BYTES.with(|c| c.get()))
 }
 
 /// Deterministic body pattern (AB-9 ipc_stress method).
@@ -379,9 +389,7 @@ fn gate_g2_wire_ceiling() -> GateOutcome {
         return skip(
             G,
             C,
-            format!(
-                "release-profile fence only (AF-17 axis 2; {v}); context: {column} | {detail}"
-            ),
+            format!("release-profile fence only (AF-17 axis 2; {v}); context: {column} | {detail}"),
         );
     }
     if amortized >= CEILING_NS {
@@ -409,7 +417,12 @@ fn gate_g3_spec_drift() -> GateOutcome {
     let ttl = match std::fs::read_to_string(ONTOLOGY_PATH) {
         Ok(t) => t,
         Err(e) => {
-            return fail(G, C, format!("landed ontology unreadable: {e}"), String::new())
+            return fail(
+                G,
+                C,
+                format!("landed ontology unreadable: {e}"),
+                String::new(),
+            )
         }
     };
 
@@ -492,7 +505,12 @@ fn gate_g3_spec_drift() -> GateOutcome {
         return fail(G, C, "flip witness did not flip".into(), String::new());
     }
     if mutated == gen_pairs {
-        return fail(G, C, "mutated table still equals generated layout".into(), String::new());
+        return fail(
+            G,
+            C,
+            "mutated table still equals generated layout".into(),
+            String::new(),
+        );
     }
     pass(
         G,
@@ -533,10 +551,17 @@ fn gate_g4_kat() -> GateOutcome {
         .try_into()
         .unwrap();
     let msg = b"Cryptographic Forum Research Group";
-    let want_tag: [u8; 16] = unhex("a8061dc1305136c6c22b8baf0c0127a9").try_into().unwrap();
+    let want_tag: [u8; 16] = unhex("a8061dc1305136c6c22b8baf0c0127a9")
+        .try_into()
+        .unwrap();
     let got = poly1305::one_shot(&key, msg);
     if got != want_tag {
-        return fail(G, C, "RFC 8439 2.5.2 Poly1305 tag mismatch".into(), String::new());
+        return fail(
+            G,
+            C,
+            "RFC 8439 2.5.2 Poly1305 tag mismatch".into(),
+            String::new(),
+        );
     }
 
     // Flip witnesses (anti-vacuity): any flipped input byte must flip
@@ -544,12 +569,22 @@ fn gate_g4_kat() -> GateOutcome {
     let mut flipped = [0u8; 32];
     Shake256::xof(b"\x01", &mut flipped);
     if flipped == out {
-        return fail(G, C, "flip witness: SHAKE256 insensitive to input byte".into(), String::new());
+        return fail(
+            G,
+            C,
+            "flip witness: SHAKE256 insensitive to input byte".into(),
+            String::new(),
+        );
     }
     let mut bad_msg = msg.to_vec();
     bad_msg[0] ^= 0x01;
     if poly1305::one_shot(&key, &bad_msg) == want_tag {
-        return fail(G, C, "flip witness: Poly1305 tag unchanged under message flip".into(), String::new());
+        return fail(
+            G,
+            C,
+            "flip witness: Poly1305 tag unchanged under message flip".into(),
+            String::new(),
+        );
     }
 
     pass(
@@ -608,7 +643,10 @@ fn gate_g5_storm() -> GateOutcome {
         return fail(
             G,
             C,
-            format!("partial-accept witness weak: {} calls for {N} frames", sink.accepted),
+            format!(
+                "partial-accept witness weak: {} calls for {N} frames",
+                sink.accepted
+            ),
             String::new(),
         );
     }
@@ -659,16 +697,19 @@ fn gate_g6_churn() -> GateOutcome {
     const C: &str = "AB-17 200-cycle churn court (CROSS-REPO: lsp-max-compositor)";
     // AB-17 landed in the lsp-max repo (coordinator correction 2026-11-03:
     // the original cgap-scoped path lookup missed the cross-repo receipt).
-    const RECEIPT: &str =
-        "/Users/sac/lsp-max/docs/jira/v26.11.3/receipts/ab-17-churn-stress.md";
-    const COURT: &str =
-        "/Users/sac/lsp-max/crates/lsp-max-compositor/tests/child_churn_stress.rs";
+    const RECEIPT: &str = "/Users/sac/lsp-max/docs/jira/v26.11.3/receipts/ab-17-churn-stress.md";
+    const COURT: &str = "/Users/sac/lsp-max/crates/lsp-max-compositor/tests/child_churn_stress.rs";
 
     // Disk-ground the citation: receipt + court file must exist. A
     // citation whose referent vanished is a FAIL, never a silent pass.
     for f in [RECEIPT, COURT] {
         if !std::path::Path::new(f).exists() {
-            return fail(G, C, format!("cited artifact missing on disk: {f}"), String::new());
+            return fail(
+                G,
+                C,
+                format!("cited artifact missing on disk: {f}"),
+                String::new(),
+            );
         }
     }
     let rec = std::fs::read_to_string(RECEIPT).expect("receipt readable");
@@ -744,14 +785,24 @@ fn gate_g7_receipt_chain() -> GateOutcome {
 
     // Chain verify green.
     if let Err(e) = verify_records(&ShakeDigest, chain.records()) {
-        return fail(G, C, format!("chain verify refused own receipts: {e:?}"), String::new());
+        return fail(
+            G,
+            C,
+            format!("chain verify refused own receipts: {e:?}"),
+            String::new(),
+        );
     }
 
     // Flip witness (chain-court c3 method): a tampered COPY must refuse.
     let mut tampered = chain.records().to_vec();
     tampered[FRAMES / 2].payload_digest[0] ^= 0x01;
     if verify_records(&ShakeDigest, &tampered).is_ok() {
-        return fail(G, C, "tampered chain verified green (vacuous)".into(), String::new());
+        return fail(
+            G,
+            C,
+            "tampered chain verified green (vacuous)".into(),
+            String::new(),
+        );
     }
 
     pass(
@@ -782,20 +833,24 @@ fn cbmqs_seven_gates_summary_table() {
         gate_g7_receipt_chain,
     ];
     let gates: Vec<GateOutcome> = drivers
-    .iter()
-    .map(|g| match std::panic::catch_unwind(std::panic::AssertUnwindSafe(g)) {
-        Ok(o) => o,
-        Err(p) => GateOutcome {
-            gate: "?",
-            composes: "?",
-            status: Status::Fail(format!(
-                "gate panicked: {}",
-                p.downcast_ref::<&str>().map(|s| s.to_string()).unwrap_or_else(|| "<non-str panic>".into())
-            )),
-            measured: String::new(),
-        },
-    })
-    .collect();
+        .iter()
+        .map(
+            |g| match std::panic::catch_unwind(std::panic::AssertUnwindSafe(g)) {
+                Ok(o) => o,
+                Err(p) => GateOutcome {
+                    gate: "?",
+                    composes: "?",
+                    status: Status::Fail(format!(
+                        "gate panicked: {}",
+                        p.downcast_ref::<&str>()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "<non-str panic>".into())
+                    )),
+                    measured: String::new(),
+                },
+            },
+        )
+        .collect();
 
     println!();
     println!("================ CBMQS SEVEN-GATE SUMMARY (AF-10) ================");
@@ -839,6 +894,9 @@ fn cbmqs_seven_gates_summary_table() {
         8,
         "CBMQS must evaluate exactly the 7-gate standard (G1 + G1b floor leg)"
     );
-    assert_eq!(n_fail, 0, "CBMQS: {n_fail} gate(s) FAILED — see table above");
+    assert_eq!(
+        n_fail, 0,
+        "CBMQS: {n_fail} gate(s) FAILED — see table above"
+    );
     // Skips are lawful only with a typed reason; gate_g6 carries one.
 }

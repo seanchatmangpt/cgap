@@ -209,7 +209,10 @@ fn ledger_digest_is_byte_stable_across_insertion_orders() {
     // Different content set flips the ledger digest.
     let mut store = ObjectStore::new(BLAKE3);
     store.insert(Blob, &payload(9999, 50)).expect("insert");
-    assert_ne!(store.ledger_digest(), ObjectStore::new(BLAKE3).ledger_digest());
+    assert_ne!(
+        store.ledger_digest(),
+        ObjectStore::new(BLAKE3).ledger_digest()
+    );
     assert_ne!(store.ledger_digest(), da);
 }
 
@@ -283,10 +286,15 @@ fn stale_constant_hasher_is_rejected_not_laundered() {
     let mut store = ObjectStore::new(stale as HashFn);
     let p1 = payload(77_001, 32);
     let p2 = payload(77_002, 32);
-    assert_ne!(p1, p2, "payloads must differ so only the hasher can collide them");
+    assert_ne!(
+        p1, p2,
+        "payloads must differ so only the hasher can collide them"
+    );
     // Under the stale hasher the two distinct payloads address identically:
     // the FIRST insert lands, the SECOND is a typed Duplicate (not silent).
-    let d1 = store.insert(Blob, &p1).expect("first insert under stale hasher");
+    let d1 = store
+        .insert(Blob, &p1)
+        .expect("first insert under stale hasher");
     assert_eq!(d1, [0x5A; 32], "stale digest must be the returned address");
     assert_eq!(
         store.insert(Blob, &p2),

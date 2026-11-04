@@ -41,16 +41,31 @@ fn raw_bytes_only_consumer_resolves_all_four_primitives() {
 
     // --- header by offset (A06 §6) ------------------------------------------
     assert_eq!(&bytes[0..8], b"OABIv1\0\0", "magic");
-    assert_eq!(u32::from_le_bytes(bytes[8..12].try_into().unwrap()), 64, "header_len");
-    assert_eq!(u16::from_le_bytes(bytes[12..14].try_into().unwrap()), 1, "version_major");
-    assert_eq!(u16::from_le_bytes(bytes[14..16].try_into().unwrap()), 0, "version_minor");
+    assert_eq!(
+        u32::from_le_bytes(bytes[8..12].try_into().unwrap()),
+        64,
+        "header_len"
+    );
+    assert_eq!(
+        u16::from_le_bytes(bytes[12..14].try_into().unwrap()),
+        1,
+        "version_major"
+    );
+    assert_eq!(
+        u16::from_le_bytes(bytes[14..16].try_into().unwrap()),
+        0,
+        "version_minor"
+    );
     let flags = u32::from_le_bytes(bytes[16..20].try_into().unwrap());
     assert_eq!(flags & 0b11, 0b11, "LE + LexHash flags");
     let class_count = u32::from_le_bytes(bytes[20..24].try_into().unwrap());
     let enum_count = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
     let slot_count = u32::from_le_bytes(bytes[28..32].try_into().unwrap());
     let record_size = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
-    assert_eq!((class_count, enum_count, slot_count, record_size), (4, 6, 31, 48));
+    assert_eq!(
+        (class_count, enum_count, slot_count, record_size),
+        (4, 6, 31, 48)
+    );
     assert!(bytes[36..64].iter().all(|&b| b == 0), "reserved zero");
     assert_eq!(bytes.len(), 64 + slot_count as usize * 48);
 
@@ -62,11 +77,18 @@ fn raw_bytes_only_consumer_resolves_all_four_primitives() {
         let class = u32::from_le_bytes(bytes[base + 8..base + 12].try_into().unwrap());
         assert!(class < class_count, "record {i} class out of range");
         let enum_family = u16::from_le_bytes(bytes[base + 12..base + 14].try_into().unwrap());
-        assert!((enum_family as u32) < enum_count, "record {i} enum out of range");
+        assert!(
+            (enum_family as u32) < enum_count,
+            "record {i} enum out of range"
+        );
         let mut lex = [0u8; 32];
         lex.copy_from_slice(&bytes[base + 16..base + 48]);
         // §6 per-record obligation, re-checked on the raw bytes.
-        assert_eq!(slot, u64::from_le_bytes(lex[0..8].try_into().unwrap()), "record {i} derivation");
+        assert_eq!(
+            slot,
+            u64::from_le_bytes(lex[0..8].try_into().unwrap()),
+            "record {i} derivation"
+        );
         slots.push((slot, lex));
     }
 
@@ -74,7 +96,10 @@ fn raw_bytes_only_consumer_resolves_all_four_primitives() {
     for (lexeme, expected) in ROOT_EXPECTATIONS {
         let d = lex_hash(lexeme.as_bytes());
         let slot = u64::from_le_bytes(d[0..8].try_into().unwrap());
-        assert_eq!(&slot, expected, "spec re-derivation != committed literal: {lexeme}");
+        assert_eq!(
+            &slot, expected,
+            "spec re-derivation != committed literal: {lexeme}"
+        );
         assert!(
             slots.iter().any(|(s, l)| s == expected && *l == d),
             "pack has no record for {lexeme} (slot {expected:#018x}) with matching preimage"
@@ -83,6 +108,10 @@ fn raw_bytes_only_consumer_resolves_all_four_primitives() {
     // Totality: 31 distinct slots present, zero duplicates.
     slots.sort_by_key(|(s, _)| *s);
     let dup = slots.windows(2).find(|w| w[0].0 == w[1].0);
-    assert!(dup.is_none(), "duplicate slot in pack: {:?}", dup.map(|d| d[0].0));
+    assert!(
+        dup.is_none(),
+        "duplicate slot in pack: {:?}",
+        dup.map(|d| d[0].0)
+    );
     assert_eq!(slots.len(), 31);
 }

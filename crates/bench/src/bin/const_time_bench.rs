@@ -111,8 +111,7 @@ impl SplitMix {
 /// Instance seed keyed by (kernel, class, instance), stirred through one
 /// splitmix64 step so nearby keys land far apart in the stream.
 fn instance_seed(kernel: usize, class: usize, k: usize) -> u64 {
-    let z = (kernel as u64)
-        .wrapping_mul(0xA24B_AED5_3CE5_8C4E)
+    let z = (kernel as u64).wrapping_mul(0xA24B_AED5_3CE5_8C4E)
         ^ (class as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
         ^ (k as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9)
         ^ 0x1234_5678_9ABC_DEF0;
@@ -348,11 +347,7 @@ fn time_min_ns(mut f: impl FnMut()) -> f64 {
 /// (min, median, max) over the per-instance samples (house lower median).
 fn stats(mut xs: Vec<f64>) -> (f64, f64, f64) {
     xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    (
-        xs[0],
-        xs[xs.len() / 2],
-        xs[xs.len() - 1],
-    )
+    (xs[0], xs[xs.len() / 2], xs[xs.len() - 1])
 }
 
 /// Head/mid/tail consumption through `black_box` so a decode output cannot
@@ -379,9 +374,7 @@ struct ClassStat {
 /// MIN statistic (most noise-robust) with argmax/argmin classes named.
 fn report(kernel: &str, idx: usize, per_class: &[ClassStat]) {
     println!();
-    println!(
-        "== kernel {idx}/6: {kernel} (rows={ROWS}, K={K} instances/class, min-of-{REPS}) =="
-    );
+    println!("== kernel {idx}/6: {kernel} (rows={ROWS}, K={K} instances/class, min-of-{REPS}) ==");
     println!(
         "{:<20} {:>14} {:>14} {:>14} {:>12}",
         "class", "min_ns", "median_ns", "max_ns", "wire_B"
@@ -392,31 +385,24 @@ fn report(kernel: &str, idx: usize, per_class: &[ClassStat]) {
         mins.push((cid, mn));
         println!(
             "{:<20} {:>14.0} {:>14.0} {:>14.0} {:>12}",
-            CLASSES[cid],
-            mn,
-            md,
-            mx,
-            cs.wire_bytes
+            CLASSES[cid], mn, md, mx, cs.wire_bytes
         );
         if cs.errors != 0 {
             println!(
                 "{:<20} anomalies: {} (decode failures / REE shape drift)",
-                CLASSES[cid],
-                cs.errors
+                CLASSES[cid], cs.errors
             );
         }
     }
-    let (imax, imin) = mins
-        .iter()
-        .fold((0, 0), |(mx, mn), &(cid, v)| {
-            if v > mins[mx].1 {
-                (cid, mn)
-            } else if v < mins[mn].1 {
-                (mx, cid)
-            } else {
-                (mx, mn)
-            }
-        });
+    let (imax, imin) = mins.iter().fold((0, 0), |(mx, mn), &(cid, v)| {
+        if v > mins[mx].1 {
+            (cid, mn)
+        } else if v < mins[mn].1 {
+            (mx, cid)
+        } else {
+            (mx, mn)
+        }
+    });
     let vmax = mins[imax].1;
     let vmin = mins[imin].1;
     let ratio = if vmin > 0.0 { vmax / vmin } else { f64::NAN };
@@ -438,7 +424,11 @@ fn bench_mask_words() {
     let mut out = vec![0u64; words];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         for k in 0..K {
@@ -461,7 +451,11 @@ fn bench_decode_into() {
     let mut out = vec![0u32; ROWS];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         let mut wire_sum = 0u64;
@@ -497,7 +491,11 @@ fn bench_encode_fast() {
     let mut values = vec![0u32; ROWS];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         let mut wire_sum = 0u64;
@@ -523,7 +521,11 @@ fn bench_rle_decode() {
     let mut out = vec![0u32; ROWS];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         let mut wire_sum = 0u64;
@@ -565,7 +567,11 @@ fn bench_ree_get() {
     let mut run_values = vec![0i32; RUNS];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         for k in 0..K {
@@ -612,7 +618,11 @@ fn bench_dict_decode_page() {
     let mut out = vec![0u32; ROWS];
     let mut per_class: Vec<ClassStat> = CLASSES
         .iter()
-        .map(|_| ClassStat { wire_bytes: 0, errors: 0, samples: Vec::with_capacity(K) })
+        .map(|_| ClassStat {
+            wire_bytes: 0,
+            errors: 0,
+            samples: Vec::with_capacity(K),
+        })
         .collect();
     for (cid, _) in CLASSES.iter().enumerate() {
         let mut wire_sum = 0u64;
@@ -641,9 +651,7 @@ fn bench_dict_decode_page() {
 }
 
 fn main() {
-    println!(
-        "cgap const-time data-independence instrument — bench v26.10.29, lane PCL8"
-    );
+    println!("cgap const-time data-independence instrument — bench v26.10.29, lane PCL8");
     println!(
         "rows={ROWS} (identical for every kernel x class x instance), \
          K={K} instances/class, min-of-{REPS} per instance, seeds splitmix64 \

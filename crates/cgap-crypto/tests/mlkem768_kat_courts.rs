@@ -32,7 +32,10 @@ fn kat_keygen_encaps_decaps() {
     let mut ss = [0u8; 32];
     kem::encaps(&ek, &m, &mut ct, &mut ss);
     // ct/ss pinned from liboqs enc_derand (byte-exact, in-session)
-    assert_eq!(&hx(&ct[..32]), "459f33fd2319498f268ce825ba9e26718a05e2bfb91d398068f1a1b782a040f9");
+    assert_eq!(
+        &hx(&ct[..32]),
+        "459f33fd2319498f268ce825ba9e26718a05e2bfb91d398068f1a1b782a040f9"
+    );
     assert_eq!(
         &ss[..],
         &uh("868c53e91833c9a530f8cf81ec8a155d86f36888ec7ef7d04354eae707b99266")

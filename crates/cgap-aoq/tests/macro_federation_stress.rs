@@ -100,7 +100,13 @@ struct Hist {
 
 impl Hist {
     const fn new() -> Self {
-        Self { buckets: [0; 48], min: u64::MAX, max: 0, total: 0, n: 0 }
+        Self {
+            buckets: [0; 48],
+            min: u64::MAX,
+            max: 0,
+            total: 0,
+            n: 0,
+        }
     }
 
     fn observe(&mut self, ns: u64) {
@@ -137,14 +143,17 @@ impl Hist {
     }
 
     fn mean_ns(&self) -> f64 {
-        if self.n == 0 { 0.0 } else { self.total as f64 / self.n as f64 }
+        if self.n == 0 {
+            0.0
+        } else {
+            self.total as f64 / self.n as f64
+        }
     }
 }
 
 /// Census of typed refusals keyed by class code (codec classes 0x00_01..
 /// 0x00_0B plus consent 0x00_0C).
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Census([u64; 16]);
 
 impl Census {
@@ -291,15 +300,7 @@ fn node_loop(
         // Pipeline latency: measured around the admission turnstile only
         // (gate + consent + seal + append), not the socket I/O.
         let t0 = Instant::now();
-        let result = admit_record(
-            &mut chain,
-            ct_slab,
-            tag_slab,
-            admitted,
-            &frame,
-            ep,
-            key,
-        );
+        let result = admit_record(&mut chain, ct_slab, tag_slab, admitted, &frame, ep, key);
         let us = t0.elapsed().as_nanos() as u64;
         pipeline.observe(us);
         match result {
@@ -339,7 +340,11 @@ fn node_loop(
     let mut plain = [0u8; PAYLOAD];
     let mut base = [0u8; FRAME];
     for slot in 0..admitted {
-        lawful_frame(u32::from(ep) * 10_000 + slot as u32 + 1, u32::from(ep), &mut base);
+        lawful_frame(
+            u32::from(ep) * 10_000 + slot as u32 + 1,
+            u32::from(ep),
+            &mut base,
+        );
         let consent_epoch = 0x4000 | (ep & ORIGIN_MASK);
         let nonce_epoch = (u32::from(consent_epoch) << 16) | (slot as u32 & 0xFFFF);
         let nonce = Nonce96::new(nonce_epoch, slot as u64).expect("lawful nonce");
@@ -348,7 +353,11 @@ fn node_loop(
         let ct = &ct_slab[slot * PAYLOAD..(slot + 1) * PAYLOAD];
         aead::open_detached(&mut plain, ct, &tag_slab[slot], &aad, key, &nonce)
             .expect("seal/open roundtrip");
-        assert_eq!(plain, base[HDR..], "ep {ep} slot {slot}: plaintext mismatch");
+        assert_eq!(
+            plain,
+            base[HDR..],
+            "ep {ep} slot {slot}: plaintext mismatch"
+        );
         opens_ok += 1;
     }
 
@@ -389,12 +398,7 @@ fn node_loop(
 
 /// Sender loop: stream exactly `lawful + probes` frames, evenly interleaved
 /// probes (i % (total/probes) == 0), and record the ack census classes.
-fn sender_loop(
-    mut tx: UnixStream,
-    ep: u16,
-    lawful_per_ep: usize,
-    probes_per_ep: usize,
-) -> Census {
+fn sender_loop(mut tx: UnixStream, ep: u16, lawful_per_ep: usize, probes_per_ep: usize) -> Census {
     let mut census = Census::new();
     let mut frame = [0u8; FRAME];
     let mut ack = [0u8; 2];
@@ -428,7 +432,10 @@ fn count_pattern(haystack: &[u8], needle: &[u8]) -> u64 {
     if needle.len() > haystack.len() {
         return 0;
     }
-    haystack.windows(needle.len()).filter(|w| *w == needle).count() as u64
+    haystack
+        .windows(needle.len())
+        .filter(|w| *w == needle)
+        .count() as u64
 }
 
 /// The macro court (default 1M-record mode; run with `--nocapture` for the
@@ -515,7 +522,10 @@ fn run_federation(lawful_per_ep: usize, probes_per_ep: usize) {
     let lawful_total = (lawful_per_ep * ENDPOINTS) as u64;
     let probe_total = (probes_per_ep * ENDPOINTS) as u64;
     assert_eq!(admitted, lawful_total, "admitted count");
-    assert_eq!(chain_len, lawful_total, "every admitted record is a chain link");
+    assert_eq!(
+        chain_len, lawful_total,
+        "every admitted record is a chain link"
+    );
 
     // 2. Adversarial census: 100% typed rejection, per class.
     let per_class = probe_total / 5;
@@ -523,7 +533,11 @@ fn run_federation(lawful_per_ep: usize, probes_per_ep: usize) {
     assert_eq!(census.get(0x00_04), per_class, "UnsupportedVersion census");
     assert_eq!(census.get(0x00_05), per_class, "UnknownEpochWire census");
     assert_eq!(census.get(0x00_06), per_class, "DigestMismatch census");
-    assert_eq!(census.get(CONSENT_REVOKED), per_class, "ConsentRevoked census");
+    assert_eq!(
+        census.get(CONSENT_REVOKED),
+        per_class,
+        "ConsentRevoked census"
+    );
     assert_eq!(census.total(), probe_total, "100% of probes refused, typed");
     assert_eq!(
         census.total() + admitted,

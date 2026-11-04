@@ -339,8 +339,8 @@ fn buf_drop_deallocates() {
         {
             let _b = Buf::new(4096);
         } // drop here
-        // Correct code frees immediately; a no-op drop leaks 4096 bytes
-        // forever. Bounded poll on a real observable.
+          // Correct code frees immediately; a no-op drop leaks 4096 bytes
+          // forever. Bounded poll on a real observable.
         poll_live_returns_to(baseline);
         return;
     }
@@ -385,7 +385,7 @@ fn foreign_array_len_exact() {
     assert_eq!(fa.len(), 3);
     assert!(!fa.is_empty());
     drop(fa); // releases the owned data; the shell box below is ours
-    // SAFETY: the shell was boxed by this test and released above.
+              // SAFETY: the shell was boxed by this test and released above.
     drop(unsafe { Box::from_raw(ptr) });
 }
 

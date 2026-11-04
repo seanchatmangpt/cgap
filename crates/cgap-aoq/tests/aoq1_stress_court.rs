@@ -46,17 +46,18 @@ fn ten_k_random_buffers_refuse_typed_no_panic() {
         rng.fill(&mut buf);
         match decode(&buf) {
             Ok(_) => panic!("random buffer {i} decoded Ok — refusal ladder failed"),
-            Err(e) => {
-                match e {
-                    AoqError::HeaderTooShort { .. } => refusals[0] += 1,
-                    AoqError::BadMagic { .. } => refusals[1] += 1,
-                    _ => panic!("variant {e:?} outside the typed ladder at {i}"),
-                }
-            }
+            Err(e) => match e {
+                AoqError::HeaderTooShort { .. } => refusals[0] += 1,
+                AoqError::BadMagic { .. } => refusals[1] += 1,
+                _ => panic!("variant {e:?} outside the typed ladder at {i}"),
+            },
         }
     }
     let total: usize = refusals.iter().sum();
-    assert_eq!(total, 10_000, "all random buffers must land in typed refusals");
+    assert_eq!(
+        total, 10_000,
+        "all random buffers must land in typed refusals"
+    );
 }
 
 #[test]

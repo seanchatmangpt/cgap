@@ -179,7 +179,10 @@ fn af33_density_court() {
     assert!(!samples.is_empty(), "RSS sampler collected zero samples");
     let peak_kB = samples.iter().map(|(_, kb)| *kb).max().unwrap();
     // Plateau: median of the second half of the window (sustained state).
-    let mut tail: Vec<u64> = samples[samples.len() / 2..].iter().map(|(_, kb)| *kb).collect();
+    let mut tail: Vec<u64> = samples[samples.len() / 2..]
+        .iter()
+        .map(|(_, kb)| *kb)
+        .collect();
     tail.sort_unstable();
     let plateau_kB = tail[tail.len() / 2];
 

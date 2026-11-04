@@ -48,15 +48,15 @@ use cgap::cgap_arrow::bitmask::{mask_bytes, PresenceMask};
 use cgap::cgap_blake3;
 use cgap::cgap_git::pack_write::{git_object_oid, sha1};
 use cgap::cgap_parquet::footer::{verify_seal, BlockSummary, FooterSealer};
-use cgap_storage::dred;
-use cgap_bn3::sigil::{encode_term, Sigil};
 use cgap_bn3::noalloc::{na_compile, na_unify_radix, NaEngine, NaMatches};
+use cgap_bn3::sigil::{encode_term, Sigil};
 use cgap_bn3::unify::{BodyAtom, JoinProbeScratch, Rule, StatementColumns};
 use cgap_gate::penstock::{
     ingress, CGAP_OK, HEADER_LEN, HEADER_VERSION, MAGIC, OABI_DIGEST_LEN, OFF_ATTESTATION,
     OFF_FLAGS, OFF_MAGIC, OFF_OABI_DIGEST, OFF_PAYLOAD_BYTE_LEN, OFF_VERSION, P28_FLAG_ROOT,
     P28_LICENSE_MAGIC, P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION,
 };
+use cgap_storage::dred;
 
 // --- Counting allocator (FA4 allocation witness) --------------------------
 
@@ -369,7 +369,10 @@ fn run_closed_loop_inner(check_alloc: bool) -> Artifacts {
     let mut na_out = boxed_zeroed::<NaMatches>();
     let probe = JoinProbeScratch::default();
     assert!(probe.radix, "L3 fast path must be the DEFAULT (FA3)");
-    let mut mask = PresenceMask::<{ STORE_MAX.next_power_of_two() }, { mask_bytes(STORE_MAX.next_power_of_two()) }>::EMPTY;
+    let mut mask = PresenceMask::<
+        { STORE_MAX.next_power_of_two() },
+        { mask_bytes(STORE_MAX.next_power_of_two()) },
+    >::EMPTY;
     let facts_words = (FACTS + 63) / 64;
     let mut del_mask = vec![0u64; facts_words];
     let mut derived = vec![0u64; facts_words];
@@ -436,12 +439,24 @@ fn run_closed_loop_inner(check_alloc: bool) -> Artifacts {
         dred::build_csr(&edges, FACTS, &mut counts, &mut fill, &mut adj)
             .expect("CSR build from the iteration topology");
         let total = dred::cascade_retract(
-            &derived, &del_mask, &alt, FACTS, &counts, &adj, &mut purged,
-            &mut keep, &mut worklist, 0, &mut cascade_out,
+            &derived,
+            &del_mask,
+            &alt,
+            FACTS,
+            &counts,
+            &adj,
+            &mut purged,
+            &mut keep,
+            &mut worklist,
+            0,
+            &mut cascade_out,
         )
         .expect("cascade on a fully-provisioned lease");
         let purged_n: usize = purged.iter().map(|w| w.count_ones() as usize).sum();
-        assert_eq!(purged_n, FACTS, "iter {iter}: cascade purges the full window");
+        assert_eq!(
+            purged_n, FACTS,
+            "iter {iter}: cascade purges the full window"
+        );
         assert_eq!(total, 0, "iter {iter}: zero phantom survivors");
         // 6. Parquet seal (i32 lane-domain witness inside seal_delta).
         body_buf.clear();
@@ -453,7 +468,11 @@ fn run_closed_loop_inner(check_alloc: bool) -> Artifacts {
         let (sealed, _seal_digest) = seal_delta(&mut seal_buf, &body_buf, tick, &running);
         // 7. Git loose-object commit binding tick + receipt.
         let blob_oid = git_object_oid("blob", &sealed);
-        assert_eq!(blob_oid, independent_oid("blob", &sealed), "blob OID recompute");
+        assert_eq!(
+            blob_oid,
+            independent_oid("blob", &sealed),
+            "blob OID recompute"
+        );
         let running_hex = hex32(&running);
         let (commit, commit_oid) = commit_object(blob_oid, iter, tick, &running_hex);
         assert_eq!(
@@ -558,7 +577,11 @@ fn sp_chain_tamper_flip() {
     );
     // Byte-flip back: byte-exact restore restores the chain.
     tampered[mid][byte_at] ^= 0xFF;
-    assert_eq!(recompute_chain(&tampered), a.final_digest, "restore restores the chain");
+    assert_eq!(
+        recompute_chain(&tampered),
+        a.final_digest,
+        "restore restores the chain"
+    );
 }
 
 #[test]

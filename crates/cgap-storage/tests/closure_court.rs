@@ -60,9 +60,8 @@ fn court2_bitplane_parity() {
     // feasibility caps this court at a 40-node / 180-pair closure.
     let (ex, ez) = chains_corpus(40, 10);
     let full = semi_naive_closure(&ex, &ez).0.len();
-    let bp: usize =
-        semi_naive_closure_bitplane_count::<1024>(&ex, &ez)
-            .expect("capacity 1024 slots sufficient for 40-node closure");
+    let bp: usize = semi_naive_closure_bitplane_count::<1024>(&ex, &ez)
+        .expect("capacity 1024 slots sufficient for 40-node closure");
     assert_eq!(full, bp, "packed-hash vs bitplane count divergence");
     // Loud capacity refusal: tiny set must type-err, not silently drop.
     let tiny = semi_naive_closure_bitplane_count::<4>(&ex, &ez);

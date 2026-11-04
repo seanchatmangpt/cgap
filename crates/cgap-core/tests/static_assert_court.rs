@@ -74,7 +74,10 @@ fn shim_pad_header_field_to_129b_fails_compile() {
     );
     let (ok, stderr) = rustc_compiles("pad-129", &shim);
     assert!(!ok, "129-byte header must fail to compile");
-    assert!(stderr.contains("E0080"), "expected const-assert E0080, got:\n{stderr}");
+    assert!(
+        stderr.contains("E0080"),
+        "expected const-assert E0080, got:\n{stderr}"
+    );
 }
 
 #[test]
@@ -135,5 +138,8 @@ fn shim_pad_attestation_field_fails_compile() {
     );
     let (ok, stderr) = rustc_compiles("attest-pad", &shim);
     assert!(!ok, "88-byte attestation must fail to compile");
-    assert!(stderr.contains("E0080"), "expected const-assert E0080, got:\n{stderr}");
+    assert!(
+        stderr.contains("E0080"),
+        "expected const-assert E0080, got:\n{stderr}"
+    );
 }

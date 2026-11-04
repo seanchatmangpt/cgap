@@ -99,7 +99,9 @@ fn sp8_two_threads_one_spill_path_racer_denied_owner_prefix_exact() {
             let mut ready_set = false;
             for _ in 0..4096 {
                 match commit(&cp_owner, 64) {
-                    CGAP_OK => { owner_ok.fetch_add(1, Ordering::Relaxed); }
+                    CGAP_OK => {
+                        owner_ok.fetch_add(1, Ordering::Relaxed);
+                    }
                     _ => {
                         owner_bad.fetch_add(1, Ordering::Relaxed);
                         return;
@@ -118,7 +120,9 @@ fn sp8_two_threads_one_spill_path_racer_denied_owner_prefix_exact() {
             // Phase 2: stream until the stop flag (race window).
             while !stop.load(Ordering::Relaxed) {
                 match commit(&cp_owner, 64) {
-                    CGAP_OK => { owner_ok.fetch_add(1, Ordering::Relaxed); }
+                    CGAP_OK => {
+                        owner_ok.fetch_add(1, Ordering::Relaxed);
+                    }
                     _ => {
                         owner_bad.fetch_add(1, Ordering::Relaxed);
                         break;
@@ -139,7 +143,9 @@ fn sp8_two_threads_one_spill_path_racer_denied_owner_prefix_exact() {
         std::thread::spawn(move || {
             while !stop.load(Ordering::Relaxed) {
                 match commit(&cp_racer, 64) {
-                    DENIED => { racer.fetch_add(1, Ordering::Relaxed); }
+                    DENIED => {
+                        racer.fetch_add(1, Ordering::Relaxed);
+                    }
                     CGAP_OK => panic!("racer GRANTed an owned spill path (truncation channel)"),
                     other => panic!("racer observed non-DENIED typed code 0x{other:08X}"),
                 }

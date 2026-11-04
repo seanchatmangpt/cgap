@@ -40,9 +40,7 @@ use cgap_git::admission_gate::{
 use cgap_git::commit_synth::{
     validate, CommitScratch, CommitSynthError, LeaseCommitSpec, LeaseReceipt, RECEIPT_HEX_LEN,
 };
-use cgap_git::mcp_driver::{
-    parse_frame, Driver, ProtocolError,
-};
+use cgap_git::mcp_driver::{parse_frame, Driver, ProtocolError};
 use cgap_git::octopus_merge::{
     octopus_merge, octopus_merge_andon, HeadInput, MergeError, OctopusScratch,
 };
@@ -112,8 +110,7 @@ static GLOBAL: CountingAlloc = CountingAlloc;
 fn open_window() {
     ALLOC_BYTES.store(0, AOrd::Relaxed);
     DEALLOC_BYTES.store(0, AOrd::Relaxed);
-    *WINDOW_OWNER.lock().unwrap_or_else(|e| e.into_inner()) =
-        Some(std::thread::current().id());
+    *WINDOW_OWNER.lock().unwrap_or_else(|e| e.into_inner()) = Some(std::thread::current().id());
     WINDOW_OPEN.store(1, AOrd::Relaxed);
 }
 fn close_window() -> (usize, usize) {
@@ -658,7 +655,10 @@ fn f4_trailer_mutation_refuses() {
     let _g = serial();
     let corpus = head_corpus(9, 8, 0);
     let (bytes, receipt, _tree, payload) = sealed_commit(&corpus);
-    assert!(validate(&bytes).is_ok(), "F4 control: clean commit validates");
+    assert!(
+        validate(&bytes).is_ok(),
+        "F4 control: clean commit validates"
+    );
 
     // F4a: flip one hex digit inside the 8-byte tag region (last 16
     // hex chars of the lease-receipt trailer).

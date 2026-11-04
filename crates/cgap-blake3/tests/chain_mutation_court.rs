@@ -101,7 +101,10 @@ fn court_a_child_payload_bitflip_rejected() {
     let orig = chain[k].frame[MUTATE_BYTE];
     let mut mutant_chain: Vec<Receipt> = chain
         .iter()
-        .map(|r| Receipt { frame: r.frame.clone(), digest: r.digest })
+        .map(|r| Receipt {
+            frame: r.frame.clone(),
+            digest: r.digest,
+        })
         .collect();
     mutant_chain[k].frame[MUTATE_BYTE] ^= MUTATE_MASK;
 
@@ -127,7 +130,10 @@ fn court_a_child_payload_bitflip_rejected() {
     // re-derivation, not a stale fixture.
     let mut digest_mutant: Vec<Receipt> = chain
         .iter()
-        .map(|r| Receipt { frame: r.frame.clone(), digest: r.digest })
+        .map(|r| Receipt {
+            frame: r.frame.clone(),
+            digest: r.digest,
+        })
         .collect();
     digest_mutant[k].digest[0] ^= 1;
     assert!(
@@ -150,7 +156,10 @@ fn court_b_duplicate_digest_substitution_typed_fail() {
     let k = 5;
     let mut mutant: Vec<Receipt> = chain
         .iter()
-        .map(|r| Receipt { frame: r.frame.clone(), digest: r.digest })
+        .map(|r| Receipt {
+            frame: r.frame.clone(),
+            digest: r.digest,
+        })
         .collect();
     // Identical-digest substitution: receipt k claims receipt k-1's digest.
     mutant[k].digest = chain[k - 1].digest;
@@ -163,7 +172,11 @@ fn court_b_duplicate_digest_substitution_typed_fail() {
     );
 
     // Witness the substitution landed: the digests were distinct BEFORE.
-    assert_ne!(chain[k].digest, chain[k - 1].digest, "substitution was vacuous: digests already equal");
+    assert_ne!(
+        chain[k].digest,
+        chain[k - 1].digest,
+        "substitution was vacuous: digests already equal"
+    );
 }
 
 // =========================================================================
@@ -187,7 +200,10 @@ fn court_c_root_mutation_rederivation_mismatch() {
     // Mutate the stored root.
     let mut mutant: Vec<Receipt> = chain
         .iter()
-        .map(|r| Receipt { frame: r.frame.clone(), digest: r.digest })
+        .map(|r| Receipt {
+            frame: r.frame.clone(),
+            digest: r.digest,
+        })
         .collect();
     mutant[last].digest[31] ^= 0x80;
     assert_ne!(mutant[last].digest, true_root, "root mutation did not land");
@@ -195,6 +211,14 @@ fn court_c_root_mutation_rederivation_mismatch() {
     // AFTER: full-chain court rejects, and a direct re-derivation
     // comparison also mismatches (the exit-1-class assertion).
     let err = verify_chain(&mutant).expect_err("mutated-root chain must be REJECTED");
-    assert!(err.contains("digest mismatch"), "typed FAIL expected, got: {}", err);
-    assert_ne!(hash(&mutant[last].frame), mutant[last].digest, "mutated root must not re-derive");
+    assert!(
+        err.contains("digest mismatch"),
+        "typed FAIL expected, got: {}",
+        err
+    );
+    assert_ne!(
+        hash(&mutant[last].frame),
+        mutant[last].digest,
+        "mutated root must not re-derive"
+    );
 }

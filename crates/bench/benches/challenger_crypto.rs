@@ -26,11 +26,10 @@ fn make_buffer(len: usize) -> Vec<u8> {
 fn hash_incumbent_scalar(b: Bencher, len: usize) {
     let buf = make_buffer(len);
 
-    b.counter(BytesCount::new(len))
-        .bench_local(|| {
-            let digest = hash(black_box(&buf));
-            black_box(digest);
-        });
+    b.counter(BytesCount::new(len)).bench_local(|| {
+        let digest = hash(black_box(&buf));
+        black_box(digest);
+    });
 }
 
 // -----------------------------------------------------------------------------
@@ -41,9 +40,8 @@ fn hash_incumbent_scalar(b: Bencher, len: usize) {
 fn hash_cgap_wide_simd(b: Bencher, len: usize) {
     let buf = make_buffer(len);
 
-    b.counter(BytesCount::new(len))
-        .bench_local(|| {
-            let digest = hash_wide_simd(black_box(&buf));
-            black_box(digest);
-        });
+    b.counter(BytesCount::new(len)).bench_local(|| {
+        let digest = hash_wide_simd(black_box(&buf));
+        black_box(digest);
+    });
 }

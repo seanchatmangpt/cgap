@@ -523,7 +523,10 @@ mod fix05_courts {
             .expect_err("VACUOUS: surplus close admitted");
         assert_eq!(
             err,
-            DemuxError::ObjectSurplus { seen: 0, declared: 0 }
+            DemuxError::ObjectSurplus {
+                seen: 0,
+                declared: 0
+            }
         );
     }
 }

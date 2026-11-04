@@ -17,7 +17,9 @@ fn pseudo_random_bytes(n: usize) -> Vec<u8> {
     let mut x = 0x9E37_79B9_7F4A_7C15u64;
     let mut v = Vec::with_capacity(n);
     for _ in 0..n {
-        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         v.push((x >> 33) as u8);
     }
     v
@@ -32,33 +34,8 @@ fn multi_chunk_matches_sequential_across_dispatch_boundaries() {
     // 8193+ (x2 batch + tail), plus 20480 (5 batches), 32768 (8 batches),
     // and odd lengths at each boundary +/- 1.
     let mut sizes: Vec<usize> = vec![
-        1,
-        31,
-        63,
-        64,
-        1023,
-        1024,
-        1025,
-        2047,
-        2048,
-        4095,
-        4096,
-        4097,
-        5000,
-        6143,
-        6144,
-        6145,
-        8191,
-        8192,
-        8193,
-        12287,
-        12288,
-        12289,
-        20480,
-        32768,
-        40000,
-        65536,
-        65537,
+        1, 31, 63, 64, 1023, 1024, 1025, 2047, 2048, 4095, 4096, 4097, 5000, 6143, 6144, 6145,
+        8191, 8192, 8193, 12287, 12288, 12289, 20480, 32768, 40000, 65536, 65537,
     ];
     for b in [4095usize, 4096, 4097, 8191, 8192, 8193] {
         sizes.push(b - 1);
@@ -70,7 +47,13 @@ fn multi_chunk_matches_sequential_across_dispatch_boundaries() {
     for (i, &size) in sizes.iter().enumerate() {
         let data = pseudo_random_bytes(size);
         let ref_d = hash(&data);
-        assert_eq!(hash_many_simd(&data), ref_d, "hash_many_simd size={} idx={}", size, i);
+        assert_eq!(
+            hash_many_simd(&data),
+            ref_d,
+            "hash_many_simd size={} idx={}",
+            size,
+            i
+        );
         assert_eq!(
             hash_many_simd_x2(&data),
             ref_d,
@@ -206,7 +189,9 @@ fn differential_vs_b3sum_corpus_25_and_odd_lengths() {
             len
         );
     }
-    for len in [1025usize, 2049, 3072, 3073, 4095, 4609, 6144, 8192, 20480, 40960] {
+    for len in [
+        1025usize, 2049, 3072, 3073, 4095, 4609, 6144, 8192, 20480, 40960,
+    ] {
         let data = &buf[..len];
         assert_eq!(
             hex(&cgap_blake3::hash_many_simd(data)),
@@ -259,7 +244,9 @@ fn x2_driver_matches_b3sum() {
         );
     }
     // Non-whole-chunk tails route to the scalar path inside the driver.
-    for len in [1025usize, 2049, 3072, 3073, 4095, 4609, 6144, 8192, 20480, 40960] {
+    for len in [
+        1025usize, 2049, 3072, 3073, 4095, 4609, 6144, 8192, 20480, 40960,
+    ] {
         let data = &buf[..len];
         assert_eq!(
             hex(&cgap_blake3::hash_many_simd_x2(data)),
@@ -303,18 +290,17 @@ fn register_resident_permute_4way_matches_scalar_multi_pattern() {
     // Three 1 KiB patterns hitting distinct permutation paths: splitmix-style
     // ramp, period-3 cycle (misaligned with the 16-word message windows), and
     // a repeated 32-bit word (equal vectors would mask a wrong shuffle).
-    let mut data: Vec<u8> = (0..2048usize).map(|i| (i.wrapping_mul(7) ^ (i >> 3)) as u8).collect();
+    let mut data: Vec<u8> = (0..2048usize)
+        .map(|i| (i.wrapping_mul(7) ^ (i >> 3)) as u8)
+        .collect();
     data.extend((0..1024usize).map(|i| (i % 3) as u8));
     data.extend([0x5Au8; 1024]);
 
     for base in [0u64, 3, 1 << 40, u64::MAX - 3] {
         let four = cgap_blake3::multi_chunk::compress_chunks_4way(&data, base);
         for l in 0..4usize {
-            let s = cgap_blake3::hash_chunk(
-                &data[l * 1024..(l + 1) * 1024],
-                base + l as u64,
-                false,
-            );
+            let s =
+                cgap_blake3::hash_chunk(&data[l * 1024..(l + 1) * 1024], base + l as u64, false);
             assert_eq!(
                 four[l], s,
                 "4way lane {l} (base={base}) != scalar hash_chunk"

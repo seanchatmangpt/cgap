@@ -132,7 +132,10 @@ fn af30_contender_a_frame_pipeline() {
             aad[..36].copy_from_slice(&wire[..36]);
             let nonce = Nonce96::new(0, i).expect("nonce");
             aead::seal_detached(&mut ct, &mut tag, &payload, &aad, &key, &nonce);
-            sink = sink.wrapping_add(hdr.seq as u64).wrapping_add(ct[0] as u64).wrapping_add(tag[0] as u64);
+            sink = sink
+                .wrapping_add(hdr.seq as u64)
+                .wrapping_add(ct[0] as u64)
+                .wrapping_add(tag[0] as u64);
             chain.append(hdr.epoch, &payload).expect("append");
         }
         let us = t0.elapsed().as_secs_f64() * 1e6 / N as f64;

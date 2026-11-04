@@ -44,7 +44,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::time::Instant;
 
-use cgap_arrow::ipc::{emit, read_with_meta, window_len, MAGIC, MetaHeader};
+use cgap_arrow::ipc::{emit, read_with_meta, window_len, MetaHeader, MAGIC};
 use cgap_arrow::stream_writer::{StreamWriter, VectoredSink};
 use cgap_crypto::fips202::{Shake128, Shake256};
 use cgap_crypto::poly1305;
@@ -226,7 +226,11 @@ fn meta_for(body_len: usize, alignment: u32, seq: u32) -> MetaHeader {
     }
 }
 
-const PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
+const PROFILE: &str = if cfg!(debug_assertions) {
+    "debug"
+} else {
+    "release"
+};
 
 // ---------------------------------------------------------------
 // G1 — zero-alloc hot path (AB-9 counting-allocator court + AB-19
@@ -313,7 +317,9 @@ fn leg_g1b_slab_floor() -> Verdict {
         min_rate = min_rate.min((CYCLES * CAP) as f64 / secs);
     }
     if min_rate < FLOOR {
-        return Verdict::Unmet(format!("slab rate {min_rate:.0}/s below floor {FLOOR:.0}/s"));
+        return Verdict::Unmet(format!(
+            "slab rate {min_rate:.0}/s below floor {FLOOR:.0}/s"
+        ));
     }
     Verdict::Met
 }
@@ -324,7 +330,8 @@ fn gate_g1() -> GateRow {
     let measured = format!(
         "alloc census: {} | slab floor: {}",
         match &alloc {
-            Verdict::Met => "0 allocs / 0 bytes over 100k emit+read windows (counter delta 0)".into(),
+            Verdict::Met =>
+                "0 allocs / 0 bytes over 100k emit+read windows (counter delta 0)".into(),
             other => other.detail(),
         },
         match &floor {
@@ -412,8 +419,9 @@ fn gate_g2() -> GateRow {
         min_dec = min_dec.min(dec);
     }
     let amortized = min_enc + min_dec;
-    let measured =
-        format!("{min_enc:.1} + {min_dec:.1} = {amortized:.1} ns combined (min of {ROUNDS}x{ITERS})");
+    let measured = format!(
+        "{min_enc:.1} + {min_dec:.1} = {amortized:.1} ns combined (min of {ROUNDS}x{ITERS})"
+    );
     let verdict = if amortized < CEILING_NS {
         Verdict::Met
     } else {
@@ -466,11 +474,20 @@ fn gate_g3() -> GateRow {
         fields.sort();
 
         let gen_pairs: Vec<(usize, usize)> = [
-            (cgap_aoq::generated_aoq_header_layout::AOQ1_MAGIC_OFFSET, 4usize),
-            (cgap_aoq::generated_aoq_header_layout::AOQ1_VERSION_OFFSET, 2),
+            (
+                cgap_aoq::generated_aoq_header_layout::AOQ1_MAGIC_OFFSET,
+                4usize,
+            ),
+            (
+                cgap_aoq::generated_aoq_header_layout::AOQ1_VERSION_OFFSET,
+                2,
+            ),
             (cgap_aoq::generated_aoq_header_layout::AOQ1_EPOCH_OFFSET, 2),
             (cgap_aoq::generated_aoq_header_layout::AOQ1_KEY_ID_OFFSET, 8),
-            (cgap_aoq::generated_aoq_header_layout::AOQ1_FRAME_ORDINAL_OFFSET, 4),
+            (
+                cgap_aoq::generated_aoq_header_layout::AOQ1_FRAME_ORDINAL_OFFSET,
+                4,
+            ),
             (cgap_aoq::generated_aoq_header_layout::AOQ1_SEQ_OFFSET, 4),
             (
                 cgap_aoq::generated_aoq_header_layout::AOQ1_RESERVED_OFFSET,
@@ -478,12 +495,17 @@ fn gate_g3() -> GateRow {
                     - cgap_aoq::generated_aoq_header_layout::AOQ1_RESERVED_OFFSET
                     - 4,
             ),
-            (cgap_aoq::generated_aoq_header_layout::AOQ1_HEADER_DIGEST_OFFSET, 4),
+            (
+                cgap_aoq::generated_aoq_header_layout::AOQ1_HEADER_DIGEST_OFFSET,
+                4,
+            ),
         ]
         .to_vec();
 
         if fields != gen_pairs {
-            return Err(format!("graph/code drift: TTL {fields:?} != generated {gen_pairs:?}"));
+            return Err(format!(
+                "graph/code drift: TTL {fields:?} != generated {gen_pairs:?}"
+            ));
         }
         // Flip witness: injected offset mutation must flip the law.
         let mut mutated = fields.clone();
@@ -522,22 +544,23 @@ fn gate_g4() -> GateRow {
     let outcome = (|| -> Result<String, String> {
         let mut out = [0u8; 32];
         Shake128::xof(b"", &mut out);
-        let want128 =
-            unhex("7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26");
+        let want128 = unhex("7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26");
         if out[..] != want128[..] {
             return Err("SHAKE128 empty KAT mismatch".into());
         }
         Shake256::xof(b"", &mut out);
-        let want256 =
-            unhex("46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f");
+        let want256 = unhex("46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f");
         if out[..] != want256[..] {
             return Err("SHAKE256 empty KAT mismatch".into());
         }
-        let key: [u8; 32] = unhex("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b")
+        let key: [u8; 32] =
+            unhex("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b")
+                .try_into()
+                .unwrap();
+        let msg = b"Cryptographic Forum Research Group";
+        let want_tag: [u8; 16] = unhex("a8061dc1305136c6c22b8baf0c0127a9")
             .try_into()
             .unwrap();
-        let msg = b"Cryptographic Forum Research Group";
-        let want_tag: [u8; 16] = unhex("a8061dc1305136c6c22b8baf0c0127a9").try_into().unwrap();
         let got = poly1305::one_shot(&key, msg);
         if got != want_tag {
             return Err("RFC 8439 2.5.2 Poly1305 tag mismatch".into());
@@ -639,7 +662,11 @@ fn gate_g5() -> GateRow {
                     ));
                 }
             }
-            other => return Err(format!("oversized frame not refused FrameTooLarge: {other:?}")),
+            other => {
+                return Err(format!(
+                    "oversized frame not refused FrameTooLarge: {other:?}"
+                ))
+            }
         }
         let _ = std::fs::remove_file(&seg);
 
@@ -914,10 +941,8 @@ fn seal_json(body_with_placeholder: String) -> (String, String) {
     let canonical = body_with_placeholder.replace(SEAL_FIELD_EMPTY, "");
     let digest = cgap_blake3::hash(canonical.as_bytes());
     let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-    let sealed = body_with_placeholder.replace(
-        SEAL_FIELD_EMPTY,
-        &format!("\"scorecard_hash\": \"{hex}\""),
-    );
+    let sealed =
+        body_with_placeholder.replace(SEAL_FIELD_EMPTY, &format!("\"scorecard_hash\": \"{hex}\""));
     (sealed, hex)
 }
 
@@ -941,7 +966,10 @@ fn verify_seal(sealed: &str) -> bool {
     open.push_str(&sealed[vend + 1..]);
     let canonical = open.replace(SEAL_FIELD_EMPTY, "");
     let recomputed_digest = cgap_blake3::hash(canonical.as_bytes());
-    let recomputed: String = recomputed_digest.iter().map(|b| format!("{b:02x}")).collect();
+    let recomputed: String = recomputed_digest
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
     claimed == recomputed
 }
 
@@ -974,7 +1002,10 @@ fn render_json(rows: &[GateRow], overall: &Overall) -> String {
     for (i, r) in rows.iter().enumerate() {
         b.push_str("    {\n");
         b.push_str(&format!("      \"gate\": \"{}\",\n", r.gate));
-        b.push_str(&format!("      \"dimension\": \"{}\",\n", json_escape(r.dimension)));
+        b.push_str(&format!(
+            "      \"dimension\": \"{}\",\n",
+            json_escape(r.dimension)
+        ));
         b.push_str(&format!(
             "      \"sovereign_target\": \"{}\",\n",
             json_escape(r.sovereign_target)
@@ -983,11 +1014,17 @@ fn render_json(rows: &[GateRow], overall: &Overall) -> String {
             "      \"legacy_tolerance\": \"{}\",\n",
             json_escape(r.legacy_tolerance)
         ));
-        b.push_str(&format!("      \"measured\": \"{}\",\n", json_escape(&r.measured)));
+        b.push_str(&format!(
+            "      \"measured\": \"{}\",\n",
+            json_escape(&r.measured)
+        ));
         b.push_str(&format!("      \"verdict\": \"{}\",\n", r.verdict.label()));
         let d = r.verdict.detail();
         if !d.is_empty() {
-            b.push_str(&format!("      \"verdict_detail\": \"{}\",\n", json_escape(&d)));
+            b.push_str(&format!(
+                "      \"verdict_detail\": \"{}\",\n",
+                json_escape(&d)
+            ));
         }
         b.push_str(&format!(
             "      \"verification\": \"{}\"\n",
@@ -1015,7 +1052,11 @@ fn render_table(rows: &[GateRow], overall: &Overall) -> String {
     for r in rows {
         t.push_str(&format!(
             "{:<4} {:<28} {:<44} {:<10} {}\n",
-            r.gate, r.dimension, r.sovereign_target, r.verdict.label(), r.measured
+            r.gate,
+            r.dimension,
+            r.sovereign_target,
+            r.verdict.label(),
+            r.measured
         ));
         let d = r.verdict.detail();
         if !d.is_empty() {
@@ -1062,8 +1103,11 @@ fn rfc0089_scorecard_emits_sealed_table() {
     // Structural law: exactly seven §6 rows, every verdict typed.
     assert_eq!(rows.len(), 7, "RFC-0089 §6 has seven gates");
     for r in &rows {
-        assert!(!r.measured.is_empty() || !matches!(r.verdict, Verdict::Met),
-            "{} row carries no measured value", r.gate);
+        assert!(
+            !r.measured.is_empty() || !matches!(r.verdict, Verdict::Met),
+            "{} row carries no measured value",
+            r.gate
+        );
         let _ = r.verdict.label();
     }
 
@@ -1079,7 +1123,9 @@ fn rfc0089_scorecard_emits_sealed_table() {
 
     // Tamper detection: any byte flipped in the body must break the seal.
     let mut tampered = sealed.clone();
-    let idx = tampered.find("\"measured\"").expect("measured field present");
+    let idx = tampered
+        .find("\"measured\"")
+        .expect("measured field present");
     let bidx = tampered[idx..].find("a").map(|i| idx + i).expect("a byte");
     tampered.replace_range(bidx..bidx + 1, "b");
     assert!(
@@ -1109,7 +1155,8 @@ fn rfc0089_disqualification_witnessed_by_injected_unmet() {
     assert_eq!(overall_verdict(&all_met), Overall::Qualified);
 
     let mut injected = all_met.clone();
-    injected[2].verdict = Verdict::Unmet("sandbox-injected UNMET (test fixture, not a measurement)".into());
+    injected[2].verdict =
+        Verdict::Unmet("sandbox-injected UNMET (test fixture, not a measurement)".into());
     let overall = overall_verdict(&injected);
     assert_eq!(
         overall,
@@ -1118,7 +1165,10 @@ fn rfc0089_disqualification_witnessed_by_injected_unmet() {
     );
     let table = render_table(&injected, &overall);
     assert!(table.contains("DISQUALIFIED"), "table renders DISQUALIFIED");
-    assert!(table.contains("sandbox-injected UNMET"), "table carries the typed reason");
+    assert!(
+        table.contains("sandbox-injected UNMET"),
+        "table carries the typed reason"
+    );
 
     // Typed, never softened: a SKIP/UNMEASURED must NOT disqualify —
     // it degrades to PROVISIONAL (unweighted law: only UNMET fails).
@@ -1138,9 +1188,15 @@ fn rfc0089_profile_guard_loud_skip() {
     // compiled this binary, the branch taken must be the lawful one.
     let guard = cgap_aoq::profile_guard::assert_release();
     if cfg!(debug_assertions) {
-        assert!(guard.is_err(), "debug build must be refused by the release guard");
+        assert!(
+            guard.is_err(),
+            "debug build must be refused by the release guard"
+        );
     } else {
-        assert!(guard.is_ok(), "release build must be admitted by the release guard");
+        assert!(
+            guard.is_ok(),
+            "release build must be admitted by the release guard"
+        );
     }
 
     // In debug, G2's row must be SKIP-typed (loud), never MEASURED-*.

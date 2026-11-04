@@ -8,12 +8,12 @@
 
 #![cfg(feature = "std")]
 
+use cgap_parquet::level_free::parse_schema_elements;
 use cgap_parquet::level_free::{
     admit_schema, write_file, write_row_group_page, FooterRowGroup, LevelFreeColumn,
     LevelFreeError, LevelFreeType,
 };
 use cgap_parquet::scan::ParquetFile;
-use cgap_parquet::level_free::parse_schema_elements;
 use cgap_parquet::thrift::write_i32_field;
 
 /// Unique temp path; real file on disk, no tempfile dependency.
@@ -28,7 +28,12 @@ impl TempFile {
             .map(|d| d.as_nanos())
             .unwrap_or(0);
         let mut p = std::env::temp_dir();
-        p.push(format!("cgap_lf_multi_{}_{}_{}", name, std::process::id(), nanos));
+        p.push(format!(
+            "cgap_lf_multi_{}_{}_{}",
+            name,
+            std::process::id(),
+            nanos
+        ));
         std::fs::write(&p, bytes).expect("write court file");
         TempFile { path: p }
     }
@@ -48,16 +53,27 @@ struct Corpus {
 
 fn corpus(num_rows: usize) -> Corpus {
     let cols = vec![
-        LevelFreeColumn { name: b"a_u32".to_vec(), ty: LevelFreeType::U32 },
-        LevelFreeColumn { name: b"b_u64".to_vec(), ty: LevelFreeType::U64 },
-        LevelFreeColumn { name: b"h_256".to_vec(), ty: LevelFreeType::Bytes32 },
+        LevelFreeColumn {
+            name: b"a_u32".to_vec(),
+            ty: LevelFreeType::U32,
+        },
+        LevelFreeColumn {
+            name: b"b_u64".to_vec(),
+            ty: LevelFreeType::U64,
+        },
+        LevelFreeColumn {
+            name: b"h_256".to_vec(),
+            ty: LevelFreeType::Bytes32,
+        },
     ];
     let payloads: Vec<Vec<u8>> = cols
         .iter()
         .enumerate()
         .map(|(i, c)| {
             let n = num_rows * c.ty.width();
-            (0..n).map(|b| ((b * 13 + i * 7 + 3) & 0xFF) as u8).collect()
+            (0..n)
+                .map(|b| ((b * 13 + i * 7 + 3) & 0xFF) as u8)
+                .collect()
         })
         .collect();
     Corpus { cols, payloads }
@@ -113,9 +129,7 @@ fn multi_column_write_scan_isomorphism() {
 
     // Typed accessor spot checks against the corpus bit patterns.
     let a0 = u32::from_le_bytes(c.payloads[0][0..4].try_into().unwrap());
-    let b17 = u64::from_le_bytes(
-        c.payloads[1][17 * 8..17 * 8 + 8].try_into().unwrap(),
-    );
+    let b17 = u64::from_le_bytes(c.payloads[1][17 * 8..17 * 8 + 8].try_into().unwrap());
     assert_eq!(pf.value_u32(0, 0, 0).expect("u32"), a0);
     assert_eq!(pf.value_u64(0, 1, 17).expect("u64"), b17);
     assert_eq!(
@@ -132,11 +146,17 @@ fn row_group_page_header_carries_all_columns() {
     let c = corpus(rows);
     let refs: Vec<&[u8]> = c.payloads.iter().map(|p| p.as_slice()).collect();
     let page = write_row_group_page(&c.cols, &refs, rows).expect("page");
-    let (header, header_len) =
-        cgap_parquet::thrift::read_page_header(&page).expect("header");
+    let (header, header_len) = cgap_parquet::thrift::read_page_header(&page).expect("header");
     let v2 = header.data_page_header_v2.expect("v2");
-    assert_eq!(header.page_type, cgap_parquet::thrift::page_type::DATA_PAGE_V2);
-    assert_eq!(v2.num_values as usize, rows * 3, "num_values = rows * ncols");
+    assert_eq!(
+        header.page_type,
+        cgap_parquet::thrift::page_type::DATA_PAGE_V2
+    );
+    assert_eq!(
+        v2.num_values as usize,
+        rows * 3,
+        "num_values = rows * ncols"
+    );
     assert_eq!(v2.num_rows as usize, rows);
     assert_eq!(v2.num_nulls, 0);
     assert_eq!(v2.definition_levels_byte_length, 0);
@@ -186,13 +206,19 @@ fn wrong_payload_length_refused() {
     short[1] = &c.payloads[1][..63];
     assert_eq!(
         write_row_group_page(&c.cols, &short, rows),
-        Err(LevelFreeError::PayloadMismatch { expected: 64, actual: 63 })
+        Err(LevelFreeError::PayloadMismatch {
+            expected: 64,
+            actual: 63
+        })
     );
     // Column-count mismatch refused the same way.
     let too_few: Vec<&[u8]> = c.payloads[..2].iter().map(|p| p.as_slice()).collect();
     assert_eq!(
         write_row_group_page(&c.cols, &too_few, rows),
-        Err(LevelFreeError::PayloadMismatch { expected: 3, actual: 2 })
+        Err(LevelFreeError::PayloadMismatch {
+            expected: 3,
+            actual: 2
+        })
     );
     // The whole-file writer propagates the refusal (no file is minted).
     let refs: Vec<&[u8]> = c.payloads.iter().map(|p| p.as_slice()).collect();
@@ -213,8 +239,14 @@ fn wrong_payload_length_refused() {
         &c.cols,
         rows,
         &[
-            FooterRowGroup { page_offset: 4, page_len: 1 },
-            FooterRowGroup { page_offset: 4, page_len: 1 },
+            FooterRowGroup {
+                page_offset: 4,
+                page_len: 1,
+            },
+            FooterRowGroup {
+                page_offset: 4,
+                page_len: 1,
+            },
         ],
     );
     assert!(!footer.is_empty());

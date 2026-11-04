@@ -723,10 +723,8 @@ pub fn hash_wide_simd(data: &[u8]) -> [u8; 32] {
                 let c_idx = chunk_idx + k;
                 let start = c_idx * 1024;
                 if start + 4096 <= len {
-                    let outs = multi_chunk::compress_chunks_4way(
-                        &data[start..start + 4096],
-                        c_idx as u64,
-                    );
+                    let outs =
+                        multi_chunk::compress_chunks_4way(&data[start..start + 4096], c_idx as u64);
                     for (g, out) in outs.iter().enumerate() {
                         cvs[k + g].copy_from_slice(&out[0..8]);
                     }

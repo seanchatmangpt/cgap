@@ -8,12 +8,12 @@ use std::fs;
 use cgap_blake3::hash;
 use cgap_bont::oabi::{OabiError, OabiPackV1};
 use cgap_cloud::{
-    PACK_DIGEST_HEX, CLASS_BLOB, CLASS_COMPUTE, CLASS_COUNT, CLASS_EVENTSTREAM,
-    CLASS_VAULT, CIMI_CREDENTIAL_SLOT, CIMI_EVENT_SLOT, CIMI_JOB_SLOT, CIMI_MACHINE_SLOT,
-    CIMI_VOLUME_IMAGE_SLOT, CIMI_VOLUME_SLOT, ENUM_COUNT, ENUM_FAMILIES, ENUM_NONE, EQUIV_TABLE,
-    LEXEME_TABLE, LOCAL_LEXEMES, OABI_FLAG_LE, OABI_FLAG_LEXHASH, OABI_HEADER_LEN,
-    OABI_MAGIC, OABI_RECORD_SIZE, OABI_VERSION_MAJOR, OABI_VERSION_MINOR, PACK_GENERATION,
-    resolve_equivalence, resolve_equivalence_lexeme, slot_of, TOSCA_BLOCKSTORAGE_SLOT,
+    resolve_equivalence, resolve_equivalence_lexeme, slot_of, CIMI_CREDENTIAL_SLOT,
+    CIMI_EVENT_SLOT, CIMI_JOB_SLOT, CIMI_MACHINE_SLOT, CIMI_VOLUME_IMAGE_SLOT, CIMI_VOLUME_SLOT,
+    CLASS_BLOB, CLASS_COMPUTE, CLASS_COUNT, CLASS_EVENTSTREAM, CLASS_VAULT, ENUM_COUNT,
+    ENUM_FAMILIES, ENUM_NONE, EQUIV_TABLE, LEXEME_TABLE, LOCAL_LEXEMES, OABI_FLAG_LE,
+    OABI_FLAG_LEXHASH, OABI_HEADER_LEN, OABI_MAGIC, OABI_RECORD_SIZE, OABI_VERSION_MAJOR,
+    OABI_VERSION_MINOR, PACK_DIGEST_HEX, PACK_GENERATION, TOSCA_BLOCKSTORAGE_SLOT,
     TOSCA_COMPUTE_SLOT,
 };
 
@@ -44,8 +44,15 @@ fn digest_hex(bytes: &[u8]) -> String {
 #[test]
 fn t1_golden_digest_court() {
     let bytes = pack_bytes();
-    assert_eq!(bytes.len(), OABI_HEADER_LEN + LEXEME_TABLE.len() * OABI_RECORD_SIZE);
-    assert_eq!(digest_hex(&bytes), PACK_DIGEST_HEX, "pack bytes drifted from committed digest");
+    assert_eq!(
+        bytes.len(),
+        OABI_HEADER_LEN + LEXEME_TABLE.len() * OABI_RECORD_SIZE
+    );
+    assert_eq!(
+        digest_hex(&bytes),
+        PACK_DIGEST_HEX,
+        "pack bytes drifted from committed digest"
+    );
 }
 
 /// T1 sensitivity proof: each named T1 mutation (a)-(d) applied to REAL
@@ -75,7 +82,10 @@ fn t1_mutations_flip_digest() {
         base.extend_from_slice(&row.lex_hash);
     }
     let golden = digest_hex(&base);
-    assert_eq!(golden, PACK_DIGEST_HEX, "hand regeneration must equal committed pack");
+    assert_eq!(
+        golden, PACK_DIGEST_HEX,
+        "hand regeneration must equal committed pack"
+    );
 
     // (a) lexeme edit: swap which lexeme a row's slot/lex_hash golden pair
     // belongs to (equivalent to editing the lexeme string: the identity bytes
@@ -90,7 +100,11 @@ fn t1_mutations_flip_digest() {
         r[16..48].copy_from_slice(&neighbor.lex_hash);
         r
     });
-    assert_ne!(digest_hex(&a), golden, "mutation (a) lexeme edit did not flip digest");
+    assert_ne!(
+        digest_hex(&a),
+        golden,
+        "mutation (a) lexeme edit did not flip digest"
+    );
 
     // (b) record reorder: swap records 0 and 1.
     let mut b = base.clone();
@@ -100,20 +114,33 @@ fn t1_mutations_flip_digest() {
     );
     b[OABI_HEADER_LEN..OABI_HEADER_LEN + 48].copy_from_slice(&r1);
     b[OABI_HEADER_LEN + 48..OABI_HEADER_LEN + 96].copy_from_slice(&r0);
-    assert_ne!(digest_hex(&b), golden, "mutation (b) reorder did not flip digest");
+    assert_ne!(
+        digest_hex(&b),
+        golden,
+        "mutation (b) reorder did not flip digest"
+    );
 
     // (c) ClassId reassignment: flip record 0's class byte.
     let mut c = base.clone();
     c[OABI_HEADER_LEN + 8] ^= 0x01;
-    assert_ne!(digest_hex(&c), golden, "mutation (c) class reassign did not flip digest");
+    assert_ne!(
+        digest_hex(&c),
+        golden,
+        "mutation (c) class reassign did not flip digest"
+    );
 
     // (d) namespace tag drop: recompute record 0's slot+LexHash WITHOUT the
     // b"bont\x01" tag.
     let mut d = base.clone();
     let bare = hash(LEXEME_TABLE[0].lexeme.as_bytes());
-    d[off..off + 8].copy_from_slice(&u64::from_le_bytes(bare[0..8].try_into().unwrap()).to_le_bytes());
+    d[off..off + 8]
+        .copy_from_slice(&u64::from_le_bytes(bare[0..8].try_into().unwrap()).to_le_bytes());
     d[off + 16..off + 48].copy_from_slice(&bare);
-    assert_ne!(digest_hex(&d), golden, "mutation (d) namespace drop did not flip digest");
+    assert_ne!(
+        digest_hex(&d),
+        golden,
+        "mutation (d) namespace drop did not flip digest"
+    );
 }
 
 /// T2 — primitive-slot court (lane doc §7 T2): the 12 goldens (8 named
@@ -149,8 +176,15 @@ fn t2_primitive_slot_court() {
     for (lexeme, golden) in named {
         let (slot, d) = slot_of_lexeme(lexeme);
         assert_eq!(slot, *golden, "T2 slot drift: {lexeme}");
-        let row = LEXEME_TABLE.iter().find(|r| r.lexeme == *lexeme).expect("T2 lexeme in table");
-        assert_eq!(&row.lex_hash, d.as_slice(), "T2 LexHash witness drift: {lexeme}");
+        let row = LEXEME_TABLE
+            .iter()
+            .find(|r| r.lexeme == *lexeme)
+            .expect("T2 lexeme in table");
+        assert_eq!(
+            &row.lex_hash,
+            d.as_slice(),
+            "T2 LexHash witness drift: {lexeme}"
+        );
         assert_eq!(row.slot, *golden, "T2 table row slot != const: {lexeme}");
     }
 
@@ -159,9 +193,17 @@ fn t2_primitive_slot_court() {
     for (i, row) in LEXEME_TABLE.iter().enumerate() {
         let (slot, d) = slot_of_lexeme(row.lexeme);
         assert_eq!(slot, row.slot, "row {i} slot drift: {}", row.lexeme);
-        assert_eq!(&row.lex_hash, d.as_slice(), "row {i} lex_hash drift: {}", row.lexeme);
+        assert_eq!(
+            &row.lex_hash,
+            d.as_slice(),
+            "row {i} lex_hash drift: {}",
+            row.lexeme
+        );
         // A06 §2: SlotId is the LE low-64 of the LexHash witness.
-        assert_eq!(slot, u64::from_le_bytes(row.lex_hash[0..8].try_into().unwrap()));
+        assert_eq!(
+            slot,
+            u64::from_le_bytes(row.lex_hash[0..8].try_into().unwrap())
+        );
         if let Some(prev) = seen.insert(slot, i) {
             panic!("SlotId collision: rows {prev} and {i} both -> {slot:#018x}");
         }
@@ -191,22 +233,35 @@ fn t3_loader_refusal_court() {
     // (a) bad magic
     let mut bytes = good.clone();
     bytes[3] ^= 0xFF;
-    assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::BadMagic);
+    assert_eq!(
+        OabiPackV1::from_bytes(&bytes).unwrap_err(),
+        OabiError::BadMagic
+    );
 
     // (b) header_len != 64
     let mut bytes = good.clone();
     bytes[8..12].copy_from_slice(&32u32.to_le_bytes());
-    assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::HeaderLen { got: 32 });
+    assert_eq!(
+        OabiPackV1::from_bytes(&bytes).unwrap_err(),
+        OabiError::HeaderLen { got: 32 }
+    );
 
     // (c) record_size != 48
     let mut bytes = good.clone();
     bytes[32..36].copy_from_slice(&24u32.to_le_bytes());
-    assert_eq!(OabiPackV1::from_bytes(&bytes).unwrap_err(), OabiError::RecordSize { got: 24 });
+    assert_eq!(
+        OabiPackV1::from_bytes(&bytes).unwrap_err(),
+        OabiError::RecordSize { got: 24 }
+    );
 
     // (d) one record's SlotId != truncate64(LexHash)
     let mut bytes = good.clone();
     bytes[OABI_HEADER_LEN] ^= 0x01;
-    let bad = u64::from_le_bytes(bytes[OABI_HEADER_LEN..OABI_HEADER_LEN + 8].try_into().unwrap());
+    let bad = u64::from_le_bytes(
+        bytes[OABI_HEADER_LEN..OABI_HEADER_LEN + 8]
+            .try_into()
+            .unwrap(),
+    );
     assert_eq!(
         OabiPackV1::from_bytes(&bytes).unwrap_err(),
         OabiError::SlotDerivationMismatch {
@@ -237,9 +292,21 @@ fn t4_equivalence_court() {
     for row in EQUIV_TABLE {
         let alias_slot = slot_of(row.alias_lexeme);
         let canonical_slot = slot_of(row.canonical_lexeme);
-        assert_ne!(alias_slot, 0, "alias lexeme missing from table: {}", row.alias_lexeme);
-        assert_ne!(canonical_slot, 0, "canonical lexeme missing: {}", row.canonical_lexeme);
-        assert_ne!(alias_slot, canonical_slot, "self-loop: {}", row.alias_lexeme);
+        assert_ne!(
+            alias_slot, 0,
+            "alias lexeme missing from table: {}",
+            row.alias_lexeme
+        );
+        assert_ne!(
+            canonical_slot, 0,
+            "canonical lexeme missing: {}",
+            row.canonical_lexeme
+        );
+        assert_ne!(
+            alias_slot, canonical_slot,
+            "self-loop: {}",
+            row.alias_lexeme
+        );
         assert_eq!(
             resolve_equivalence(alias_slot),
             Some(canonical_slot),
@@ -259,16 +326,29 @@ fn t4_equivalence_court() {
     let aliases: Vec<&str> = EQUIV_TABLE.iter().map(|r| r.alias_lexeme).collect();
     assert_eq!(
         aliases,
-        vec!["cimi.Machine", "cimi.Volume", "cimi.VolumeImage", "cimi.Job"],
+        vec![
+            "cimi.Machine",
+            "cimi.Volume",
+            "cimi.VolumeImage",
+            "cimi.Job"
+        ],
         "equivalence coverage drifted"
     );
     // Slot-path lookup is table-order-independent and total.
     for row in LEXEME_TABLE {
         let resolved = resolve_equivalence(row.slot);
         if aliases.contains(&row.lexeme) {
-            assert!(resolved.is_some(), "corpus alias unresolved: {}", row.lexeme);
+            assert!(
+                resolved.is_some(),
+                "corpus alias unresolved: {}",
+                row.lexeme
+            );
         } else {
-            assert_eq!(resolved, None, "non-alias lexeme wrongly resolves: {}", row.lexeme);
+            assert_eq!(
+                resolved, None,
+                "non-alias lexeme wrongly resolves: {}",
+                row.lexeme
+            );
         }
     }
 }
@@ -287,8 +367,15 @@ fn t4_dropped_row_flips() {
         .filter(|a| !dropped.contains(a))
         .copied()
         .collect();
-    assert_eq!(unresolved, vec!["cimi.Machine"], "dropped alias must become unresolved");
-    assert_eq!(resolve_equivalence_lexeme("cimi.Machine"), Some(slot_of("tosca.nodes.Compute")));
+    assert_eq!(
+        unresolved,
+        vec!["cimi.Machine"],
+        "dropped alias must become unresolved"
+    );
+    assert_eq!(
+        resolve_equivalence_lexeme("cimi.Machine"),
+        Some(slot_of("tosca.nodes.Compute"))
+    );
 }
 
 /// Class/enum space court (lane doc §6 metadata): header counts, dense
@@ -298,7 +385,10 @@ fn t4_dropped_row_flips() {
 fn pack_metadata_court() {
     assert_eq!(CLASS_COUNT, 4);
     assert_eq!(ENUM_COUNT, 6);
-    for (i, c) in [CLASS_COMPUTE, CLASS_BLOB, CLASS_EVENTSTREAM, CLASS_VAULT].iter().enumerate() {
+    for (i, c) in [CLASS_COMPUTE, CLASS_BLOB, CLASS_EVENTSTREAM, CLASS_VAULT]
+        .iter()
+        .enumerate()
+    {
         assert_eq!(*c, i as u32);
     }
     assert_eq!(ENUM_FAMILIES.len(), 5);
@@ -306,7 +396,11 @@ fn pack_metadata_court() {
         assert_ne!(family.id, ENUM_NONE);
         assert!((family.id as u32) < ENUM_COUNT);
         for (want, v) in family.variants.iter().enumerate() {
-            assert_eq!(v.value as usize, want, "family {} variant {} not dense", family.name, v.name);
+            assert_eq!(
+                v.value as usize, want,
+                "family {} variant {} not dense",
+                family.name, v.name
+            );
         }
     }
     // Local-lexeme fence: the LOCAL rows are exactly the sanctioned set.
@@ -330,10 +424,28 @@ fn pack_metadata_court() {
 #[test]
 fn a06_constants_witness_court() {
     assert_eq!(cgap_cloud::OABI_MAGIC, cgap_bont::oabi::OABI_MAGIC);
-    assert_eq!(cgap_cloud::OABI_HEADER_LEN, cgap_bont::oabi::OABI_HEADER_LEN);
-    assert_eq!(cgap_cloud::OABI_RECORD_SIZE, cgap_bont::oabi::OABI_RECORD_SIZE);
-    assert_eq!(cgap_cloud::OABI_VERSION_MAJOR, cgap_bont::oabi::OABI_VERSION_MAJOR);
-    assert_eq!(cgap_cloud::OABI_VERSION_MINOR, cgap_bont::oabi::OABI_VERSION_MINOR);
-    assert_eq!(cgap_cloud::OABI_FLAG_LE, cgap_bont::oabi::OABI_FLAG_LITTLE_ENDIAN);
-    assert_eq!(cgap_cloud::OABI_FLAG_LEXHASH, cgap_bont::oabi::OABI_FLAG_LEXHASH_PRESENT);
+    assert_eq!(
+        cgap_cloud::OABI_HEADER_LEN,
+        cgap_bont::oabi::OABI_HEADER_LEN
+    );
+    assert_eq!(
+        cgap_cloud::OABI_RECORD_SIZE,
+        cgap_bont::oabi::OABI_RECORD_SIZE
+    );
+    assert_eq!(
+        cgap_cloud::OABI_VERSION_MAJOR,
+        cgap_bont::oabi::OABI_VERSION_MAJOR
+    );
+    assert_eq!(
+        cgap_cloud::OABI_VERSION_MINOR,
+        cgap_bont::oabi::OABI_VERSION_MINOR
+    );
+    assert_eq!(
+        cgap_cloud::OABI_FLAG_LE,
+        cgap_bont::oabi::OABI_FLAG_LITTLE_ENDIAN
+    );
+    assert_eq!(
+        cgap_cloud::OABI_FLAG_LEXHASH,
+        cgap_bont::oabi::OABI_FLAG_LEXHASH_PRESENT
+    );
 }

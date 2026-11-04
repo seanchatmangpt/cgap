@@ -173,7 +173,9 @@ pub fn issue(
         .map(|g| g.id)
         .collect();
     if !skipped.is_empty() {
-        return Err(CertificateIncomplete { skipped_gates: skipped });
+        return Err(CertificateIncomplete {
+            skipped_gates: skipped,
+        });
     }
 
     let input_hash = hex(&table.content_hash());
@@ -199,7 +201,12 @@ pub fn issue(
 
 /// Canonical JSON of the certificate (fixed key order, no whitespace).
 pub fn certificate_json(c: &Certificate) -> String {
-    let gates = c.gates.iter().map(canonical_gate_json).collect::<Vec<_>>().join(",");
+    let gates = c
+        .gates
+        .iter()
+        .map(canonical_gate_json)
+        .collect::<Vec<_>>()
+        .join(",");
     let receipts = c
         .evidence_receipts
         .iter()
@@ -244,7 +251,10 @@ pub fn seal(cert: &Certificate) -> String {
 pub fn verify(cert: &Certificate, presented_seal: &str) -> Result<(), SealMismatch> {
     let recomputed = seal(cert);
     if recomputed != presented_seal {
-        return Err(SealMismatch { expected: recomputed, observed: presented_seal.to_string() });
+        return Err(SealMismatch {
+            expected: recomputed,
+            observed: presented_seal.to_string(),
+        });
     }
     Ok(())
 }
@@ -278,8 +288,7 @@ const G7_TARGET_US_PER_LINK: f64 = 25.0;
 /// mirroring the scorecard's TARGET-UNMEASURED degradation.
 pub fn g7_leg_b_from_receipt(path: &str) -> Verdict {
     let parse = (|| -> Result<Verdict, String> {
-        let rec =
-            std::fs::read_to_string(path).map_err(|e| format!("receipt unreadable: {e}"))?;
+        let rec = std::fs::read_to_string(path).map_err(|e| format!("receipt unreadable: {e}"))?;
         let marker = "50k span";
         let idx = rec
             .find(marker)
@@ -311,7 +320,9 @@ pub fn g7_leg_b_from_receipt(path: &str) -> Verdict {
     })();
     match parse {
         Ok(v) => v,
-        Err(e) => Verdict::Skip { reason: format!("G7 §6 source unmeasurable: {e}") },
+        Err(e) => Verdict::Skip {
+            reason: format!("G7 §6 source unmeasurable: {e}"),
+        },
     }
 }
 
@@ -378,8 +389,9 @@ pub fn scorecard_table(run_seq: u64) -> VerdictTable {
                 composes: "AB-14/AF-21 receipt chain (§6 scorecard source, leg B binding)",
                 verdict: g7_leg_b_from_receipt(AB14_RECEIPT),
                 measured: match g7_leg_b_from_receipt(AB14_RECEIPT) {
-                    Verdict::Pass => "leg B within 25 µs/link at 50k span (per receipt on disk)"
-                        .into(),
+                    Verdict::Pass => {
+                        "leg B within 25 µs/link at 50k span (per receipt on disk)".into()
+                    }
                     Verdict::Fail { why } => why,
                     Verdict::Skip { reason } => reason,
                 },
@@ -444,8 +456,9 @@ mod courts {
     fn court_disqualified_certificate_on_injected_failure() {
         let mut table = green(11);
         // SANDBOX-INJECTED FAILURE (court mutation): G5 (index 5) flips.
-        table.gates[5].verdict =
-            Verdict::Fail { why: "injected: storm frame 4173 desynced".into() };
+        table.gates[5].verdict = Verdict::Fail {
+            why: "injected: storm frame 4173 desynced".into(),
+        };
         table.gates[5].measured = "injected failure witness".into();
         let (cert, seal_hex) = issue(&table, vec![]).unwrap();
         assert_eq!(cert.overall, Overall::Disqualified);
@@ -470,7 +483,9 @@ mod courts {
         let mut witnessed = 0;
 
         let mut flip = cert.clone();
-        flip.gates[2].verdict = Verdict::Fail { why: "post-seal tamper witness".into() };
+        flip.gates[2].verdict = Verdict::Fail {
+            why: "post-seal tamper witness".into(),
+        };
         assert!(verify(&flip, &seal_hex).is_err());
         witnessed += 1;
 
@@ -519,15 +534,20 @@ mod courts {
     #[test]
     fn court_skip_gate_fails_closed() {
         let mut table = green(5);
-        table.gates[6].verdict =
-            Verdict::Skip { reason: "cross-repo receipt unreachable this run".into() };
+        table.gates[6].verdict = Verdict::Skip {
+            reason: "cross-repo receipt unreachable this run".into(),
+        };
         let err = issue(&table, vec![]).unwrap_err();
         assert_eq!(err.skipped_gates, vec!["G6"]);
 
         // SKIP + FAIL mix also refuses: the SKIP check precedes everything.
         let mut mixed = green(6);
-        mixed.gates[6].verdict = Verdict::Skip { reason: "unreachable".into() };
-        mixed.gates[2].verdict = Verdict::Fail { why: "also failing".into() };
+        mixed.gates[6].verdict = Verdict::Skip {
+            reason: "unreachable".into(),
+        };
+        mixed.gates[2].verdict = Verdict::Fail {
+            why: "also failing".into(),
+        };
         assert!(issue(&mixed, vec![]).is_err());
 
         // Re-check the original SKIP table still refuses (idempotent).

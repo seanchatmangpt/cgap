@@ -31,7 +31,9 @@ fn rc01_overspend_through_rmw_is_typed_refusal() {
     let name: &[u8] = b"refs/heads/main";
     let mut seal = SealRegister::with_ceiling(5);
     let mut store = RefStore::new();
-    store.create(b"refs/heads/main", [0xAA; 20]).expect("create");
+    store
+        .create(b"refs/heads/main", [0xAA; 20])
+        .expect("create");
     let lease = drive_to(&mut seal, &mut store, name, 5);
     assert_eq!(lease, 5);
     assert_eq!(seal.counter(), 5, "counter at ceiling");
@@ -62,7 +64,9 @@ fn rc01_control_no_interrupt_no_overspend() {
     let name: &[u8] = b"refs/heads/single";
     let mut seal = SealRegister::with_ceiling(5);
     let mut store = RefStore::new();
-    store.create(b"refs/heads/single", [0xAA; 20]).expect("create");
+    store
+        .create(b"refs/heads/single", [0xAA; 20])
+        .expect("create");
     let lease = drive_to(&mut seal, &mut store, name, 5);
     assert_eq!(lease, 5);
     let next = store.cas(b"refs/heads/single", 5, OID_B, &mut seal);
@@ -96,7 +100,8 @@ fn rc01_lease_uniqueness_invariant() {
     store.create(b"refs/agents/a7", [0xAA; 20]).expect("create");
     let mut last = 0u64;
     for i in 0..64 {
-        let l = store.cas(b"refs/agents/a7", last, OID_B, &mut seal)
+        let l = store
+            .cas(b"refs/agents/a7", last, OID_B, &mut seal)
             .expect("stamp");
         assert!(l > last, "lease strictly monotonic at step {}", i);
         let stale = store.cas(b"refs/agents/a7", last, OID_B, &mut seal);
@@ -127,14 +132,18 @@ fn rc01_lease_uniqueness_invariant() {
 fn rc01_preempted_window_replay() {
     let mut seal = SealRegister::with_ceiling(5);
     let mut store = RefStore::new();
-    store.create(b"refs/heads/main", [0xAA; 20]).expect("create");
+    store
+        .create(b"refs/heads/main", [0xAA; 20])
+        .expect("create");
     // Context A drives counter to 4: next lease would be 5 == ceiling, so
     // A's check passes.
     let lease = drive_to(&mut seal, &mut store, b"refs/heads/main", 5 - 1);
     assert_eq!(lease, 4);
     assert!(seal.counter() < 5, "context A check passes");
     // ISR: spend the remaining authority through real public stamps.
-    let isr = store.cas(b"refs/heads/main", 4, OID_B, &mut seal).expect("isr stamp");
+    let isr = store
+        .cas(b"refs/heads/main", 4, OID_B, &mut seal)
+        .expect("isr stamp");
     assert_eq!(isr, 5);
     assert_eq!(seal.counter(), 5, "authority spent by the ISR");
     // Context A resumes AT the RMW (production reserve path, no re-check).
@@ -161,7 +170,9 @@ fn rc01_preempted_window_replay() {
 #[test]
 fn rc01_exhausts_never_wraps_law() {
     let mut seal = SealRegister::with_ceiling(SEAL_COUNTER_WIDTH);
-    let v = seal.stamp(0, &[2u8; 8]).expect("first stamp under width ceiling");
+    let v = seal
+        .stamp(0, &[2u8; 8])
+        .expect("first stamp under width ceiling");
     assert_eq!(v, 1);
     assert_eq!(seal.counter(), 1);
     assert_ne!(seal.chain(), 0, "chain folded");

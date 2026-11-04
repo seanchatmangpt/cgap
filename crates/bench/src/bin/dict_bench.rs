@@ -142,7 +142,9 @@ fn main() {
         // value stream is the gather of the dict through the indices.
         let dict: Vec<u32> = (0..card as u32).collect();
         let mut lcg = Lcg(0x1234_5678);
-        let indices: Vec<u32> = (0..LANES).map(|_| (lcg.next() % card as u64) as u32).collect();
+        let indices: Vec<u32> = (0..LANES)
+            .map(|_| (lcg.next() % card as u64) as u32)
+            .collect();
         let values: Vec<u32> = indices.iter().map(|&ix| dict[ix as usize]).collect();
 
         // ---- pre-flight: full round trip BEFORE any timing ----
@@ -153,7 +155,11 @@ fn main() {
             b.push(v);
         }
         let (dict_b, idx_b) = b.finish();
-        assert_eq!(dict_b.len(), card, "card={card}: builder dict must be exact");
+        assert_eq!(
+            dict_b.len(),
+            card,
+            "card={card}: builder dict must be exact"
+        );
         // The builder emits FIRST-SEEN order (not the synthetic dict's
         // index order); the invariant is that its pair re-derives the
         // stream exactly — the real pipeline's (dict, indices) from here on.

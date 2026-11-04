@@ -34,9 +34,7 @@ fn lib_links_and_core_api_runs_under_both_configs() {
 
 #[cfg(feature = "std")]
 mod std_only {
-    use cgap_parquet::scan::{
-        write_fixture_file, FixtureColumn, ParquetFile, PhysType,
-    };
+    use cgap_parquet::scan::{write_fixture_file, FixtureColumn, ParquetFile, PhysType};
 
     /// Real file on disk (no tempfile dependency — the crate is
     /// zero-dependency by charter); unique per-run path, removed on drop.
@@ -51,7 +49,12 @@ mod std_only {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0);
             let mut p = std::env::temp_dir();
-            p.push(format!("cgap_std_court_{}_{}_{}", name, std::process::id(), nanos));
+            p.push(format!(
+                "cgap_std_court_{}_{}_{}",
+                name,
+                std::process::id(),
+                nanos
+            ));
             std::fs::write(&p, bytes).expect("write fixture");
             TempFile { path: p }
         }
@@ -70,7 +73,9 @@ mod std_only {
     #[test]
     fn std_scan_surface_runs_end_to_end_under_std_feature() {
         let rows = 32usize;
-        let a: Vec<u32> = (0..rows as u32).map(|i| i.wrapping_mul(0x9E37_79B9)).collect();
+        let a: Vec<u32> = (0..rows as u32)
+            .map(|i| i.wrapping_mul(0x9E37_79B9))
+            .collect();
         let a_bytes: Vec<u8> = a.iter().flat_map(|x| x.to_le_bytes()).collect();
         let cols = vec![FixtureColumn {
             name: "a".into(),

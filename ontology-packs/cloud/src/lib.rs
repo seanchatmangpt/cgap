@@ -278,7 +278,6 @@ pub const LEXEME_TABLE: &[LexemeRow] = &[
     LexemeRow { lexeme: "vault.mount", class: 3, enum_family: ENUM_NONE, origin: Origin::Local, citation: "LOCAL(A10)", slot: 0x6ECD09CF28EC2A49, lex_hash: [0x49, 0x2A, 0xEC, 0x28, 0xCF, 0x09, 0xCD, 0x6E, 0x46, 0x25, 0x0B, 0x71, 0x48, 0x21, 0xC1, 0xCE, 0xEF, 0xAC, 0x94, 0x94, 0x94, 0x7C, 0x1A, 0x8B, 0x85, 0x26, 0x93, 0x9C, 0x36, 0xFE, 0xAE, 0x23] },
 ];
 
-
 // --- TOSCA<->CIMI equivalence table (lane doc §6: "the alias lexeme gets its
 // --- own LexHash and its own SlotId, and the equivalence is a crate-level
 // --- mapping alias_slot -> canonical_slot"). -------------------------------
@@ -305,7 +304,8 @@ pub const EQUIV_TABLE: &[EquivRow] = &[
     EquivRow {
         alias_lexeme: "cimi.Volume",
         canonical_lexeme: "tosca.nodes.BlockStorage",
-        citation: "A10 §5.2/§9: BlockStorage vs Volume — witnessed mapping-ambiguity case, both pinned",
+        citation:
+            "A10 §5.2/§9: BlockStorage vs Volume — witnessed mapping-ambiguity case, both pinned",
     },
     EquivRow {
         alias_lexeme: "cimi.VolumeImage",
@@ -381,13 +381,19 @@ pub const TOSCA_PROFILE: &str = "OASIS TOSCA Simple Profile in YAML v1.3";
 pub const CIMI_PROFILE: &str = "DMTF CIMI (DSP0263) v2.0.0";
 
 /// The sanctioned cgap-local lexemes (lane doc §9 local-lexeme fence).
-pub const LOCAL_LEXEMES: &[&str] = &["eventstream.channel", "vault.secret", "vault.lease", "vault.mount"];
+pub const LOCAL_LEXEMES: &[&str] = &[
+    "eventstream.channel",
+    "vault.secret",
+    "vault.lease",
+    "vault.mount",
+];
 
 /// BLAKE3 digest (hex, uppercase) of the exact committed
 /// `ontology-packs/cloud/tosca_cimi_v1.oabi` bytes (lane doc §7 T1 golden
 /// digest court). Committed at emit time 2026-11-01 over the 1552-byte
 /// pack (64 B header + 31 x 48 B records).
-pub const PACK_DIGEST_HEX: &str = "974C73EAC4F8ACF03AD67B9FEA5961574592B8A8F95BD53E7BA82B50EC156472";
+pub const PACK_DIGEST_HEX: &str =
+    "974C73EAC4F8ACF03AD67B9FEA5961574592B8A8F95BD53E7BA82B50EC156472";
 
 // --- Compile-time gates (lane doc DoD 1: A06 widths under static gates).
 // --- `static_assertions` is intentionally NOT a dependency (the facade stays

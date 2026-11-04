@@ -68,9 +68,7 @@ fn allocs() -> u64 {
 // Deterministic corpus (no entropy, no clocks): SplitMix64 draws seeded by
 // the row index, same shape as the A01 wave-9 corpus generator.
 // --------------------------------------------------------------------------
-use cgap_arrow::slab::{
-    Slab64, SlabError, FLAG_PRESENT_INLINE, FLAG_SEALED, SLOT_PAYLOAD_SIZE,
-};
+use cgap_arrow::slab::{Slab64, SlabError, FLAG_PRESENT_INLINE, FLAG_SEALED, SLOT_PAYLOAD_SIZE};
 
 const SEED: u64 = 0xA19D_0FFE_E5A7_E001;
 
@@ -99,7 +97,10 @@ fn row_payload(row: u64) -> [u8; SLOT_PAYLOAD_SIZE] {
 struct Lcg(u64);
 impl Lcg {
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0 >> 33
     }
 }
@@ -118,14 +119,20 @@ fn capacity_stress_1k_fill_refuse_reset_refill_cycles() {
     for cycle in 0..CAPACITY_CYCLES {
         let mut slab = Slab64::new();
         for i in 0..64u64 {
-            assert_eq!(slab.push(&row_payload(cycle as u64 * 64 + i), i % 2 == 0), Ok(()));
+            assert_eq!(
+                slab.push(&row_payload(cycle as u64 * 64 + i), i % 2 == 0),
+                Ok(())
+            );
         }
         assert_eq!(slab.len(), 64);
         assert_eq!(slab.capacity(), 64);
 
         // Exact typed refusal at the boundary, state byte-identical after.
         let frozen = slab;
-        assert_eq!(slab.push(&row_payload(0xFFFF_0000), true), Err(SlabError::SlabFull));
+        assert_eq!(
+            slab.push(&row_payload(0xFFFF_0000), true),
+            Err(SlabError::SlabFull)
+        );
         assert_eq!(slab, frozen, "cycle {cycle}: refused push mutated state");
         refusals += 1;
 
@@ -146,7 +153,10 @@ fn capacity_stress_1k_fill_refuse_reset_refill_cycles() {
         assert_eq!(round, slab);
         assert_eq!(round.header.flags, FLAG_PRESENT_INLINE | FLAG_SEALED);
     }
-    assert_eq!(refusals, CAPACITY_CYCLES as u64, "every cycle hit the boundary");
+    assert_eq!(
+        refusals, CAPACITY_CYCLES as u64,
+        "every cycle hit the boundary"
+    );
 }
 
 // --------------------------------------------------------------------------
@@ -177,11 +187,22 @@ struct Census {
 fn run_ordering(seed: u64) -> (Census, std::vec::Vec<u8>) {
     let mut slab = Slab64::new();
     let mut rng = Lcg(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
-    let mut c = Census { ok_push: 0, full: 0, sealed: 0, too_long: 0, ok_seal: 0, ok_reset: 0 };
+    let mut c = Census {
+        ok_push: 0,
+        full: 0,
+        sealed: 0,
+        too_long: 0,
+        ok_seal: 0,
+        ok_reset: 0,
+    };
     let ops = 64 + (seed % 97) as usize; // 64..160 ops per ordering
     for step in 0..ops {
         // Invariant at every step: successful pushes == rows resident.
-        assert_eq!(c.ok_push, slab.len(), "ordering {seed} step {step}: census != len");
+        assert_eq!(
+            c.ok_push,
+            slab.len(),
+            "ordering {seed} step {step}: census != len"
+        );
         match rng.next() % 6 {
             0 | 1 => {
                 let row = (rng.next() % 256) as u64;
@@ -239,12 +260,18 @@ fn fragmentation_17_orderings_x100_image_and_census_stable() {
         for it in 1..ITERATIONS {
             let (c, image) = run_ordering(seed);
             assert_eq!(c, c0, "ordering {seed} iteration {it}: census drift");
-            assert_eq!(image, image0, "ordering {seed} iteration {it}: byte-image drift");
+            assert_eq!(
+                image, image0,
+                "ordering {seed} iteration {it}: byte-image drift"
+            );
         }
         // Final state laws: resident rows equal recorded successes, and a
         // successfully sealed slab decodes with identity.
         assert!(c0.ok_push <= 64);
-        assert!(c0.full + c0.sealed + c0.too_long > 0, "ordering {seed}: no refusal observed");
+        assert!(
+            c0.full + c0.sealed + c0.too_long > 0,
+            "ordering {seed}: no refusal observed"
+        );
     }
 }
 
@@ -297,13 +324,22 @@ fn sealed_state_refuses_every_mutation_typed_and_frozen() {
     m[0x00] = b'X'; // magic -> BadMagic
     assert_eq!(
         Slab64::from_bytes(&m),
-        Err(SlabError::BadMagic { got: u32::from_le_bytes([b'X', b'B', b'L', b'S']) })
+        Err(SlabError::BadMagic {
+            got: u32::from_le_bytes([b'X', b'B', b'L', b'S'])
+        })
     );
     assert_eq!(
         Slab64::from_bytes(&image[..image.len() - 1]),
-        Err(SlabError::BadLength { expected: 64 + 64 * 64, got: image.len() - 1 })
+        Err(SlabError::BadLength {
+            expected: 64 + 64 * 64,
+            got: image.len() - 1
+        })
     );
-    assert_eq!(Slab64::from_bytes(&image), Ok(frozen), "pristine window still decodes");
+    assert_eq!(
+        Slab64::from_bytes(&image),
+        Ok(frozen),
+        "pristine window still decodes"
+    );
 }
 
 // --------------------------------------------------------------------------
@@ -319,7 +355,11 @@ fn alloc_census_refusal_paths_allocate_zero() {
     // Positive control: the counter is live.
     let before = allocs();
     let v = vec![0u8; 4096];
-    assert_eq!(allocs() - before, 1, "positive control: allocator not counted");
+    assert_eq!(
+        allocs() - before,
+        1,
+        "positive control: allocator not counted"
+    );
     assert!(v[0] == 0);
     drop(v);
 
@@ -344,10 +384,18 @@ fn alloc_census_refusal_paths_allocate_zero() {
             let r = $call;
             let d = allocs() - b;
             assert_eq!(r, $expect, "{}", $site);
-            assert_eq!(d, 0, "{}: refusal allocated {} bytes-worth of calls", $site, d);
+            assert_eq!(
+                d, 0,
+                "{}: refusal allocated {} bytes-worth of calls",
+                $site, d
+            );
         }};
     }
-    refusal_allocs_zero!(full.push(&row_payload(0), true), Err(SlabError::SlabFull), "SlabFull");
+    refusal_allocs_zero!(
+        full.push(&row_payload(0), true),
+        Err(SlabError::SlabFull),
+        "SlabFull"
+    );
     refusal_allocs_zero!(
         sealed.push(&row_payload(0), true),
         Err(SlabError::Sealed),
@@ -359,10 +407,14 @@ fn alloc_census_refusal_paths_allocate_zero() {
         Err(SlabError::Sealed),
         "too-long-after-seal"
     );
-    refusal_allocs_zero!(Slab64::from_bytes(short), Err(SlabError::BadLength {
-        expected: 64 + 64 * 64,
-        got: 100
-    }), "BadLength");
+    refusal_allocs_zero!(
+        Slab64::from_bytes(short),
+        Err(SlabError::BadLength {
+            expected: 64 + 64 * 64,
+            got: 100
+        }),
+        "BadLength"
+    );
 
     // Cumulative soak: 10k refusals across all classes, zero allocations.
     let soak_start = allocs();
@@ -415,8 +467,14 @@ fn throughput_push_reset_pairs_min_of_3() {
         }
         let dt = t0.elapsed().as_secs_f64();
         let pushes_per_sec = (CYCLES * 64) as f64 / dt;
-        println!("run {run}: {} fill+reset cycles in {dt:.4}s -> {pushes_per_sec:.0} pushes/sec", CYCLES);
-        assert!(pushes_per_sec > FLOOR_PUSHES_PER_SEC, "run {run}: {pushes_per_sec:.0} pushes/sec below floor");
+        println!(
+            "run {run}: {} fill+reset cycles in {dt:.4}s -> {pushes_per_sec:.0} pushes/sec",
+            CYCLES
+        );
+        assert!(
+            pushes_per_sec > FLOOR_PUSHES_PER_SEC,
+            "run {run}: {pushes_per_sec:.0} pushes/sec below floor"
+        );
         best = best.min(pushes_per_sec);
     }
     println!("MIN-OF-3: {best:.0} pushes/sec (fill+reset pairs over Slab64)");

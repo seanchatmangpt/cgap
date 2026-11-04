@@ -64,10 +64,7 @@ impl VerifiedWindow {
     /// Window length implied by `body_len` at alignment 64.
     #[must_use]
     pub const fn window_len(&self) -> usize {
-        8 + META_SPAN_W64 as usize
-            + self.body_len
-            + pad64(self.body_len)
-            + 8
+        8 + META_SPAN_W64 as usize + self.body_len + pad64(self.body_len) + 8
     }
 }
 
@@ -105,7 +102,9 @@ pub fn verify_window(
 ) -> Result<VerifiedWindow, AoqError> {
     // 1-4: prefix/span shape (w64 only).
     if buf.len() < HEADER_AT + crate::header::SIZE_BYTES {
-        return Err(AoqError::HeaderTooShort { got: buf.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: buf.len() as u16,
+        });
     }
     let cont = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
     if cont != CONTINUATION {
@@ -117,13 +116,18 @@ pub fn verify_window(
     }
     let body_at = HEADER_AT + META_SPAN_W64 as usize;
     if buf.len() < body_at + crate::header::SIZE_BYTES {
-        return Err(AoqError::HeaderTooShort { got: buf.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: buf.len() as u16,
+        });
     }
     // 5: header law — composed through the landed codec, never re-declared.
     let header = codec::decode(&buf[HEADER_AT..body_at])?;
     // 6: seq/ordinal cursor lockstep (caller-owned cursor, PG-A2 law).
     if header.seq != expected_seq {
-        return Err(AoqError::SeqGap { expected: expected_seq, got: header.seq });
+        return Err(AoqError::SeqGap {
+            expected: expected_seq,
+            got: header.seq,
+        });
     }
     if header.frame_ordinal != expected_ordinal {
         return Err(AoqError::FrameOrdinalRegression {
@@ -149,11 +153,19 @@ pub fn verify_window(
     }
     // 8: tag presence + match (host supplies the expected tag; R-K1).
     if tag == [0u8; TAG_BYTES] {
-        return Err(AoqError::DigestMismatch { expected: 0, got: 0 });
+        return Err(AoqError::DigestMismatch {
+            expected: 0,
+            got: 0,
+        });
     }
     if &tag != expected_tag {
         return Err(AoqError::DigestMismatch {
-            expected: u32::from_le_bytes([expected_tag[0], expected_tag[1], expected_tag[2], expected_tag[3]]),
+            expected: u32::from_le_bytes([
+                expected_tag[0],
+                expected_tag[1],
+                expected_tag[2],
+                expected_tag[3],
+            ]),
             got: u32::from_le_bytes([tag[0], tag[1], tag[2], tag[3]]),
         });
     }
@@ -161,7 +173,9 @@ pub fn verify_window(
     // identity with the cgap-arrow framing surface, court ab8_sweep).
     let body_pad = pad64(body_len);
     if buf.len() < body_at + body_len + body_pad + 8 {
-        return Err(AoqError::HeaderTooShort { got: buf.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: buf.len() as u16,
+        });
     }
     // [AB-1 SLA MINIMAL UNBLOCK 2026-11-03] enumerate-destructure pattern
     // fix; owning lane may restyle. Disclosed in ab-1.md.
@@ -187,9 +201,16 @@ pub fn verify_window(
         buf[eos_at + 7],
     ]);
     if eos_cont != CONTINUATION || eos_tail != 0 {
-        return Err(AoqError::HeaderTooShort { got: buf.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: buf.len() as u16,
+        });
     }
-    Ok(VerifiedWindow { header, body_at, body_len, tag })
+    Ok(VerifiedWindow {
+        header,
+        body_at,
+        body_len,
+        tag,
+    })
 }
 
 /// Apply the caller-derived keystream to the body IN PLACE. Lawful only
@@ -208,10 +229,14 @@ pub fn decrypt_in_place(
     let body_at = window.body_at;
     let body_len = window.body_len;
     if buf.len() < body_at + body_len {
-        return Err(AoqError::HeaderTooShort { got: buf.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: buf.len() as u16,
+        });
     }
     if keystream.len() < body_len {
-        return Err(AoqError::HeaderTooShort { got: keystream.len() as u16 });
+        return Err(AoqError::HeaderTooShort {
+            got: keystream.len() as u16,
+        });
     }
     for i in 0..body_len {
         buf[body_at + i] ^= keystream[i];

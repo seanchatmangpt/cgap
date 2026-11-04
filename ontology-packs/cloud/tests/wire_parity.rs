@@ -54,7 +54,7 @@ use std::time::SystemTime;
 
 use cgap_blake3::hash;
 use cgap_cloud::{
-    ENUM_FAMILIES, LEXEME_TABLE, PACK_DIGEST_HEX, resolve_equivalence_lexeme, slot_of,
+    resolve_equivalence_lexeme, slot_of, ENUM_FAMILIES, LEXEME_TABLE, PACK_DIGEST_HEX,
 };
 
 /// Canonical seed (W2-11 dispatch): sandbox dir suffix and the flip byte
@@ -97,28 +97,52 @@ const RAW_ALIAS: &[(&str, &str)] = &[
 
 /// Severity variants, restated from the pack's pinned subset (lane doc §5.3:
 /// INFO/WARNING/CRITICAL, dense from 0).
-const RAW_SEVERITY_VARIANTS: &[(&str, u16)] =
-    &[("INFO", 0), ("WARNING", 1), ("CRITICAL", 2)];
+const RAW_SEVERITY_VARIANTS: &[(&str, u16)] = &[("INFO", 0), ("WARNING", 1), ("CRITICAL", 2)];
 
 /// Typed wire-parity refusal. Every variant names its subject; the parity
 /// path refuses, it never silently substitutes.
 #[derive(Debug, PartialEq, Eq)]
 enum WireError {
     BadMagic,
-    Truncated { len: usize },
-    RecordSize { got: usize },
+    Truncated {
+        len: usize,
+    },
+    RecordSize {
+        got: usize,
+    },
     /// A06 §6 per-record obligation: record SlotId != low64(LexHash).
-    SlotDerivationMismatch { index: usize, record_slot: u64, derived_slot: u64 },
-    LexemeNotInPack { lexeme: String },
-    SpecUnknownLexeme { lexeme: String },
+    SlotDerivationMismatch {
+        index: usize,
+        record_slot: u64,
+        derived_slot: u64,
+    },
+    LexemeNotInPack {
+        lexeme: String,
+    },
+    SpecUnknownLexeme {
+        lexeme: String,
+    },
     /// Record ClassId != the restated spec expectation.
-    ClassFieldMismatch { lexeme: String, record_class: u32, expected_class: u32 },
+    ClassFieldMismatch {
+        lexeme: String,
+        record_class: u32,
+        expected_class: u32,
+    },
     /// Record EnumId family != the restated spec expectation.
-    FamilyFieldMismatch { lexeme: String, record_family: u16, expected_family: u16 },
+    FamilyFieldMismatch {
+        lexeme: String,
+        record_family: u16,
+        expected_family: u16,
+    },
     /// Severity name outside the pinned variant subset.
-    VariantUnknown { family: &'static str, name: String },
+    VariantUnknown {
+        family: &'static str,
+        name: String,
+    },
     /// `slot_of` sentinel 0 — presented lexeme has no committed slot.
-    AliasUnresolved { lexeme: String },
+    AliasUnresolved {
+        lexeme: String,
+    },
 }
 
 /// BLAKE3 digest, uppercase hex (courts.rs T1 pattern).
@@ -135,9 +159,12 @@ fn decode_hex64(s: &str) -> [u8; 64] {
     assert_eq!(s.len(), 128, "golden hex must be 128 chars");
     let mut out = [0u8; 64];
     for i in 0..64 {
-        let hi = (s.as_bytes()[2 * i] as char).to_digit(16).expect("hex hi nibble") as u8;
-        let lo =
-            (s.as_bytes()[2 * i + 1] as char).to_digit(16).expect("hex lo nibble") as u8;
+        let hi = (s.as_bytes()[2 * i] as char)
+            .to_digit(16)
+            .expect("hex hi nibble") as u8;
+        let lo = (s.as_bytes()[2 * i + 1] as char)
+            .to_digit(16)
+            .expect("hex lo nibble") as u8;
         out[i] = (hi << 4) | lo;
     }
     out
@@ -164,7 +191,9 @@ fn sandbox_dir(name: &str) -> PathBuf {
 fn facade_frame(presented: &'static str, severity: &'static str) -> Result<[u8; 64], WireError> {
     let presented_slot = slot_of(presented);
     if presented_slot == 0 {
-        return Err(WireError::AliasUnresolved { lexeme: presented.to_string() });
+        return Err(WireError::AliasUnresolved {
+            lexeme: presented.to_string(),
+        });
     }
     // Alias -> canonical through the crate lookup (A10 §6); identity when
     // the presented lexeme is not an alias.
@@ -172,7 +201,9 @@ fn facade_frame(presented: &'static str, severity: &'static str) -> Result<[u8; 
     let root_row = LEXEME_TABLE
         .iter()
         .find(|r| r.slot == root_slot)
-        .ok_or_else(|| WireError::AliasUnresolved { lexeme: presented.to_string() })?;
+        .ok_or_else(|| WireError::AliasUnresolved {
+            lexeme: presented.to_string(),
+        })?;
     let sev_row = LEXEME_TABLE
         .iter()
         .find(|r| r.lexeme == "cimi.Event.severity")
@@ -194,8 +225,14 @@ fn facade_frame(presented: &'static str, severity: &'static str) -> Result<[u8; 
     let timestamp_slot = slot_of("cimi.Event.timestamp");
     let channel_slot = slot_of("eventstream.channel");
     assert_ne!(content_slot, 0, "committed row missing: cimi.Event.content");
-    assert_ne!(timestamp_slot, 0, "committed row missing: cimi.Event.timestamp");
-    assert_ne!(channel_slot, 0, "committed row missing: eventstream.channel");
+    assert_ne!(
+        timestamp_slot, 0,
+        "committed row missing: cimi.Event.timestamp"
+    );
+    assert_ne!(
+        channel_slot, 0,
+        "committed row missing: eventstream.channel"
+    );
 
     let mut fr = [0u8; 64];
     fr[0..4].copy_from_slice(b"CEW1");
@@ -217,7 +254,11 @@ fn facade_frame(presented: &'static str, severity: &'static str) -> Result<[u8; 
 /// LexHash (the corruption detector), every event lexeme is resolved
 /// through a real BLAKE3 preimage, and the record ClassId/EnumId fields
 /// are validated against the restated spec constants.
-fn raw_frame(pack: &[u8], presented: &'static str, severity: &'static str) -> Result<[u8; 64], WireError> {
+fn raw_frame(
+    pack: &[u8],
+    presented: &'static str,
+    severity: &'static str,
+) -> Result<[u8; 64], WireError> {
     if pack.len() < 64 {
         return Err(WireError::Truncated { len: pack.len() });
     }
@@ -260,13 +301,17 @@ fn raw_frame(pack: &[u8], presented: &'static str, severity: &'static str) -> Re
         let d = lex_hash(name);
         match index.iter().find(|(l, _, _, _)| *l == d) {
             Some((_, s, c, f)) => Ok((*s, *c, *f)),
-            None => Err(WireError::LexemeNotInPack { lexeme: name.to_string() }),
+            None => Err(WireError::LexemeNotInPack {
+                lexeme: name.to_string(),
+            }),
         }
     };
     let expect = |name: &str| -> Result<(u32, u16), WireError> {
         match RAW_EVENT_LEXEMES.iter().find(|(l, _, _)| *l == name) {
             Some((_, c, f)) => Ok((*c, *f)),
-            None => Err(WireError::SpecUnknownLexeme { lexeme: name.to_string() }),
+            None => Err(WireError::SpecUnknownLexeme {
+                lexeme: name.to_string(),
+            }),
         }
     };
     let check = |name: &'static str| -> Result<(u64, u32, u16), WireError> {
@@ -339,14 +384,18 @@ fn wire_parity_facade_raw_golden() {
         "canonical pack is the committed bytes (T1 witness)"
     );
 
-    for (presented, severity, golden_hex) in
-        [("cimi.Event", "WARNING", GOLDEN_E1), ("cimi.Job", "CRITICAL", GOLDEN_E2)]
-    {
+    for (presented, severity, golden_hex) in [
+        ("cimi.Event", "WARNING", GOLDEN_E1),
+        ("cimi.Job", "CRITICAL", GOLDEN_E2),
+    ] {
         let golden = decode_hex64(golden_hex);
         let facade = facade_frame(presented, severity).expect("facade encode");
         let raw = raw_frame(&pack, presented, severity).expect("raw encode");
         assert_eq!(facade, raw, "facade/raw divergence: {presented}/{severity}");
-        assert_eq!(facade, golden, "wire bytes != golden: {presented}/{severity}");
+        assert_eq!(
+            facade, golden,
+            "wire bytes != golden: {presented}/{severity}"
+        );
     }
 
     // Field witnesses on E2 (the alias-carrying frame): magic, version,
@@ -354,16 +403,35 @@ fn wire_parity_facade_raw_golden() {
     // semantics separate — canonical root vs presented alias.
     let g2 = decode_hex64(GOLDEN_E2);
     assert_eq!(&g2[0..4], b"CEW1", "magic");
-    assert_eq!(u16::from_le_bytes(g2[4..6].try_into().expect("u16")), 1, "version");
-    assert_eq!(u16::from_le_bytes(g2[6..8].try_into().expect("u16")), 2, "class");
-    assert_eq!(u16::from_le_bytes(g2[8..10].try_into().expect("u16")), 3, "family");
-    assert_eq!(u16::from_le_bytes(g2[10..12].try_into().expect("u16")), 2, "variant");
+    assert_eq!(
+        u16::from_le_bytes(g2[4..6].try_into().expect("u16")),
+        1,
+        "version"
+    );
+    assert_eq!(
+        u16::from_le_bytes(g2[6..8].try_into().expect("u16")),
+        2,
+        "class"
+    );
+    assert_eq!(
+        u16::from_le_bytes(g2[8..10].try_into().expect("u16")),
+        3,
+        "family"
+    );
+    assert_eq!(
+        u16::from_le_bytes(g2[10..12].try_into().expect("u16")),
+        2,
+        "variant"
+    );
     assert_eq!(&g2[12..16], &[0u8; 4], "reserved zero");
     let root = u64::from_le_bytes(g2[16..24].try_into().expect("u64"));
     let presented = u64::from_le_bytes(g2[56..64].try_into().expect("u64"));
     assert_eq!(root, cgap_cloud::CIMI_EVENT_SLOT, "canonical root slot");
     assert_eq!(presented, cgap_cloud::CIMI_JOB_SLOT, "presented alias slot");
-    assert_ne!(root, presented, "alias resolution must be visible on the wire");
+    assert_ne!(
+        root, presented,
+        "alias resolution must be visible on the wire"
+    );
 }
 
 /// Golden-sensitivity court: the goldens pin the variant bits and the
@@ -374,14 +442,22 @@ fn golden_sensitivity() {
     let e1 = decode_hex64(GOLDEN_E1);
     let e2 = decode_hex64(GOLDEN_E2);
     // Variant swaps flip E1.
-    assert_ne!(facade_frame("cimi.Event", "INFO").expect("info"), e1, "variant bits unpinned");
+    assert_ne!(
+        facade_frame("cimi.Event", "INFO").expect("info"),
+        e1,
+        "variant bits unpinned"
+    );
     assert_ne!(
         facade_frame("cimi.Event", "CRITICAL").expect("critical"),
         e1,
         "variant bits unpinned"
     );
     // Presented-slot swap flips both goldens.
-    assert_ne!(facade_frame("cimi.Job", "WARNING").expect("job/warn"), e1, "presented bits unpinned");
+    assert_ne!(
+        facade_frame("cimi.Job", "WARNING").expect("job/warn"),
+        e1,
+        "presented bits unpinned"
+    );
     assert_ne!(
         facade_frame("cimi.Event", "CRITICAL").expect("event/crit"),
         e2,
@@ -407,8 +483,10 @@ fn golden_sensitivity() {
 fn flip_slot_corruption_refuses_typed() {
     let canonical = fs::read(PACK_PATH).expect("committed pack readable");
     let base_digest = digest_hex(&canonical);
-    let canonical_mtime =
-        fs::metadata(PACK_PATH).expect("canonical metadata").modified().expect("mtime");
+    let canonical_mtime = fs::metadata(PACK_PATH)
+        .expect("canonical metadata")
+        .modified()
+        .expect("mtime");
 
     let dir = sandbox_dir("slot-flip");
     fs::create_dir_all(&dir).expect("sandbox dir");
@@ -419,18 +497,33 @@ fn flip_slot_corruption_refuses_typed() {
     // cimi.Event.content (slot re-derived through the real BLAKE3).
     let rec = 19usize;
     let base = 64 + rec * 48;
-    let expected_slot = u64::from_le_bytes(lex_hash("cimi.Event.content")[0..8].try_into().expect("u64"));
+    let expected_slot = u64::from_le_bytes(
+        lex_hash("cimi.Event.content")[0..8]
+            .try_into()
+            .expect("u64"),
+    );
     let record_slot = u64::from_le_bytes(canonical[base..base + 8].try_into().expect("u64"));
-    assert_eq!(record_slot, expected_slot, "record {rec} is not cimi.Event.content");
+    assert_eq!(
+        record_slot, expected_slot,
+        "record {rec} is not cimi.Event.content"
+    );
 
     let mut mutated = canonical.clone();
     mutated[base + (SEED % 8) as usize] ^= 0x01;
     fs::write(&copy_path, &mutated).expect("write mutated copy");
     let on_disk = fs::read(&copy_path).expect("read mutated copy back");
-    assert_ne!(digest_hex(&on_disk), base_digest, "sandbox mutation must change the copy");
+    assert_ne!(
+        digest_hex(&on_disk),
+        base_digest,
+        "sandbox mutation must change the copy"
+    );
 
     match raw_frame(&on_disk, "cimi.Event", "WARNING") {
-        Err(WireError::SlotDerivationMismatch { index, record_slot, derived_slot }) => {
+        Err(WireError::SlotDerivationMismatch {
+            index,
+            record_slot,
+            derived_slot,
+        }) => {
             assert_eq!(index, rec, "refusal must name the corrupted record");
             assert_ne!(record_slot, derived_slot);
         }
@@ -440,13 +533,26 @@ fn flip_slot_corruption_refuses_typed() {
     // Byte-exact restore + mtime bump (shim-court protocol).
     fs::write(&copy_path, &canonical).expect("restore");
     let restored = fs::read(&copy_path).expect("restored read");
-    assert_eq!(digest_hex(&restored), base_digest, "restore must be byte-exact");
-    let f = fs::OpenOptions::new().write(true).open(&copy_path).expect("reopen copy");
+    assert_eq!(
+        digest_hex(&restored),
+        base_digest,
+        "restore must be byte-exact"
+    );
+    let f = fs::OpenOptions::new()
+        .write(true)
+        .open(&copy_path)
+        .expect("reopen copy");
     f.set_modified(SystemTime::now()).expect("mtime bump");
     // The shared-tree pack was never touched: digest AND mtime equal.
-    assert_eq!(digest_hex(&fs::read(PACK_PATH).expect("canonical reread")), base_digest);
     assert_eq!(
-        fs::metadata(PACK_PATH).expect("canonical metadata 2").modified().expect("mtime 2"),
+        digest_hex(&fs::read(PACK_PATH).expect("canonical reread")),
+        base_digest
+    );
+    assert_eq!(
+        fs::metadata(PACK_PATH)
+            .expect("canonical metadata 2")
+            .modified()
+            .expect("mtime 2"),
         canonical_mtime,
         "canonical pack mtime moved — shared-tree mutation"
     );
@@ -463,8 +569,10 @@ fn flip_slot_corruption_refuses_typed() {
 fn flip_class_field_corruption_refuses_typed() {
     let canonical = fs::read(PACK_PATH).expect("committed pack readable");
     let base_digest = digest_hex(&canonical);
-    let canonical_mtime =
-        fs::metadata(PACK_PATH).expect("canonical metadata").modified().expect("mtime");
+    let canonical_mtime = fs::metadata(PACK_PATH)
+        .expect("canonical metadata")
+        .modified()
+        .expect("mtime");
 
     let dir = sandbox_dir("class-flip");
     fs::create_dir_all(&dir).expect("sandbox dir");
@@ -475,9 +583,16 @@ fn flip_class_field_corruption_refuses_typed() {
     // cimi.Event.severity with ClassId 2 / family 3.
     let rec = 20usize;
     let base = 64 + rec * 48;
-    let expected_slot = u64::from_le_bytes(lex_hash("cimi.Event.severity")[0..8].try_into().expect("u64"));
+    let expected_slot = u64::from_le_bytes(
+        lex_hash("cimi.Event.severity")[0..8]
+            .try_into()
+            .expect("u64"),
+    );
     let record_slot = u64::from_le_bytes(canonical[base..base + 8].try_into().expect("u64"));
-    assert_eq!(record_slot, expected_slot, "record {rec} is not cimi.Event.severity");
+    assert_eq!(
+        record_slot, expected_slot,
+        "record {rec} is not cimi.Event.severity"
+    );
     let class = u32::from_le_bytes(canonical[base + 8..base + 12].try_into().expect("u32"));
     assert_eq!(class, 2, "severity record class must be EventStream");
 
@@ -485,7 +600,11 @@ fn flip_class_field_corruption_refuses_typed() {
     mutated[base + 8..base + 12].copy_from_slice(&3u32.to_le_bytes());
     fs::write(&copy_path, &mutated).expect("write mutated copy");
     let on_disk = fs::read(&copy_path).expect("read mutated copy back");
-    assert_ne!(digest_hex(&on_disk), base_digest, "sandbox mutation must change the copy");
+    assert_ne!(
+        digest_hex(&on_disk),
+        base_digest,
+        "sandbox mutation must change the copy"
+    );
     // Derivation still holds on the mutated copy (slot bytes untouched) —
     // proving the flip exercises the FIELD cross-check, not T3's check.
     assert_eq!(
@@ -495,7 +614,11 @@ fn flip_class_field_corruption_refuses_typed() {
     );
 
     match raw_frame(&on_disk, "cimi.Event", "WARNING") {
-        Err(WireError::ClassFieldMismatch { lexeme, record_class: 3, expected_class: 2 }) => {
+        Err(WireError::ClassFieldMismatch {
+            lexeme,
+            record_class: 3,
+            expected_class: 2,
+        }) => {
             assert_eq!(lexeme, "cimi.Event.severity");
         }
         other => panic!("expected typed ClassFieldMismatch, got {other:?}"),
@@ -504,12 +627,25 @@ fn flip_class_field_corruption_refuses_typed() {
     // Byte-exact restore + mtime bump; shared tree witnessed untouched.
     fs::write(&copy_path, &canonical).expect("restore");
     let restored = fs::read(&copy_path).expect("restored read");
-    assert_eq!(digest_hex(&restored), base_digest, "restore must be byte-exact");
-    let f = fs::OpenOptions::new().write(true).open(&copy_path).expect("reopen copy");
-    f.set_modified(SystemTime::now()).expect("mtime bump");
-    assert_eq!(digest_hex(&fs::read(PACK_PATH).expect("canonical reread")), base_digest);
     assert_eq!(
-        fs::metadata(PACK_PATH).expect("canonical metadata 2").modified().expect("mtime 2"),
+        digest_hex(&restored),
+        base_digest,
+        "restore must be byte-exact"
+    );
+    let f = fs::OpenOptions::new()
+        .write(true)
+        .open(&copy_path)
+        .expect("reopen copy");
+    f.set_modified(SystemTime::now()).expect("mtime bump");
+    assert_eq!(
+        digest_hex(&fs::read(PACK_PATH).expect("canonical reread")),
+        base_digest
+    );
+    assert_eq!(
+        fs::metadata(PACK_PATH)
+            .expect("canonical metadata 2")
+            .modified()
+            .expect("mtime 2"),
         canonical_mtime,
         "canonical pack mtime moved — shared-tree mutation"
     );

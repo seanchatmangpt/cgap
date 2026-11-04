@@ -36,9 +36,7 @@ use std::time::Instant;
 use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_blake3::hash;
 use cgap_ffi::receipt_chain::{ReceiptChainRefusal, RingReceiptChain, GENESIS};
-use cgap_p28::attestation::{
-    P28LicenseAttestation, ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC,
-};
+use cgap_p28::attestation::{P28LicenseAttestation, ATTESTATION_VERSION, FLAG_ROOT, LICENSE_MAGIC};
 use cgap_parquet::footer::SealedBlock;
 use cgap_parquet::mmap_writer::{SlabView, StaticPageBuffer};
 
@@ -261,7 +259,10 @@ fn verify_span_from_checkpoints_o_span_curve() {
         curve.insert(span, ms(best));
     }
     for (span, t) in &curve {
-        eprintln!("[SPAN-CURVE] span {span}: best {:.3}ms (20 checkpoints, min-of-3)", t);
+        eprintln!(
+            "[SPAN-CURVE] span {span}: best {:.3}ms (20 checkpoints, min-of-3)",
+            t
+        );
     }
     // O(span) law measured: 50k-span cost must dominate 1k-span cost on
     // the same chain (>= 20x for a 50x span; loose floor).

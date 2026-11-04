@@ -47,7 +47,9 @@ fn time_min<F: FnMut()>(mut f: F, rounds: usize) -> Timing {
 fn fill(buf: &mut [u8]) {
     let mut x: u64 = 0x9E3779B97F4A7C15;
     for b in buf.iter_mut() {
-        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         *b = (x >> 33) as u8;
     }
 }
@@ -94,7 +96,11 @@ fn finalize_root(stack: &mut [[u32; 8]; 54], mut stack_len: usize) -> [u8; 32] {
         block[..8].copy_from_slice(&left_child);
         block[8..].copy_from_slice(&right_child);
 
-        let flags = if stack_len == 0 { PARENT | ROOT_FLAGS } else { PARENT };
+        let flags = if stack_len == 0 {
+            PARENT | ROOT_FLAGS
+        } else {
+            PARENT
+        };
         let out = compress_scalar(&IV, &block, 0, 64, flags);
 
         if stack_len == 0 {
@@ -134,8 +140,8 @@ fn replicate_hash_many(data: &[u8]) -> [u8; 32] {
             let outs = compress_chunks_4way(&data[start..start + 4096], chunk_idx as u64);
             for k in 0..4 {
                 let cv = [
-                    outs[k][0], outs[k][1], outs[k][2], outs[k][3],
-                    outs[k][4], outs[k][5], outs[k][6], outs[k][7],
+                    outs[k][0], outs[k][1], outs[k][2], outs[k][3], outs[k][4], outs[k][5],
+                    outs[k][6], outs[k][7],
                 ];
                 merge_one(&mut stack, &mut stack_len, cv, chunk_idx + k, num_chunks);
             }
@@ -145,7 +151,10 @@ fn replicate_hash_many(data: &[u8]) -> [u8; 32] {
         let start = chunk_idx * 1024;
         let end = (start + 1024).min(len);
         let cv_full = hash_chunk(&data[start..end], chunk_idx as u64, false);
-        let cv = [cv_full[0], cv_full[1], cv_full[2], cv_full[3], cv_full[4], cv_full[5], cv_full[6], cv_full[7]];
+        let cv = [
+            cv_full[0], cv_full[1], cv_full[2], cv_full[3], cv_full[4], cv_full[5], cv_full[6],
+            cv_full[7],
+        ];
         merge_one(&mut stack, &mut stack_len, cv, chunk_idx, num_chunks);
         chunk_idx += 1;
     }
@@ -252,7 +261,14 @@ fn main() {
 
         let parent_diff = full.best - leaf.best;
         let parent_share = parent_diff / full.best * 100.0;
-        phases.push((chunks, full.best, leaf.best, parent_diff, parent_share, merge.best));
+        phases.push((
+            chunks,
+            full.best,
+            leaf.best,
+            parent_diff,
+            parent_share,
+            merge.best,
+        ));
         json_lines.push(format!(
             r#"  {{"section": "phases", "chunks": {}, "full_s": {:.6}, "leaf_s": {:.6}, "parents_s": {:.6}, "parent_share_pct": {:.2}, "merge_loop_alone_s": {:.6}}}"#,
             chunks, full.best, leaf.best, parent_diff, parent_share, merge.best

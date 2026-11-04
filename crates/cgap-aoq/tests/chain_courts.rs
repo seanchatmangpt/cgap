@@ -7,8 +7,8 @@
 //! run with no observed refusal is a VACUOUS GATE.
 
 use cgap_aoq::chain::{
-    record_digest, verify_records, AoqChain, AoqChainRecord, ChainDigest, GENESIS,
-    RECORD_BYTES, Spoliation,
+    record_digest, verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS,
+    RECORD_BYTES,
 };
 
 /// Deterministic dual-FNV digest substrate (same construction as the
@@ -47,9 +47,8 @@ fn mix32(parts: &[&[u8]]) -> [u8; 32] {
 /// Fresh chain over a leaked slab (courts only; the kernel stays
 /// alloc-free — slab provision is the caller-provided-slab law).
 fn chain(cap: usize) -> AoqChain<'static, Mix32> {
-    let slab: &'static mut [AoqChainRecord] = Box::leak(
-        vec![AoqChainRecord::zeroed(); cap].into_boxed_slice(),
-    );
+    let slab: &'static mut [AoqChainRecord] =
+        Box::leak(vec![AoqChainRecord::zeroed(); cap].into_boxed_slice());
     AoqChain::new(Mix32, slab)
 }
 
@@ -64,7 +63,10 @@ fn c1_genesis_all_zeros() {
     assert_eq!(c.verify_all(), Ok(()));
     assert_eq!(c.verify_span(0, 0), Ok(()));
     // Out-of-range span refuses (opaque).
-    assert!(c.verify_span(0, 1).is_err(), "out-of-range span refuses opaque");
+    assert!(
+        c.verify_span(0, 1).is_err(),
+        "out-of-range span refuses opaque"
+    );
     let tok = c.resumption_token();
     assert_eq!(tok.head, GENESIS);
     assert_eq!(tok.links, 0);
@@ -95,7 +97,10 @@ fn c2_append_verify_all_span_token() {
     }
     assert_eq!(c2.resume(c.resumption_token()), Ok(()));
     // A token claiming more links than the chain holds refuses.
-    let forged = cgap_aoq::chain::ResumptionToken { head: tok.head, links: 65 };
+    let forged = cgap_aoq::chain::ResumptionToken {
+        head: tok.head,
+        links: 65,
+    };
     let mut c3 = chain(64);
     assert!(c3.resume(forged).is_err(), "forged link count refuses");
 }
@@ -116,7 +121,11 @@ fn c3_tamper_battery_flips_verify() {
     let mut a: [AoqChainRecord; 16] = c.records().try_into().ok().unwrap();
 
     a[5].payload_digest[3] ^= 0x40;
-    assert_eq!(c.verify_all(), Ok(()), "chain itself untouched by copy mutation");
+    assert_eq!(
+        c.verify_all(),
+        Ok(()),
+        "chain itself untouched by copy mutation"
+    );
     assert!(
         verify_records(&Mix32, &a).is_err(),
         "VACUOUS COURT: tampered copy verified clean"
@@ -176,7 +185,10 @@ fn c4_checkpoint_resume_law() {
     // Token encode/decode round trip.
     let bytes = tok.to_bytes();
     assert_eq!(bytes.len(), 36);
-    assert_eq!(cgap_aoq::chain::ResumptionToken::from_bytes(&bytes), Some(tok));
+    assert_eq!(
+        cgap_aoq::chain::ResumptionToken::from_bytes(&bytes),
+        Some(tok)
+    );
 }
 
 /// COURT 5 — append-only law: typed refusals leave the chain byte-identical;
@@ -214,7 +226,11 @@ fn c5_append_only_no_mutation_on_refusal() {
     assert_eq!(before, after, "refusals must not mutate landed records");
     assert_eq!(c.len(), before_len + 2, "only the two accepts landed");
     assert_ne!(c.checkpoint(), GENESIS);
-    assert_ne!(c.checkpoint(), before_head, "head advanced only via accepts");
+    assert_ne!(
+        c.checkpoint(),
+        before_head,
+        "head advanced only via accepts"
+    );
 }
 /// COURT 6 — Spoliation opacity: the witness carries no readable state.
 #[test]
@@ -237,11 +253,11 @@ fn c6_spoliation_is_opaque() {
 /// any tampered emission refuses and leaves the chain unmutated.
 #[test]
 fn c7_compose_emit_verified_law() {
+    use cgap_aoq::codec;
+    use cgap_aoq::header::AoqHeader;
     use cgap_aoq::session::{
         parse_frame, FrameKind, KemSeam, Session, SessionState, CT_BYTES, EK_BYTES,
     };
-    use cgap_aoq::header::AoqHeader;
-    use cgap_aoq::codec;
 
     /// Session-side test KEM whose kdf IS Mix32 (one substrate, both seams).
     struct TestKem;
@@ -315,7 +331,9 @@ fn c7_compose_emit_verified_law() {
 
     // Tampered emission refuses BEFORE linking: byte at body start flips.
     let mut out = [0u8; 96];
-    let n = session.emit_verified(9, b"compose-payload", &mut out[..]).unwrap();
+    let n = session
+        .emit_verified(9, b"compose-payload", &mut out[..])
+        .unwrap();
     let mut bad = out[..n].to_vec();
     bad[65] ^= 0x01;
     let head_before = c.checkpoint();

@@ -17,7 +17,10 @@ fn ntt_c_reference_pins() {
     s0[6] = 1;
     s0[7] = 1;
     fips203::ntt(&mut s0);
-    assert_eq!(&s0[..8], &[1567, 989, -1567, -2145, 1599, 2177, -1599, -1021]);
+    assert_eq!(
+        &s0[..8],
+        &[1567, 989, -1567, -2145, 1599, 2177, -1599, -1021]
+    );
     // intt_tomont(ntt(f)) == f * 2^16 mod q (montgomery round trip)
     let mut f = [0i16; 256];
     for i in 0..256 {

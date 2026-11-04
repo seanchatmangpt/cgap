@@ -73,9 +73,7 @@ fn corpus(c: usize, bits: u8) -> Vec<u32> {
     // across widths); values are a function of (c, bits).
     let mut skel = Lcg::new(0xC0FF_EE00 ^ c as u64);
     let mut vals = Lcg::new(
-        0x51CE_0000
-            ^ (c as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-            ^ (u64::from(bits) << 32),
+        0x51CE_0000 ^ (c as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (u64::from(bits) << 32),
     );
     let mut v = Vec::with_capacity(len);
     while v.len() < len {
@@ -111,7 +109,8 @@ fn prop1_rle_round_trip_widths_1_to_8_x_500_corpora() {
             if KERNEL_WIDTHS.contains(&bits) {
                 rle_decode(&page, &mut out).expect("kernel-width decode");
                 assert_eq!(
-                    out, values,
+                    out,
+                    values,
                     "P1 identity: bits={bits} corpus={c} len={}",
                     values.len()
                 );
@@ -181,7 +180,11 @@ fn prop2_constant_run_decode_l_1_to_10000() {
 #[test]
 fn prop3_level_free_page_round_trip_rows_x_types() {
     const ROWS_SET: [usize; 9] = [0, 1, 2, 3, 255, 256, 257, 65535, 65536];
-    const TYPES: [LevelFreeType; 3] = [LevelFreeType::U32, LevelFreeType::U64, LevelFreeType::Bytes32];
+    const TYPES: [LevelFreeType; 3] = [
+        LevelFreeType::U32,
+        LevelFreeType::U64,
+        LevelFreeType::Bytes32,
+    ];
     let mut page_cases = 0usize;
     let mut row_cases = 0usize;
     for &ty in &TYPES {
@@ -229,7 +232,13 @@ fn prop4_quad64_lcg_wire_identity_5000() {
         } else if c % 5 == 0 {
             // Sentinel-heavy: term ids drawn from {BOTTOM, WILDCARD}.
             let bits = rng.next();
-            let pick = |i: u32| if (bits >> i) & 1 == 0 { BOTTOM_TERM_ID } else { WILDCARD_TERM_ID };
+            let pick = |i: u32| {
+                if (bits >> i) & 1 == 0 {
+                    BOTTOM_TERM_ID
+                } else {
+                    WILDCARD_TERM_ID
+                }
+            };
             Quad64::new(
                 pick(0),
                 pick(1),
@@ -238,7 +247,11 @@ fn prop4_quad64_lcg_wire_identity_5000() {
                 if bits & 0x100 == 0 { 0 } else { u64::MAX },
                 if bits & 0x200 == 0 { 0 } else { u32::MAX },
                 if bits & 0x400 == 0 { 0 } else { u32::MAX },
-                if bits & 0x800 == 0 { [0u8; 32] } else { [0xFFu8; 32] },
+                if bits & 0x800 == 0 {
+                    [0u8; 32]
+                } else {
+                    [0xFFu8; 32]
+                },
             )
         } else if c % 7 == 0 {
             // Max-heavy: every scalar field at its ceiling, all-FF digest.

@@ -69,7 +69,11 @@ fn main() {
     let mut stderr = std::io::stderr();
     let (scale, n_reps) = parse_args();
     let workload_len = WORKLOAD_LEN_BASE * scale;
-    let _ = writeln!(stderr, "config: scale={} workload_bytes={} n_reps={}", scale, workload_len, n_reps);
+    let _ = writeln!(
+        stderr,
+        "config: scale={} workload_bytes={} n_reps={}",
+        scale, workload_len, n_reps
+    );
 
     // Fixed workload buffer.
     let mut buf = vec![0u8; workload_len];
@@ -106,7 +110,10 @@ fn main() {
     let _ = writeln!(stderr, "measured: {} reps", samples_us.len());
 
     // ---- Stats ----
-    let workload_desc = format!("cgap_blake3::hash over fixed {}-byte buffer (scale {})", workload_len, scale);
+    let workload_desc = format!(
+        "cgap_blake3::hash over fixed {}-byte buffer (scale {})",
+        workload_len, scale
+    );
     let mut sorted = samples_us.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 

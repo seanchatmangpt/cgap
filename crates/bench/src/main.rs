@@ -10,8 +10,8 @@
 
 use cgap_arrow::bitmap::mask_words;
 use std::hint::black_box;
-use std::sync::Barrier;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Barrier;
 use std::thread;
 use std::time::Instant;
 
@@ -165,7 +165,10 @@ fn main() {
     }
     // Bytes formula for the aggregate: 16 lanes x per-round bytes.
     let agg = (16.0 * per_round_bytes) / dt16 / GIB;
-    println!("16-lane wall: {:.0} us, aggregate {agg:.1} GiB/s (secondary, noisy)", dt16 * 1e6);
+    println!(
+        "16-lane wall: {:.0} us, aggregate {agg:.1} GiB/s (secondary, noisy)",
+        dt16 * 1e6
+    );
     println!("sink {sink:#x} lanes0 {}", lanes[0][0] & 1);
 }
 

@@ -101,10 +101,16 @@ fn a06_citation_freshness_court() {
     // --- Truth side: re-derived from the REAL reader on disk, every run ---
     let oabi_rs = read_oabi_rs();
     let magic_line = decl_line(&oabi_rs, "pub const OABI_MAGIC: [u8; 8]", "OABI_MAGIC");
-    let header_len_line =
-        decl_line(&oabi_rs, "pub const OABI_HEADER_LEN: usize", "OABI_HEADER_LEN");
-    let record_size_line =
-        decl_line(&oabi_rs, "pub const OABI_RECORD_SIZE: usize", "OABI_RECORD_SIZE");
+    let header_len_line = decl_line(
+        &oabi_rs,
+        "pub const OABI_HEADER_LEN: usize",
+        "OABI_HEADER_LEN",
+    );
+    let record_size_line = decl_line(
+        &oabi_rs,
+        "pub const OABI_RECORD_SIZE: usize",
+        "OABI_RECORD_SIZE",
+    );
     assert!(
         magic_line < header_len_line && header_len_line < record_size_line,
         "A06 constant order regressed"
@@ -127,7 +133,8 @@ fn a06_citation_freshness_court() {
     assert!(
         lo <= magic_line && hi > record_size_line,
         "emit-pack.rs range citation {}-{} no longer covers the container constants — wave-8 D1",
-        lo, hi
+        lo,
+        hi
     );
 
     // --- Value joins: the producer's restated constants are byte-identical
@@ -152,7 +159,9 @@ fn a06_citation_freshness_court() {
         .nth(header_len_line) // 0-based nth(54) == 1-based line 55
         .expect("line after the decl must exist");
     assert!(
-        !shifted.trim_start().starts_with("pub const OABI_HEADER_LEN: usize"),
+        !shifted
+            .trim_start()
+            .starts_with("pub const OABI_HEADER_LEN: usize"),
         "line-exactness witness vacuous: the next line also matches the decl"
     );
 

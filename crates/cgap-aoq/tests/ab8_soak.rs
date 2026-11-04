@@ -76,19 +76,14 @@ fn writev_frame(
         IoSlice::new(segs.body),
         IoSlice::new(zero_pad),
         IoSlice::new(segs.tail),
-]
-    ;
+    ];
     let n = tx.write_vectored(&bufs)?;
     w.commit();
     Ok(n)
 }
 
 /// Reader side: read one window, verify, decrypt, return plaintext.
-fn read_unseal_frame(
-    rx: &mut UnixStream,
-    ordinal: u32,
-    seq: u32,
-) -> std::io::Result<[u8; BODY]> {
+fn read_unseal_frame(rx: &mut UnixStream, ordinal: u32, seq: u32) -> std::io::Result<[u8; BODY]> {
     let mut win = [0u8; WIN_LEN];
     rx.read_exact(&mut win)?;
     let mut ct = [0u8; BODY];
@@ -108,8 +103,7 @@ fn read_unseal_frame(
     let mut ks = [0u8; 64];
     ks[..32].copy_from_slice(&ks0);
     ks[32..].copy_from_slice(&ks1);
-    decrypt_in_place(&vw, &ks, &mut win)
-        .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+    decrypt_in_place(&vw, &ks, &mut win).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut plain = [0u8; BODY];
     plain.copy_from_slice(&win[vw.body_at..vw.body_at + BODY]);
     Ok(plain)
@@ -154,5 +148,8 @@ fn soak_10k_seal_writev_uds_verify_unseal() {
     let allocs = ALLOCS.load(Ordering::Relaxed) - baseline;
     let fps = (FRAMES as f64) / dt.as_secs_f64();
     println!("soak: {FRAMES} frames, {bytes} bytes, {dt:?}, {fps:.0} frames/sec, {allocs} allocs");
-    assert_eq!(allocs, 0, "zero-alloc-per-frame court: {allocs} allocations");
+    assert_eq!(
+        allocs, 0,
+        "zero-alloc-per-frame court: {allocs} allocations"
+    );
 }

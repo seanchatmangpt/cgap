@@ -90,11 +90,7 @@ impl AlignedBuffers {
 
 /// A real `ArrowArray` over two buffer slots. `slots` must outlive the
 /// court's use of the returned struct (caller holds the AlignedBuffers).
-unsafe fn array_fixture(
-    slots: &[*const c_void; 2],
-    length: i64,
-    n_buffers: i64,
-) -> ArrowArray {
+unsafe fn array_fixture(slots: &[*const c_void; 2], length: i64, n_buffers: i64) -> ArrowArray {
     ArrowArray {
         length,
         null_count: 0,
@@ -205,7 +201,11 @@ fn import_branch_courts() {
     // the reduced fixture is a VACUOUS gate and this assert fails it.
     array.n_buffers = 1;
     let rc_flip = unsafe { cgap_import_array(&mut array, &tschema) };
-    assert_eq!(rc_flip, status::MISSING_BUFFER, "n_buffers-reduced twin must flip");
+    assert_eq!(
+        rc_flip,
+        status::MISSING_BUFFER,
+        "n_buffers-reduced twin must flip"
+    );
 }
 
 /// `cgap_import_schema`: null schema / null format -> INVALID_FORMAT,
@@ -222,7 +222,11 @@ fn import_schema_branch_courts() {
     assert_eq!(rc, status::OK, "modeled format U");
     let q_schema = schema_with_format(fmt_ptr!("q"));
     let rc = unsafe { cgap_import_schema(&q_schema) };
-    assert_eq!(rc, status::OK, "schema import validates UTF-8 only, not kind membership");
+    assert_eq!(
+        rc,
+        status::OK,
+        "schema import validates UTF-8 only, not kind membership"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +303,10 @@ fn bit_test_law_tracks_input_and_kills() {
     m[0] ^= 0b0000_0010; // bit 1 was clear -> becomes set
     assert!(bitmap_bit_test(&m, 1), "mutation flips the law output");
     m[0] ^= 0b0000_0010;
-    assert!(!bitmap_bit_test(&m, 1), "restore returns the law to baseline");
+    assert!(
+        !bitmap_bit_test(&m, 1),
+        "restore returns the law to baseline"
+    );
 }
 
 /// Anti-vacuity table-shape assert: the modeled kind table is exactly the
@@ -307,7 +314,11 @@ fn bit_test_law_tracks_input_and_kills() {
 /// without the courts noticing is impossible.
 #[test]
 fn array_kinds_table_shape() {
-    assert_eq!(ARRAY_KINDS.len(), 4, "4 modeled kinds (ontology individuals)");
+    assert_eq!(
+        ARRAY_KINDS.len(),
+        4,
+        "4 modeled kinds (ontology individuals)"
+    );
     for k in ARRAY_KINDS {
         assert!(!k.label.is_empty());
         assert!(!k.format.is_empty());

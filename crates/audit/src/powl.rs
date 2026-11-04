@@ -236,7 +236,10 @@ fn collect_leaves(node: &PowlNode, out: &mut Vec<u16>) {
 fn validate_model_node(node: &PowlNode) -> Result<(), PowlError> {
     match node {
         PowlNode::Activity(_) => Ok(()),
-        PowlNode::Operator { construct, children } => {
+        PowlNode::Operator {
+            construct,
+            children,
+        } => {
             let legal = match construct {
                 PowlConstruct::Sequence
                 | PowlConstruct::Choice
@@ -292,7 +295,10 @@ pub fn compile(model: &PowlModel) -> Result<CompiledPowlModel, PowlError> {
 fn collect_nodes(node: &PowlNode, out: &mut Vec<CompiledNode>) {
     match node {
         PowlNode::Activity(_) => {}
-        PowlNode::Operator { construct, children } => {
+        PowlNode::Operator {
+            construct,
+            children,
+        } => {
             for c in children {
                 collect_nodes(c, out);
             }
@@ -415,9 +421,7 @@ fn violation_of(construct: PowlConstruct, evidence_event_id: u64) -> PowlViolati
         construct,
         reserved: [0; 3],
         evidence_len: 1,
-        evidence: [
-            evidence_event_id, 0, 0, 0, 0, 0, 0, 0,
-        ],
+        evidence: [evidence_event_id, 0, 0, 0, 0, 0, 0, 0],
     }
 }
 
@@ -436,7 +440,11 @@ fn binding_closed(log: &Ocel2ColumnarLog, events: &[u32], terminals: &[u16]) -> 
 /// §2.4 Sequence: every occurrence of a later child's activity must be
 /// preceded, in the same binding, by an occurrence of some earlier child's
 /// activity. Slab-order walk with a u64 seen-bitmask (arity <= 64).
-fn check_sequence(log: &Ocel2ColumnarLog, node: &CompiledNode, events: &[u32]) -> Option<PowlViolation> {
+fn check_sequence(
+    log: &Ocel2ColumnarLog,
+    node: &CompiledNode,
+    events: &[u32],
+) -> Option<PowlViolation> {
     let mut seen: u64 = 0;
     for &e in events {
         let activity = log.activity[e as usize];
@@ -459,7 +467,11 @@ fn check_sequence(log: &Ocel2ColumnarLog, node: &CompiledNode, events: &[u32]) -
 
 /// §2.4 Choice: within one binding, children are mutually exclusive — once
 /// an event of child k is seen, an event of any other child violates.
-fn check_choice(log: &Ocel2ColumnarLog, node: &CompiledNode, events: &[u32]) -> Option<PowlViolation> {
+fn check_choice(
+    log: &Ocel2ColumnarLog,
+    node: &CompiledNode,
+    events: &[u32],
+) -> Option<PowlViolation> {
     let mut first: Option<u32> = None;
     for &e in events {
         let Some(o) = ordinal_of(node, log.activity[e as usize]) else {
@@ -536,7 +548,11 @@ fn check_loop(
 /// construction — reads columns and the prebuilt index, returns the verdict
 /// by value. This is the path the §5 allocation law and its court target.
 #[must_use]
-pub fn check(log: &Ocel2ColumnarLog, index: &BindingIndex, compiled: &CompiledPowlModel) -> PowlVerdict {
+pub fn check(
+    log: &Ocel2ColumnarLog,
+    index: &BindingIndex,
+    compiled: &CompiledPowlModel,
+) -> PowlVerdict {
     for node in &compiled.nodes {
         for binding in &index.entries {
             let events: &[u32] = &binding.events;
@@ -641,11 +657,15 @@ mod tests {
             }
         );
         // Violating: B before A — the court MUST reject (anti-vacuity flip).
-        let vio =
-            violation_of_verdict(verify(&log_with(&[(1, 10, B, OBJ), (2, 20, A, OBJ)]), &m).unwrap());
+        let vio = violation_of_verdict(
+            verify(&log_with(&[(1, 10, B, OBJ), (2, 20, A, OBJ)]), &m).unwrap(),
+        );
         assert_eq!(vio.construct, PowlConstruct::Sequence);
         assert_eq!(vio.evidence_len, 1);
-        assert_eq!(vio.evidence[0], 1, "evidence is the out-of-order B event id");
+        assert_eq!(
+            vio.evidence[0], 1,
+            "evidence is the out-of-order B event id"
+        );
     }
 
     #[test]
@@ -654,7 +674,12 @@ mod tests {
         // Binding 100 conforms; binding 200 violates. The violation must be
         // found and pinned to binding 200's event — never laundered across
         // bindings.
-        let log = log_with(&[(1, 10, A, 100), (2, 20, B, 100), (3, 30, B, 200), (4, 40, A, 200)]);
+        let log = log_with(&[
+            (1, 10, A, 100),
+            (2, 20, B, 100),
+            (3, 30, B, 200),
+            (4, 40, A, 200),
+        ]);
         let vio = violation_of_verdict(verify(&log, &m).unwrap());
         assert_eq!(vio.construct, PowlConstruct::Sequence);
         assert_eq!(vio.evidence[0], 3);
@@ -669,7 +694,10 @@ mod tests {
         let log = log_with(&[(1, 10, A, OBJ), (2, 20, B, OBJ)]);
         let vio = violation_of_verdict(verify(&log, &m).unwrap());
         assert_eq!(vio.construct, PowlConstruct::Choice);
-        assert_eq!(vio.evidence[0], 2, "evidence is the second exclusive arm's event");
+        assert_eq!(
+            vio.evidence[0], 2,
+            "evidence is the second exclusive arm's event"
+        );
     }
 
     #[test]
@@ -683,7 +711,10 @@ mod tests {
         let log = log_with(&[(1, 10, A, OBJ)]);
         let vio = violation_of_verdict(verify(&log, &m).unwrap());
         assert_eq!(vio.construct, PowlConstruct::Parallel);
-        assert_eq!(vio.evidence[0], 1, "evidence is the incomplete binding's last event");
+        assert_eq!(
+            vio.evidence[0], 1,
+            "evidence is the incomplete binding's last event"
+        );
     }
 
     #[test]
@@ -711,9 +742,12 @@ mod tests {
     fn loop_court_conforming_and_violating() {
         let m = model(PowlConstruct::Loop, &[A, B]);
         // Conforming: do A, redo B, do A again — every redo closed.
-        let ok = verify(&log_with(&[(1, 10, A, OBJ), (2, 20, B, OBJ), (3, 30, A, OBJ)]), &m)
-            .unwrap()
-            .unwrap();
+        let ok = verify(
+            &log_with(&[(1, 10, A, OBJ), (2, 20, B, OBJ), (3, 30, A, OBJ)]),
+            &m,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(ok.constructs_checked, 1);
         // Violating: redo B with no later do A — MUST reject.
         let log = log_with(&[(1, 10, A, OBJ), (2, 20, B, OBJ)]);
@@ -770,7 +804,10 @@ mod tests {
         let compiled = compile(&m).unwrap();
         let index = index_bindings(&log);
         let (verdict, report) = with_alloc_tracking(|| check(&log, &index, &compiled));
-        assert!(verdict.is_ok(), "conforming fixture must conform: {verdict:?}");
+        assert!(
+            verdict.is_ok(),
+            "conforming fixture must conform: {verdict:?}"
+        );
         assert!(
             report.is_zero(),
             "check path allocated beyond the binding index: {report:?}"
@@ -789,25 +826,40 @@ mod tests {
         // §5/§7.8: malformed logs surface as Err(PowlError::MalformedLog).
         let mut log = log_with(&[(1, 10, A, OBJ), (2, 20, B, OBJ)]);
         log.event_id[1] = 1; // duplicate event id — §4.1 monotonicity broken
-        assert_eq!(verify(&log, &model(PowlConstruct::Sequence, &[A, B])).unwrap_err(), PowlError::MalformedLog);
+        assert_eq!(
+            verify(&log, &model(PowlConstruct::Sequence, &[A, B])).unwrap_err(),
+            PowlError::MalformedLog
+        );
 
         let mut log2 = log_with(&[(1, 10, A, OBJ)]);
         log2.activity[0] = 0; // activity code 0 is reserved (§4.3)
-        assert_eq!(verify(&log2, &model(PowlConstruct::Sequence, &[A, B])).unwrap_err(), PowlError::MalformedLog);
+        assert_eq!(
+            verify(&log2, &model(PowlConstruct::Sequence, &[A, B])).unwrap_err(),
+            PowlError::MalformedLog
+        );
     }
 
     #[test]
     fn malformed_model_yields_typed_invalid_model() {
         // Loop arity != 2.
         let m = model(PowlConstruct::Loop, &[A]);
-        assert_eq!(verify(&log_with(&[]), &m).unwrap_err(), PowlError::InvalidModel);
+        assert_eq!(
+            verify(&log_with(&[]), &m).unwrap_err(),
+            PowlError::InvalidModel
+        );
         // Unary Sequence.
         let m2 = model(PowlConstruct::Sequence, &[A]);
-        assert_eq!(verify(&log_with(&[]), &m2).unwrap_err(), PowlError::InvalidModel);
+        assert_eq!(
+            verify(&log_with(&[]), &m2).unwrap_err(),
+            PowlError::InvalidModel
+        );
         // Arity above the bitmask ceiling.
         let many: Vec<u16> = (0..=POWL_MAX_ARITY as u16 + 1).map(|i| i + 1).collect();
         let m3 = model(PowlConstruct::Parallel, &many);
-        assert_eq!(verify(&log_with(&[]), &m3).unwrap_err(), PowlError::InvalidModel);
+        assert_eq!(
+            verify(&log_with(&[]), &m3).unwrap_err(),
+            PowlError::InvalidModel
+        );
     }
 
     #[test]
@@ -840,7 +892,12 @@ mod tests {
         let m = model(PowlConstruct::Sequence, &[A, B]);
         // Binding 100: rows [B, A] -> violation, evidence event id 1.
         // Binding 200: rows [B, A] -> violation, evidence event id 3.
-        let log = log_with(&[(1, 10, B, 100), (2, 20, A, 100), (3, 30, B, 200), (4, 40, A, 200)]);
+        let log = log_with(&[
+            (1, 10, B, 100),
+            (2, 20, A, 100),
+            (3, 30, B, 200),
+            (4, 40, A, 200),
+        ]);
         let expected = PowlViolation {
             construct: PowlConstruct::Sequence,
             reserved: [0; 3],
@@ -849,7 +906,10 @@ mod tests {
         };
         for _ in 0..64 {
             let v = violation_of_verdict(verify(&log, &m).unwrap());
-            assert_eq!(v, expected, "verdict evidence must not vary per index build");
+            assert_eq!(
+                v, expected,
+                "verdict evidence must not vary per index build"
+            );
         }
         // Both violations are real and findable — the court is not hiding
         // one behind the other: with binding 100 removed, binding 200's
@@ -947,7 +1007,8 @@ mod tests {
     fn a20_stress_one_million_rows_powl_verify() {
         const ROWS: u64 = 1_000_000;
         const OBJECTS: u64 = 1_000;
-        let mut log = Ocel2ColumnarLog::with_capacity(ROWS as usize, ROWS as usize, OBJECTS as usize);
+        let mut log =
+            Ocel2ColumnarLog::with_capacity(ROWS as usize, ROWS as usize, OBJECTS as usize);
         for i in 0..ROWS {
             let activity = if i % 2 == 0 { A } else { B };
             let object = OBJ + ((i / 2) % OBJECTS);

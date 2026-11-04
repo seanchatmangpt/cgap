@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use cgap_arrow::layout::Quad64 as LayoutQuad;
-use cgap_arrow::layout::{QUAD_SIZE};
+use cgap_arrow::layout::QUAD_SIZE;
 use cgap_arrow::predicates::filter_quads_eq;
 use cgap_arrow::transpose::transpose;
 use cgap_blake3::{hash, hash_many_simd, hash_wide_simd, is_small_batch_eligible};
@@ -173,7 +173,8 @@ fn ctq03_parquet_roundtrip() -> String {
     let mut best = f64::INFINITY;
     for r in 0..rounds {
         let t0 = now();
-        let (got, got_rows) = read_page_payload(&page, LevelFreeType::U64).expect("read_page_payload");
+        let (got, got_rows) =
+            read_page_payload(&page, LevelFreeType::U64).expect("read_page_payload");
         black_box(&got);
         black_box(got_rows);
         let dt = t0.elapsed().as_secs_f64();
@@ -293,7 +294,11 @@ fn ctq04_transpose_variance() -> (String, bool) {
     let mean = samples.iter().sum::<f64>() / runs as f64;
     let var = samples.iter().map(|s| (s - mean) * (s - mean)).sum::<f64>() / (runs - 1) as f64;
     let stdev = var.sqrt();
-    let frac = if mean > 0.0 { stdev / mean } else { f64::INFINITY };
+    let frac = if mean > 0.0 {
+        stdev / mean
+    } else {
+        f64::INFINITY
+    };
     // Gated statistic: percentile dispersion p99/p50 (nearest-rank on the
     // sorted samples) — immune to single-sample contamination that dominates
     // raw stdev under preemption. stdev/mean stays informational.
@@ -386,9 +391,18 @@ fn ctq05_e2e_admission() -> (String, bool) {
         dg.extend_from_slice(&q.inline_digest);
     }
     let pages = [
-        (LevelFreeType::U32, write_page(LevelFreeType::U32, &s, N).expect("page s")),
-        (LevelFreeType::U64, write_page(LevelFreeType::U64, &t, N).expect("page t")),
-        (LevelFreeType::Bytes32, write_page(LevelFreeType::Bytes32, &dg, N).expect("page dg")),
+        (
+            LevelFreeType::U32,
+            write_page(LevelFreeType::U32, &s, N).expect("page s"),
+        ),
+        (
+            LevelFreeType::U64,
+            write_page(LevelFreeType::U64, &t, N).expect("page t"),
+        ),
+        (
+            LevelFreeType::Bytes32,
+            write_page(LevelFreeType::Bytes32, &dg, N).expect("page dg"),
+        ),
     ];
 
     // Verify the roundtrip is byte-identical once, outside the timed loop.
@@ -506,8 +520,16 @@ fn ctq02_zero_alloc() -> (String, bool) {
         *b = (x >> 33) as u8;
     }
     let reference = hash(&buf);
-    assert_eq!(reference, hash_wide_simd(&buf), "SIMD paths must be byte-identical");
-    assert_eq!(reference, hash_many_simd(&buf), "hash_many_simd must be byte-identical");
+    assert_eq!(
+        reference,
+        hash_wide_simd(&buf),
+        "SIMD paths must be byte-identical"
+    );
+    assert_eq!(
+        reference,
+        hash_many_simd(&buf),
+        "hash_many_simd must be byte-identical"
+    );
 
     // Measured pass: hash_many_simd (the production 4-way SIMD path).
     ALLOC_EVENTS.store(0, Ordering::Relaxed);
@@ -519,7 +541,10 @@ fn ctq02_zero_alloc() -> (String, bool) {
     let events = ALLOC_EVENTS.load(Ordering::Relaxed);
     let bytes_alloced = ALLOC_BYTES.load(Ordering::Relaxed);
 
-    assert_eq!(digest, reference, "measured pass digest must match reference");
+    assert_eq!(
+        digest, reference,
+        "measured pass digest must match reference"
+    );
     let pass = events == 0;
     log(&format!(
         "CTQ-02: bytes={BYTES} alloc_events={events} alloc_bytes={bytes_alloced} time={:.3} s -> {}",
@@ -577,12 +602,22 @@ fn ctq06_blake3() -> (String, bool) {
     // 1.85) and would fail any LSL above 0.43 regardless of kernel health —
     // see docs/OPERATOR_DECISIONS.md decision 1, package 59 §6 edit A2.
     for (name, f, gates) in [
-        ("hash_wide_simd", hash_wide_simd as fn(&[u8]) -> [u8; 32], false),
-        ("hash_many_simd", hash_many_simd as fn(&[u8]) -> [u8; 32], true),
+        (
+            "hash_wide_simd",
+            hash_wide_simd as fn(&[u8]) -> [u8; 32],
+            false,
+        ),
+        (
+            "hash_many_simd",
+            hash_many_simd as fn(&[u8]) -> [u8; 32],
+            true,
+        ),
     ] {
         // Correctness screen before timing: byte-identical or honest FAIL.
         if f(&buf) != reference {
-            log(&format!("CTQ-06: {name} DIGEST MISMATCH vs reference -> row FAIL"));
+            log(&format!(
+                "CTQ-06: {name} DIGEST MISMATCH vs reference -> row FAIL"
+            ));
             rows.push(format!(
                 r#"{{"path":"{name}","digest_correct":false,"gate":"REAL","verdict":"FAIL"}}"#
             ));
@@ -612,10 +647,7 @@ fn ctq06_blake3() -> (String, bool) {
             all_pass = false;
         }
         let (gate_tag, verdict) = if gates {
-            (
-                "REAL",
-                if pass { "PASS" } else { "FAIL" },
-            )
+            ("REAL", if pass { "PASS" } else { "FAIL" })
         } else {
             ("informational", "REPORT")
         };

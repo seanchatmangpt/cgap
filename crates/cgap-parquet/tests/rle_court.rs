@@ -175,7 +175,10 @@ fn fast_encoder_parity_with_baseline() {
     for bits in [0u8, 9, 12, 16] {
         let values = vec![1u32, 2, 3, 4];
         let refused = std::panic::catch_unwind(|| rle_encode_fast(&values, bits)).is_err();
-        assert!(refused, "bits={bits}: fast path must refuse too (by delegation)");
+        assert!(
+            refused,
+            "bits={bits}: fast path must refuse too (by delegation)"
+        );
     }
 }
 

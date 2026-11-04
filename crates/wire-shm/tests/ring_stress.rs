@@ -27,7 +27,9 @@ fn fill_payload(ordinal: u32, len: usize) -> Vec<u8> {
     let seed = 0xA20C_0FFE_E5A7_E000u64 ^ (ordinal as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     let mut x = seed;
     while v.len() < len {
-        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         v.push((x >> 33) as u8);
     }
     v
@@ -92,7 +94,10 @@ fn churn_100k_fill_drain_integrity() {
             let evicted = next - CHURN_CAPACITY - 1;
             let err = ring.read_frame(evicted).unwrap_err();
             assert!(
-                matches!(err, WireError::StaleOrdinal { .. } | WireError::CrcMismatch { .. }),
+                matches!(
+                    err,
+                    WireError::StaleOrdinal { .. } | WireError::CrcMismatch { .. }
+                ),
                 "evicted read must fail typed, got {err:?}"
             );
         }
@@ -132,7 +137,10 @@ fn ordinal_wrap_walk_three_times() {
             let payload = fill_payload(post, 128 + cycle as usize);
             ring.stamp_frame(&payload, post).unwrap();
             let (got, crc) = ring.read_frame_with_crc(post).unwrap();
-            assert_eq!(got, payload, "cycle {cycle}: wrapped read corrupted at {post}");
+            assert_eq!(
+                got, payload,
+                "cycle {cycle}: wrapped read corrupted at {post}"
+            );
             assert_eq!(crc, crc32_ieee(&payload), "cycle {cycle}: crc at {post}");
         }
         // Ordinal-match law across the boundary: slot(pre % cap) was
@@ -141,13 +149,22 @@ fn ordinal_wrap_walk_three_times() {
         // u32::MAX % 256 = 255; post frames occupy slots 0..2, so slot 255
         // still holds the pre frame. Read it back and verify.
         let (got_pre, crc_pre) = ring.read_frame_with_crc(pre).unwrap();
-        assert_eq!(got_pre, pre_payload, "cycle {cycle}: pre-boundary frame corrupted");
+        assert_eq!(
+            got_pre, pre_payload,
+            "cycle {cycle}: pre-boundary frame corrupted"
+        );
         assert_eq!(crc_pre, crc32_ieee(&pre_payload));
         // StaleOrdinal law survives the wrap: writing 0 again with next=3
         // must refuse typed.
         let err = ring.stamp_frame(&fill_payload(0, 8), 0).unwrap_err();
         assert!(
-            matches!(err, WireError::StaleOrdinal { expected: 3, found: 0 }),
+            matches!(
+                err,
+                WireError::StaleOrdinal {
+                    expected: 3,
+                    found: 0
+                }
+            ),
             "cycle {cycle}: expected typed StaleOrdinal, got {err:?}"
         );
     }
@@ -210,7 +227,10 @@ fn backpressure_typed_refusal_state_intact() {
     }
     // Evicted frames are gone-typed, not silently stale-readable.
     let err = ring.read_frame(0).unwrap_err();
-    assert!(matches!(err, WireError::StaleOrdinal { .. } | WireError::CrcMismatch { .. }));
+    assert!(matches!(
+        err,
+        WireError::StaleOrdinal { .. } | WireError::CrcMismatch { .. }
+    ));
     std::fs::remove_file(&path).unwrap();
 }
 

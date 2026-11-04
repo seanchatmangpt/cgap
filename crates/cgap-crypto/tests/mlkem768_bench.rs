@@ -46,5 +46,8 @@ fn bench_keygen_encaps_decaps() {
     let dec = bench("decaps", 10, || {
         let _ = kem::decaps(&dk, &ct);
     });
-    println!("BENCH_SUMMARY keygen={:.2}us encaps={:.2}us decaps={:.2}us", k, e, dec);
+    println!(
+        "BENCH_SUMMARY keygen={:.2}us encaps={:.2}us decaps={:.2}us",
+        k, e, dec
+    );
 }

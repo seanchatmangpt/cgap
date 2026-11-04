@@ -37,13 +37,11 @@ use std::thread;
 
 const MANIFEST: &str = env!("CARGO_MANIFEST_DIR");
 
-const RFC8439_232_BLOCK: &str =
-    "10f1e7e4d13b5915500fdd1fa32071c4\
+const RFC8439_232_BLOCK: &str = "10f1e7e4d13b5915500fdd1fa32071c4\
      c7d1f4c733c068030422aa9ac3d46c4e\
      d2826446079faa0914c2d705d98b02a2\
      b5129cd1de164eb9cbd083e8a2503c4e";
-const SHAKE256_EMPTY_64: &str =
-    "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f\
+const SHAKE256_EMPTY_64: &str = "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f\
      d75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be";
 
 /// Kernel files under mutation (paths under the crate's src/).
@@ -227,10 +225,14 @@ fn flip_sigma(src: &str, word: usize, bit: u32) -> String {
     flipped[word] ^= 1 << bit;
     let old_lit = format!(
         "[0x{:04x}_{:04x}, 0x{:04x}_{:04x}, 0x{:04x}_{:04x}, 0x{:04x}_{:04x}]",
-        WORDS[0] >> 16, WORDS[0] & 0xffff,
-        WORDS[1] >> 16, WORDS[1] & 0xffff,
-        WORDS[2] >> 16, WORDS[2] & 0xffff,
-        WORDS[3] >> 16, WORDS[3] & 0xffff
+        WORDS[0] >> 16,
+        WORDS[0] & 0xffff,
+        WORDS[1] >> 16,
+        WORDS[1] & 0xffff,
+        WORDS[2] >> 16,
+        WORDS[2] & 0xffff,
+        WORDS[3] >> 16,
+        WORDS[3] & 0xffff
     );
     let new_lit = format!(
         "[0x{:08X}, 0x{:08X}, 0x{:08X}, 0x{:08X}]",
@@ -347,7 +349,12 @@ fn run_flip(
 fn run_all() -> Report {
     let before: Vec<(String, Vec<u8>)> = KERNELS
         .iter()
-        .map(|k| (k.to_string(), fs::read(PathBuf::from(MANIFEST).join("src").join(k)).expect("read")))
+        .map(|k| {
+            (
+                k.to_string(),
+                fs::read(PathBuf::from(MANIFEST).join("src").join(k)).expect("read"),
+            )
+        })
         .collect();
 
     // ---- Baselines: sandbox must reproduce the LANDED kernel's outputs,
@@ -360,9 +367,14 @@ fn run_all() -> Report {
     let fips203_src = kernel_text("fips203.rs");
 
     let kat_key: [u8; 32] = core::array::from_fn(|i| i as u8);
-    let kat_nonce: [u8; 12] = [0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00];
+    let kat_nonce: [u8; 12] = [
+        0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00,
+    ];
     let landed_block = cgap_crypto::chacha::chacha20_block(&kat_key, 1, &kat_nonce);
-    let landed_hex = landed_block.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let landed_hex = landed_block
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
     let rfc = strip_ws(RFC8439_232_BLOCK);
     if landed_hex != rfc {
         baselines_ok = false;
@@ -386,28 +398,35 @@ fn run_all() -> Report {
     cgap_crypto::fips203::ntt(&mut q);
     cgap_crypto::fips203::intt_tomont(&mut q);
     let canon = |x: i16| ((x as i32).rem_euclid(3329)) as i16;
-    let roundtrip_ok = (0..256).all(|i| canon(cgap_crypto::fips203::fqmul(q[i], 1)) == canon(p0[i]));
+    let roundtrip_ok =
+        (0..256).all(|i| canon(cgap_crypto::fips203::fqmul(q[i], 1)) == canon(p0[i]));
     if !roundtrip_ok {
         baselines_ok = false;
         baseline_detail.push_str("LANDED ntt/intt_tomont roundtrip fails; ");
     }
 
     // Sandbox baselines (unflipped copies) must match the landed outputs.
-    let sbx_block = Sandbox::new("base-chacha")
-        .build_and_run(&[("chacha.rs", &chacha_src)], CHACHA_DRIVER);
-    let sbx_shake = Sandbox::new("base-f202")
-        .build_and_run(&[("fips202.rs", &fips202_src)], FIPS202_DRIVER);
+    let sbx_block =
+        Sandbox::new("base-chacha").build_and_run(&[("chacha.rs", &chacha_src)], CHACHA_DRIVER);
+    let sbx_shake =
+        Sandbox::new("base-f202").build_and_run(&[("fips202.rs", &fips202_src)], FIPS202_DRIVER);
     let sbx_ntt = Sandbox::new("base-f203").build_and_run(
         &[("fips202.rs", &fips202_src), ("fips203.rs", &fips203_src)],
         FIPS203_DRIVER,
     );
     let (chacha_base, shake_base, ntt_base_and_verdict) = match (sbx_block, sbx_shake, sbx_ntt) {
-        (Ok(a), Ok(b), Ok(c)) => (a.trim().to_string(), b.trim().to_string(), c.trim().to_string()),
+        (Ok(a), Ok(b), Ok(c)) => (
+            a.trim().to_string(),
+            b.trim().to_string(),
+            c.trim().to_string(),
+        ),
         (e, f, g) => {
             baselines_ok = false;
             let msg = format!(
                 "SANDBOX BASELINE ERRORS: chacha={:?} f202={:?} f203={:?}",
-                e.err(), f.err(), g.err()
+                e.err(),
+                f.err(),
+                g.err()
             );
             baseline_detail.push_str(&msg);
             eprintln!("{msg}");
@@ -426,12 +445,22 @@ fn run_all() -> Report {
             String::new()
         }
     };
-    println!("AF-12 baselines: chacha RFC-8439-fixture={} shake256-KAT={} ntt-roundtrip={}",
-        chacha_base == landed_hex, shake_base == landed_shk, roundtrip_ok);
+    println!(
+        "AF-12 baselines: chacha RFC-8439-fixture={} shake256-KAT={} ntt-roundtrip={}",
+        chacha_base == landed_hex,
+        shake_base == landed_shk,
+        roundtrip_ok
+    );
 
     // ---- Build the flip cases.
-    let mut cases: Vec<(&'static str, String, Vec<(&'static str, String)>, &'static str, &str, bool)> =
-        Vec::new();
+    let mut cases: Vec<(
+        &'static str,
+        String,
+        Vec<(&'static str, String)>,
+        &'static str,
+        &str,
+        bool,
+    )> = Vec::new();
     for word in 0..4usize {
         for bit in 0..32u32 {
             cases.push((
@@ -469,7 +498,10 @@ fn run_all() -> Report {
     }
 
     // ---- Execute flips, thread-limited.
-    let n_threads = thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
+    let n_threads = thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .min(8);
     let rows: Vec<Row> = thread::scope(|s| {
         let mut handles = Vec::new();
         let mut chunks: Vec<Vec<_>> = Vec::new();
@@ -486,7 +518,10 @@ fn run_all() -> Report {
                 out
             }));
         }
-        handles.into_iter().flat_map(|h| h.join().expect("flip worker panicked")).collect()
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().expect("flip worker panicked"))
+            .collect()
     });
 
     finish(before, rows, baselines_ok, baseline_detail)
@@ -498,10 +533,15 @@ fn finish(
     baselines_ok: bool,
     baseline_detail: String,
 ) -> Report {
-    let restore_ok = before
-        .iter()
-        .all(|(k, v)| *v == fs::read(PathBuf::from(MANIFEST).join("src").join(k)).expect("re-read"));
-    let mut report = Report { rows, baselines_ok, restore_ok, baseline_detail };
+    let restore_ok = before.iter().all(|(k, v)| {
+        *v == fs::read(PathBuf::from(MANIFEST).join("src").join(k)).expect("re-read")
+    });
+    let mut report = Report {
+        rows,
+        baselines_ok,
+        restore_ok,
+        baseline_detail,
+    };
     print_tables(&report);
     report
 }
@@ -523,8 +563,10 @@ fn print_tables(r: &Report) {
     let total = r.rows.len();
     let detected = r.rows.iter().filter(|row| row.detected).count();
     println!("\n== AF-12 meta-court ==");
-    println!("flips_total={total} flips_detected={detected} baselines_ok={} restore_ok={}",
-        r.baselines_ok, r.restore_ok);
+    println!(
+        "flips_total={total} flips_detected={detected} baselines_ok={} restore_ok={}",
+        r.baselines_ok, r.restore_ok
+    );
 }
 
 /// Flip byte `idx` of RC (idx = 8*round + byte, little-endian byte order
@@ -627,6 +669,10 @@ fn meta_court_flip_demo_is_not_vacuous() {
     let detected = r.rows.iter().filter(|row| row.detected).count();
     assert_eq!(detected, total, "flips_detected must equal flips_total");
     assert_eq!(total, 128 + 192 + 4, "SIGMA 128 + RC 192 + ZETAS 4 = 324");
-    assert!(r.baselines_ok, "unflipped baseline must pass: {}", r.baseline_detail);
+    assert!(
+        r.baselines_ok,
+        "unflipped baseline must pass: {}",
+        r.baseline_detail
+    );
     assert!(r.restore_ok, "repo tree must be restored byte-exact");
 }

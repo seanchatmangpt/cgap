@@ -26,11 +26,19 @@ fn scan(text: &str, path: &Path) -> std::vec::Vec<String> {
     let mut violations = std::vec::Vec::new();
     for (n, line) in text.lines().enumerate() {
         if line.contains("unsafe") && !line.contains("forbid(unsafe_code)") {
-            violations.push(format!("{:?}:{}: unsafe outside forbid attr: {line}", path, n + 1));
+            violations.push(format!(
+                "{:?}:{}: unsafe outside forbid attr: {line}",
+                path,
+                n + 1
+            ));
         }
         for tok in FORBIDDEN_ASM_TOKENS {
             if line.contains(tok) {
-                violations.push(format!("{:?}:{}: forbidden token {tok:?}: {line}", path, n + 1));
+                violations.push(format!(
+                    "{:?}:{}: forbidden token {tok:?}: {line}",
+                    path,
+                    n + 1
+                ));
             }
         }
     }
@@ -77,10 +85,7 @@ fn kernel_scan_zero_unsafe_zero_asm_with_sandbox_kills() {
         std::fs::write(&sandbox, mutated.as_bytes()).expect("write sandbox");
         let v = scan(&read(&sandbox), &sandbox);
         let _ = std::fs::remove_file(&sandbox);
-        assert!(
-            !v.is_empty(),
-            "VACUOUS SCAN: {label} token undetected"
-        );
+        assert!(!v.is_empty(), "VACUOUS SCAN: {label} token undetected");
         kills += 1;
     }
     assert_eq!(kills, 3, "all three injection kills fired");
@@ -88,6 +93,10 @@ fn kernel_scan_zero_unsafe_zero_asm_with_sandbox_kills() {
     // Fail-closed restore witness.
     for (p, before_bytes) in &before {
         let after = std::fs::read(p).expect("re-read source");
-        assert_eq!(before_bytes, &after, "{:?} untouched (fail-closed restore)", p);
+        assert_eq!(
+            before_bytes, &after,
+            "{:?} untouched (fail-closed restore)",
+            p
+        );
     }
 }

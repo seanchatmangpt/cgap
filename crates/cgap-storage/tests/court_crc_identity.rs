@@ -36,7 +36,7 @@
 
 use cgap_git::pack_write as git_crc;
 use cgap_storage::atomic_commit::{
-    encode_record, crc32, FLAG_DUAL_WRITE, NewRootDescriptor, RECORD_SIZE,
+    crc32, encode_record, NewRootDescriptor, FLAG_DUAL_WRITE, RECORD_SIZE,
 };
 
 /// zlib-derived IEEE CRC-32 reference vectors (authoring session evidence;
@@ -72,7 +72,7 @@ fn crc32_matches_cgap_git_differential() {
     corpus.push(encode_record(1, &desc).to_vec()); // 112-byte record
     corpus.push(vec![0xFF; RECORD_SIZE]); // erased slot
     corpus.push(vec![0x00; RECORD_SIZE]); // zero-filled slot
-    // Mixed 0xFF/0x00 torn-erase mix (§9 risk class).
+                                          // Mixed 0xFF/0x00 torn-erase mix (§9 risk class).
     corpus.push(
         (0..RECORD_SIZE)
             .map(|i| if i % 3 == 0 { 0xFF } else { 0x00 })
@@ -98,7 +98,10 @@ fn crc32_matches_cgap_git_differential() {
 /// streaming surface too, not just the one-shot convenience wrapper.
 #[test]
 fn crc32_streaming_identity() {
-    let payload = encode_record(2, &NewRootDescriptor::new([0xBB; 20], 0x2000, 10, 1, FLAG_DUAL_WRITE));
+    let payload = encode_record(
+        2,
+        &NewRootDescriptor::new([0xBB; 20], 0x2000, 10, 1, FLAG_DUAL_WRITE),
+    );
     let (head, tail) = payload.split_at(48);
     let mut stream = git_crc::Crc32::new();
     stream.update(head);

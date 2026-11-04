@@ -61,7 +61,9 @@ const CHUNK: usize = 1024;
 fn fill_pseudo(buf: &mut [u8]) {
     let mut x: u64 = 0x9E3779B97F4A7C15;
     for b in buf.iter_mut() {
-        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         *b = (x >> 33) as u8;
     }
 }
@@ -115,7 +117,10 @@ fn hash_scalar_64mib_is_zero_alloc() {
         let d = cgap_blake3::hash(&buf);
         std::hint::black_box(d);
     });
-    assert_eq!(n, 0, "cgap_blake3::hash allocated {n} times ({bytes} bytes)");
+    assert_eq!(
+        n, 0,
+        "cgap_blake3::hash allocated {n} times ({bytes} bytes)"
+    );
 }
 
 #[test]
@@ -191,5 +196,8 @@ fn positive_control_counter_is_live() {
         let d = cgap_blake3::hash(&buf);
         std::hint::black_box(d);
     });
-    assert_eq!(n, 0, "cgap_blake3::hash allocated {n} times ({bytes} bytes)");
+    assert_eq!(
+        n, 0,
+        "cgap_blake3::hash allocated {n} times ({bytes} bytes)"
+    );
 }

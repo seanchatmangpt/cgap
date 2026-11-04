@@ -145,7 +145,11 @@ impl ChainDigest for Mix32 {
         }
         let mut out = [0u8; 32];
         for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
-            let v = if i % 2 == 0 { a.wrapping_add(i as u64) } else { b.wrapping_add(i as u64) };
+            let v = if i % 2 == 0 {
+                a.wrapping_add(i as u64)
+            } else {
+                b.wrapping_add(i as u64)
+            };
             chunk.copy_from_slice(&v.to_le_bytes());
         }
         out
@@ -248,8 +252,12 @@ fn storm_write_all(tx: &mut StormTx, pieces: &[&[u8]; 6]) -> std::io::Result<usi
     let mut total = 0usize;
     loop {
         let mut bufs: [IoSlice; 6] = [
-            IoSlice::new(&[]), IoSlice::new(&[]), IoSlice::new(&[]),
-            IoSlice::new(&[]), IoSlice::new(&[]), IoSlice::new(&[]),
+            IoSlice::new(&[]),
+            IoSlice::new(&[]),
+            IoSlice::new(&[]),
+            IoSlice::new(&[]),
+            IoSlice::new(&[]),
+            IoSlice::new(&[]),
         ];
         let mut k = 0usize;
         for h in heads.iter_mut() {
@@ -305,7 +313,12 @@ fn seal_and_write(
         .frame_segments(0, 7, &tag16, &ct)
         .expect("af32: lawful frame");
     let pieces: [&[u8]; 6] = [
-        segs.prefix, segs.header, segs.pad, segs.body, &ZERO_PAD, segs.tail,
+        segs.prefix,
+        segs.header,
+        segs.pad,
+        segs.body,
+        &ZERO_PAD,
+        segs.tail,
     ];
     let n = if storm {
         let mut stx = StormTx { inner: tx, ok0 };
@@ -335,7 +348,8 @@ fn read_verify_unseal(
     win: &mut [u8; WIN_LEN],
     corrupt: bool,
 ) -> Result<Option<([u8; 64], [u8; 80])>, AoqError> {
-    rx.read_exact(win).map_err(|_| AoqError::HeaderTooShort { got: 0 })?;
+    rx.read_exact(win)
+        .map_err(|_| AoqError::HeaderTooShort { got: 0 })?;
     let mut ct = [0u8; 64];
     let parsed = match ipc::read_with_meta(win, None, &mut ct) {
         Ok(p) => p,
@@ -408,7 +422,10 @@ fn run_cycle(
     let (mut s0, mut b0): (u64, u64) = (0, 0);
     let strict_start = 1024usize;
     if spec.strict {
-        assert!(spec.count >= strict_start + 64, "af32: strict cycle too short");
+        assert!(
+            spec.count >= strict_start + 64,
+            "af32: strict cycle too short"
+        );
         // Positive control: an explicit alloc proves the counter moves.
         let probe: Vec<u8> = vec![7u8; 991];
         assert_eq!(probe[990], 7);
@@ -544,7 +561,12 @@ fn lane_loop(
         } else {
             Some(64 + (lane * 7_919 + cycle_no * 104_729) % (batch - 128))
         };
-        let spec = CycleSpec { start: next, count, kill_at, strict };
+        let spec = CycleSpec {
+            start: next,
+            count,
+            kill_at,
+            strict,
+        };
         let slab_len = CHAIN_WIN.min(slab.len());
         let out = thread::scope(|s| {
             let slab_ref: &mut [AoqChainRecord] = &mut slab[..slab_len];
@@ -581,10 +603,7 @@ fn lane_loop(
 // ------------------------------------------------ helpers ----------
 
 fn alloc_delta() -> (u64, u64) {
-    (
-        ALLOCS.with(|c| c.get()),
-        BYTES.with(|c| c.get()),
-    )
+    (ALLOCS.with(|c| c.get()), BYTES.with(|c| c.get()))
 }
 
 /// lsof fd census for this process.
@@ -619,7 +638,10 @@ fn report(total: usize, dt: std::time::Duration, rss: &[usize], fd0: usize, fd1:
     let fps = total as f64 / dt.as_secs_f64();
     println!("af32 SOAK REPORT (measured)");
     println!("  frames_total_requested : {total}");
-    println!("  frames_valid           : {}", VALID.load(Ordering::Relaxed));
+    println!(
+        "  frames_valid           : {}",
+        VALID.load(Ordering::Relaxed)
+    );
     println!(
         "  refusals_corrupt_typed : {}",
         CORRUPT_REFUSED.load(Ordering::Relaxed)
@@ -640,7 +662,10 @@ fn report(total: usize, dt: std::time::Duration, rss: &[usize], fd0: usize, fd1:
         "  ok0_retries            : {}",
         OK0_RETRIES.load(Ordering::Relaxed)
     );
-    println!("  churn killed           : {}", KILLED.load(Ordering::Relaxed));
+    println!(
+        "  churn killed           : {}",
+        KILLED.load(Ordering::Relaxed)
+    );
     println!(
         "  churn respawned        : {}",
         RESPAWNED.load(Ordering::Relaxed)
@@ -686,8 +711,7 @@ fn run_soak(total_requested: usize) -> f64 {
             for (lane, slab) in slabs.iter_mut().enumerate() {
                 let slab = &mut slab[..];
                 s.spawn(move || {
-                    let start_seq =
-                        (wave * LANES + lane) as u64 * per_lw as u64;
+                    let start_seq = (wave * LANES + lane) as u64 * per_lw as u64;
                     let (_q, _d, _cp) = lane_loop(lane, per_lw, slab, start_seq);
                     let _ = (_q, _cp);
                 });
@@ -701,11 +725,9 @@ fn run_soak(total_requested: usize) -> f64 {
     // Census identity: every seq classified, none dropped.
     let warm = WARMUP as u64;
     let t = total as u64;
-    let exp_storm =
-        count_pred(t, STORM_EVERY, 13) - count_pred(warm, STORM_EVERY, 13);
+    let exp_storm = count_pred(t, STORM_EVERY, 13) - count_pred(warm, STORM_EVERY, 13);
     let exp_ok0 = count_pred(t, OK0_EVERY, 141) - count_pred(warm, OK0_EVERY, 141);
-    let exp_corrupt =
-        count_pred(t, CORRUPT_EVERY, 777) - count_pred(warm, CORRUPT_EVERY, 777);
+    let exp_corrupt = count_pred(t, CORRUPT_EVERY, 777) - count_pred(warm, CORRUPT_EVERY, 777);
     assert_eq!(
         VALID.load(Ordering::Relaxed) as u64,
         t - exp_corrupt,
@@ -726,7 +748,10 @@ fn run_soak(total_requested: usize) -> f64 {
         TRUNC_LEGS.load(Ordering::Relaxed) * 6,
         "truncation census mismatch (6 probes per leg)"
     );
-    assert!(TRUNC_LEGS.load(Ordering::Relaxed) > 0, "trunc legs must run");
+    assert!(
+        TRUNC_LEGS.load(Ordering::Relaxed) > 0,
+        "trunc legs must run"
+    );
     assert!(
         STORM_CALLS.load(Ordering::Relaxed) as u64 > exp_storm,
         "storm witness weak"
@@ -736,28 +761,40 @@ fn run_soak(total_requested: usize) -> f64 {
         exp_ok0,
         "Ok(0) census must equal the injected count"
     );
-    assert!(KILLED.load(Ordering::Relaxed) >= LANES * WAVES, "churn witness weak");
+    assert!(
+        KILLED.load(Ordering::Relaxed) >= LANES * WAVES,
+        "churn witness weak"
+    );
     assert_eq!(
-        RESPAWNED.load(Ordering::Relaxed), KILLED.load(Ordering::Relaxed),
+        RESPAWNED.load(Ordering::Relaxed),
+        KILLED.load(Ordering::Relaxed),
         "every kill must be respawned"
     );
     assert_eq!(
-        UNHANDLED.load(Ordering::Relaxed), 0,
+        UNHANDLED.load(Ordering::Relaxed),
+        0,
         "unhandled worker exceptions must be 0"
     );
     assert_eq!(
-        SEGMENTS_VERIFIED.load(Ordering::Relaxed), SEGMENTS_OPENED.load(Ordering::Relaxed),
+        SEGMENTS_VERIFIED.load(Ordering::Relaxed),
+        SEGMENTS_OPENED.load(Ordering::Relaxed),
         "every opened chain segment must verify at close"
     );
     assert_eq!(
-        STRICT_ALLOCS.load(Ordering::Relaxed), 0,
+        STRICT_ALLOCS.load(Ordering::Relaxed),
+        0,
         "strict alloc court: allocations in the steady-state window"
     );
     assert_eq!(
-        STRICT_BYTES.load(Ordering::Relaxed), 0,
+        STRICT_BYTES.load(Ordering::Relaxed),
+        0,
         "strict alloc court: bytes in the steady-state window"
     );
-    assert_eq!(STRICT_POS.load(Ordering::Relaxed), 1, "positive control ran");
+    assert_eq!(
+        STRICT_POS.load(Ordering::Relaxed),
+        1,
+        "positive control ran"
+    );
     assert_eq!(fd1, fd0, "fd delta must be 0 (lsof)");
     // RSS plateau: last-half band tight, bounded total growth.
     let n = rss_samples.len();

@@ -11,14 +11,30 @@
 /// Round constants RC[0..24] for iota, FIPS 202 Table 2 (cross-checked
 /// against mjosaarinen/tiny_sha3 sha3.c keccakf_rndc).
 const RC: [u64; 24] = [
-    0x0000_0000_0000_0001, 0x0000_0000_0000_8082, 0x8000_0000_0000_808a,
-    0x8000_0000_8000_8000, 0x0000_0000_0000_808b, 0x0000_0000_8000_0001,
-    0x8000_0000_8000_8081, 0x8000_0000_0000_8009, 0x0000_0000_0000_008a,
-    0x0000_0000_0000_0088, 0x0000_0000_8000_8009, 0x0000_0000_8000_000a,
-    0x0000_0000_8000_808b, 0x8000_0000_0000_008b, 0x8000_0000_0000_8089,
-    0x8000_0000_0000_8003, 0x8000_0000_0000_8002, 0x8000_0000_0000_0080,
-    0x0000_0000_0000_800a, 0x8000_0000_8000_000a, 0x8000_0000_8000_8081,
-    0x8000_0000_0000_8080, 0x0000_0000_8000_0001, 0x8000_0000_8000_8008,
+    0x0000_0000_0000_0001,
+    0x0000_0000_0000_8082,
+    0x8000_0000_0000_808a,
+    0x8000_0000_8000_8000,
+    0x0000_0000_0000_808b,
+    0x0000_0000_8000_0001,
+    0x8000_0000_8000_8081,
+    0x8000_0000_0000_8009,
+    0x0000_0000_0000_008a,
+    0x0000_0000_0000_0088,
+    0x0000_0000_8000_8009,
+    0x0000_0000_8000_000a,
+    0x0000_0000_8000_808b,
+    0x8000_0000_0000_008b,
+    0x8000_0000_0000_8089,
+    0x8000_0000_0000_8003,
+    0x8000_0000_0000_8002,
+    0x8000_0000_0000_0080,
+    0x0000_0000_0000_800a,
+    0x8000_0000_8000_000a,
+    0x8000_0000_8000_8081,
+    0x8000_0000_0000_8080,
+    0x0000_0000_8000_0001,
+    0x8000_0000_8000_8008,
 ];
 
 /// Lane rotation offsets r[x][y], FIPS 202 Table 2, indexed [x + 5*y]
@@ -84,14 +100,19 @@ pub fn keccak_f1600(state: &mut [u64; 25]) {
 pub struct Sponge {
     state: [u64; 25],
     rate: usize,
-    pos: usize,     // next byte index in the rate block
+    pos: usize, // next byte index in the rate block
     squeezing: bool,
 }
 
 impl Sponge {
     /// New sponge with the given rate in bytes.
     pub fn new(rate: usize) -> Self {
-        Sponge { state: [0; 25], rate, pos: 0, squeezing: false }
+        Sponge {
+            state: [0; 25],
+            rate,
+            pos: 0,
+            squeezing: false,
+        }
     }
 
     /// Absorb more input. Call any number of times before squeezing.
@@ -292,7 +313,9 @@ mod tests {
 
     fn split_inputs(seed: u64) -> (alloc::vec::Vec<u8>, alloc::vec::Vec<usize>) {
         // Deterministic PRNG input and chunking plan.
-        let mut x = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut x = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let mut next = || {
             x ^= x >> 12;
             x ^= x << 25;
@@ -318,7 +341,11 @@ mod tests {
     fn stress_incremental_equals_oneshot_10k() {
         for case in 0..10_000u64 {
             let (msg, plan) = split_inputs(case);
-            let rate = if case % 2 == 0 { Shake128::RATE } else { Shake256::RATE };
+            let rate = if case % 2 == 0 {
+                Shake128::RATE
+            } else {
+                Shake256::RATE
+            };
             let mut one = alloc::vec![0u8; 97];
             if rate == Shake128::RATE {
                 Shake128::xof(&msg, &mut one);
@@ -384,7 +411,11 @@ mod tests {
         // sponge in 168-byte blocks.
         let ns_1kb = measure(1024, 50);
         let ns_1mb = measure(1024 * 1024, 3);
-        std::println!("BENCH fips202 SHAKE-128 ns/byte (min-of-N): 1KB={:.3} 1MB={:.3}", ns_1kb, ns_1mb);
+        std::println!(
+            "BENCH fips202 SHAKE-128 ns/byte (min-of-N): 1KB={:.3} 1MB={:.3}",
+            ns_1kb,
+            ns_1mb
+        );
         // Fence is meaningful only under optimization (debug builds run
         // ~100x slower unoptimized); enforce in --release runs.
         if !cfg!(debug_assertions) {

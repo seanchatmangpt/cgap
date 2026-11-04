@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use cgap_arrow::ipc::{
     emit, emit_verified, meta_span_for, read, read_verified, read_with_meta, seq_ok, window_len,
-    IpcError, LAYOUT_VERSION, MAGIC, MetaHeader,
+    IpcError, MetaHeader, LAYOUT_VERSION, MAGIC,
 };
 
 /// Counting allocator: wraps `System`, counts alloc/realloc calls and
@@ -192,7 +192,12 @@ fn t3_alloc_court_zero_per_window() {
         let mut min_b = usize::MAX;
         for _ in 0..trials {
             let (a0, b0) = alloc_snapshot();
-            black_box(cycle(black_box(w), m, black_box(body), black_box(&mut *out)));
+            black_box(cycle(
+                black_box(w),
+                m,
+                black_box(body),
+                black_box(&mut *out),
+            ));
             let (a1, b1) = alloc_snapshot();
             min_a = min_a.min(a1 - a0);
             min_b = min_b.min(b1 - b0);
@@ -291,13 +296,18 @@ fn t4_body_size_boundary_sweep_read_verified() {
             let mut out = vec![0u8; body_len.max(1)];
             let m = meta_for(body_len, alignment, 1);
             let n = emit(&mut w, &m, &body).expect("emit green at boundary");
-            assert_eq!(n, w.len(), "window_len exact at {body_len}B/align{alignment}");
+            assert_eq!(
+                n,
+                w.len(),
+                "window_len exact at {body_len}B/align{alignment}"
+            );
             // Symmetry: emit-accepted => read-accepted, byte-exact, at
             // every cell including the former parse-minimum cells
             // (0B both alignments, 1-16B at align-8).
             let expect_schema = Some(&[7u8; 32]);
-            let rn = read(&w, expect_schema, &mut out[..body_len])
-                .unwrap_or_else(|e| panic!("emit-accepted {body_len}B/align{alignment} refused by read: {e:?}"));
+            let rn = read(&w, expect_schema, &mut out[..body_len]).unwrap_or_else(|e| {
+                panic!("emit-accepted {body_len}B/align{alignment} refused by read: {e:?}")
+            });
             assert_eq!(rn, body_len);
             assert_eq!(&out[..body_len], &body[..]);
             // read_verified classification on the plain-emitted window.

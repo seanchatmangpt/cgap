@@ -20,10 +20,7 @@ pub const VERSION: u16 = gen::AOQ1_VERSION;
 /// Header size in bytes (`aoq:header-aq1 aoq:sizeBytes 64`).
 pub const SIZE_BYTES: usize = gen::AOQ1_SIZE_BYTES;
 /// FNV-1a32 coverage is half-open `[0x00, 0x3C)`; digest stored at `0x3C`.
-pub const DIGEST_SPAN: (usize, usize) = (
-    gen::AOQ1_DIGEST_SPAN_START,
-    gen::AOQ1_DIGEST_SPAN_END,
-);
+pub const DIGEST_SPAN: (usize, usize) = (gen::AOQ1_DIGEST_SPAN_START, gen::AOQ1_DIGEST_SPAN_END);
 
 /// Closed key-epoch enum (`aoq:Epoch`, u16 wire kind at header offset 6).
 /// `RETIRED` (u16::MAX) is the reserved read-only sentinel.
@@ -124,7 +121,10 @@ impl fmt::Debug for AoqHeader {
             .field("key_id", &self.key_id)
             .field("frame_ordinal", &self.frame_ordinal)
             .field("seq", &self.seq)
-            .field("header_digest", &format_args!("{:#010x}", self.header_digest))
+            .field(
+                "header_digest",
+                &format_args!("{:#010x}", self.header_digest),
+            )
             .finish_non_exhaustive()
     }
 }

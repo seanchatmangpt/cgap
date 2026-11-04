@@ -23,8 +23,8 @@
 
 #![allow(dead_code)] // Wave-1 ML-DSA-shape consts wait on the Wave-3 PQC gate.
 
-use alloc::vec::Vec;
 use crate::lease::{Lease, PhiLease, PHI_LEASE_LEN};
+use alloc::vec::Vec;
 use cgap_blake3::{compress_scalar, hash, CHUNK_END, CHUNK_START, ROOT};
 
 /// `domain_tag`: 8 bytes, ASCII `"CGAPDLT1"` — versioned domain separator
@@ -138,12 +138,8 @@ const _: () = assert!(core::mem::offset_of!(Receipt, delta) == 5);
 const _: () = assert!(core::mem::offset_of!(Receipt, phi) == 117);
 const _: () = assert!(core::mem::offset_of!(Receipt, blake3_digest) == 197);
 const _: () = assert!(core::mem::offset_of!(Receipt, pqc_seal) == 229);
-const _: () = assert!(
-    RECEIPT_LEN == RECEIPT_FIXED_PREFIX_LEN + SEAL_ML_DSA_65_LEN
-);
-const _: () = assert!(
-    RECEIPT_FIXED_PREFIX_LEN == 4 + 1 + DELTA_LEN + PHI_LEASE_LEN + DIGEST_LEN
-);
+const _: () = assert!(RECEIPT_LEN == RECEIPT_FIXED_PREFIX_LEN + SEAL_ML_DSA_65_LEN);
+const _: () = assert!(RECEIPT_FIXED_PREFIX_LEN == 4 + 1 + DELTA_LEN + PHI_LEASE_LEN + DIGEST_LEN);
 
 // ---------------------------------------------------------------------------
 // Wave 2 — core engines (§3.3 keyed digest, §3.1 codec, §4 Sealer seam,
@@ -459,8 +455,13 @@ impl UnsealedReceipt {
     /// Canonical 229-byte encoding (§3.1 discipline: fixed order, LE fields,
     /// no choices). Packed-struct reads are by-value copies only.
     pub fn to_bytes(&self) -> [u8; UNSEALED_RECEIPT_LEN] {
-        let (magic, version, delta, phi, digest) =
-            (self.magic, self.version, self.delta, self.phi, self.blake3_digest);
+        let (magic, version, delta, phi, digest) = (
+            self.magic,
+            self.version,
+            self.delta,
+            self.phi,
+            self.blake3_digest,
+        );
         let mut out = [0u8; UNSEALED_RECEIPT_LEN];
         out[0..4].copy_from_slice(&magic);
         out[4] = version;
@@ -579,8 +580,13 @@ pub fn seal_unsealed(delta: DeltaS, lease: &mut Lease) -> UnsealedReceipt {
 ///    an exhausted tick is forged by construction (§3.3 step 3's seal check
 ///    degenerates here: the unsealed tier's binding IS the digest).
 pub fn verify_unsealed(receipt: &UnsealedReceipt) -> Result<(), VerifyError> {
-    let (magic, version, delta, phi, stored_digest) =
-        (receipt.magic, receipt.version, receipt.delta, receipt.phi, receipt.blake3_digest);
+    let (magic, version, delta, phi, stored_digest) = (
+        receipt.magic,
+        receipt.version,
+        receipt.delta,
+        receipt.phi,
+        receipt.blake3_digest,
+    );
     if magic != UNSEALED_RECEIPT_MAGIC {
         return Err(VerifyError::BadMagic(magic));
     }
@@ -617,10 +623,7 @@ pub fn admissions_root(encoded_receipts: &[&[u8]]) -> [u8; ROOT_LEN] {
     if encoded_receipts.is_empty() {
         return [0u8; ROOT_LEN];
     }
-    let mut level: Vec<[u8; ROOT_LEN]> = encoded_receipts
-        .iter()
-        .map(|bytes| hash(bytes))
-        .collect();
+    let mut level: Vec<[u8; ROOT_LEN]> = encoded_receipts.iter().map(|bytes| hash(bytes)).collect();
     while level.len() > 1 {
         let mut next = Vec::with_capacity(level.len().div_ceil(2));
         for pair in level.chunks(2) {

@@ -36,8 +36,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use cgap_blake3::{
-    compress_scalar, hash, hash_chunk, hash_wide_simd, should_dispatch_gpu, CHUNK_END,
-    CHUNK_START, GPU_CROSSOVER_BYTES, IV, PARENT, ROOT,
+    compress_scalar, hash, hash_chunk, hash_wide_simd, should_dispatch_gpu, CHUNK_END, CHUNK_START,
+    GPU_CROSSOVER_BYTES, IV, PARENT, ROOT,
 };
 
 /// Spec domain-separation flag for keyed mode (BLAKE3 spec section 5,
@@ -181,7 +181,8 @@ fn throughput_curve_and_gpu_dispatch_boundary() {
             best = best.min(size as f64 / (1u64 << 20) as f64 / el);
             let tw = Instant::now();
             black_box(hash_wide_simd(black_box(&data)));
-            best_wide = best_wide.min(size as f64 / (1u64 << 20) as f64 / tw.elapsed().as_secs_f64());
+            best_wide =
+                best_wide.min(size as f64 / (1u64 << 20) as f64 / tw.elapsed().as_secs_f64());
         }
         println!(
             "  {:>9} B: {:>10.1} MiB/s (hash)   {:>10.1} MiB/s (hash_wide_simd)",

@@ -6,10 +6,10 @@
 
 use cgap_blake3::hash;
 use cgap_fibo::{
-    ArRecord, BondRecord, ClassSlot, FiboCurrency, ACCT_RECV_SLOT, BOND_SLOT, CLASS_ACCT_RECV,
-    CLASS_BOND, CLASS_CORP_BOND, CLASS_DEBT_INSTR, CLASS_NONE, ATTR_COUPON_RATE,
-    ATTR_MATURITY_DATE, COUPON_RATE_SLOT, CORP_BOND_SLOT, DEBT_INSTR_SLOT, EUR_SLOT, JPY_SLOT,
-    LEX_ACCT_RECV, LEX_BOND, LEX_COUPON_RATE, LEX_CORP_BOND, LEX_DEBT_INSTR, LEX_EUR, LEX_JPY,
+    ArRecord, BondRecord, ClassSlot, FiboCurrency, ACCT_RECV_SLOT, ATTR_COUPON_RATE,
+    ATTR_MATURITY_DATE, BOND_SLOT, CLASS_ACCT_RECV, CLASS_BOND, CLASS_CORP_BOND, CLASS_DEBT_INSTR,
+    CLASS_NONE, CORP_BOND_SLOT, COUPON_RATE_SLOT, DEBT_INSTR_SLOT, EUR_SLOT, JPY_SLOT,
+    LEX_ACCT_RECV, LEX_BOND, LEX_CORP_BOND, LEX_COUPON_RATE, LEX_DEBT_INSTR, LEX_EUR, LEX_JPY,
     LEX_MATURITY_DATE, LEX_USD, MATURITY_DATE_SLOT, USD_SLOT,
 };
 
@@ -25,10 +25,26 @@ const CORPUS: &[(u64, [u8; 32], &[u8])] = &[
     (JPY_SLOT, LEX_JPY, b"fibo:FndUtlCur:JPY"),
     (CORP_BOND_SLOT, LEX_CORP_BOND, b"fibo:SecDbt:CorporateBond"),
     (BOND_SLOT, LEX_BOND, b"fibo:SecDbt:Bond"),
-    (DEBT_INSTR_SLOT, LEX_DEBT_INSTR, b"fibo:SecDbt:DebtInstrument"),
-    (ACCT_RECV_SLOT, LEX_ACCT_RECV, b"fibo:ClAcct:AccountsReceivable"),
-    (MATURITY_DATE_SLOT, LEX_MATURITY_DATE, b"fibo:SecDbt:hasMaturityDate"),
-    (COUPON_RATE_SLOT, LEX_COUPON_RATE, b"fibo:SecDbt:hasCouponRate"),
+    (
+        DEBT_INSTR_SLOT,
+        LEX_DEBT_INSTR,
+        b"fibo:SecDbt:DebtInstrument",
+    ),
+    (
+        ACCT_RECV_SLOT,
+        LEX_ACCT_RECV,
+        b"fibo:ClAcct:AccountsReceivable",
+    ),
+    (
+        MATURITY_DATE_SLOT,
+        LEX_MATURITY_DATE,
+        b"fibo:SecDbt:hasMaturityDate",
+    ),
+    (
+        COUPON_RATE_SLOT,
+        LEX_COUPON_RATE,
+        b"fibo:SecDbt:hasCouponRate",
+    ),
 ];
 
 fn lex_hash(lexeme: &[u8]) -> [u8; 32] {
@@ -55,17 +71,22 @@ fn derivation_court() {
         let d = lex_hash(lexeme);
         let slot = u64::from_le_bytes(d[0..8].try_into().unwrap());
         assert_eq!(
-            slot, *slot_const,
+            slot,
+            *slot_const,
             "corpus[{i}] SlotId drift: lexeme {:?}",
             String::from_utf8_lossy(lexeme)
         );
         assert_eq!(
-            &d[..], lex_const,
+            &d[..],
+            lex_const,
             "corpus[{i}] LexHash drift: lexeme {:?}",
             String::from_utf8_lossy(lexeme)
         );
         // A06 §2: SlotId is the low 64 bits of LexHash (LE).
-        assert_eq!(slot, u64::from_le_bytes(lex_const[0..8].try_into().unwrap()));
+        assert_eq!(
+            slot,
+            u64::from_le_bytes(lex_const[0..8].try_into().unwrap())
+        );
         if let Some(prev) = seen.insert(slot, i) {
             panic!("SlotId collision: corpus[{prev}] and corpus[{i}] both -> {slot:#018x}");
         }
@@ -95,7 +116,12 @@ fn derivation_court() {
 #[test]
 fn derivation_mutation_witness() {
     for (i, (slot_const, lex_const, lexeme)) in CORPUS.iter().enumerate() {
-        let ctx = |m: &str| format!("W-mutation {m} corpus[{i}] {:?}", String::from_utf8_lossy(lexeme));
+        let ctx = |m: &str| {
+            format!(
+                "W-mutation {m} corpus[{i}] {:?}",
+                String::from_utf8_lossy(lexeme)
+            )
+        };
 
         // W1: namespace-tag drop.
         let d = hash(lexeme);
@@ -105,12 +131,22 @@ fn derivation_mutation_witness() {
             "{}",
             ctx("W1 ns-tag drop: SlotId unchanged")
         );
-        assert_ne!(&d[..], lex_const, "{}", ctx("W1 ns-tag drop: LexHash unchanged"));
+        assert_ne!(
+            &d[..],
+            lex_const,
+            "{}",
+            ctx("W1 ns-tag drop: LexHash unchanged")
+        );
 
         // W2: truncation-window shift.
         let d = lex_hash(lexeme);
         let shifted = u64::from_le_bytes(d[1..9].try_into().unwrap());
-        assert_ne!(shifted, *slot_const, "{}", ctx("W2 window shift: SlotId unchanged"));
+        assert_ne!(
+            shifted,
+            *slot_const,
+            "{}",
+            ctx("W2 window shift: SlotId unchanged")
+        );
 
         // W3: one-byte lexeme flip.
         let mut flipped = lexeme.to_vec();
@@ -122,7 +158,12 @@ fn derivation_mutation_witness() {
             "{}",
             ctx("W3 lexeme flip: SlotId unchanged")
         );
-        assert_ne!(&d[..], lex_const, "{}", ctx("W3 lexeme flip: LexHash unchanged"));
+        assert_ne!(
+            &d[..],
+            lex_const,
+            "{}",
+            ctx("W3 lexeme flip: LexHash unchanged")
+        );
     }
 }
 
@@ -155,8 +196,13 @@ fn dense_classid_court() {
     assert_eq!(ATTR_MATURITY_DATE, 0x0000_0020);
     assert_eq!(ATTR_COUPON_RATE, 0x0000_0021);
     let all = [
-        CLASS_NONE, CLASS_CORP_BOND, CLASS_BOND, CLASS_DEBT_INSTR, CLASS_ACCT_RECV,
-        ATTR_MATURITY_DATE, ATTR_COUPON_RATE,
+        CLASS_NONE,
+        CLASS_CORP_BOND,
+        CLASS_BOND,
+        CLASS_DEBT_INSTR,
+        CLASS_ACCT_RECV,
+        ATTR_MATURITY_DATE,
+        ATTR_COUPON_RATE,
     ];
     for (i, a) in all.iter().enumerate() {
         for b in &all[i + 1..] {
@@ -243,7 +289,11 @@ fn record_byte_round_trip_court() {
         slot: CORP_BOND_SLOT,
         lex: LEX_CORP_BOND,
     };
-    assert_eq!(bond_record_bytes(canary), gold, "BondRecord byte image drifted");
+    assert_eq!(
+        bond_record_bytes(canary),
+        gold,
+        "BondRecord byte image drifted"
+    );
 
     // --- ArRecord golden: class@0, obligor@8, currency@16, lex@18.
     let mut gold = [0u8; 56];

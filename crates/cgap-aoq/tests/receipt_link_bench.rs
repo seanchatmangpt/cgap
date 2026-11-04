@@ -182,6 +182,12 @@ fn g7_receipt_link_bench() {
     // is far above zero and far below a microsecond-scale path is not
     // expected for a 2-hash link; these fail only on structural breakage
     // (optimizer folding / pathological machine), never gate a number.
-    assert!(app_min > 0.0 && app_min < 100.0, "append per-link out of structural range: {app_min}");
-    assert!(h64_min > 5.0, "64B hash per-call implausibly fast (folded?): {h64_min} ns");
+    assert!(
+        app_min > 0.0 && app_min < 100.0,
+        "append per-link out of structural range: {app_min}"
+    );
+    assert!(
+        h64_min > 5.0,
+        "64B hash per-call implausibly fast (folded?): {h64_min} ns"
+    );
 }

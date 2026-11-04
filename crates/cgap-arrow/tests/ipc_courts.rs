@@ -7,7 +7,7 @@
 
 use cgap_arrow::blake3;
 use cgap_arrow::ipc::{
-    emit, read, seal_meta, window_len, MetaHeader, CONTINUATION, EOS, IpcError, MAGIC,
+    emit, read, seal_meta, window_len, IpcError, MetaHeader, CONTINUATION, EOS, MAGIC,
 };
 use cgap_arrow::slab::{ArrowRecordSlab, SlabError};
 
@@ -57,7 +57,11 @@ fn c1_byte_layout() {
     for &alignment in &[8u32, 64] {
         let mut w = vec![0u8; window_len(body.len(), alignment as usize)];
         let n = emit(&mut w, &meta_for(body.len(), alignment, 7, digest), body).unwrap();
-        assert_eq!(n, w.len(), "emit must fill exactly window_len at {alignment}");
+        assert_eq!(
+            n,
+            w.len(),
+            "emit must fill exactly window_len at {alignment}"
+        );
         // Continuation at 0x00.
         assert_eq!(&w[0..4], &CONTINUATION.to_le_bytes());
         // metadata_size at 0x04 = header + metadata padding.
@@ -69,7 +73,10 @@ fn c1_byte_layout() {
         // alignment field.
         assert_eq!(&w[8..12], &MAGIC.to_le_bytes());
         assert_eq!(u16::from_le_bytes([w[12], w[13]]), 1);
-        assert_eq!(u32::from_le_bytes([w[0x30 + 8], w[0x31 + 8], w[0x32 + 8], w[0x33 + 8]]), 7);
+        assert_eq!(
+            u32::from_le_bytes([w[0x30 + 8], w[0x31 + 8], w[0x32 + 8], w[0x33 + 8]]),
+            7
+        );
         assert_eq!(
             u32::from_le_bytes([w[0x28 + 8], w[0x28 + 9], w[0x28 + 10], w[0x28 + 11]]),
             body.len() as u32
@@ -80,7 +87,11 @@ fn c1_byte_layout() {
         );
         // Body starts alignment-aligned.
         let body_at: usize = 8 + expected_span;
-        assert_eq!(body_at % alignment_usize, 0, "body start aligned to {alignment}");
+        assert_eq!(
+            body_at % alignment_usize,
+            0,
+            "body start aligned to {alignment}"
+        );
         assert_eq!(&w[body_at..body_at + body.len()], body);
         // Padding zero-filled, then EOS.
         assert!(w[body_at + body.len()..w.len() - 8].iter().all(|&b| b == 0));
@@ -96,7 +107,12 @@ fn c1b_body_start_is_64b_aligned_in_64_mode() {
     let slab = sealed_4row().unwrap();
     let body = slab.as_bytes();
     let mut w = vec![0u8; window_len(body.len(), 64)];
-    emit(&mut w, &meta_for(body.len(), 64, 0, schema_digest_of(body)), body).unwrap();
+    emit(
+        &mut w,
+        &meta_for(body.len(), 64, 0, schema_digest_of(body)),
+        body,
+    )
+    .unwrap();
     let body_at = 8 + 120;
     assert_eq!(body_at % 64, 0);
     assert_eq!(&w[body_at..body_at + body.len()], body);
@@ -163,7 +179,8 @@ fn c3_differential_vs_generated_c_header() {
         "dictionary-ordered macro present"
     );
     assert!(
-        C_HEADER.contains("ARROW_FLAG_MAP_KEYS_SORTED") || C_HEADER.contains("CGAP_FLAG_MAP_KEYS_SORTED"),
+        C_HEADER.contains("ARROW_FLAG_MAP_KEYS_SORTED")
+            || C_HEADER.contains("CGAP_FLAG_MAP_KEYS_SORTED"),
         "map-keys-sorted macro present"
     );
     // Offset ladder of the C structs must equal the Rust repr(C) ladder
@@ -204,7 +221,12 @@ fn c4_corrupt_continuation_refused() {
         let mut m = w.clone();
         m[off] ^= 0xFF;
         let err = read(&m, Some(&digest), &mut [0u8; 320]).unwrap_err();
-        assert_eq!(err, IpcError::BadContinuation { got: CONTINUATION ^ (0xFF << (off * 8)) });
+        assert_eq!(
+            err,
+            IpcError::BadContinuation {
+                got: CONTINUATION ^ (0xFF << (off * 8))
+            }
+        );
     }
     // EOS continuation corrupted: typed MissingEos.
     let mut m = w.clone();
@@ -234,18 +256,29 @@ fn c4b_schema_and_pad_mutations_refused() {
     let mut m = w.clone();
     m[body_at + body.len()] = 0xAA;
     let err = read(&m, Some(&digest), &mut [0u8; 320]).unwrap_err();
-    assert_eq!(err, IpcError::PadNonZero { at: body_at + body.len() });
+    assert_eq!(
+        err,
+        IpcError::PadNonZero {
+            at: body_at + body.len()
+        }
+    );
     // Metadata header mutation flips the header digest gate.
     let mut m = w.clone();
     m[0x10] ^= 0x01; // inside schema_digest span
     let err = read(&m, Some(&digest), &mut [0u8; 320]).unwrap_err();
     assert!(
-        matches!(err, IpcError::HeaderDigestMismatch { .. } | IpcError::SchemaMismatch { .. }),
+        matches!(
+            err,
+            IpcError::HeaderDigestMismatch { .. } | IpcError::SchemaMismatch { .. }
+        ),
         "header mutation: {err:?}"
     );
     // Missing EOS (truncated window): typed refusal.
     let err = read(&w[..w.len() - 8], Some(&digest), &mut [0u8; 320]);
-    assert!(matches!(err, Err(IpcError::MissingEos { .. }) | Err(IpcError::BadBodyLen { .. })));
+    assert!(matches!(
+        err,
+        Err(IpcError::MissingEos { .. }) | Err(IpcError::BadBodyLen { .. })
+    ));
 }
 
 /// C5: full byte-sweep mutation: every single-byte flip in the prefix and
@@ -278,11 +311,18 @@ fn c6_emit_typed_faults() {
     let mut small = [0u8; 32];
     assert_eq!(
         emit(&mut small, &meta, body),
-        Err(IpcError::Truncated { needed: window_len(body.len(), 64), got: 32 })
+        Err(IpcError::Truncated {
+            needed: window_len(body.len(), 64),
+            got: 32
+        })
     );
     // body_len mismatch between metadata and body.
     assert_eq!(
-        emit(&mut [0u8; 4096], &meta_for(body.len() + 1, 64, 1, digest), body),
+        emit(
+            &mut [0u8; 4096],
+            &meta_for(body.len() + 1, 64, 1, digest),
+            body
+        ),
         Err(IpcError::BadBodyLen {
             got: (body.len() + 1) as u32,
             expected: body.len() as u32
@@ -308,11 +348,7 @@ use cgap_arrow::ipc::{read_verified, read_with_meta, seq_ok, LAYOUT_VERSION};
 /// the body digest. This is the w8-pattern mutation: the header fields are
 /// mutated AND the FNV-1a seal recomputed, so the window dies on the
 /// VERSION/FLAGS gate, never on the digest gate.
-fn sealed_window_with(
-    v: u16,
-    f: u16,
-    with_digest: bool,
-) -> (Vec<u8>, Vec<u8>, [u8; 32]) {
+fn sealed_window_with(v: u16, f: u16, with_digest: bool) -> (Vec<u8>, Vec<u8>, [u8; 32]) {
     let slab = sealed_4row().unwrap();
     let body = slab.as_bytes();
     let digest = schema_digest_of(body);
@@ -387,11 +423,18 @@ fn c8_foreign_version_refused_typed_through_both_paths() {
     let err = read(&w, Some(&digest), &mut out).unwrap_err();
     assert_eq!(err, IpcError::BadVersion { got: 2 }, "read: exact variant");
     let err = read_verified(&w, Some(&digest), &mut out).unwrap_err();
-    assert_eq!(err, IpcError::BadVersion { got: 2 }, "read_verified: exact variant");
+    assert_eq!(
+        err,
+        IpcError::BadVersion { got: 2 },
+        "read_verified: exact variant"
+    );
     // Control: version 1 twin reads OK (the gate is on the value, not the
     // fixture shape). Digest gate passed, framing identical.
     let (w1, body1, digest1) = sealed_window_with(LAYOUT_VERSION, 0, true);
-    assert_eq!(read(&w1, Some(&digest1), &mut [0u8; 320]).unwrap(), body1.len());
+    assert_eq!(
+        read(&w1, Some(&digest1), &mut [0u8; 320]).unwrap(),
+        body1.len()
+    );
     let _ = (body, w1.len());
 }
 
@@ -535,13 +578,19 @@ fn c12_truncated_classifies_truncated_not_body_digest_no_room() {
     let err = read(m, Some(&digest), &mut out).unwrap_err();
     assert_eq!(
         err,
-        IpcError::Truncated { needed: 128, got: 100 },
+        IpcError::Truncated {
+            needed: 128,
+            got: 100
+        },
         "read classifies truncation exactly"
     );
     let err = read_verified(m, Some(&digest), &mut out).unwrap_err();
     assert_eq!(
         err,
-        IpcError::Truncated { needed: 128, got: 100 },
+        IpcError::Truncated {
+            needed: 128,
+            got: 100
+        },
         "read_verified classifies truncation exactly (NOT BodyDigestNoRoom)"
     );
     let _ = (baseline.len(), body.len());

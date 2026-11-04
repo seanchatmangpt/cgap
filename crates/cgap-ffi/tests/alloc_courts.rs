@@ -27,9 +27,9 @@
 //! zero_copy.rs lesson applied: the static export slots are process-global —
 //! every test that drives `cgap_i32_batch` serializes on `SLOTS`.
 
-use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_arrow::c_abi::{export, ArrowArray};
 use cgap_arrow::primitive::PrimitiveBuilder;
+use cgap_audit::alloc_counter::with_alloc_tracking;
 
 const FMT_I: *const core::ffi::c_char = b"i\0".as_ptr() as *const _;
 
@@ -104,7 +104,9 @@ fn digest_shapes_are_zero_alloc_and_deterministic() {
     let _g = SLOTS.lock().unwrap();
     let all_valid = export_i32(&(1..=64).map(Some).collect::<Vec<_>>());
     let with_nulls = export_i32(
-        &(0..193).map(|i| if i % 7 == 3 { None } else { Some(i) }).collect::<Vec<_>>(),
+        &(0..193)
+            .map(|i| if i % 7 == 3 { None } else { Some(i) })
+            .collect::<Vec<_>>(),
     );
 
     let (dv, rv) = with_alloc_tracking(|| cgap_ffi::cgap_digest_of(all_valid as usize));
@@ -133,7 +135,11 @@ fn digest_shapes_are_zero_alloc_and_deterministic() {
 /// would trip it.
 #[test]
 fn release_callback_is_zero_alloc() {
-    let array = export_i32(&(0..65).map(|i| if i % 7 == 6 { None } else { Some(i) }).collect::<Vec<_>>());
+    let array = export_i32(
+        &(0..65)
+            .map(|i| if i % 7 == 6 { None } else { Some(i) })
+            .collect::<Vec<_>>(),
+    );
 
     // SAFETY: live boxed export we own; released inside the tracked scope.
     let (_, report) = unsafe {

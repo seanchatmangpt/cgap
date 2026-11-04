@@ -14,7 +14,9 @@ const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 
 fn gen_values(n: usize, w: u8) -> Vec<u32> {
     let mask = (1u64 << w) - 1;
-    (0..n).map(|i| ((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) & mask) as u32).collect()
+    (0..n)
+        .map(|i| ((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) & mask) as u32)
+        .collect()
 }
 
 fn time_min_fixed<F: FnMut() -> u64>(iters: usize, mut f: F) -> f64 {

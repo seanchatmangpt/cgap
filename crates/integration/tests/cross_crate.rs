@@ -262,14 +262,14 @@ fn varlen_u32_unicode_empty_null_roundtrip() {
 #[test]
 fn views_inline_foreign_boundary_roundtrip() {
     let rows: [Option<&[u8]>; 8] = [
-        Some(b"short"),                            // 5  -> inline
-        Some(b""),                                 // 0  -> inline
-        Some(b"abcdefghijkl"),                     // 12 -> inline boundary
-        Some(b"abcdefghijklm"),                    // 13 -> foreign boundary
-        Some(b"this-one-is-longer-than-twelve"),   // 30 -> foreign
+        Some(b"short"),                                      // 5  -> inline
+        Some(b""),                                           // 0  -> inline
+        Some(b"abcdefghijkl"),                               // 12 -> inline boundary
+        Some(b"abcdefghijklm"),                              // 13 -> foreign boundary
+        Some(b"this-one-is-longer-than-twelve"),             // 30 -> foreign
         Some("日本語のちょっと長いテキストです".as_bytes()), // multibyte foreign
-        None,                                      // null row
-        Some(b"x"),                                // 1  -> inline
+        None,                                                // null row
+        Some(b"x"),                                          // 1  -> inline
     ];
 
     let mut b = ViewVecBuilder::new();

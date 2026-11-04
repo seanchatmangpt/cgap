@@ -11,13 +11,14 @@ const LSL_GIB_S: f64 = 1.0;
 
 fn main() {
     let gate = std::env::args().any(|a| a == "--gate");
-    let model = std::env::var("BLAKE3_BENCH_MACHINE")
-        .unwrap_or_else(|_| String::from("unknown"));
+    let model = std::env::var("BLAKE3_BENCH_MACHINE").unwrap_or_else(|_| String::from("unknown"));
 
     let mut buf = vec![0u8; BYTES];
     let mut x: u64 = 0x9E3779B97F4A7C15;
     for b in buf.iter_mut() {
-        x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        x = x
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         *b = (x >> 33) as u8;
     }
 
@@ -35,7 +36,7 @@ fn main() {
             round,
             dt,
             (BYTES as f64) / dt / (1024.0 * 1024.0 * 1024.0)
-       );
+        );
     }
 
     let gib_s = (BYTES as f64) / best / (1024.0 * 1024.0 * 1024.0);

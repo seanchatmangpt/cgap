@@ -12,8 +12,8 @@
 
 mod common;
 
-use common::{base_root, commit, new_payload, prior_payload};
 use cgap_storage::atomic_commit::*;
+use common::{base_root, commit, new_payload, prior_payload};
 
 #[test]
 fn flash_erase_semantics() {
@@ -50,7 +50,11 @@ fn overwrite_requires_erase() {
     let err = write_record_cut(&mut m, 3, &new_payload(), RECORD_SIZE);
     assert_eq!(err, Err(TxnError::Medium(MediumError::NeedsErase)));
     let out = recover(&m).unwrap();
-    assert_eq!(out.root, prior_payload(), "refused overwrite moved no bytes");
+    assert_eq!(
+        out.root,
+        prior_payload(),
+        "refused overwrite moved no bytes"
+    );
     assert_eq!(out.recovered_seq, Some(1));
 
     m.erase_slot(slot_for_seq(3)).unwrap();
@@ -99,6 +103,10 @@ fn cut_during_erase_sweep() {
     m.erase_prefix(0, RECORD_SIZE).unwrap();
     let out = recover(&m).unwrap();
     assert_eq!(out.root, base_root());
-    assert_eq!(out.report, RecoveryReport::Clean, "fully erased = never written");
+    assert_eq!(
+        out.report,
+        RecoveryReport::Clean,
+        "fully erased = never written"
+    );
     assert_eq!(out.slot_verdicts[0], SlotVerdict::Empty);
 }

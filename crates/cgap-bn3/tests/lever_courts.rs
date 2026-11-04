@@ -161,7 +161,11 @@ fn kernel_keys(rule: &Rule, cols: &StatementColumns<'_>, chunk: usize) -> HashSe
 
 fn corpus(n: usize) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
     let mut rng = CourtRng::new(SEED);
-    let (mut s, mut p, mut o) = (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+    let (mut s, mut p, mut o) = (
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+    );
     for _ in 0..n {
         s.push(rng.pooled(S_POOL));
         p.push(rng.pooled(P_POOL));
@@ -179,7 +183,11 @@ fn l3_differential_join_court() {
         for &chunk in &[1usize, 64, 4096] {
             let kernel = kernel_keys(&rule, &cols, chunk);
             let truth = oracle(&cols, &rule, false);
-            assert_eq!(kernel.len(), truth.len(), "N={n} chunk={chunk}: match count");
+            assert_eq!(
+                kernel.len(),
+                truth.len(),
+                "N={n} chunk={chunk}: match count"
+            );
             assert_eq!(kernel, truth, "N={n} chunk={chunk}: binding sets differ");
         }
     }
@@ -207,10 +215,7 @@ fn l3_antivacuity_probe_drop_flips() {
 // --- W3-L3 additions ---------------------------------------------------
 
 use cgap_bn3::noalloc::{NaEngine, NaError, NaMatches, NA_MAX_ROWS};
-use cgap_bn3::unify::{
-    emit_join_masks, unify_batch_probe, EvalScratch, JoinProbeScratch,
-};
-
+use cgap_bn3::unify::{emit_join_masks, unify_batch_probe, EvalScratch, JoinProbeScratch};
 
 /// Heap-direct zeroed Box for the multi-MiB fixed buffers (the crate's
 /// `boxed_zeroed` pattern; `Box::new(T::zeroed())` materializes the
@@ -238,17 +243,26 @@ fn l3_radix_vs_nested_differential() {
             let mut out_r = MatchSet::default();
             let mut out_n = MatchSet::default();
             let mut pr = JoinProbeScratch::default();
-            let mut pn = JoinProbeScratch { radix: false, ..Default::default() };
+            let mut pn = JoinProbeScratch {
+                radix: false,
+                ..Default::default()
+            };
             unify_batch_probe(&compiled, &cols, chunk, &mut scratch, &mut out_r, &mut pr)
                 .expect("radix ok");
             unify_batch_probe(&compiled, &cols, chunk, &mut scratch, &mut out_n, &mut pn)
                 .expect("nested ok");
-            assert_eq!(out_r.len, out_n.len, "N={n} chunk={chunk}: radix/nested count");
+            assert_eq!(
+                out_r.len, out_n.len,
+                "N={n} chunk={chunk}: radix/nested count"
+            );
             for m in 0..out_r.len {
                 assert_eq!(out_r.atom_rows[0][m], out_n.atom_rows[0][m], "row0 m={m}");
                 assert_eq!(out_r.atom_rows[1][m], out_n.atom_rows[1][m], "row1 m={m}");
                 for idx in 0..compiled.var_count {
-                    assert_eq!(out_r.var_values[idx][m], out_n.var_values[idx][m], "var m={m}");
+                    assert_eq!(
+                        out_r.var_values[idx][m], out_n.var_values[idx][m],
+                        "var m={m}"
+                    );
                 }
             }
         }
@@ -259,7 +273,11 @@ fn l3_radix_vs_nested_differential() {
 fn corpus_wide(n: usize) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
     let mut rng = CourtRng::new(SEED);
     let pools = (2048u64, 4u64, 4096u64);
-    let (mut s, mut p, mut o) = (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+    let (mut s, mut p, mut o) = (
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+    );
     for _ in 0..n {
         s.push(rng.pooled(pools.0));
         p.push(rng.pooled(pools.1));
@@ -281,9 +299,11 @@ fn l3_radix_vs_nested_100k() {
     let mut out_r = MatchSet::default();
     let mut out_n = MatchSet::default();
     let mut pr = JoinProbeScratch::default();
-    let mut pn = JoinProbeScratch { radix: false, ..Default::default() };
-    unify_batch_probe(&compiled, &cols, 4096, &mut scratch, &mut out_r, &mut pr)
-        .expect("radix ok");
+    let mut pn = JoinProbeScratch {
+        radix: false,
+        ..Default::default()
+    };
+    unify_batch_probe(&compiled, &cols, 4096, &mut scratch, &mut out_r, &mut pr).expect("radix ok");
     unify_batch_probe(&compiled, &cols, 4096, &mut scratch, &mut out_n, &mut pn)
         .expect("nested ok");
     assert_eq!(out_r.len, out_n.len, "100_003: radix/nested count");
@@ -291,7 +311,10 @@ fn l3_radix_vs_nested_100k() {
         assert_eq!(out_r.atom_rows[0][m], out_n.atom_rows[0][m], "row0 m={m}");
         assert_eq!(out_r.atom_rows[1][m], out_n.atom_rows[1][m], "row1 m={m}");
         for idx in 0..compiled.var_count {
-            assert_eq!(out_r.var_values[idx][m], out_n.var_values[idx][m], "var m={m}");
+            assert_eq!(
+                out_r.var_values[idx][m], out_n.var_values[idx][m],
+                "var m={m}"
+            );
         }
     }
 }
@@ -427,4 +450,3 @@ fn l3_emit_join_masks_court() {
         "VACUOUS: dropping the Const arm did not flip the oracle"
     );
 }
-

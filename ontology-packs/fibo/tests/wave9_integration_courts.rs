@@ -148,8 +148,7 @@ fn w9_a04_frame_identity_court() {
 
     // --- the identity join, both directions -------------------------------
     assert_eq!(
-        header.oabi_digest,
-        PACK_DIGEST,
+        header.oabi_digest, PACK_DIGEST,
         "A04 frame digest field must carry A09's committed pack identity"
     );
     assert_eq!(
@@ -254,8 +253,8 @@ fn w9_a04_frame_identity_court() {
     let mut m = frame.clone();
     let probe_offset = FRAME_HEADER_LEN + 5;
     m[probe_offset] ^= 0x80;
-    let mismatch = identity_assert(&frame, Tier::Memory, &m)
-        .expect_err("one divergent byte must be reported");
+    let mismatch =
+        identity_assert(&frame, Tier::Memory, &m).expect_err("one divergent byte must be reported");
     assert_eq!(mismatch.tier, Tier::Memory);
     assert_eq!(mismatch.offset, probe_offset);
     assert_eq!(mismatch.wire, frame[probe_offset]);
@@ -361,7 +360,10 @@ fn w9_a20_1m_row_stress_court() {
     // Positive control: row 0's stored slot is the derivation of its lexeme.
     let rec0 = &pack.records()[0];
     let lex0 = lex_hash(b"fibo:W9Stress:row00000000");
-    assert_eq!(rec0.slot.0, u64::from_le_bytes(lex0[0..8].try_into().expect("32-byte digest")));
+    assert_eq!(
+        rec0.slot.0,
+        u64::from_le_bytes(lex0[0..8].try_into().expect("32-byte digest"))
+    );
 
     // Advisory timing only (stated method; never a gate).
     println!(
@@ -447,7 +449,10 @@ fn w9_a05_powercut_sweep_court() {
     assert_eq!(n, 64 + 9 * 48, "pack length drifted");
 
     // Anchor: the complete pack passes EVERY gate.
-    assert!(OabiPackV1::from_bytes(&bytes).is_ok(), "complete pack loads");
+    assert!(
+        OabiPackV1::from_bytes(&bytes).is_ok(),
+        "complete pack loads"
+    );
     assert_eq!(hash(&bytes), PACK_DIGEST, "complete pack digests true");
 
     // Sweep 1 — truncation at EVERY offset: a prefix is never admitted.
@@ -485,7 +490,10 @@ fn w9_a05_powercut_sweep_court() {
         let in_pad = off >= 64 && (off - 64) % 48 >= 14 && (off - 64) % 48 < 16;
         let loader_ok = OabiPackV1::from_bytes(&torn).is_ok();
         if in_reserved {
-            assert!(!loader_ok, "reserved-byte corruption at {off} must be loader-refused");
+            assert!(
+                !loader_ok,
+                "reserved-byte corruption at {off} must be loader-refused"
+            );
         }
         if in_pad {
             assert!(
@@ -605,7 +613,11 @@ fn w9_a07_facade_token_census_court() {
     }
 
     // (c) exact count: nine terms, no additions.
-    assert_eq!(sorted.len(), 9, "facade carries extra fibo: tokens: {sorted:?}");
+    assert_eq!(
+        sorted.len(),
+        9,
+        "facade carries extra fibo: tokens: {sorted:?}"
+    );
 
     // Facade ABI surface pins (the slice's cross-lane authority list):
     // A06 SlotId width stays 64, the pack keeps its committed identity.

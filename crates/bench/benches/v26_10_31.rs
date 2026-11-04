@@ -99,10 +99,9 @@ fn predicate_filter_64k(b: Bencher) {
 fn blake3_hash_64mib(b: Bencher) {
     let mut next = xorshift(0xDEAD_BEEF);
     let buf: Vec<u8> = (0..HASH_BUF).map(|_| next() as u8).collect();
-    b.counter(BytesCount::new(HASH_BUF))
-        .bench(|| {
-            black_box(hash_wide_simd(black_box(&buf)));
-        });
+    b.counter(BytesCount::new(HASH_BUF)).bench(|| {
+        black_box(hash_wide_simd(black_box(&buf)));
+    });
 }
 
 // (d) Parquet level-free DataPageV2 write + zero-copy read round trip,
@@ -112,8 +111,8 @@ fn parquet_level_free_roundtrip_u64_64k(b: Bencher) {
     let mut next = xorshift(0x5EED_5EED_5EED_5EED);
     let payload: Vec<u8> = (0..PARQUET_ROWS * 8).map(|_| next() as u8).collect();
     b.bench(|| {
-        let page = write_page(LevelFreeType::U64, black_box(&payload), PARQUET_ROWS)
-            .expect("write_page");
+        let page =
+            write_page(LevelFreeType::U64, black_box(&payload), PARQUET_ROWS).expect("write_page");
         let (got, rows) = read_page_payload(&page, LevelFreeType::U64).expect("read_page_payload");
         black_box((got.len(), rows));
     });

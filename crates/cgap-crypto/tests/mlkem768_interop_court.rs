@@ -71,8 +71,8 @@ fn interop_liboqs_both_directions() {
     let mut ek = [0u8; 1184];
     let mut dk = [0u8; 2400];
     kem::keygen(&d, &z, &mut ek, &mut dk);
-    let out = run_oracle(&["enc".into(), hx(&ek)])
-        .expect("oracle enc must run when the oracle builds");
+    let out =
+        run_oracle(&["enc".into(), hx(&ek)]).expect("oracle enc must run when the oracle builds");
     let parts: Vec<&str> = out.split('|').collect();
     assert_eq!(parts.len(), 2);
     let oct: [u8; 1088] = uh(parts[0]).as_slice().try_into().unwrap();
@@ -89,8 +89,7 @@ fn interop_liboqs_both_directions() {
     let mut ct2 = [0u8; 1088];
     let mut ss2 = [0u8; 32];
     kem::encaps(&oek, &m, &mut ct2, &mut ss2);
-    let outc = run_oracle(&["dec".into(), hx(&odk), hx(&ct2)])
-        .expect("oracle dec must run");
+    let outc = run_oracle(&["dec".into(), hx(&odk), hx(&ct2)]).expect("oracle dec must run");
     let ss3: [u8; 32] = uh(&outc).as_slice().try_into().unwrap();
     assert_eq!(ss2, ss3, "interop B: liboqs decaps(my ct) != my ss");
 }

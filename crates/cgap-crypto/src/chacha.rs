@@ -142,20 +142,16 @@ mod tests {
     /// RFC 8439 §2.3.2 — ChaCha20 block function test vector.
     #[test]
     fn rfc8439_2_3_2_block() {
-        let key: [u8; 32] = hex(
-            "000102030405060708090a0b0c0d0e0f\
-             101112131415161718191a1b1c1d1e1f",
-        )
+        let key: [u8; 32] = hex("000102030405060708090a0b0c0d0e0f\
+             101112131415161718191a1b1c1d1e1f")
         .try_into()
         .unwrap();
         let nonce: [u8; 12] = hex("000000090000004a00000000").try_into().unwrap();
         let out = chacha20_block(&key, 1, &nonce);
-        let want = hex(
-            "10f1e7e4d13b5915500fdd1fa32071c4\
+        let want = hex("10f1e7e4d13b5915500fdd1fa32071c4\
              c7d1f4c733c068030422aa9ac3d46c4e\
              d2826446079faa0914c2d705d98b02a2\
-             b5129cd1de164eb9cbd083e8a2503c4e",
-        );
+             b5129cd1de164eb9cbd083e8a2503c4e");
         assert_eq!(out.as_slice(), &want[..]);
     }
 
@@ -163,19 +159,15 @@ mod tests {
     /// 00..1f, nonce 000000000000004a00000000, initial counter 1.
     #[test]
     fn rfc8439_2_4_2_keystream() {
-        let key: [u8; 32] = hex(
-            "000102030405060708090a0b0c0d0e0f\
-             101112131415161718191a1b1c1d1e1f",
-        )
+        let key: [u8; 32] = hex("000102030405060708090a0b0c0d0e0f\
+             101112131415161718191a1b1c1d1e1f")
         .try_into()
         .unwrap();
         let nonce: [u8; 12] = hex("000000000000004a00000000").try_into().unwrap();
         let out = chacha20_block(&key, 1, &nonce);
-        let want = hex(
-            "224f51f3401bd9e12fde276fb8631ded8c131f823d2c06\
+        let want = hex("224f51f3401bd9e12fde276fb8631ded8c131f823d2c06\
              e27e4fcaec9ef3cf788a3b0aa372600a92b57974cded2b\
-             9334794cba40c63e34cdea212c4cf07d41b769a6749f3f",
-        );
+             9334794cba40c63e34cdea212c4cf07d41b769a6749f3f");
         // want is 69 bytes (23+23+23); the first 64 are block 1.
         assert_eq!(want.len(), 69);
         assert_eq!(out.as_slice(), &want[..64]);
@@ -187,10 +179,8 @@ mod tests {
     /// 000000000000004a00000000, counter 1.
     #[test]
     fn rfc8439_sunscreen_encryption() {
-        let key: [u8; 32] = hex(
-            "000102030405060708090a0b0c0d0e0f\
-             101112131415161718191a1b1c1d1e1f",
-        )
+        let key: [u8; 32] = hex("000102030405060708090a0b0c0d0e0f\
+             101112131415161718191a1b1c1d1e1f")
         .try_into()
         .unwrap();
         let nonce: [u8; 12] = hex("000000000000004a00000000").try_into().unwrap();
@@ -199,16 +189,14 @@ mod tests {
                          only one tip for the future, sunscreen would be it.";
         let mut buf = plaintext.to_vec();
         chacha20_xor_stream(&key, &nonce, counter, &mut buf);
-        let want = hex(
-            "6e2e359a2568f98041ba0728dd0d6981\
+        let want = hex("6e2e359a2568f98041ba0728dd0d6981\
              e97e7aec1d4360c20a27afccfd9fae0b\
              f91b65c5524733ab8f593dabcd62b357\
              1639d624e65152ab8f530c359f0861d8\
              07ca0dbf500d6a6156a38e088a22b65e\
              52bc514d16ccf806818ce91ab7793736\
              5af90bbf74a35be6b40b8eedf2785e42\
-             874d",
-        );
+             874d");
         assert_eq!(want.len(), 114);
         assert_eq!(buf.len(), 114);
         assert_eq!(&buf[..], &want[..]);
@@ -223,10 +211,8 @@ mod tests {
     /// the plaintext back, byte-for-byte.
     #[test]
     fn rfc8439_sunscreen_independent_blocks() {
-        let key: [u8; 32] = hex(
-            "000102030405060708090a0b0c0d0e0f\
-             101112131415161718191a1b1c1d1e1f",
-        )
+        let key: [u8; 32] = hex("000102030405060708090a0b0c0d0e0f\
+             101112131415161718191a1b1c1d1e1f")
         .try_into()
         .unwrap();
         let nonce: [u8; 12] = hex("000000000000004a00000000").try_into().unwrap();
@@ -240,7 +226,8 @@ mod tests {
             for ((b, k), p) in chunk
                 .iter()
                 .zip(ks.iter())
-                .zip(plaintext.chunks(64).nth(blk).expect("block index")) {
+                .zip(plaintext.chunks(64).nth(blk).expect("block index"))
+            {
                 assert_eq!(b ^ k, *p, "block {blk} mismatch");
             }
         }

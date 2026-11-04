@@ -9,7 +9,7 @@
 
 use cgap_arrow::blake3;
 use cgap_arrow::ipc::{
-    emit, emit_verified, meta_span_for, read, read_verified, BODY_DIGEST_AT, IpcError, MetaHeader,
+    emit, emit_verified, meta_span_for, read, read_verified, IpcError, MetaHeader, BODY_DIGEST_AT,
 };
 
 const ALIGN64: u32 = 64;
@@ -78,7 +78,11 @@ fn t2_corrupted_body_legacy_passes_verified_refuses() {
     let err = read_verified(&w, Some(&[7u8; 32]), &mut [0u8; 200]).unwrap_err();
     match err {
         IpcError::BodyDigestMismatch { got } => {
-            assert_eq!(got, blake3::hash(&body), "stored digest is the pristine-body digest");
+            assert_eq!(
+                got,
+                blake3::hash(&body),
+                "stored digest is the pristine-body digest"
+            );
         }
         other => panic!("expected BodyDigestMismatch, got {other:?}"),
     }
@@ -131,11 +135,18 @@ fn t5_digest_slot_tamper_flips() {
     let mut w = clean_verified_window(&body);
     let saved = w[BODY_DIGEST_AT];
     w[BODY_DIGEST_AT] ^= 0x01;
-    assert_ne!(w[BODY_DIGEST_AT], saved, "vacuous court: mutation was a no-op");
+    assert_ne!(
+        w[BODY_DIGEST_AT], saved,
+        "vacuous court: mutation was a no-op"
+    );
     let err = read_verified(&w, None, &mut [0u8; 100]).unwrap_err();
     match err {
         IpcError::BodyDigestMismatch { got } => {
-            assert_ne!(got, blake3::hash(&body), "got is the tampered stored digest");
+            assert_ne!(
+                got,
+                blake3::hash(&body),
+                "got is the tampered stored digest"
+            );
         }
         other => panic!("expected BodyDigestMismatch, got {other:?}"),
     }

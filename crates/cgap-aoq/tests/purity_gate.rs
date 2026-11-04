@@ -14,7 +14,10 @@ const BANNED: [(&str, &str); 9] = [
     ("std::", "std path (kernel is core-only)"),
     ("sleep", "no-sleep doctrine: time is not a proxy for state"),
     ("todo!()", "unimplemented hole: use a typed refusal"),
-    ("unimplemented!()", "unimplemented hole: use a typed refusal"),
+    (
+        "unimplemented!()",
+        "unimplemented hole: use a typed refusal",
+    ),
     ("static mut", "unsynchronized interior mutability"),
     ("UnsafeCell", "interior mutability requires a named court"),
 ];
@@ -133,8 +136,12 @@ fn strip_comments(src: &str) -> String {
 fn contains_token(haystack: &str, token: &str) -> bool {
     let bytes = haystack.as_bytes();
     let t = token.as_bytes();
-    let word_start = t.first().is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
-    let word_end = t.last().is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    let word_start = t
+        .first()
+        .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    let word_end = t
+        .last()
+        .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_');
     let mut from = 0;
     while let Some(pos) = haystack[from..].find(token) {
         let at = from + pos;
@@ -191,7 +198,10 @@ fn gate_exits_clean_on_registered_sources() {
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
             continue;
         }
-        let name = path.file_name().and_then(|n| n.to_str()).expect("utf8 name");
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .expect("utf8 name");
         assert!(
             REGISTERED.contains(&name) || KNOWN_UNREGISTERED.contains(&name),
             "UNREGISTERED SOURCE (fail-closed): {name} is under src/ but is \
@@ -266,7 +276,10 @@ fn gate_comment_stripping_is_not_a_hole() {
     // Tokens inside comments must not trip; the SAME tokens in code must.
     let commented =
         "// vec![0u8]; Box::new(1); std::mem; sleep(1); todo!(); static mut\nlet x = 5;";
-    assert!(scan_text(commented).is_empty(), "comment tokens must not trip");
+    assert!(
+        scan_text(commented).is_empty(),
+        "comment tokens must not trip"
+    );
     let in_code = "let y = 5; Box::new(1);";
     assert_eq!(scan_text(in_code), vec!["Box"]);
 }
@@ -293,9 +306,7 @@ fn chain_rs_collision_ledger_is_closed_and_registered() {
         "AB-7 chain.rs expected on disk (collision ledger closed)"
     );
     let lib = std::fs::read_to_string(src.join("lib.rs")).expect("read lib.rs");
-    let registered_chain = lib
-        .lines()
-        .any(|l| l.trim() == "pub mod chain;");
+    let registered_chain = lib.lines().any(|l| l.trim() == "pub mod chain;");
     assert!(
         registered_chain,
         "LEDGER NOT CLOSED: chain.rs exists but is not registered in lib.rs"
@@ -359,14 +370,16 @@ fn exemption_requires_justification_and_known_token() {
     let marker_unknown = "// SOURCE-SCAN-EXEMPT: frobnicate : fully justified long enough text\n";
     let v = scan_file_exempt(marker_unknown, "t.rs");
     assert!(
-        v.iter().any(|s| s.contains("INVALID-EXEMPTION"),
-        ),
+        v.iter().any(|s| s.contains("INVALID-EXEMPTION"),),
         "unknown-token marker must be flagged: {v:?}"
     );
     let marker_good =
         "// SOURCE-SCAN-EXEMPT: alloc:: : path-included test-harness allocator, tests-only collaborator\n";
     let v = scan_file_exempt(marker_good, "t.rs");
-    assert!(v.is_empty(), "valid marker on clean source must stay clean: {v:?}");
+    assert!(
+        v.is_empty(),
+        "valid marker on clean source must stay clean: {v:?}"
+    );
 }
 
 #[test]

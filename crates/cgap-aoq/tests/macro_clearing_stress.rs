@@ -204,7 +204,11 @@ fn plan(i: usize) -> (Option<Toxic>, usize) {
             1 => Toxic::Unauthorized,
             _ => Toxic::Oversize,
         };
-        let wire_len = if toxic == Toxic::Oversize { WIRE_OVERSIZE } else { WIRE_CLEAN };
+        let wire_len = if toxic == Toxic::Oversize {
+            WIRE_OVERSIZE
+        } else {
+            WIRE_CLEAN
+        };
         (Some(toxic), wire_len)
     } else {
         (None, WIRE_CLEAN)
@@ -373,7 +377,9 @@ fn report(name: &str, r: &SoakResult) {
     let max = sorted.last().copied().unwrap_or(0);
     let secs = r.wall.as_secs_f64();
     let tput = r.frames as f64 / secs;
-    let expected_margin = (0..r.frames).filter(|i| plan(*i).0 == Some(Toxic::Margin)).count();
+    let expected_margin = (0..r.frames)
+        .filter(|i| plan(*i).0 == Some(Toxic::Margin))
+        .count();
     let expected_unauth = (0..r.frames)
         .filter(|i| plan(*i).0 == Some(Toxic::Unauthorized))
         .count();
@@ -382,7 +388,12 @@ fn report(name: &str, r: &SoakResult) {
         .count();
 
     println!("\n=== AF-26 Flash Crash Clearinghouse — {name} ===");
-    println!("frames: {} (admitted {}, refused {})", r.frames, r.admitted, r.frames - r.admitted);
+    println!(
+        "frames: {} (admitted {}, refused {})",
+        r.frames,
+        r.admitted,
+        r.frames - r.admitted
+    );
     println!("wall: {:.3?}  throughput: {:.0} frames/s", r.wall, tput);
     println!(
         "latency ns: p50 {}  p95 {}  p99 {}  max {}",
@@ -397,18 +408,33 @@ fn report(name: &str, r: &SoakResult) {
         "alloc census: {} calls / {} bytes across the hot loop (target 0)",
         r.alloc_calls, r.alloc_bytes
     );
-    println!("chain: {} links, head {:02x?}…, verify: OK", r.links, &r.head[..4]);
+    println!(
+        "chain: {} links, head {:02x?}…, verify: OK",
+        r.links,
+        &r.head[..4]
+    );
 
     // --- Gates ---
     // Toxic census must match the deterministic plan exactly.
     assert_eq!(r.margin_refusals, expected_margin, "margin census drift");
-    assert_eq!(r.unauthorized_refusals, expected_unauth, "unauth census drift");
+    assert_eq!(
+        r.unauthorized_refusals, expected_unauth,
+        "unauth census drift"
+    );
     assert_eq!(r.oversize_refusals, expected_over, "oversize census drift");
     assert_eq!(r.header_refusals, 0, "unexpected codec refusals");
-    assert_eq!(r.admitted + r.frames / 10, r.frames, "admit+refuse conservation");
+    assert_eq!(
+        r.admitted + r.frames / 10,
+        r.frames,
+        "admit+refuse conservation"
+    );
     // Typed refusals never panic: reaching this point IS that gate.
     // Zero-alloc court: the hot loop allocates nothing.
-    assert_eq!(r.alloc_calls, 0, "hot loop allocated {} times", r.alloc_calls);
+    assert_eq!(
+        r.alloc_calls, 0,
+        "hot loop allocated {} times",
+        r.alloc_calls
+    );
     // Chain absorbed exactly the admitted frames.
     assert_eq!(r.links, r.admitted, "chain link conservation");
 }

@@ -25,10 +25,16 @@ fn struct_pins_match_generated_layout() {
     assert_eq!(offset_of!(AoqHeader, version), gen::AOQ1_VERSION_OFFSET);
     assert_eq!(offset_of!(AoqHeader, epoch), gen::AOQ1_EPOCH_OFFSET);
     assert_eq!(offset_of!(AoqHeader, key_id), gen::AOQ1_KEY_ID_OFFSET);
-    assert_eq!(offset_of!(AoqHeader, frame_ordinal), gen::AOQ1_FRAME_ORDINAL_OFFSET);
+    assert_eq!(
+        offset_of!(AoqHeader, frame_ordinal),
+        gen::AOQ1_FRAME_ORDINAL_OFFSET
+    );
     assert_eq!(offset_of!(AoqHeader, seq), gen::AOQ1_SEQ_OFFSET);
     assert_eq!(offset_of!(AoqHeader, reserved), gen::AOQ1_RESERVED_OFFSET);
-    assert_eq!(offset_of!(AoqHeader, header_digest), gen::AOQ1_HEADER_DIGEST_OFFSET);
+    assert_eq!(
+        offset_of!(AoqHeader, header_digest),
+        gen::AOQ1_HEADER_DIGEST_OFFSET
+    );
 }
 
 #[test]
@@ -78,11 +84,16 @@ fn parse_header_fields(ttl: &str) -> Vec<OntoField> {
         };
         let offset = grab("aoq:offset").expect("HeaderField block without aoq:offset");
         let size_bytes = grab("aoq:sizeBytes").expect("HeaderField block without aoq:sizeBytes");
-        let wk_idx = body.find("aoq:wireKind \"").expect("block without wireKind");
+        let wk_idx = body
+            .find("aoq:wireKind \"")
+            .expect("block without wireKind");
         let tail = &body[wk_idx + "aoq:wireKind \"".len()..];
-        let wire_kind =
-            tail[..tail.find('"').expect("unterminated wireKind string")].to_string();
-        fields.push(OntoField { offset, size_bytes, wire_kind });
+        let wire_kind = tail[..tail.find('"').expect("unterminated wireKind string")].to_string();
+        fields.push(OntoField {
+            offset,
+            size_bytes,
+            wire_kind,
+        });
     }
     fields.sort_by_key(|f| f.offset);
     fields
@@ -99,7 +110,11 @@ fn ontology_field_table_matches_generated_layout() {
         "field count: ontology vs generated layout",
     );
     for (onto, genf) in onto_fields.iter().zip(gen::HEADER_FIELDS.iter()) {
-        assert_eq!(onto.offset, genf.offset, "offset drift at {}", genf.rust_name);
+        assert_eq!(
+            onto.offset, genf.offset,
+            "offset drift at {}",
+            genf.rust_name
+        );
         assert_eq!(
             onto.size_bytes, genf.size_bytes,
             "size drift at {}",
@@ -140,15 +155,23 @@ fn ontology_contiguity_chain_first_0_last_end_64() {
 // in-memory TTL copy (never the landed file).
 #[test]
 fn drift_court_flips_on_injected_mutation() {
-    let ttl = std::fs::read_to_string(ONTOLOGY_PATH)
-        .expect("landed ontology MISSING");
+    let ttl = std::fs::read_to_string(ONTOLOGY_PATH).expect("landed ontology MISSING");
     // Mutation: seq offset 20 -> 21. The comparator must see it.
     let mutated = ttl.replace("aoq:offset 20 ;", "aoq:offset 21 ;");
-    assert!(mutated != ttl, "mutation did not apply (vacuous self-check)");
+    assert!(
+        mutated != ttl,
+        "mutation did not apply (vacuous self-check)"
+    );
     let fields = parse_header_fields(&mutated);
-    let seq = fields.iter().find(|f| f.offset == 21).expect("mutated seq field");
+    let seq = fields
+        .iter()
+        .find(|f| f.offset == 21)
+        .expect("mutated seq field");
     assert_eq!(seq.size_bytes, 4);
-    let gen_seq = gen::HEADER_FIELDS.iter().find(|f| f.rust_name == "SEQ").unwrap();
+    let gen_seq = gen::HEADER_FIELDS
+        .iter()
+        .find(|f| f.rust_name == "SEQ")
+        .unwrap();
     assert_ne!(
         seq.offset, gen_seq.offset,
         "drift court accepted a mutated offset — court is vacuous",

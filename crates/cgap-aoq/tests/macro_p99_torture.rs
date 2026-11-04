@@ -39,8 +39,8 @@
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::io::{Read, Write};
-use std::process::Command;
 use std::os::unix::net::UnixStream;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -247,8 +247,7 @@ fn build_frame(
     codec::encode(&h, &mut hb).expect("bench: lawful header");
     tag_scratch[..60].copy_from_slice(&hb[..60]);
     tag_scratch[60..60 + body.len()].copy_from_slice(body);
-    let tag: [u8; TAG_BYTES] = blake3::hash(&tag_scratch[..60 + body.len()])
-        [..TAG_BYTES]
+    let tag: [u8; TAG_BYTES] = blake3::hash(&tag_scratch[..60 + body.len()])[..TAG_BYTES]
         .try_into()
         .expect("blake3 32B");
     writer
@@ -384,8 +383,12 @@ fn process_op(
     let tag = expected_tag(win, SMALL_BODY, tag_scratch);
     let vw = verify_window(win, idx as u32, idx as u32, &tag)?;
     gate.admit(&vw.header, &win[128..128 + vw.body_len])
-        .map_err(|code| AoqError::KemKernelNotAdmitted { kernel_id: u32::from(code) })?;
-    chain.append(1, &win[128..128 + vw.body_len]).expect("chain append");
+        .map_err(|code| AoqError::KemKernelNotAdmitted {
+            kernel_id: u32::from(code),
+        })?;
+    chain
+        .append(1, &win[128..128 + vw.body_len])
+        .expect("chain append");
     Ok(())
 }
 
@@ -442,7 +445,9 @@ fn i1_bimodal_size_storm() {
             Ok(vw) => {
                 gate.admit(&vw.header, &win[128..128 + vw.body_len])
                     .expect("I1: lawful frame must admit");
-                chain.append(1, &win[128..128 + vw.body_len]).expect("I1 chain");
+                chain
+                    .append(1, &win[128..128 + vw.body_len])
+                    .expect("I1 chain");
                 admitted += 1;
             }
             Err(e) => panic!("I1: unexpected refusal: {e:?}"),
@@ -458,10 +463,18 @@ fn i1_bimodal_size_storm() {
     let big: Vec<u32> = (0..frames).filter(|i| i % 2 == 1).map(|i| lat[i]).collect();
     dist_line("I1 64B class only", &small);
     dist_line("I1 3.8KB class only", &big);
-    println!("  alloc census: {} calls / {} bytes (target 0)", allocs.0, allocs.1);
-    println!("  admitted {admitted}/{frames}, chain {} links", chain.len());
-    println!("  | I1 heap-storm processing p99 | {p99} ns | {T_HEAP_STORM_NS} ns | {} |",
-        verdict_of(p99, T_HEAP_STORM_NS).word());
+    println!(
+        "  alloc census: {} calls / {} bytes (target 0)",
+        allocs.0, allocs.1
+    );
+    println!(
+        "  admitted {admitted}/{frames}, chain {} links",
+        chain.len()
+    );
+    println!(
+        "  | I1 heap-storm processing p99 | {p99} ns | {T_HEAP_STORM_NS} ns | {} |",
+        verdict_of(p99, T_HEAP_STORM_NS).word()
+    );
     assert_eq!(admitted, frames, "I1 admit conservation");
     assert_eq!(chain.len(), frames, "I1 chain link conservation");
     assert_eq!(allocs, (0, 0), "I1 hot loop allocated");
@@ -535,10 +548,19 @@ fn i2_stall_walk_isolation() {
     let stall_rounds = stall_hits_total / 8;
     println!("  rounds: 3 baseline / {stall_rounds} stall; stalls landed {stall_hits_total} x {STALL_MS} ms (producer-counted)");
     println!("  isolation fence: min p99 under stall {healthy_min} ns vs min baseline p99 {base_min} ns (fence 1.5x)");
-    let (_, _, p99h_final, _) = dist_line("I2 healthy lane UNDER stall (final round)", &last_healthy_store);
-    println!("  | I2 healthy-lane p99 under stall | {p99h_final} ns | {T_STALL_WALK_NS} ns | {} |",
-        verdict_of(p99h_final, T_STALL_WALK_NS).word());
-    assert_eq!(stall_hits_total, stall_rounds * 8, "I2 anti-vacuity: stalls must land every round");
+    let (_, _, p99h_final, _) = dist_line(
+        "I2 healthy lane UNDER stall (final round)",
+        &last_healthy_store,
+    );
+    println!(
+        "  | I2 healthy-lane p99 under stall | {p99h_final} ns | {T_STALL_WALK_NS} ns | {} |",
+        verdict_of(p99h_final, T_STALL_WALK_NS).word()
+    );
+    assert_eq!(
+        stall_hits_total,
+        stall_rounds * 8,
+        "I2 anti-vacuity: stalls must land every round"
+    );
     assert!(stall_rounds == 3, "I2 ran 3 stall rounds");
     let ratio = healthy_min as f64 / base_min.max(1) as f64;
     println!("  ratio {ratio:.2}x (fence 1.5x, with a disclosed {NOISE_FLOOR_NS} ns timer/scheduler quantum allowance -- a real head-of-line regression is 200 ms-scale, 5 orders above it)");
@@ -562,11 +584,15 @@ fn i3_cache_stride() {
     const SWEEP_BYTES: usize = 16 * 1024 * 1024;
     let mut rng = Xorshift(0xAF37_0033);
     // Arena of lawful 64B-body windows (208 B each), preallocated.
-    let wins: &'static mut [[u8; SMALL_WIN]] =
-        Box::leak((0..FRAMES).map(|_| {
-            let w = [0u8; SMALL_WIN];
-            w
-        }).collect::<Vec<_>>().into_boxed_slice());
+    let wins: &'static mut [[u8; SMALL_WIN]] = Box::leak(
+        (0..FRAMES)
+            .map(|_| {
+                let w = [0u8; SMALL_WIN];
+                w
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    );
     {
         let mut writer = AoqWriter::new();
         let mut out = [0u8; MAX_WIN];
@@ -594,8 +620,7 @@ fn i3_cache_stride() {
     let (_, _, base_decode_p99, _) = dist_line("I3 decode baseline (clean)", &base_lat);
     let _ = base_decode_p99;
     // Background sweeper: touches every cache line of a 16 MB buffer.
-    let sweep: &'static mut [u8] =
-        Box::leak(vec![0u8; SWEEP_BYTES].into_boxed_slice());
+    let sweep: &'static mut [u8] = Box::leak(vec![0u8; SWEEP_BYTES].into_boxed_slice());
     let run = Arc::new(AtomicBool::new(true));
     let r2 = Arc::clone(&run);
     let sweeper = thread::spawn(move || {
@@ -629,7 +654,8 @@ fn i3_cache_stride() {
         let t1 = Instant::now();
         let tag = expected_tag(w, SMALL_BODY, &mut scratch);
         let vw = verify_window(w, idx as u32, idx as u32, &tag).expect("I3 verify");
-        gate.admit(&vw.header, &w[128..128 + vw.body_len]).expect("I3 admit");
+        gate.admit(&vw.header, &w[128..128 + vw.body_len])
+            .expect("I3 admit");
         let d1 = t1.elapsed();
         verify_lat.push((d1.as_secs() * 1_000_000_000 + u64::from(d1.subsec_nanos())) as u32);
     }
@@ -638,9 +664,14 @@ fn i3_cache_stride() {
     sweeper.join().expect("sweeper join");
     let (_, _, under_p99, _) = dist_line("I3 decode UNDER sweep", &under_lat);
     let (_, _, v99, _) = dist_line("I3 verify+gate UNDER sweep", &verify_lat);
-    println!("  alloc census: {} calls / {} bytes (target 0)", allocs.0, allocs.1);
-    println!("  | I3 decode p99 under cache pressure | {under_p99} ns | {T_CACHE_STRIDE_NS} ns | {} |",
-        verdict_of(under_p99, T_CACHE_STRIDE_NS).word());
+    println!(
+        "  alloc census: {} calls / {} bytes (target 0)",
+        allocs.0, allocs.1
+    );
+    println!(
+        "  | I3 decode p99 under cache pressure | {under_p99} ns | {T_CACHE_STRIDE_NS} ns | {} |",
+        verdict_of(under_p99, T_CACHE_STRIDE_NS).word()
+    );
     println!("  | I3 verify+gate p99 (context) | {v99} ns | n/a | INFO |");
     assert_eq!(allocs, (0, 0), "I3 timed ops allocated");
     let _ = base_decode_p99;
@@ -686,7 +717,7 @@ fn i4_tamper_inundation() {
             match plan(i) {
                 None => {}
                 Some(0) => out[8 + 10] ^= 0x40, // key_id bit -> DigestMismatch
-                Some(1) => out[8] ^= 0xFF, // magic -> BadMagic
+                Some(1) => out[8] ^= 0xFF,      // magic -> BadMagic
                 Some(2) => {
                     // seq regression, re-sealed with the real FNV
                     out[8 + 20..8 + 24].copy_from_slice(&((i as u32) - 1).to_le_bytes());
@@ -727,7 +758,9 @@ fn i4_tamper_inundation() {
             Ok(vw) => {
                 gate.admit(&vw.header, &win[128..128 + vw.body_len])
                     .expect("I4: admit frame lawful");
-                chain.append(1, &win[128..128 + vw.body_len]).expect("I4 chain");
+                chain
+                    .append(1, &win[128..128 + vw.body_len])
+                    .expect("I4 chain");
                 admit_lat.push(ns);
                 admitted += 1;
             }
@@ -753,19 +786,29 @@ fn i4_tamper_inundation() {
     println!("  refusal census: digest={} magic={} seqgap={} oversize={} (plan 9000 each class over 12000 tampered)",
         census[0], census[1], census[2], census[3]);
     println!("  parity ratio p99(refuse)/p99(admit) = {parity:.2} (fence 1.5x)");
-    println!("  alloc census: {} calls / {} bytes (target 0)", allocs.0, allocs.1);
-    println!("  | I4 admit p99 under 60% tamper | {p99} ns | {T_TAMPER_NS} ns | {} |",
-        verdict_of(admit_p99, T_TAMPER_NS).word());
+    println!(
+        "  alloc census: {} calls / {} bytes (target 0)",
+        allocs.0, allocs.1
+    );
+    println!(
+        "  | I4 admit p99 under 60% tamper | {p99} ns | {T_TAMPER_NS} ns | {} |",
+        verdict_of(admit_p99, T_TAMPER_NS).word()
+    );
     let _ = (p50, p95, max);
     assert_eq!(admitted, FRAMES * 2 / 5, "I4 admit conservation");
-    assert_eq!(census[0] + census[1] + census[2] + census[3], FRAMES * 3 / 5,
-        "I4 refuse conservation");
+    assert_eq!(
+        census[0] + census[1] + census[2] + census[3],
+        FRAMES * 3 / 5,
+        "I4 refuse conservation"
+    );
     for c in census {
         assert_eq!(c, FRAMES * 3 / 5 / 4, "I4 per-class census drift");
     }
     assert_eq!(allocs, (0, 0), "I4 hot loop allocated");
-    assert!(parity <= 1.5,
-        "I4 parity fence: p99(refuse) {refuse_p99} ns > 1.5 x p99(admit) {admit_p99} ns");
+    assert!(
+        parity <= 1.5,
+        "I4 parity fence: p99(refuse) {refuse_p99} ns > 1.5 x p99(admit) {admit_p99} ns"
+    );
 }
 
 // Court I5 -- supervisor churn under load (AB-17 kill-cycle pattern).
@@ -787,8 +830,8 @@ fn i5_supervisor_churn() {
     let t_send: &'static [AtomicU64] = Box::leak(send_v.into_boxed_slice());
     let done_v: Vec<AtomicU64> = (0..FRAMES).map(|_| AtomicU64::new(0)).collect();
     let t_done: &'static [AtomicU64] = Box::leak(done_v.into_boxed_slice());
-    use std::sync::mpsc::{self, sync_channel, Receiver};
     use std::sync::atomic::AtomicU64;
+    use std::sync::mpsc::{self, sync_channel, Receiver};
     type Item = [u8; SMALL_WIN];
     let base = Instant::now();
     let (tx, rx) = sync_channel::<Item>(256);
@@ -848,11 +891,13 @@ fn i5_supervisor_churn() {
                 }
                 let done_ns = (Instant::now() - base).as_nanos() as u64;
                 let tag = expected_tag(&item, SMALL_BODY, &mut scratch);
-                let vw = verify_window(&item, i as u32, i as u32, &tag)
-                    .expect("I5 relay frame lawful");
+                let vw =
+                    verify_window(&item, i as u32, i as u32, &tag).expect("I5 relay frame lawful");
                 gate.admit(&vw.header, &item[128..128 + vw.body_len])
                     .expect("I5 admit");
-                chain.append(1, &item[128..128 + vw.body_len]).expect("I5 chain");
+                chain
+                    .append(1, &item[128..128 + vw.body_len])
+                    .expect("I5 chain");
                 t_done[i].store(done_ns, Ordering::Relaxed);
                 ack_count.fetch_add(1, Ordering::Relaxed);
                 processed += 1;
@@ -871,7 +916,9 @@ fn i5_supervisor_churn() {
         generations += 1;
         let run = Arc::new(AtomicBool::new(true));
         let h = spawn_relay(Arc::clone(&run));
-        while ack_count.load(Ordering::Relaxed) < target && ack_count.load(Ordering::Relaxed) < FRAMES {
+        while ack_count.load(Ordering::Relaxed) < target
+            && ack_count.load(Ordering::Relaxed) < FRAMES
+        {
             thread::yield_now();
         }
         if ack_count.load(Ordering::Relaxed) >= FRAMES {
@@ -897,13 +944,24 @@ fn i5_supervisor_churn() {
     let (p50, p95, p99, max) = dist_line("I5 end-to-end under churn", &lat_ns);
     let p99_ms = p99 as f64 / 1e6;
     let in_band = p99_ms >= T_CHURN_BAND_MS.0 && p99_ms <= T_CHURN_BAND_MS.1;
-    let v = if in_band { Verdict::Meets } else { Verdict::Unmet };
+    let v = if in_band {
+        Verdict::Meets
+    } else {
+        Verdict::Unmet
+    };
     println!("  kills {kills}, generations {generations} (target cadence every {KILL_EVERY} acks, supervisor-observed), acked {acks_set}/{FRAMES} (each exactly once)");
-    println!("  | I5 relay e2e p99 vs ab-17/ab-18 band | {p99} ns | band {:.1}-{:.1} ms | {} |",
-        T_CHURN_BAND_MS.0, T_CHURN_BAND_MS.1, v.word());
+    println!(
+        "  | I5 relay e2e p99 vs ab-17/ab-18 band | {p99} ns | band {:.1}-{:.1} ms | {} |",
+        T_CHURN_BAND_MS.0,
+        T_CHURN_BAND_MS.1,
+        v.word()
+    );
     let _ = (p50, p95, max, acked);
     drop(tx_keep);
     assert_eq!(acks_set, FRAMES, "I5 conservation: every frame acked");
-    assert!(kills >= 1, "I5 anti-vacuity: at least one kill cycle must land");
+    assert!(
+        kills >= 1,
+        "I5 anti-vacuity: at least one kill cycle must land"
+    );
     assert_eq!(generations, kills + 1, "I5 generation census");
 }

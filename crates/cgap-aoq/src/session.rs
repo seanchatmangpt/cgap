@@ -533,7 +533,11 @@ mod tests {
             Ok((ct, ss))
         }
 
-        fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], SessionError> {
+        fn decapsulate(
+            &self,
+            dk: &[u8],
+            ct: &[u8; CT_BYTES],
+        ) -> Result<[u8; SS_BYTES], SessionError> {
             if dk.len() != EK_BYTES {
                 return Err(SessionError::KemRefused { op: 1 });
             }

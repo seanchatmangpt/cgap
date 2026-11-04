@@ -12,8 +12,8 @@
 
 // [2026-11-03 AB-7] chain.rs header-agnostic rewrite (R-H1) landed;
 // re-registered by AB-7. Disclosed in ab-7-chain-session.md.
-pub mod chain;
 pub mod aead;
+pub mod chain;
 pub mod codec;
 pub mod error;
 pub mod generated_aoq_header_layout;

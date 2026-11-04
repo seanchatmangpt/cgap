@@ -181,7 +181,11 @@ fn rle_decode_direct(b: Bencher) {
     });
 
     let out = out.into_inner().unwrap();
-    assert_eq!(fnv_u32(&out), want_sum, "rle_decode_direct checksum drifted");
+    assert_eq!(
+        fnv_u32(&out),
+        want_sum,
+        "rle_decode_direct checksum drifted"
+    );
 }
 
 /// (3) DOE-2 staged arm — bench-local wrapper ONLY (M-3 kernel purity: the
@@ -206,7 +210,10 @@ fn rle_decode_staged(b: Bencher) {
     assert_eq!(staged, values, "staged decode mismatch vs corpus");
     let mut direct = vec![0u32; LANES];
     decode_into(&page, &mut direct).expect("direct setup decode");
-    assert_eq!(staged, direct, "staged vs direct mismatch (DOE-2 arms differ)");
+    assert_eq!(
+        staged, direct,
+        "staged vs direct mismatch (DOE-2 arms differ)"
+    );
     let want_sum = fnv_u32(&staged);
 
     let out = Mutex::new(out);
@@ -217,7 +224,11 @@ fn rle_decode_staged(b: Bencher) {
     });
 
     let out = out.into_inner().unwrap();
-    assert_eq!(fnv_u32(&out), want_sum, "rle_decode_staged checksum drifted");
+    assert_eq!(
+        fnv_u32(&out),
+        want_sum,
+        "rle_decode_staged checksum drifted"
+    );
 }
 
 fn main() {

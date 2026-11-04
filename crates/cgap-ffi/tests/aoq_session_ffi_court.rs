@@ -105,7 +105,10 @@ fn close_frame(ordinal: u32) -> Vec<u8> {
 /// Every status word the surface can return must round-trip through the
 /// generated name map (closed-band law).
 fn assert_in_band(w: u32) {
-    assert!(aoq_status_name(w).is_some(), "word {w:#x} outside frozen band");
+    assert!(
+        aoq_status_name(w).is_some(),
+        "word {w:#x} outside frozen band"
+    );
     if w != AOQ_STATUS_OK {
         assert_ne!(w, AOQ_STATUS_OK, "refusal must not be OK");
     }
@@ -117,15 +120,12 @@ fn establish() -> u64 {
     let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
     assert_ne!(h, 0, "session_new returned 0");
     let ek_wire = ek_frame(0, &ek);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len())
-    };
+    let st =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "ek step refused: {st:#x}");
     let ct = expected_pending_ct(&ek);
     let fin = finish_frame(1, &ct);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len())
-    };
+    let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "finish step refused: {st:#x}");
     h
 }
@@ -150,17 +150,14 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
 
     // HandshakeInit -> HandshakeWait on the peer ek frame.
     let ek_wire = ek_frame(0, &ek);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len())
-    };
+    let st =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "ek step refused: {st:#x}");
 
     // HandshakeWait -> Established on the ct-echo finish frame.
     let ct = expected_pending_ct(&ek);
     let fin = finish_frame(1, &ct);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len())
-    };
+    let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "finish step refused: {st:#x}");
 
     // Verified emit: [header 64B][kind 2][seq BE 4B][payload][tag 4B].
@@ -170,8 +167,13 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
     let mut written = 0usize;
     let st = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
-            h, seq, payload.as_ptr(), payload.len(),
-            out.as_mut_ptr(), out.len(), &mut written,
+            h,
+            seq,
+            payload.as_ptr(),
+            payload.len(),
+            out.as_mut_ptr(),
+            out.len(),
+            &mut written,
         )
     };
     assert_eq!(st, AOQ_STATUS_OK, "emit refused: {st:#x}");
@@ -182,10 +184,17 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
     assert_eq!(frame.kind, FrameKind::AppData);
     assert_eq!(frame.header.epoch, EPOCH);
     assert_eq!(frame.header.key_id, KEY_ID);
-    assert_eq!(frame.header.frame_ordinal, 2, "emit uses the current ordinal");
+    assert_eq!(
+        frame.header.frame_ordinal, 2,
+        "emit uses the current ordinal"
+    );
     assert_eq!(frame.header.seq, seq);
     assert_eq!(frame.payload[..4], seq.to_be_bytes(), "seq prefix");
-    assert_eq!(&frame.payload[4..4 + payload.len()], &payload, "payload identity");
+    assert_eq!(
+        &frame.payload[4..4 + payload.len()],
+        &payload,
+        "payload identity"
+    );
 
     // Tag law: kdf(header||kind||seq||payload)[0..4] over the WHOLE wire
     // frame minus the trailing 4 tag bytes.
@@ -212,9 +221,8 @@ fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
     let (ek, _dk) = peer_keypair();
     let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
     let ek_wire = ek_frame(0, &ek);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len())
-    };
+    let st =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
     assert_eq!(st, AOQ_STATUS_OK);
     let fp_before = fingerprint(h);
 
@@ -222,10 +230,11 @@ fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
     let mut ct = expected_pending_ct(&ek);
     ct[7] ^= 0x01;
     let fin = finish_frame(1, &ct);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len())
-    };
-    assert_eq!(st, AOQ_STATUS_DIGEST_MISMATCH, "ct flip must refuse: {st:#x}");
+    let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
+    assert_eq!(
+        st, AOQ_STATUS_DIGEST_MISMATCH,
+        "ct flip must refuse: {st:#x}"
+    );
     assert_in_band(st);
     assert_eq!(cgap_ffi::aoq_session::cgap_aoq_last_error(), st);
 
@@ -271,9 +280,8 @@ fn court3_fingerprint_identity_after_every_refused_step() {
         ("appdata-in-init", &app_too_early),
     ] {
         let fp_before = fingerprint(h);
-        let st = unsafe {
-            cgap_ffi::aoq_session::cgap_aoq_session_step(h, frame.as_ptr(), frame.len())
-        };
+        let st =
+            unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, frame.as_ptr(), frame.len()) };
         assert_ne!(st, AOQ_STATUS_OK, "{name} must refuse");
         assert_in_band(st);
         refused.push(st);
@@ -296,11 +304,14 @@ fn court3_fingerprint_identity_after_every_refused_step() {
     // Anti-vacuity for law 4 itself: an ACCEPTED step must move the
     // fingerprint (otherwise identity-after-refusal is vacuous).
     let ek_wire = ek_frame(0, &ek);
-    let st = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len())
-    };
+    let st =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "happy step refused: {st:#x}");
-    assert_ne!(fingerprint(h), fp0, "accepted step must move the fingerprint (law-4 vacuity check)");
+    assert_ne!(
+        fingerprint(h),
+        fp0,
+        "accepted step must move the fingerprint (law-4 vacuity check)"
+    );
 }
 
 /// Header-only wire bytes (truncated frame: no kind tag).
@@ -325,17 +336,21 @@ fn court4_stale_handle_refused_everywhere() {
     // After free, every export refuses with the same typed word.
     let (ek, _dk) = peer_keypair();
     let wire = ek_frame(0, &ek);
-    let st_step = unsafe {
-        cgap_ffi::aoq_session::cgap_aoq_session_step(h, wire.as_ptr(), wire.len())
-    };
+    let st_step =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, wire.as_ptr(), wire.len()) };
     let mut fp = [0u8; 32];
-    let st_fp =
-        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_fingerprint(h, fp.as_mut_ptr()) };
+    let st_fp = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_fingerprint(h, fp.as_mut_ptr()) };
     let mut out = [0u8; 256];
     let mut written = 0usize;
     let st_emit = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
-            h, 0, out.as_ptr(), 0, out.as_mut_ptr(), out.len(), &mut written,
+            h,
+            0,
+            out.as_ptr(),
+            0,
+            out.as_mut_ptr(),
+            out.len(),
+            &mut written,
         )
     };
     let st_free = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_free(h) };
@@ -385,7 +400,8 @@ fn court5_hostile_inputs_never_panic() {
     assert_eq!(st, AOQ_STATUS_INCOMPLETE_FRAME);
 
     // Fingerprint into a null buffer: refused.
-    let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_fingerprint(h, core::ptr::null_mut()) };
+    let st =
+        unsafe { cgap_ffi::aoq_session::cgap_aoq_session_fingerprint(h, core::ptr::null_mut()) };
     assert_eq!(st, AOQ_STATUS_INCOMPLETE_FRAME);
 
     // Emit with null out / null out_len / too-small out: refused, typed.
@@ -394,22 +410,37 @@ fn court5_hostile_inputs_never_panic() {
     let mut written = 0usize;
     let st = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
-            h, 0, payload.as_ptr(), payload.len(),
-            core::ptr::null_mut(), out.len(), &mut written,
+            h,
+            0,
+            payload.as_ptr(),
+            payload.len(),
+            core::ptr::null_mut(),
+            out.len(),
+            &mut written,
         )
     };
     assert_eq!(st, AOQ_STATUS_INCOMPLETE_FRAME);
     let st = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
-            h, 0, payload.as_ptr(), payload.len(),
-            out.as_mut_ptr(), out.len(), core::ptr::null_mut(),
+            h,
+            0,
+            payload.as_ptr(),
+            payload.len(),
+            out.as_mut_ptr(),
+            out.len(),
+            core::ptr::null_mut(),
         )
     };
     assert_eq!(st, AOQ_STATUS_INCOMPLETE_FRAME);
     let st = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
-            h, 0, payload.as_ptr(), payload.len(),
-            out.as_mut_ptr(), out.len(), &mut written,
+            h,
+            0,
+            payload.as_ptr(),
+            payload.len(),
+            out.as_mut_ptr(),
+            out.len(),
+            &mut written,
         )
     };
     assert_eq!(st, AOQ_STATUS_INCOMPLETE_FRAME, "too-small out cap");

@@ -77,7 +77,13 @@ fn frame_too_large_typed() {
     let mut ring = WireRing::create(&path, 2).expect("create");
     let big = vec![0u8; 5000];
     let err = ring.stamp_frame(&big, 0).expect_err("oversize must error");
-    assert_eq!(err, WireError::FrameTooLarge { len: 5000, max: 4080 });
+    assert_eq!(
+        err,
+        WireError::FrameTooLarge {
+            len: 5000,
+            max: 4080
+        }
+    );
     cleanup(&path);
 }
 
@@ -128,7 +134,11 @@ fn tamper_court_flips() {
     }
     let raw = read_seg(&sandbox_path);
     let slot3 = &raw[4096 + 3 * 4096..];
-    assert_eq!(&slot3[..4], &0x5749_5230u32.to_be_bytes(), "magic at slot 3");
+    assert_eq!(
+        &slot3[..4],
+        &0x5749_5230u32.to_be_bytes(),
+        "magic at slot 3"
+    );
 
     // Locate the ordinal bytes: slot idx = 7 % 4 = 3 ->
     // BOOK_LEN + 3*SLOT_LEN + 12 = 4096 + 12288 + 12.
@@ -208,10 +218,7 @@ fn wire_tier_scan_zero_blake3_with_sandbox_kill() {
     // scan MUST flip.
     let sandbox = std::env::temp_dir().join(format!("cg1-ws-scan-{}.rs", std::process::id()));
     let first = &befores[0].1;
-    let mutated = format!(
-        "// blake3 injected\n{}",
-        String::from_utf8_lossy(first)
-    );
+    let mutated = format!("// blake3 injected\n{}", String::from_utf8_lossy(first));
     std::fs::write(&sandbox, mutated).expect("write sandbox");
     let stext = std::fs::read_to_string(&sandbox).expect("read sandbox");
     let shits = stext.lines().filter(|l| l.contains("blake3")).count();

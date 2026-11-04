@@ -75,8 +75,7 @@ pub fn push(state: &mut Poly1305, data: &[u8]) {
     let mut i = 0;
     if state.leftover > 0 {
         let want = core::cmp::min(BLOCK_LEN - state.leftover, data.len());
-        state.buffer[state.leftover..state.leftover + want]
-            .copy_from_slice(&data[..want]);
+        state.buffer[state.leftover..state.leftover + want].copy_from_slice(&data[..want]);
         state.leftover += want;
         i += want;
         if state.leftover < BLOCK_LEN {
@@ -181,7 +180,7 @@ pub fn finish(state: Poly1305) -> [u8; TAG_LEN] {
         let mut block = [0u8; BLOCK_LEN];
         block[..state.leftover].copy_from_slice(&state.buffer[..state.leftover]);
         block[state.leftover] = 1; // the 2^(8*leftover) term...
-        // ...and NO 2^128 hibit: donna final flag (hibit = 0).
+                                   // ...and NO 2^128 hibit: donna final flag (hibit = 0).
         absorb_block(&mut state, &block, 0);
     }
 

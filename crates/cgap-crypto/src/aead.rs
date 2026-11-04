@@ -39,7 +39,7 @@ pub const NONCE_LEN: usize = 12;
 pub const EPOCH_RESERVED: u32 = 0xFFFF_FFFF;
 
 const BLOCK_LEN: usize = 64; // ChaCha20 block, bytes
-// "expa nd 3 2-by te k" — RFC 8439 §2.3 constants.
+                             // "expa nd 3 2-by te k" — RFC 8439 §2.3 constants.
 const SIGMA: [u32; 4] = [0x6170_7865, 0x3320_646e, 0x7962_2d32, 0x6b20_6574];
 
 /// Detached-open failure: recomputed tag != provided tag.
@@ -85,7 +85,10 @@ impl core::fmt::Debug for Nonce96 {
 
 impl Clone for Nonce96 {
     fn clone(&self) -> Self {
-        Self { epoch: self.epoch, counter: self.counter }
+        Self {
+            epoch: self.epoch,
+            counter: self.counter,
+        }
     }
 }
 impl Copy for Nonce96 {}

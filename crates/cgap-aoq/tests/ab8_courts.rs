@@ -134,10 +134,16 @@ fn a3_seq_regression_refused_zero_progress() {
     assert_eq!(w.cursor(), (2, 2));
     // Frame 1 replayed at the consumed cursor (2,2): ordinal gate fires.
     let err = verify_window(&win1, 2, 2, &tag1).unwrap_err();
-    assert!(matches!(err, AoqError::FrameOrdinalRegression { .. } | AoqError::SeqGap { .. }));
+    assert!(matches!(
+        err,
+        AoqError::FrameOrdinalRegression { .. } | AoqError::SeqGap { .. }
+    ));
     // Old window at the new cursor also refuses (skip/gap both directions).
     let err = verify_window(&win0, 2, 2, &tag0).unwrap_err();
-    assert!(matches!(err, AoqError::FrameOrdinalRegression { .. } | AoqError::SeqGap { .. }));
+    assert!(matches!(
+        err,
+        AoqError::FrameOrdinalRegression { .. } | AoqError::SeqGap { .. }
+    ));
     assert_eq!(w.cursor(), (2, 2), "A3: cursor unchanged by verifications");
 }
 
@@ -153,9 +159,15 @@ fn a4_header_digest_mismatch_both_surfaces() {
         let mut m = win.clone();
         m[byte_at] ^= 0x01;
         let ipc_err = ipc::read_with_meta(&m, None, &mut [0u8; 100]).unwrap_err();
-        assert!(matches!(ipc_err, ipc::IpcError::HeaderDigestMismatch { .. }), "at {byte_at}");
+        assert!(
+            matches!(ipc_err, ipc::IpcError::HeaderDigestMismatch { .. }),
+            "at {byte_at}"
+        );
         let aoq_err = verify_window(&m, 0, 0, &tag).unwrap_err();
-        assert!(matches!(aoq_err, AoqError::DigestMismatch { .. }), "at {byte_at}");
+        assert!(
+            matches!(aoq_err, AoqError::DigestMismatch { .. }),
+            "at {byte_at}"
+        );
     }
     // Version-byte mutation: the two surfaces gate in different orders
     // (ipc: digest -> version; aoq codec: version -> digest), so the
@@ -164,7 +176,10 @@ fn a4_header_digest_mismatch_both_surfaces() {
     let mut m = win.clone();
     m[12] ^= 0x01;
     let ipc_err = ipc::read_with_meta(&m, None, &mut [0u8; 100]).unwrap_err();
-    assert!(matches!(ipc_err, ipc::IpcError::HeaderDigestMismatch { .. }));
+    assert!(matches!(
+        ipc_err,
+        ipc::IpcError::HeaderDigestMismatch { .. }
+    ));
     let aoq_err = verify_window(&m, 0, 0, &tag).unwrap_err();
     assert!(matches!(aoq_err, AoqError::UnsupportedVersion { .. }));
 }
@@ -221,7 +236,10 @@ fn a5_epoch_gate() {
     let e = ipc::read_with_meta(&iso, None, &mut [0u8; 100]).unwrap_err();
     assert!(matches!(e, ipc::IpcError::BadFlags { got: 3 }), "got {e:?}");
     let e = verify_window(&iso, 0, 0, &tag).unwrap_err();
-    assert!(matches!(e, AoqError::UnknownEpochWire { got: 3 }), "got {e:?}");
+    assert!(
+        matches!(e, AoqError::UnknownEpochWire { got: 3 }),
+        "got {e:?}"
+    );
 }
 
 /// A6 pad cleanliness: a nonzero metadata-pad byte OUTSIDE the
@@ -254,7 +272,10 @@ fn a7_body_len_word_corruption() {
     // full-window law refuses as Short. Identity: both refuse.
     let e = ipc::read_with_meta(&m, None, &mut [0u8; 100]).unwrap_err();
     assert!(
-        matches!(e, ipc::IpcError::Truncated { .. } | ipc::IpcError::MissingEos { .. }),
+        matches!(
+            e,
+            ipc::IpcError::Truncated { .. } | ipc::IpcError::MissingEos { .. }
+        ),
         "got {e:?}"
     );
     let e = verify_window(&m, 0, 0, &tag).unwrap_err();
@@ -300,12 +321,18 @@ fn a9_truncated_exact_needed() {
     // Band [128,356): body-span demand (body_len + pad = 228 from 128).
     for l in [128usize, 150, 191, 300, 355] {
         let e = ipc::read_with_meta(&win[..l], None, &mut [0u8; 100]).unwrap_err();
-        assert!(matches!(e, ipc::IpcError::BadBodyLen { .. }), "L={l}: {e:?}");
+        assert!(
+            matches!(e, ipc::IpcError::BadBodyLen { .. }),
+            "L={l}: {e:?}"
+        );
     }
     // Band [356,364): EOS band.
     for l in [356usize, 357, 363] {
         let e = ipc::read_with_meta(&win[..l], None, &mut [0u8; 100]).unwrap_err();
-        assert!(matches!(e, ipc::IpcError::MissingEos { .. }), "L={l}: {e:?}");
+        assert!(
+            matches!(e, ipc::IpcError::MissingEos { .. }),
+            "L={l}: {e:?}"
+        );
     }
     // At exactly 364: passes.
     assert!(ipc::read_with_meta(&win, None, &mut [0u8; 100]).is_ok());
@@ -386,9 +413,7 @@ fn a12_no_plaintext_on_error() {
     tag.copy_from_slice(&h[..16]);
     let mut w = AoqWriter::new();
     let mut win = vec![0u8; 8 + 120 + 100 + 128 + 8];
-    let n = w
-        .write_window(&mut win, 0, 7, &tag, &ct)
-        .expect("lawful");
+    let n = w.write_window(&mut win, 0, 7, &tag, &ct).expect("lawful");
     let win_ct = win.clone();
     assert_ne!(&win[128..228], &plain[..], "ciphertext on the wire");
 

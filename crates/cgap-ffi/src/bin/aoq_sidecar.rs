@@ -49,17 +49,21 @@ mod imp {
     use std::process::exit;
 
     use cgap_aoq::codec;
-    use cgap_aoq::header::{AoqHeader, SIZE_BYTES as FRAME_HEADER_BYTES};
-    use cgap_aoq::session::{self as sess, KemSeam, Session, SessionError, CT_BYTES, EK_BYTES, SS_BYTES};
     use cgap_aoq::error::AoqError;
+    use cgap_aoq::header::{AoqHeader, SIZE_BYTES as FRAME_HEADER_BYTES};
+    use cgap_aoq::session::{
+        self as sess, KemSeam, Session, SessionError, CT_BYTES, EK_BYTES, SS_BYTES,
+    };
     use cgap_arrow::ipc::{
-        self, window_len, MetaHeader, AOQ1_MAGIC, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE,
+        self, window_len, MetaHeader, AOQ1_MAGIC, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE,
+        PREFIX_SIZE,
     };
     use cgap_arrow::stream_writer::{StreamError, StreamWriter, VectoredSink};
     use cgap_crypto::fips202::Shake256;
     use cgap_ffi::aoq::status_maps::{
         AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
-        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_KEY_UNKNOWN, AOQ_STATUS_OK,
+        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_KEY_UNKNOWN,
+        AOQ_STATUS_OK,
     };
 
     // ---------------------------------------------------------------------------
@@ -94,7 +98,11 @@ mod imp {
             Ok((ct, ss))
         }
 
-        fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], SessionError> {
+        fn decapsulate(
+            &self,
+            dk: &[u8],
+            ct: &[u8; CT_BYTES],
+        ) -> Result<[u8; SS_BYTES], SessionError> {
             let dk: &[u8; 2400] = dk
                 .try_into()
                 .map_err(|_| SessionError::KemRefused { op: 1 })?;
@@ -280,7 +288,11 @@ mod imp {
 
     impl<'a> PatchSink<'a> {
         fn new(stream: &'a mut UnixStream, meta: [u8; 120]) -> Self {
-            Self { stream, meta, sent: 0 }
+            Self {
+                stream,
+                meta,
+                sent: 0,
+            }
         }
     }
 
@@ -362,7 +374,8 @@ mod imp {
 
             // TAG GATE (BEFORE accepting): recompute blake3(body)[..16] over the
             // carried body and refuse unless it equals the stored tag.
-            let body_len = u32::from_le_bytes([window[72], window[73], window[74], window[75]]) as usize;
+            let body_len =
+                u32::from_le_bytes([window[72], window[73], window[74], window[75]]) as usize;
             let mut body = vec![0u8; body_len];
             if let Err(err) = ipc::read_verified(&window, None, &mut body) {
                 let _ = send_status(&mut stream, framing_status(&err));
@@ -387,14 +400,23 @@ mod imp {
             // window: the session's own emit_verified echo (same seq, same
             // payload) scattered via StreamWriter over the pad-law sink.
             if frame.kind == sess::FrameKind::AppData {
-                let seq = u32::from_be_bytes([frame.payload[0], frame.payload[1],
-                                              frame.payload[2], frame.payload[3]]);
+                let seq = u32::from_be_bytes([
+                    frame.payload[0],
+                    frame.payload[1],
+                    frame.payload[2],
+                    frame.payload[3],
+                ]);
                 let payload = &frame.payload[4..];
                 let mut frame_buf = vec![0u8; FRAME_HEADER_BYTES + 1 + 4 + payload.len() + 4];
                 match session.emit_verified(seq, payload, &mut frame_buf) {
                     Ok(written) => {
                         let _ = send_status(&mut stream, AOQ_STATUS_OK);
-                        if let Err(err) = send_window(&mut stream, &frame_buf[..written], frame.header.frame_ordinal, seq) {
+                        if let Err(err) = send_window(
+                            &mut stream,
+                            &frame_buf[..written],
+                            frame.header.frame_ordinal,
+                            seq,
+                        ) {
                             let word = match &err {
                                 StreamError::ZeroProgress => AOQ_STATUS_BUSY,
                                 StreamError::Sink(_) => AOQ_STATUS_BUSY,
@@ -521,5 +543,4 @@ mod imp {
             }
         }
     }
-
 }

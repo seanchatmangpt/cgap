@@ -527,9 +527,7 @@ sh:path ex:name ; sh:minCount 1 ; sh:maxCount 2 ;\n  ] .\n";
         println!(
             "p1-shacl bench: {} shape-evals/s over 65536 statements x 8 shapes \
              (total {:?}, sink {})",
-            per_s as u64,
-            dt,
-            sink
+            per_s as u64, dt, sink
         );
         assert!(sink > 0 || warm.is_empty());
     }

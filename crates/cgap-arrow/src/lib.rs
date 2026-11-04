@@ -92,9 +92,9 @@ pub mod varlen;
 pub mod views;
 
 #[cfg(not(target_os = "none"))]
-mod generated_layout;
-#[cfg(not(target_os = "none"))]
 mod generated_arrow_primitives;
+#[cfg(not(target_os = "none"))]
+mod generated_layout;
 // G1 courts (CG-1, v26.11.3): hand-law courts for the never-edit generated
 // module above; live OUTSIDE it so regeneration cannot overwrite them.
 #[cfg(all(not(target_os = "none"), test))]

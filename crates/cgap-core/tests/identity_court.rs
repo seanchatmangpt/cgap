@@ -31,9 +31,7 @@ use cgap_core::frame::{CgapFrameHeader, FRAME_HEADER_LEN};
 use cgap_core::isomorphism::{identity_assert, Tier};
 
 mod common;
-use common::{
-    leak_aligned_region, payload, slot_region_len, valid_header, wire_frame, SIZES,
-};
+use common::{leak_aligned_region, payload, slot_region_len, valid_header, wire_frame, SIZES};
 
 #[test]
 fn exit_gate_wire_memory_identity_per_size() {
@@ -58,8 +56,8 @@ fn exit_gate_wire_memory_identity_per_size() {
 
         // --- memory tier: real DmaRing claim→publish→read→release ----------
         let region = leak_aligned_region(slot_region_len(size, 2));
-        let mut ring = cgap_core::dma_ring::DmaRing::new(region, 1)
-            .expect("region partitions into 2 slots");
+        let mut ring =
+            cgap_core::dma_ring::DmaRing::new(region, 1).expect("region partitions into 2 slots");
         {
             let slot = ring.claim().expect("ring has room");
             assert!(wire.len() <= slot.len());
@@ -112,7 +110,10 @@ fn mutation_flip_one_byte_fails_at_named_offset() {
     assert_eq!(err.mem, wire[flip_offset] ^ 0x01);
     // The fail-loud line (§8.2) names tier, offset, and both bytes.
     let line = err.to_string();
-    assert!(line.starts_with("IDENTITY_COURT_FAIL tier=memory offset=133 "), "{line}");
+    assert!(
+        line.starts_with("IDENTITY_COURT_FAIL tier=memory offset=133 "),
+        "{line}"
+    );
 }
 
 #[test]
@@ -123,12 +124,18 @@ fn mutation_payload_len_shift_fails_at_offset_8() {
     let payload = payload(size);
     let mut header = valid_header(size as u64, oabi_digest(&payload), common::bn3_flags());
     header.payload_byte_len += 1;
-    let wire = wire_frame(&valid_header(size as u64, oabi_digest(&payload), common::bn3_flags()), &payload);
+    let wire = wire_frame(
+        &valid_header(size as u64, oabi_digest(&payload), common::bn3_flags()),
+        &payload,
+    );
     let mutated = wire_frame(&header, &payload);
 
     let err = identity_assert(&wire, Tier::Memory, &mutated).expect_err("must flip");
     assert_eq!(err.tier, Tier::Memory);
-    assert_eq!(err.offset, 8, "first divergent byte is payload_byte_len's LSB");
+    assert_eq!(
+        err.offset, 8,
+        "first divergent byte is payload_byte_len's LSB"
+    );
     assert_ne!(err.wire, err.mem);
 }
 

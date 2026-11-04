@@ -225,7 +225,9 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
         epoch_le.copy_from_slice(&epoch.to_le_bytes());
         let mut index_le = [0u8; 8];
         index_le.copy_from_slice(&index.to_le_bytes());
-        let digest = self.h.digest(&[&prev, &epoch_le, &index_le, &payload_digest]);
+        let digest = self
+            .h
+            .digest(&[&prev, &epoch_le, &index_le, &payload_digest]);
         self.slab[self.len] = AoqChainRecord {
             prev_hash: prev,
             payload_digest,
@@ -246,7 +248,9 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
     /// on refusal).
     pub fn append_verified(&mut self, frame: &[u8]) -> Result<u64, AoqError> {
         if frame.len() < PARENT_PREFIX_BYTES + 1 {
-            return Err(AoqError::HeaderTooShort { got: frame.len() as u16 });
+            return Err(AoqError::HeaderTooShort {
+                got: frame.len() as u16,
+            });
         }
         let (body, tag) = frame.split_at(frame.len() - PARENT_PREFIX_BYTES);
         let mut want = [0u8; PARENT_PREFIX_BYTES];

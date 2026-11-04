@@ -9,10 +9,14 @@
 
 use cgap_core::frame::{CgapFrameHeader, P28LicenseAttestation};
 
-const A04_DOC: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/jira/v26.11.1/lanes/A04-triumvirate-isomorphism.md");
-const A17_DOC: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/jira/v26.11.1/lanes/A17-p28-derivative.md");
+const A04_DOC: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/jira/v26.11.1/lanes/A04-triumvirate-isomorphism.md"
+);
+const A17_DOC: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../docs/jira/v26.11.1/lanes/A17-p28-derivative.md"
+);
 
 /// Compiled truth for the frame header, by §6.1 field name:
 /// (offset, size) straight from `offset_of!`/`size_of`, never literals.
@@ -94,8 +98,7 @@ fn parse_offset_table(doc: &str, section_heading: &str) -> Vec<(usize, usize, St
         if off_c.contains("--") || off_c == "offset" || off_c == "Offset" {
             continue; // separator / header row
         }
-        let (Ok(offset), Ok(size)) = (off_c.parse::<usize>(), size_c.parse::<usize>())
-        else {
+        let (Ok(offset), Ok(size)) = (off_c.parse::<usize>(), size_c.parse::<usize>()) else {
             continue; // summary rows like "| 80 | — | end |"
         };
         let field = field_c.trim_matches('`').to_string();

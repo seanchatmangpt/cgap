@@ -88,20 +88,22 @@ fn main() {
     for &n in &SIZES {
         let valid = pattern(0x9E37_79B9_7F4A_7C15, n);
         let pred = pattern(0xBF58_476D_1CE4_E5B9, n);
-        let expect: Vec<u64> = valid
-            .iter()
-            .zip(&pred)
-            .map(|(&v, &p)| v & p)
-            .collect();
+        let expect: Vec<u64> = valid.iter().zip(&pred).map(|(&v, &p)| v & p).collect();
 
         // ---- correctness pre-flight: poisoned outputs, bitwise equality ----
         let mut out = vec![SENTINEL; n];
         mask_words_neon(&valid, &pred, &mut out);
-        assert_eq!(out, expect, "NEON pre-flight bitwise mismatch, n = {n} words");
+        assert_eq!(
+            out, expect,
+            "NEON pre-flight bitwise mismatch, n = {n} words"
+        );
 
         let mut out_port = vec![SENTINEL; n];
         mask_words(&valid, &pred, &mut out_port);
-        assert_eq!(out_port, expect, "portable pre-flight bitwise mismatch, n = {n} words");
+        assert_eq!(
+            out_port, expect,
+            "portable pre-flight bitwise mismatch, n = {n} words"
+        );
         assert_eq!(out, out_port, "cross-kernel mismatch, n = {n} words");
 
         // Vacuity guard: the sentinel must differ from the expected output

@@ -37,10 +37,7 @@ fn src_tree_compiles_no_std_for_rv32imc_esp32_c3_class() {
         "#![no_std]\n#![allow(dead_code)]\nmod frame {{\n{FRAME_SRC}\n}}\nmod dma_ring {{\n{DMA_SRC}\n}}\nmod isomorphism {{\n{ISO_SRC}\n}}\n"
     );
 
-    let dir = std::env::temp_dir().join(format!(
-        "cgap-a04-rv32imc-{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("cgap-a04-rv32imc-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp dir");
     let src_file: PathBuf = dir.join("cgap_core_probe_lib.rs");
     std::fs::write(&src_file, &lib_text).expect("write probe lib");
@@ -76,10 +73,7 @@ fn host_target_baseline_same_text_compiles_clean() {
     let lib_text = format!(
         "#![no_std]\n#![allow(dead_code)]\nmod frame {{\n{FRAME_SRC}\n}}\nmod dma_ring {{\n{DMA_SRC}\n}}\nmod isomorphism {{\n{ISO_SRC}\n}}\n"
     );
-    let dir = std::env::temp_dir().join(format!(
-        "cgap-a04-rv32imc-host-{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("cgap-a04-rv32imc-host-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp dir");
     let src_file: PathBuf = dir.join("cgap_core_host_probe_lib.rs");
     std::fs::write(&src_file, &lib_text).expect("write probe lib");

@@ -15,12 +15,10 @@
 //! each other (witnessed this session: 7.9M allocs / 3.4 GB when two
 //! N=1M courts cross-counted). Thread-local gating makes each court
 //! measure only its own thread.
+use cgap_storage::closure::{naive_closure, pair_key, semi_naive_closure, SeenSet, CORPUS_SEED};
+use cgap_storage::dred::splitmix64;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
-use cgap_storage::closure::{
-    naive_closure, pair_key, semi_naive_closure, SeenSet, CORPUS_SEED,
-};
-use cgap_storage::dred::splitmix64;
 
 thread_local! {
     static ON: Cell<bool> = const { Cell::new(false) };

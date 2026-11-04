@@ -35,10 +35,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
 
-use cgap_arrow::ipc::{
-    emit as raw_emit, seal_meta, window_len, MetaHeader, LAYOUT_VERSION, MAGIC,
-};
-use cgap_arrow::stream_writer::{StreamWriter, StreamError, VectoredSink};
+use cgap_arrow::ipc::{emit as raw_emit, seal_meta, window_len, MetaHeader, LAYOUT_VERSION, MAGIC};
+use cgap_arrow::stream_writer::{StreamError, StreamWriter, VectoredSink};
 
 // ---- deterministic bodies (SplitMix64, frozen kernel multiplier) ----
 
@@ -164,7 +162,12 @@ fn socket_path(tag: &str) -> PathBuf {
         .expect("clock before epoch")
         .subsec_nanos();
     let mut p: PathBuf = std::env::temp_dir();
-    p.push(format!("cgap-stress-{}-{}-{}.sock", std::process::id(), nanos, tag));
+    p.push(format!(
+        "cgap-stress-{}-{}-{}.sock",
+        std::process::id(),
+        nanos,
+        tag
+    ));
     p
 }
 
@@ -176,7 +179,6 @@ fn uds_pair(tag: &str) -> (UnixListener, UnixStream, UnixStream, PathBuf) {
     let (peer, _addr) = listener.accept().expect("accept");
     (listener, conn, peer, path)
 }
-
 
 /// Frame ordinal -> deterministic body length (varies segment scatter).
 fn body_len_for(frame: u64) -> usize {
@@ -190,7 +192,12 @@ fn body_len_for(frame: u64) -> usize {
 fn soak_50k_frames_byte_identity_and_throughput() {
     const FRAMES: u64 = 50_000;
     let (_listener, mut stream, mut peer, path) = uds_pair("soak");
-    let mut writer = StreamWriter::with_seq(Uds { stream: &mut stream }, 0);
+    let mut writer = StreamWriter::with_seq(
+        Uds {
+            stream: &mut stream,
+        },
+        0,
+    );
     let mut scratch: Vec<u8> = Vec::new();
     let total_bytes = core::cell::Cell::new(0usize);
 
@@ -205,7 +212,11 @@ fn soak_50k_frames_byte_identity_and_throughput() {
         assert_eq!(n, want.len(), "window len matches reference at frame {i}");
         let mut got = vec![0u8; n];
         peer.read_exact(&mut got).expect("peer read_exact");
-        assert_eq!(&got[..], &want[..], "frame {i} byte-identity vs raw emit reference");
+        assert_eq!(
+            &got[..],
+            &want[..],
+            "frame {i} byte-identity vs raw emit reference"
+        );
         total_bytes.set(total_bytes.get() + n);
     }
     let elapsed = t0.elapsed();
@@ -236,7 +247,10 @@ fn partial_accept_storm_firstseg_10k() {
     let mut reference_all: Vec<u8> = Vec::new();
     let calls;
     {
-        let mut sink = FirstSegSink { out: &mut reassembled, calls: 0 };
+        let mut sink = FirstSegSink {
+            out: &mut reassembled,
+            calls: 0,
+        };
         let mut writer = StreamWriter::with_seq(&mut sink, 0);
 
         for i in 0..FRAMES {
@@ -275,7 +289,12 @@ fn stalled_sink_recovery_seq_lockstep_through_u32_wrap() {
     const EVERY: usize = 4;
     let mut reassembled: Vec<u8> = Vec::new();
     let mut reference_all: Vec<u8> = Vec::new();
-    let mut sink = StalledSink { out: &mut reassembled, calls: 0, zero_injects: 0, every: EVERY };
+    let mut sink = StalledSink {
+        out: &mut reassembled,
+        calls: 0,
+        zero_injects: 0,
+        every: EVERY,
+    };
 
     for i in 0..FRAMES {
         let expected_seq = START_SEQ.wrapping_add(i as u32);
@@ -304,12 +323,19 @@ fn stalled_sink_recovery_seq_lockstep_through_u32_wrap() {
             }
         }
         assert_eq!(
-            u32::from_le_bytes(sink.out[frame_start + SEQ_AT..frame_start + SEQ_AT + 4].try_into().unwrap()),
+            u32::from_le_bytes(
+                sink.out[frame_start + SEQ_AT..frame_start + SEQ_AT + 4]
+                    .try_into()
+                    .unwrap()
+            ),
             expected_seq,
             "wire seq stamped == expected ordinal seq at {i} (wrap-aware)"
         );
     }
-    assert!(sink.zero_injects > 0, "vacuous court: no stalls actually injected");
+    assert!(
+        sink.zero_injects > 0,
+        "vacuous court: no stalls actually injected"
+    );
     // Exact arithmetic court: with a full-accept sink every completed
     // frame costs exactly one call and every injected zero costs exactly
     // one refused call + one retry — so calls == frames + injects. Any
@@ -346,12 +372,18 @@ fn fd_hygiene_1k_uds_pairs() {
         let total = text.lines().filter(|l| l.starts_with('n')).count();
         // Only THIS test's sockets (sibling tests hold live cgap-stress-*
         // pairs concurrently; their paths never carry the -fd tag).
-        let ours = text.lines().filter(|l| l.contains("cgap-stress-") && l.contains("-fd")).count();
+        let ours = text
+            .lines()
+            .filter(|l| l.contains("cgap-stress-") && l.contains("-fd"))
+            .count();
         (total, ours)
     }
 
     let (before_total, before_ours) = fd_count();
-    assert!(before_total > 0, "vacuous court: lsof listed no fds for this process");
+    assert!(
+        before_total > 0,
+        "vacuous court: lsof listed no fds for this process"
+    );
 
     const PAIRS: usize = 1_000;
     for i in 0..PAIRS {
@@ -368,7 +400,10 @@ fn fd_hygiene_1k_uds_pairs() {
     println!(
         "fd receipt: {PAIRS} pairs, lsof total {before_total} -> {after_total} (delta {delta}), cgap-stress sockets {before_ours} -> {after_ours}"
     );
-    assert_eq!(after_ours, 0, "no cgap-stress fd sockets left open after teardown");
+    assert_eq!(
+        after_ours, 0,
+        "no cgap-stress fd sockets left open after teardown"
+    );
     assert!(
         delta.abs() <= 4,
         "fd leak: lsof delta {delta} exceeds transient tolerance"

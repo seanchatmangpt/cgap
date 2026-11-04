@@ -764,13 +764,11 @@ mod tests {
         let packed_a = pack_vertical(&col_a, w);
         let packed_b = pack_vertical(&col_b, w);
         let mut got = alloc::vec![0u64; N.div_ceil(64)];
-        let rows = semi_join_two_hop(
-            &packed_a, &packed_b, w, lo_a, hi_a, lo_b, hi_b, &mut got,
-        );
+        let rows = semi_join_two_hop(&packed_a, &packed_b, w, lo_a, hi_a, lo_b, hi_b, &mut got);
         let mut expect_rows = 0u64;
         for i in 0..N {
-            let ok = (lo_a <= col_a[i] && col_a[i] <= hi_a)
-                && (lo_b <= col_b[i] && col_b[i] <= hi_b);
+            let ok =
+                (lo_a <= col_a[i] && col_a[i] <= hi_a) && (lo_b <= col_b[i] && col_b[i] <= hi_b);
             if ok {
                 expect_rows += 1;
             } else {
@@ -785,9 +783,7 @@ mod tests {
         // semantics); re-derive the mask from scratch and compare exactly.
         let mut expect = alloc::vec![0u64; N.div_ceil(64)];
         for i in 0..N {
-            if (lo_a <= col_a[i] && col_a[i] <= hi_a)
-                && (lo_b <= col_b[i] && col_b[i] <= hi_b)
-            {
+            if (lo_a <= col_a[i] && col_a[i] <= hi_a) && (lo_b <= col_b[i] && col_b[i] <= hi_b) {
                 expect[i / 64] |= 1u64 << (i % 64);
             }
         }

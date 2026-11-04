@@ -275,7 +275,9 @@ fn build_frame(
 fn expected_tag(win: &[u8], bl: usize, scratch: &mut [u8; 60 + BODY_CAP]) -> [u8; TAG_BYTES] {
     scratch[..60].copy_from_slice(&win[8..68]);
     scratch[60..60 + bl].copy_from_slice(&win[BODY_AT..BODY_AT + bl]);
-    blake3::hash(&scratch[..60 + bl])[..TAG_BYTES].try_into().expect("blake3 32B")
+    blake3::hash(&scratch[..60 + bl])[..TAG_BYTES]
+        .try_into()
+        .expect("blake3 32B")
 }
 
 /// Real cgap-arrow blake3 as the chain digest seam (ab-12 substrate).
@@ -307,7 +309,8 @@ fn read_window(rx: &mut UnixStream, buf: &mut [u8; WIN_MAX]) -> usize {
     let bl = u32::from_le_bytes(buf[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
     assert!(bl <= BODY_CAP, "bench body cap on wire");
     let rest = bl + ((bl + 63) & !63) + 8;
-    rx.read_exact(&mut buf[BODY_AT..BODY_AT + rest]).expect("bench read body");
+    rx.read_exact(&mut buf[BODY_AT..BODY_AT + rest])
+        .expect("bench read body");
     BODY_AT + rest
 }
 
@@ -362,7 +365,8 @@ fn run_i1(frames: usize) -> (u64, u32, u32, (usize, usize)) {
     let wall0 = Instant::now();
     for i in 0..frames {
         let wl = read_window(&mut rx, &mut win);
-        let bl = u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
+        let bl =
+            u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
         let t0 = Instant::now();
         let r = verify_prefix(&win[..wl], bl, i as u32, i as u32, &mut scratch);
         lat.push(ns(t0.elapsed()));
@@ -437,9 +441,8 @@ fn run_i2_lane(
                 freezes += 1;
             }
             let wl = read_window(&mut rx, &mut win);
-            let bl = u32::from_le_bytes(
-                win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"),
-            ) as usize;
+            let bl = u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"))
+                as usize;
             let t0 = Instant::now();
             let r = verify_prefix(&win[..wl], bl, i as u32, i as u32, &mut scratch);
             lat.push(ns(t0.elapsed()));
@@ -545,16 +548,20 @@ fn churn_cycle(
         // advances it) — the frame is stamped (ord, seq), verified at same.
         let (ord, seq) = writer.cursor();
         let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
-        let bl = u32::from_le_bytes(
-            out[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"),
-        ) as usize;
+        let bl =
+            u32::from_le_bytes(out[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
         let mut tag_scratch = [0u8; 60 + BODY_CAP];
         verify_prefix(&out[..wl], bl, ord, seq, &mut tag_scratch).expect("I5 frame lawful");
         let mut chain = chain.lock().expect("chain lock");
-        chain.append(EPOCH, &out[BODY_AT..BODY_AT + bl]).expect("chain append");
+        chain
+            .append(EPOCH, &out[BODY_AT..BODY_AT + bl])
+            .expect("chain append");
         drop(chain);
         let mut d = delivered.lock().expect("delivered lock");
-        assert!(!d[lane * I5_FRAMES_PER_LANE + i], "I5: frame delivered twice");
+        assert!(
+            !d[lane * I5_FRAMES_PER_LANE + i],
+            "I5: frame delivered twice"
+        );
         d[lane * I5_FRAMES_PER_LANE + i] = true;
         drop(d);
         // Window reuse: copy into the consumer-side buffer to mirror the
@@ -620,7 +627,11 @@ fn rfc0089_conformance_suite() {
     // ---- I1 bimodal deluge (release-fenced; loud SKIP in debug) ----------
     if release {
         let (rps, p50, p99, alloc) = run_i1(I1_FRAMES);
-        let class = if rps >= I1_TARGET_RPS_CORE { Class::Meets } else { Class::Unmet };
+        let class = if rps >= I1_TARGET_RPS_CORE {
+            Class::Meets
+        } else {
+            Class::Unmet
+        };
         rows.push(Row {
             gate: "G1 I1 throughput (scaled 200k-frame proxy)",
             target: format!(">={} req/s/pair", I1_TARGET_RPS_CORE),
@@ -628,7 +639,11 @@ fn rfc0089_conformance_suite() {
             class,
         });
         // G6: the consumer pipeline must be zero-alloc under the deluge.
-        let class = if alloc == (0, 0) { Class::Meets } else { Class::Unmet };
+        let class = if alloc == (0, 0) {
+            Class::Meets
+        } else {
+            Class::Unmet
+        };
         rows.push(Row {
             gate: "G6 I1 consumer alloc census",
             target: "0 allocs / 0 bytes".into(),
@@ -670,7 +685,11 @@ fn rfc0089_conformance_suite() {
         let (h50, h99) = dist_line("I2 healthy lanes under stall", &mut healthy);
         let ratio = f64::from(h99) / f64::from(b99.max(1));
         println!("  I2 freeze windows executed: {freezes}");
-        let class = if ratio <= 1.5 { Class::Meets } else { Class::Unmet };
+        let class = if ratio <= 1.5 {
+            Class::Meets
+        } else {
+            Class::Unmet
+        };
         rows.push(Row {
             gate: "G2 I2 healthy-lane isolation",
             target: "healthy p99 <= 1.5x baseline p99".into(),
@@ -710,8 +729,14 @@ fn rfc0089_conformance_suite() {
             let off = offs[fi];
             let bl = blens[fi];
             let t0 = Instant::now();
-            verify_prefix(&slab[off..off + 264], bl, fi as u32, fi as u32, &mut scratch)
-                .expect("I3 strided lawful");
+            verify_prefix(
+                &slab[off..off + 264],
+                bl,
+                fi as u32,
+                fi as u32,
+                &mut scratch,
+            )
+            .expect("I3 strided lawful");
             stride.push(ns(t0.elapsed()));
             let _ = k;
         }
@@ -723,7 +748,11 @@ fn rfc0089_conformance_suite() {
             gate: "G3 I3 cache-stride decode inflation",
             target: "strided p99 <= 2x contiguous p99 (AF-37 ref: 450 ns decode p99)".into(),
             measured: format!("contiguous p99 {b99} ns; strided p99 {s99} ns; ratio {ratio:.3}x"),
-            class: if ratio <= 2.0 { Class::Meets } else { Class::Unmet },
+            class: if ratio <= 2.0 {
+                Class::Meets
+            } else {
+                Class::Unmet
+            },
         });
     } else {
         println!("I3 SKIP: {}", profile_guard::assert_release().unwrap_err());
@@ -769,9 +798,8 @@ fn rfc0089_conformance_suite() {
         let mut scratch = [0u8; 60 + BODY_CAP];
         for i in 0..I4_FRAMES {
             let wl = read_window(&mut rx, &mut win);
-            let bl = u32::from_le_bytes(
-                win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"),
-            ) as usize;
+            let bl = u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"))
+                as usize;
             let t0 = Instant::now();
             let r = verify_prefix(&win[..wl], bl, i as u32, i as u32, &mut scratch);
             let d = ns(t0.elapsed());
@@ -788,7 +816,11 @@ fn rfc0089_conformance_suite() {
         let (a50, a99) = dist_line("I4 admit latency", &mut admit);
         let (r50, r99) = dist_line("I4 reject latency", &mut reject);
         let delta = (i64::from(a50) - i64::from(r50)).unsigned_abs() as u32;
-        let class = if delta <= I4_PARITY_FENCE_NS { Class::Meets } else { Class::Unmet };
+        let class = if delta <= I4_PARITY_FENCE_NS {
+            Class::Meets
+        } else {
+            Class::Unmet
+        };
         rows.push(Row {
             gate: "G4 I4 tamper parity (absolute fence, RFC §6)",
             target: format!("|admit p50 - reject p50| <= {} ns", I4_PARITY_FENCE_NS),
@@ -856,7 +888,10 @@ fn rfc0089_conformance_suite() {
         println!("  I5 kills executed: {total_kills}/{unique_kills}");
         let d = delivered.lock().expect("delivered lock");
         let ok = d.iter().all(|&b| b);
-        assert!(ok, "I5: every frame in the 8x500 fanout delivered exactly once");
+        assert!(
+            ok,
+            "I5: every frame in the 8x500 fanout delivered exactly once"
+        );
         let class = if ok { Class::Meets } else { Class::Unmet };
         rows.push(Row {
             gate: "G5 I5 churn zero-loss",
@@ -864,7 +899,11 @@ fn rfc0089_conformance_suite() {
                 "{} kills / {}x{} fanout, zero loss or duplication",
                 I5_KILLS, I5_LANES, I5_FRAMES_PER_LANE
             ),
-            measured: format!("all {} frames delivered once; {} respawns", I5_LANES * I5_FRAMES_PER_LANE, total_kills),
+            measured: format!(
+                "all {} frames delivered once; {} respawns",
+                I5_LANES * I5_FRAMES_PER_LANE,
+                total_kills
+            ),
             class,
         });
     }
@@ -940,7 +979,11 @@ fn rfc0089_full_mode() {
     }
     println!("I1 FULL MODE: {} frames (spec scale)", I1_FULL_FRAMES);
     let (rps, p50, p99, alloc) = run_i1(I1_FULL_FRAMES);
-    let class = if rps >= I1_TARGET_RPS_CORE { "MEASURED/MEETS" } else { "MEASURED/UNMET" };
+    let class = if rps >= I1_TARGET_RPS_CORE {
+        "MEASURED/MEETS"
+    } else {
+        "MEASURED/UNMET"
+    };
     println!(
         "G1 full-mode row: {rps} req/s vs target {} — {class} (p50 {p50} p99 {p99} ns, alloc {alloc:?})",
         I1_TARGET_RPS_CORE
@@ -986,7 +1029,8 @@ fn rfc0089_tamper_refusal_typing() {
     let (mut admits, mut rejects) = (0usize, 0usize);
     for i in 0..frames {
         let wl = read_window(&mut rx, &mut win);
-        let bl = u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
+        let bl =
+            u32::from_le_bytes(win[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B")) as usize;
         match verify_prefix(&win[..wl], bl, i as u32, i as u32, &mut scratch) {
             Ok(()) => admits += 1,
             Err(AoqError::DigestMismatch { .. }) => rejects += 1,
@@ -998,7 +1042,10 @@ fn rfc0089_tamper_refusal_typing() {
     println!("typing: corrupt={corrupt} admits={admits} rejects={rejects}");
     assert_eq!(admits + rejects, frames, "accounting");
     assert_eq!(rejects, corrupt, "every tampered frame refused");
-    assert!(rejects > 0 && admits > 0, "both classes witnessed (non-vacuous)");
+    assert!(
+        rejects > 0 && admits > 0,
+        "both classes witnessed (non-vacuous)"
+    );
     println!("tamper typing: {admits} admits, {rejects} typed refusals (injected {corrupt})");
 }
 
@@ -1020,7 +1067,10 @@ fn shake32(parts: &[&[u8]]) -> [u8; 32] {
 struct TestKem;
 
 impl KemSeam for TestKem {
-    fn encapsulate(&self, ek: &[u8; EK_BYTES]) -> Result<([u8; CT_BYTES], [u8; SS_BYTES],), cgap_aoq::session::SessionError> {
+    fn encapsulate(
+        &self,
+        ek: &[u8; EK_BYTES],
+    ) -> Result<([u8; CT_BYTES], [u8; SS_BYTES]), cgap_aoq::session::SessionError> {
         let ss = shake32(&[b"rx2/testkem/ss", ek]);
         let mut ct = [0u8; CT_BYTES];
         for (i, slot) in ct.iter_mut().enumerate() {
@@ -1028,7 +1078,11 @@ impl KemSeam for TestKem {
         }
         Ok((ct, ss))
     }
-    fn decapsulate(&self, dk: &[u8], _ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], cgap_aoq::session::SessionError> {
+    fn decapsulate(
+        &self,
+        dk: &[u8],
+        _ct: &[u8; CT_BYTES],
+    ) -> Result<[u8; SS_BYTES], cgap_aoq::session::SessionError> {
         let mut ek = [0u8; EK_BYTES];
         ek.copy_from_slice(dk);
         Ok(shake32(&[b"rx2/testkem/ss", &ek]))
@@ -1065,7 +1119,10 @@ fn rfc0089_profile_guard_witness() {
             println!("profile guard: release witnessed");
         }
         Err(v) => {
-            assert!(cfg!(debug_assertions), "violation must carry the debug axis");
+            assert!(
+                cfg!(debug_assertions),
+                "violation must carry the debug axis"
+            );
             println!("profile guard: loud-SKIP witnessed ({v})");
         }
     }

@@ -242,8 +242,7 @@ pub struct OcelEventVector {
 const _: () = assert!(size_of::<OcelEventVector>() == 120);
 const _: () = assert!(align_of::<OcelEventVector>() == 8);
 const _: () = assert!(
-    size_of::<OcelEventVector>()
-        == 24 + OCEL2_MAX_OBJECTS_PER_EVENT * 8 + OCEL2_ATTR_WORDS * 8
+    size_of::<OcelEventVector>() == 24 + OCEL2_MAX_OBJECTS_PER_EVENT * 8 + OCEL2_ATTR_WORDS * 8
 ); // gap-free self-check
 
 const _: () = assert!(offset_of!(OcelEventVector, event_id) == 0);
@@ -364,7 +363,9 @@ pub enum Ocel2Error {
 impl fmt::Display for Ocel2Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Ocel2Error::InternTableFull => write!(f, "intern table full (cap {OCEL2_INTERN_TABLE_CAP})"),
+            Ocel2Error::InternTableFull => {
+                write!(f, "intern table full (cap {OCEL2_INTERN_TABLE_CAP})")
+            }
             Ocel2Error::InternStringTooLong { len } => write!(
                 f,
                 "intern string {len} B exceeds the u16 wire width ({})",
@@ -386,7 +387,9 @@ impl fmt::Display for Ocel2Error {
                 write!(f, "schema version {got}, expected {expected}")
             }
             Ocel2Error::ChecksumMismatch { .. } => write!(f, "BLAKE3 checksum mismatch"),
-            Ocel2Error::Truncated { need, got } => write!(f, "truncated slab: need {need}, got {got}"),
+            Ocel2Error::Truncated { need, got } => {
+                write!(f, "truncated slab: need {need}, got {got}")
+            }
             Ocel2Error::RowPinMismatch { pinned, got } => {
                 write!(f, "row pin mismatch: frame pins {pinned}, budget {got}")
             }
@@ -504,9 +507,7 @@ impl Ocel2InternTable {
         }
         let mut code = self.next_code;
         while self.get(code).is_some() {
-            code = code
-                .checked_add(1)
-                .ok_or(Ocel2Error::InternTableFull)?; // 65535 -> typed full, never wraps to 0
+            code = code.checked_add(1).ok_or(Ocel2Error::InternTableFull)?; // 65535 -> typed full, never wraps to 0
         }
         self.entries.push((code, s.to_owned()));
         self.next_code = code.saturating_add(1);
@@ -525,10 +526,7 @@ impl Ocel2InternTable {
     /// Existing code for `s`, if already interned (never assigns).
     #[must_use]
     pub fn code_of(&self, s: &str) -> Option<u16> {
-        self.entries
-            .iter()
-            .find(|(_, e)| e == s)
-            .map(|(c, _)| *c)
+        self.entries.iter().find(|(_, e)| e == s).map(|(c, _)| *c)
     }
 
     /// Number of interned entries.
@@ -569,12 +567,14 @@ impl Ocel2InternTable {
         for _ in 0..count {
             let code = read_u16(src, pos)?;
             let len = read_u16(src, pos)? as usize;
-            let end = pos
-                .checked_add(len)
-                .ok_or(Ocel2Error::Truncated { need: len, got: src.len() })?;
-            let bytes = src
-                .get(*pos..end)
-                .ok_or(Ocel2Error::Truncated { need: len, got: src.len() - *pos })?;
+            let end = pos.checked_add(len).ok_or(Ocel2Error::Truncated {
+                need: len,
+                got: src.len(),
+            })?;
+            let bytes = src.get(*pos..end).ok_or(Ocel2Error::Truncated {
+                need: len,
+                got: src.len() - *pos,
+            })?;
             *pos = end;
             if code == 0 {
                 return Err(Ocel2Error::InternCodeZero);
@@ -604,10 +604,7 @@ impl Ocel2InternTable {
             }
             self.entries.push((code, s.to_owned()));
         }
-        self.next_code = self
-            .entries
-            .last()
-            .map_or(1, |(c, _)| c.saturating_add(1));
+        self.next_code = self.entries.last().map_or(1, |(c, _)| c.saturating_add(1));
         Ok(())
     }
 }
@@ -763,12 +760,7 @@ impl Ocel2ColumnarLog {
         for k in 0..i.min(self.object_count.len()) {
             start = start.saturating_add(self.object_count[k] as usize);
         }
-        let end = start.saturating_add(
-            self.object_count
-                .get(i)
-                .copied()
-                .unwrap_or(0) as usize,
-        );
+        let end = start.saturating_add(self.object_count.get(i).copied().unwrap_or(0) as usize);
         let end = end.min(self.object_ids.len());
         let start = start.min(end);
         &self.object_ids[start..end]
@@ -886,12 +878,14 @@ pub fn decompress_u64_column(frame: &[u8], out: &mut [u64]) -> Result<usize, Oce
     let mut lanes: Vec<u32> = vec![0; n as usize];
     for plane in 0..8 {
         let len = read_u32(frame, &mut pos)? as usize;
-        let end = pos
-            .checked_add(len)
-            .ok_or(Ocel2Error::Truncated { need: len, got: frame.len() })?;
-        let src = frame
-            .get(pos..end)
-            .ok_or(Ocel2Error::Truncated { need: len, got: frame.len() - pos })?;
+        let end = pos.checked_add(len).ok_or(Ocel2Error::Truncated {
+            need: len,
+            got: frame.len(),
+        })?;
+        let src = frame.get(pos..end).ok_or(Ocel2Error::Truncated {
+            need: len,
+            got: frame.len() - pos,
+        })?;
         pos = end;
         rle_decode(src, &mut lanes).map_err(Ocel2Error::PlaneDecode)?;
         for (k, lane) in lanes.iter().enumerate() {
@@ -933,12 +927,14 @@ pub fn decompress_u16_column(frame: &[u8], out: &mut [u16]) -> Result<usize, Oce
     let mut lanes: Vec<u32> = vec![0; n as usize];
     for plane in 0..2 {
         let len = read_u32(frame, &mut pos)? as usize;
-        let end = pos
-            .checked_add(len)
-            .ok_or(Ocel2Error::Truncated { need: len, got: frame.len() })?;
-        let src = frame
-            .get(pos..end)
-            .ok_or(Ocel2Error::Truncated { need: len, got: frame.len() - pos })?;
+        let end = pos.checked_add(len).ok_or(Ocel2Error::Truncated {
+            need: len,
+            got: frame.len(),
+        })?;
+        let src = frame.get(pos..end).ok_or(Ocel2Error::Truncated {
+            need: len,
+            got: frame.len() - pos,
+        })?;
         pos = end;
         rle_decode(src, &mut lanes).map_err(Ocel2Error::PlaneDecode)?;
         for (k, lane) in lanes.iter().enumerate() {
@@ -1234,51 +1230,49 @@ fn decode_header(b: &[u8]) -> Result<Ocel2SlabHeader, Ocel2Error> {
 }
 
 fn read_u8(src: &[u8], pos: &mut usize) -> Result<u8, Ocel2Error> {
-    let b = src
-        .get(*pos)
-        .ok_or(Ocel2Error::Truncated { need: 1, got: src.len() })?;
+    let b = src.get(*pos).ok_or(Ocel2Error::Truncated {
+        need: 1,
+        got: src.len(),
+    })?;
     *pos += 1;
     Ok(*b)
 }
 
 fn read_u16(src: &[u8], pos: &mut usize) -> Result<u16, Ocel2Error> {
-    let end = pos
-        .checked_add(2)
-        .ok_or(Ocel2Error::Truncated { need: 2, got: src.len() })?;
-    let s = src
-        .get(*pos..end)
-        .ok_or(Ocel2Error::Truncated {
-            need: 2,
-            got: src.len() - *pos,
-        })?;
+    let end = pos.checked_add(2).ok_or(Ocel2Error::Truncated {
+        need: 2,
+        got: src.len(),
+    })?;
+    let s = src.get(*pos..end).ok_or(Ocel2Error::Truncated {
+        need: 2,
+        got: src.len() - *pos,
+    })?;
     *pos = end;
     Ok(u16::from_le_bytes([s[0], s[1]]))
 }
 
 fn read_u32(src: &[u8], pos: &mut usize) -> Result<u32, Ocel2Error> {
-    let end = pos
-        .checked_add(4)
-        .ok_or(Ocel2Error::Truncated { need: 4, got: src.len() })?;
-    let s = src
-        .get(*pos..end)
-        .ok_or(Ocel2Error::Truncated {
-            need: 4,
-            got: src.len() - *pos,
-        })?;
+    let end = pos.checked_add(4).ok_or(Ocel2Error::Truncated {
+        need: 4,
+        got: src.len(),
+    })?;
+    let s = src.get(*pos..end).ok_or(Ocel2Error::Truncated {
+        need: 4,
+        got: src.len() - *pos,
+    })?;
     *pos = end;
     Ok(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
 }
 
 fn read_u64(src: &[u8], pos: &mut usize) -> Result<u64, Ocel2Error> {
-    let end = pos
-        .checked_add(8)
-        .ok_or(Ocel2Error::Truncated { need: 8, got: src.len() })?;
-    let s = src
-        .get(*pos..end)
-        .ok_or(Ocel2Error::Truncated {
-            need: 8,
-            got: src.len() - *pos,
-        })?;
+    let end = pos.checked_add(8).ok_or(Ocel2Error::Truncated {
+        need: 8,
+        got: src.len(),
+    })?;
+    let s = src.get(*pos..end).ok_or(Ocel2Error::Truncated {
+        need: 8,
+        got: src.len() - *pos,
+    })?;
     *pos = end;
     Ok(u64::from_le_bytes([
         s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
@@ -1388,10 +1382,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let dir = std::env::temp_dir().join(format!(
-            "cgap-a15-{tag}-{}-{nanos}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("cgap-a15-{tag}-{}-{nanos}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -1526,7 +1518,11 @@ mod tests {
             Err(Ocel2Error::ChecksumMismatch { .. })
         ));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert!(open_slab(&path).is_ok(), "re-open after restore");
 
         // 2. Header event_row_count flip -> header-vs-frame cross-pin.
@@ -1537,14 +1533,22 @@ mod tests {
             "header count mutation must be refused by a typed pin/truncation error"
         );
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert!(open_slab(&path).is_ok(), "re-open after restore");
 
         // 3. Magic byte flip -> magic mismatch.
         mutate(0);
         assert!(matches!(open_slab(&path), Err(Ocel2Error::MagicMismatch)));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         let reopened = open_slab(&path).unwrap();
         assert_logs_equal(&log, &reopened);
         let _ = std::fs::remove_dir_all(&dir);
@@ -1594,9 +1598,7 @@ mod tests {
             vec_for(3, 300, C, 2000),
         ];
         let mut status: u32 = u32::MAX;
-        let sealed = unsafe {
-            audit_ocel2_append(cpath.as_ptr(), events.as_ptr(), 3, &mut status)
-        };
+        let sealed = unsafe { audit_ocel2_append(cpath.as_ptr(), events.as_ptr(), 3, &mut status) };
         assert_eq!(sealed, 3, "export must return the pinned event row count");
         assert_eq!(status, Ocel2Status::Ok.code());
         let log = open_slab(&path).unwrap();
@@ -1674,7 +1676,10 @@ mod tests {
         bad.push(b'x');
         let mut t3 = Ocel2InternTable::new();
         let mut pos3 = 0usize;
-        assert!(matches!(t3.decode(&bad, &mut pos3), Err(Ocel2Error::InternCodeZero)));
+        assert!(matches!(
+            t3.decode(&bad, &mut pos3),
+            Err(Ocel2Error::InternCodeZero)
+        ));
     }
 
     /// Wave-4 court helper: rewrite ONLY the 64 B header of a real sealed
@@ -1708,10 +1713,17 @@ mod tests {
         rewrite_header(&path, |h| h.event_row_count = u32::MAX);
         assert!(matches!(
             open_slab(&path),
-            Err(Ocel2Error::CapacityExceeded { what: "event_id", .. })
+            Err(Ocel2Error::CapacityExceeded {
+                what: "event_id",
+                ..
+            })
         ));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert!(open_slab(&path).is_ok(), "re-open after restore");
 
         // 2. object budget forged to u32::MAX (same class, registry path —
@@ -1719,10 +1731,17 @@ mod tests {
         rewrite_header(&path, |h| h.object_row_count = u32::MAX);
         assert!(matches!(
             open_slab(&path),
-            Err(Ocel2Error::CapacityExceeded { what: "object rows", .. })
+            Err(Ocel2Error::CapacityExceeded {
+                what: "object rows",
+                ..
+            })
         ));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         let reopened = open_slab(&path).unwrap();
         assert_logs_equal(&log, &reopened);
         let _ = std::fs::remove_dir_all(&dir);
@@ -1747,7 +1766,11 @@ mod tests {
             })
         ));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert!(open_slab(&path).is_ok(), "re-open after restore");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1780,7 +1803,11 @@ mod tests {
             Err(Ocel2Error::TrailingBytes { got: 1 })
         ));
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         let reopened = open_slab(&path).unwrap();
         assert_logs_equal(&log, &reopened);
         let _ = std::fs::remove_dir_all(&dir);
@@ -2014,8 +2041,15 @@ mod tests {
         // Tier 1: two independent seals of ONE log are byte-identical (the
         // wire form is a pure function of the log, not of the run).
         let seal_c = seal_to_slab(&log, &pc).unwrap();
-        assert_eq!(seal_a, seal_c, "seal receipt must be a pure function of the log");
-        assert_eq!(std::fs::read(&pc).unwrap(), bytes_a, "seal bytes must be identical");
+        assert_eq!(
+            seal_a, seal_c,
+            "seal receipt must be a pure function of the log"
+        );
+        assert_eq!(
+            std::fs::read(&pc).unwrap(),
+            bytes_a,
+            "seal bytes must be identical"
+        );
 
         // Tier 2: open → re-seal is byte-exact (the decoded log re-encodes
         // to the same wire bytes — no round-trip drift, bit-for-bit).
@@ -2142,7 +2176,10 @@ mod tests {
         std::fs::write(&path, &bytes).unwrap();
         assert!(matches!(
             open_slab(&path),
-            Err(Ocel2Error::CapacityExceeded { what: "event_id", .. })
+            Err(Ocel2Error::CapacityExceeded {
+                what: "event_id",
+                ..
+            })
         ));
         let mut bytes = original.clone();
         bytes[OCEL2_HEADER_BYTES + 5] ^= 0xFF;
@@ -2176,7 +2213,11 @@ mod tests {
 
         // Real restore, byte-exact, re-open clean (shim-court discipline).
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert_logs_equal(&log, &open_slab(&path).unwrap());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2220,8 +2261,15 @@ mod tests {
                 Err(e) => panic!("power-cut sweep: unexpected tear class at k={k}: {e}"),
             }
         }
-        assert_eq!(truncated, OCEL2_HEADER_BYTES as u32, "header-cut class count");
-        assert_eq!(checksum, (n - OCEL2_HEADER_BYTES) as u32, "payload-cut class count");
+        assert_eq!(
+            truncated, OCEL2_HEADER_BYTES as u32,
+            "header-cut class count"
+        );
+        assert_eq!(
+            checksum,
+            (n - OCEL2_HEADER_BYTES) as u32,
+            "payload-cut class count"
+        );
 
         // Sweep 2 — every single header-byte flip. Exactly the 9 v1
         // ignore-on-read bytes tolerate a flip (documented); all other 55
@@ -2243,8 +2291,14 @@ mod tests {
                 refused += 1;
             }
         }
-        assert_eq!(refused, 55, "load-bearing header bytes must all fail closed");
-        assert_eq!(tolerated, 9, "exactly the documented v1 ignore-on-read bytes");
+        assert_eq!(
+            refused, 55,
+            "load-bearing header bytes must all fail closed"
+        );
+        assert_eq!(
+            tolerated, 9,
+            "exactly the documented v1 ignore-on-read bytes"
+        );
 
         // Sweep 3 — every single payload-byte flip is authenticated out.
         let mut flipped = 0u32;
@@ -2262,7 +2316,11 @@ mod tests {
 
         // The committed full file opens and equals (cut-vs-commit law).
         std::fs::write(&path, &original).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), original, "restore byte-exact");
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            original,
+            "restore byte-exact"
+        );
         assert_logs_equal(&log, &open_slab(&path).unwrap());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2282,7 +2340,8 @@ mod tests {
         const OBJECTS: u64 = 1_000;
         let dir = court_dir("w9-stress");
         let path = dir.join("stress.ocel2");
-        let mut log = Ocel2ColumnarLog::with_capacity(ROWS as usize, ROWS as usize, OBJECTS as usize);
+        let mut log =
+            Ocel2ColumnarLog::with_capacity(ROWS as usize, ROWS as usize, OBJECTS as usize);
 
         let t0 = std::time::Instant::now();
         for i in 0..ROWS {

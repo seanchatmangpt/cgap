@@ -107,7 +107,10 @@ fn tampered_and_cloned_refuse_typed() {
             );
         }
     }
-    assert_eq!(mutations_run, 640, "all 640 mutations must run (anti-vacuity)");
+    assert_eq!(
+        mutations_run, 640,
+        "all 640 mutations must run (anti-vacuity)"
+    );
 
     // MAC wire tampering: any single-bit flip of the 48-B MAC wire also
     // refuses (tag or key_id).

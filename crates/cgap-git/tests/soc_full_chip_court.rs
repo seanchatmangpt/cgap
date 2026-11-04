@@ -110,12 +110,20 @@ unsafe impl GlobalAlloc for CountingAlloc {
 static GLOBAL: CountingAlloc = CountingAlloc;
 
 fn open_window() {
-    ALLOC_WINDOW.with(|w| w.set(WindowState { open: true, count: 0 }));
+    ALLOC_WINDOW.with(|w| {
+        w.set(WindowState {
+            open: true,
+            count: 0,
+        })
+    });
 }
 fn close_window() -> usize {
     ALLOC_WINDOW.with(|w| {
         let s = w.get();
-        w.set(WindowState { open: false, count: s.count });
+        w.set(WindowState {
+            open: false,
+            count: s.count,
+        });
         s.count
     })
 }

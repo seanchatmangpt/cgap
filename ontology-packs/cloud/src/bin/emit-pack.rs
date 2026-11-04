@@ -33,9 +33,9 @@ use cgap_blake3::hash;
 use cgap_bont::oabi::{OabiError, OabiHeaderV1, OabiPackV1, OabiRecordV1};
 use cgap_bont::primitives::{truncate64, ClassId, CollisionDetector, EnumId, LexHash, SlotId};
 use cgap_cloud::{
-    CLASS_COUNT, ENUM_COUNT, ENUM_FAMILIES, ENUM_NONE, ENUM_FAMILY_CREDENTIAL_TYPE,
+    CLASS_COUNT, ENUM_COUNT, ENUM_FAMILIES, ENUM_FAMILY_CREDENTIAL_TYPE,
     ENUM_FAMILY_EVENT_SEVERITY, ENUM_FAMILY_JOB_STATUS, ENUM_FAMILY_MACHINE_STATE,
-    ENUM_FAMILY_VOLUME_STATE, EQUIV_TABLE, LEXEME_TABLE,
+    ENUM_FAMILY_VOLUME_STATE, ENUM_NONE, EQUIV_TABLE, LEXEME_TABLE,
 };
 
 /// Committed pack path (lane doc file list `tosca_cimi_v1.oabi`, emitted
@@ -48,16 +48,35 @@ enum EmitError {
     /// A06 §5 hard producer obligation (DoD 9).
     SlotCollision(cgap_bont::primitives::CollisionError),
     /// Committed golden != live derivation (DoD 2/6, fail-closed).
-    GoldenDrift { lexeme: &'static str, field: &'static str },
+    GoldenDrift {
+        lexeme: &'static str,
+        field: &'static str,
+    },
     /// Equivalence table integrity (T4 basis).
-    EquivUnknownLexeme { lexeme: &'static str },
-    EquivSelfLoop { alias: &'static str },
+    EquivUnknownLexeme {
+        lexeme: &'static str,
+    },
+    EquivSelfLoop {
+        alias: &'static str,
+    },
     /// Enum-family table integrity (record EnumId semantics).
-    EnumFamilyOutOfBounds { id: u16 },
-    EnumVariantNotDense { family: &'static str, name: &'static str, value: u16 },
+    EnumFamilyOutOfBounds {
+        id: u16,
+    },
+    EnumVariantNotDense {
+        family: &'static str,
+        name: &'static str,
+        value: u16,
+    },
     /// Record field outside the header spaces (loader would refuse).
-    ClassOutOfRange { lexeme: &'static str, class: u32 },
-    FamilyOutOfRange { lexeme: &'static str, family: u16 },
+    ClassOutOfRange {
+        lexeme: &'static str,
+        class: u32,
+    },
+    FamilyOutOfRange {
+        lexeme: &'static str,
+        family: u16,
+    },
     /// The real A06 loader refused the freshly built bytes.
     LoaderRefused(OabiError),
 }
@@ -76,14 +95,27 @@ impl core::fmt::Display for EmitError {
             Self::EnumFamilyOutOfBounds { id } => {
                 write!(f, "enum family id {id} outside [0, ENUM_COUNT)")
             }
-            Self::EnumVariantNotDense { family, name, value } => {
-                write!(f, "enum family `{family}` variant `{name}` value {value} is not dense")
+            Self::EnumVariantNotDense {
+                family,
+                name,
+                value,
+            } => {
+                write!(
+                    f,
+                    "enum family `{family}` variant `{name}` value {value} is not dense"
+                )
             }
             Self::ClassOutOfRange { lexeme, class } => {
-                write!(f, "lexeme `{lexeme}` class {class} >= CLASS_COUNT {CLASS_COUNT}")
+                write!(
+                    f,
+                    "lexeme `{lexeme}` class {class} >= CLASS_COUNT {CLASS_COUNT}"
+                )
             }
             Self::FamilyOutOfRange { lexeme, family } => {
-                write!(f, "lexeme `{lexeme}` enum family {family} >= ENUM_COUNT {ENUM_COUNT}")
+                write!(
+                    f,
+                    "lexeme `{lexeme}` enum family {family} >= ENUM_COUNT {ENUM_COUNT}"
+                )
             }
             Self::LoaderRefused(e) => write!(f, "A06 loader refused fresh pack: {e}"),
         }
@@ -100,16 +132,28 @@ fn run() -> Result<String, EmitError> {
         let lex_hash = cgap_bont::primitives::lex_hash(lexeme);
         let slot = truncate64(&lex_hash);
         if row.lex_hash != lex_hash.0 {
-            return Err(EmitError::GoldenDrift { lexeme: row.lexeme, field: "lex_hash" });
+            return Err(EmitError::GoldenDrift {
+                lexeme: row.lexeme,
+                field: "lex_hash",
+            });
         }
         if row.slot != slot.0 {
-            return Err(EmitError::GoldenDrift { lexeme: row.lexeme, field: "slot" });
+            return Err(EmitError::GoldenDrift {
+                lexeme: row.lexeme,
+                field: "slot",
+            });
         }
         if row.class >= CLASS_COUNT {
-            return Err(EmitError::ClassOutOfRange { lexeme: row.lexeme, class: row.class });
+            return Err(EmitError::ClassOutOfRange {
+                lexeme: row.lexeme,
+                class: row.class,
+            });
         }
         if row.enum_family as u32 >= ENUM_COUNT {
-            return Err(EmitError::FamilyOutOfRange { lexeme: row.lexeme, family: row.enum_family });
+            return Err(EmitError::FamilyOutOfRange {
+                lexeme: row.lexeme,
+                family: row.enum_family,
+            });
         }
         records.push(OabiRecordV1 {
             slot: SlotId(row.slot),
@@ -123,16 +167,26 @@ fn run() -> Result<String, EmitError> {
     // --- equivalence-table integrity (T4 emit-side basis) ------------------
     for row in EQUIV_TABLE {
         let alias = LEXEME_TABLE.iter().find(|r| r.lexeme == row.alias_lexeme);
-        let canonical = LEXEME_TABLE.iter().find(|r| r.lexeme == row.canonical_lexeme);
+        let canonical = LEXEME_TABLE
+            .iter()
+            .find(|r| r.lexeme == row.canonical_lexeme);
         let (alias, canonical) = match (alias, canonical) {
             (Some(a), Some(c)) => (a, c),
             (missing, _) if missing.is_none() => {
-                return Err(EmitError::EquivUnknownLexeme { lexeme: row.alias_lexeme })
+                return Err(EmitError::EquivUnknownLexeme {
+                    lexeme: row.alias_lexeme,
+                })
             }
-            _ => return Err(EmitError::EquivUnknownLexeme { lexeme: row.canonical_lexeme }),
+            _ => {
+                return Err(EmitError::EquivUnknownLexeme {
+                    lexeme: row.canonical_lexeme,
+                })
+            }
         };
         if alias.slot == canonical.slot {
-            return Err(EmitError::EquivSelfLoop { alias: row.alias_lexeme });
+            return Err(EmitError::EquivSelfLoop {
+                alias: row.alias_lexeme,
+            });
         }
     }
 
@@ -231,7 +285,10 @@ fn main() -> ExitCode {
             Ok(committed) => {
                 let regen = regen_bytes();
                 if committed == regen {
-                    println!("[emit-pack --check] committed pack == regenerated bytes ({} B)", committed.len());
+                    println!(
+                        "[emit-pack --check] committed pack == regenerated bytes ({} B)",
+                        committed.len()
+                    );
                     ExitCode::SUCCESS
                 } else {
                     eprintln!(

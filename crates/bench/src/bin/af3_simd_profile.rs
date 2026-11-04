@@ -157,7 +157,11 @@ fn main() {
     for &bytes in sizes.iter() {
         let mut buf = vec![0u8; bytes];
         fill(&mut buf);
-        let r = if bytes <= 1024 * 1024 { rounds * 4 } else { rounds };
+        let r = if bytes <= 1024 * 1024 {
+            rounds * 4
+        } else {
+            rounds
+        };
         let t_scalar = time_min(
             || {
                 let d = hash(&buf);
@@ -190,7 +194,11 @@ fn main() {
     for &bytes in [64 * 1024usize, 1024 * 1024].iter() {
         let mut buf = vec![0u8; bytes];
         fill(&mut buf);
-        let r = if bytes <= 64 * 1024 { rounds * 4 } else { rounds };
+        let r = if bytes <= 64 * 1024 {
+            rounds * 4
+        } else {
+            rounds
+        };
 
         let t_full = time_min(
             || {
@@ -222,9 +230,21 @@ fn main() {
         );
 
         println!("\n--- attribution @ {} ---", bytes);
-        println!("wide full:        {:>9.1} MiB/s  ({:.2} us)", mib_s(bytes, t_full), t_full * 1e6);
-        println!("leaf-only:        {:>9.1} MiB/s  ({:.2} us)", mib_s(bytes, t_leaf), t_leaf * 1e6);
-        println!("scalar hash full: {:>9.1} MiB/s  ({:.2} us)", mib_s(bytes, t_scalar), t_scalar * 1e6);
+        println!(
+            "wide full:        {:>9.1} MiB/s  ({:.2} us)",
+            mib_s(bytes, t_full),
+            t_full * 1e6
+        );
+        println!(
+            "leaf-only:        {:>9.1} MiB/s  ({:.2} us)",
+            mib_s(bytes, t_leaf),
+            t_leaf * 1e6
+        );
+        println!(
+            "scalar hash full: {:>9.1} MiB/s  ({:.2} us)",
+            mib_s(bytes, t_scalar),
+            t_scalar * 1e6
+        );
         println!(
             "parent cost (wide)   = full - leaf = {:.2} us ({:.1}% of full)",
             (t_full - t_leaf) * 1e6,

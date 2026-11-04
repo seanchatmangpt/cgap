@@ -28,9 +28,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 
 use cgap_arrow::blake3;
-use cgap_arrow::ipc::{
-    read, seal_meta, window_len, MetaHeader, CONTINUATION, EOS, MAGIC,
-};
+use cgap_arrow::ipc::{read, seal_meta, window_len, MetaHeader, CONTINUATION, EOS, MAGIC};
 use cgap_arrow::slab::{ArrowRecordSlab, SlabError};
 use cgap_arrow::stream_writer::{StreamWriter, VectoredSink};
 
@@ -105,18 +103,19 @@ fn socket_path(tag: &str) -> PathBuf {
 /// (emit into scratch, then the type's writev scatter with partial-accept
 /// advance) and read it back on the listener side. Returns (the window
 /// bytes as written, bytes received).
-fn handoff(
-    meta: MetaHeader,
-    body: &[u8],
-    tag: &str,
-) -> (Vec<u8>, Vec<u8>) {
+fn handoff(meta: MetaHeader, body: &[u8], tag: &str) -> (Vec<u8>, Vec<u8>) {
     let path = socket_path(tag);
     let listener = UnixListener::bind(&path).expect("bind live UDS");
     let mut stream = UnixStream::connect(&path).expect("connect live UDS");
     let (mut peer, _addr) = listener.accept().expect("accept");
 
     let mut scratch = vec![0u8; window_len(body.len(), meta.alignment as usize)];
-    let mut writer = StreamWriter::with_seq(Uds { stream: &mut stream }, meta.seq);
+    let mut writer = StreamWriter::with_seq(
+        Uds {
+            stream: &mut stream,
+        },
+        meta.seq,
+    );
     let n = writer.emit(&mut scratch, meta, body).expect("emit ok");
 
     // Synchronization is the kernel read itself — no sleeps.
@@ -146,7 +145,10 @@ fn w1_writev_handoff_through_live_uds() {
     let (meta, body) = emit_body(5);
     let (w, got) = handoff(meta, &body, "w1");
     assert_eq!(w.len(), got.len(), "writev wrote the whole window");
-    assert_eq!(got, w, "byte-exact window across the live UDS writev handoff");
+    assert_eq!(
+        got, w,
+        "byte-exact window across the live UDS writev handoff"
+    );
 
     // IPC1 layout pins on the RECEIVED bytes, not the emitted ones.
     assert_eq!(&got[0..4], &CONTINUATION.to_le_bytes());
@@ -156,19 +158,11 @@ fn w1_writev_handoff_through_live_uds() {
     assert_eq!(u16::from_le_bytes([got[12], got[13]]), 1, "layout version");
     let body_at = 8 + 120usize;
     assert_eq!(body_at % 64, 0, "body starts 64-aligned");
-    let got_body_len = u32::from_le_bytes([
-        got[0x28 + 8],
-        got[0x29 + 8],
-        got[0x2A + 8],
-        got[0x2B + 8],
-    ]);
+    let got_body_len =
+        u32::from_le_bytes([got[0x28 + 8], got[0x29 + 8], got[0x2A + 8], got[0x2B + 8]]);
     assert_eq!(got_body_len as usize, body.len());
-    let got_align = u32::from_le_bytes([
-        got[0x2C + 8],
-        got[0x2D + 8],
-        got[0x2E + 8],
-        got[0x2F + 8],
-    ]);
+    let got_align =
+        u32::from_le_bytes([got[0x2C + 8], got[0x2D + 8], got[0x2E + 8], got[0x2F + 8]]);
     assert_eq!(got_align, 64);
     assert_eq!(
         &got[body_at..body_at + body.len()],
@@ -181,7 +175,10 @@ fn w1_writev_handoff_through_live_uds() {
             .all(|&b| b == 0),
         "body padding zero-filled"
     );
-    assert_eq!(&got[got.len() - 8..got.len() - 4], &CONTINUATION.to_le_bytes());
+    assert_eq!(
+        &got[got.len() - 8..got.len() - 4],
+        &CONTINUATION.to_le_bytes()
+    );
     assert_eq!(&got[got.len() - 4..], &EOS.to_le_bytes());
 }
 
@@ -197,7 +194,11 @@ fn w2_received_window_decodes_via_read() {
     let mut out = vec![0u8; body.len()];
     let n = read(&got, Some(&digest), &mut out).expect("read ok");
     assert_eq!(n, body.len());
-    assert_eq!(&out[..n], slab.as_bytes(), "socket bytes decode to the exact slab body");
+    assert_eq!(
+        &out[..n],
+        slab.as_bytes(),
+        "socket bytes decode to the exact slab body"
+    );
 }
 
 /// W4 (anti-vacuity): corrupt one body byte of the lane's own in-memory
@@ -220,7 +221,10 @@ fn w4_mutated_window_flips_the_byte_diff_court() {
     let (w, got) = handoff(meta, &body, "w4");
     // The mutation survives the socket byte-exact (writev fidelity) but
     // the byte-diff court flips against the pristine slab body.
-    assert_eq!(got[body_at], w[body_at], "mutation survived the socket byte-exact");
+    assert_eq!(
+        got[body_at], w[body_at],
+        "mutation survived the socket byte-exact"
+    );
     assert_ne!(
         &got[body_at..body_at + body.len()],
         &slab.as_bytes()[..],
@@ -230,6 +234,7 @@ fn w4_mutated_window_flips_the_byte_diff_court() {
     // future body-integrity fix in ipc.rs flips this court too).
     let digest = schema_digest_of(&slab.as_bytes().to_vec());
     let mut out = vec![0u8; body.len()];
-    let n = read(&got, Some(&digest), &mut out).expect("scoped finding: read accepts a body-corrupted window");
+    let n = read(&got, Some(&digest), &mut out)
+        .expect("scoped finding: read accepts a body-corrupted window");
     assert_eq!(n, body.len());
 }

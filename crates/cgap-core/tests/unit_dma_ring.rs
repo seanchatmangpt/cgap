@@ -10,7 +10,11 @@ mod common;
 use common::{leak_aligned_region, payload, valid_header, wire_frame};
 
 fn bn3_header(payload_len: u64) -> CgapFrameHeader {
-    valid_header(payload_len, cgap_blake3::hash(&payload(payload_len as usize)), 0x04)
+    valid_header(
+        payload_len,
+        cgap_blake3::hash(&payload(payload_len as usize)),
+        0x04,
+    )
 }
 
 /// A 64-aligned region partitioned into exactly `2^slot_pow2` slots, each
@@ -18,10 +22,7 @@ fn bn3_header(payload_len: u64) -> CgapFrameHeader {
 /// 64-byte slot stride). One helper so slot counts and `slot_pow2` can never
 /// disagree again.
 fn ring_region(payload_len: usize, slot_pow2: u8) -> &'static mut [u8] {
-    leak_aligned_region(common::slot_region_len(
-        payload_len,
-        1usize << slot_pow2,
-    ))
+    leak_aligned_region(common::slot_region_len(payload_len, 1usize << slot_pow2))
 }
 
 #[test]
@@ -49,10 +50,7 @@ fn new_refuses_misaligned_region_fail_closed() {
             "premise: the region base is misaligned by construction"
         );
         assert!(
-            matches!(
-                DmaRing::new(heap, 2),
-                Err(RingError::MisalignedRegion)
-            ),
+            matches!(DmaRing::new(heap, 2), Err(RingError::MisalignedRegion)),
             "region at base+{offset} must refuse MisalignedRegion"
         );
     }
@@ -62,7 +60,10 @@ fn new_refuses_misaligned_region_fail_closed() {
 fn new_refuses_undersized_and_undivisible_regions() {
     // Exactly 2 header-sized slots: no payload room → refuse (typed).
     let tight = leak_aligned_region(256);
-    assert!(matches!(DmaRing::new(tight, 1), Err(RingError::RegionTooSmall)));
+    assert!(matches!(
+        DmaRing::new(tight, 1),
+        Err(RingError::RegionTooSmall)
+    ));
 
     // 192 aligned B cannot split into 4 x 64-multiple slots → refuse (typed;
     // the aligned leak makes the refusal deterministic, never address-luck).
@@ -96,7 +97,10 @@ fn read_unpublished_slot_is_none_never_garbage() {
 fn publish_without_claim_refused_typed() {
     let region = ring_region(64, 0);
     let mut ring = DmaRing::new(region, 0).expect("region");
-    assert_eq!(ring.publish(FRAME_HEADER_LEN), Err(RingError::PublishWithoutClaim));
+    assert_eq!(
+        ring.publish(FRAME_HEADER_LEN),
+        Err(RingError::PublishWithoutClaim)
+    );
     assert!(ring.read().is_none());
 }
 
@@ -108,7 +112,9 @@ fn publish_oversize_refused_overflow() {
     let mut ring = DmaRing::new(region, 1).expect("region");
     {
         let slot = ring.claim().expect("room");
-        bn3_header(1).encode_into(&mut slot[..FRAME_HEADER_LEN]).expect("encode");
+        bn3_header(1)
+            .encode_into(&mut slot[..FRAME_HEADER_LEN])
+            .expect("encode");
         slot[FRAME_HEADER_LEN] = 0x42;
     }
     assert_eq!(ring.publish(ring.slot_size() + 1), Err(RingError::Overflow));
@@ -121,10 +127,13 @@ fn publish_oversize_refused_overflow() {
     {
         let slot = ring.claim().expect("re-claim after refusal");
         assert!(slot.iter().all(|&b| b == 0), "claim re-zeroed the slot");
-        bn3_header(1).encode_into(&mut slot[..FRAME_HEADER_LEN]).expect("encode");
+        bn3_header(1)
+            .encode_into(&mut slot[..FRAME_HEADER_LEN])
+            .expect("encode");
         slot[FRAME_HEADER_LEN] = 0x42;
     }
-    ring.publish(FRAME_HEADER_LEN + 1).expect("valid frame publishes");
+    ring.publish(FRAME_HEADER_LEN + 1)
+        .expect("valid frame publishes");
     assert_eq!(ring.pending(), 1);
 }
 
@@ -152,16 +161,23 @@ fn publish_garbage_and_len_mismatch_refused_bad_frame() {
     // Shorter than a header → refuse before decoding.
     {
         let slot = ring.claim().unwrap();
-        bn3_header(0).encode_into(&mut slot[..FRAME_HEADER_LEN]).unwrap();
+        bn3_header(0)
+            .encode_into(&mut slot[..FRAME_HEADER_LEN])
+            .unwrap();
     }
     assert_eq!(ring.publish(FRAME_HEADER_LEN - 1), Err(RingError::BadFrame));
 
     // Embedded payload_byte_len disagreeing with the publish length → refuse.
     {
         let slot = ring.claim().unwrap();
-        bn3_header(63).encode_into(&mut slot[..FRAME_HEADER_LEN]).unwrap();
+        bn3_header(63)
+            .encode_into(&mut slot[..FRAME_HEADER_LEN])
+            .unwrap();
     }
-    assert_eq!(ring.publish(FRAME_HEADER_LEN + 64), Err(RingError::BadFrame));
+    assert_eq!(
+        ring.publish(FRAME_HEADER_LEN + 64),
+        Err(RingError::BadFrame)
+    );
 
     // No refused publish leaked a frame into the consumer side.
     assert_eq!(ring.pending(), 0);
@@ -192,7 +208,9 @@ fn ring_full_claim_returns_none() {
     for i in 0u8..2 {
         {
             let slot = ring.claim().expect("room before full");
-            bn3_header(8).encode_into(&mut slot[..FRAME_HEADER_LEN]).unwrap();
+            bn3_header(8)
+                .encode_into(&mut slot[..FRAME_HEADER_LEN])
+                .unwrap();
             slot[FRAME_HEADER_LEN..FRAME_HEADER_LEN + 8].copy_from_slice(&[i; 8]);
         }
         ring.publish(FRAME_HEADER_LEN + 8).unwrap();
@@ -290,10 +308,13 @@ fn read_refuses_lying_header_written_around_the_api() {
     let mut ring = DmaRing::new(region, 1).expect("region");
     {
         let slot = ring.claim().expect("room");
-        bn3_header(1).encode_into(&mut slot[..FRAME_HEADER_LEN]).expect("encode");
+        bn3_header(1)
+            .encode_into(&mut slot[..FRAME_HEADER_LEN])
+            .expect("encode");
         slot[FRAME_HEADER_LEN] = 0x42;
     }
-    ring.publish(FRAME_HEADER_LEN + 1).expect("valid frame publishes");
+    ring.publish(FRAME_HEADER_LEN + 1)
+        .expect("valid frame publishes");
     assert_eq!(ring.pending(), 1);
 
     // Hostile: declare u64::MAX payload bytes directly in the published
@@ -304,8 +325,15 @@ fn read_refuses_lying_header_written_around_the_api() {
 
     // Typed refusal: no frame, never garbage — and the refusal consumes
     // nothing (the pending frame stays pending; release still discards it).
-    assert!(ring.read().is_none(), "lying header must be refused (None), never handed out");
-    assert_eq!(ring.pending(), 1, "read() refusal must not consume the frame");
+    assert!(
+        ring.read().is_none(),
+        "lying header must be refused (None), never handed out"
+    );
+    assert_eq!(
+        ring.pending(),
+        1,
+        "read() refusal must not consume the frame"
+    );
     ring.release().expect("the poisoned frame is discardable");
     assert_eq!(ring.pending(), 0);
 }
@@ -332,7 +360,9 @@ fn wraparound_mask_indexing_two_rounds() {
     for round in 0u8..4 {
         {
             let slot = ring.claim().unwrap();
-            bn3_header(4).encode_into(&mut slot[..FRAME_HEADER_LEN]).unwrap();
+            bn3_header(4)
+                .encode_into(&mut slot[..FRAME_HEADER_LEN])
+                .unwrap();
             slot[FRAME_HEADER_LEN..FRAME_HEADER_LEN + 4].copy_from_slice(&[round; 4]);
         }
         ring.publish(FRAME_HEADER_LEN + 4).unwrap();

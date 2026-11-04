@@ -12,11 +12,11 @@
 
 mod common;
 
-use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 use cgap_storage::atomic_commit::MutationMode::{
     M1HeaderCrcSkipped, M2LowestSeq, M3TrailerDigestSkipped, M4SeqRegressionUnchecked, Strict,
 };
 use cgap_storage::atomic_commit::*;
+use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 
 /// Scenario S2 medium: committed seq 1 (slot A) + commit of seq 2 cut at `k`.
 fn s2_file(k: usize) -> FileMedium {

@@ -27,13 +27,10 @@
 
 use cgap_blake3::hash as oabi_digest;
 use cgap_core::dma_ring::DmaRing;
-use cgap_core::frame::{
-    CgapFrameHeader, FrameError, ATTESTATION_LEN, FLAG_BN3, FRAME_HEADER_LEN,
-};
+use cgap_core::frame::{CgapFrameHeader, FrameError, ATTESTATION_LEN, FLAG_BN3, FRAME_HEADER_LEN};
 use cgap_core::isomorphism::{identity_assert, Tier};
 use cgap_gate::penstock::{
-    ingress, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION,
-    CGAP_OK,
+    ingress, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
 };
 
 mod common;
@@ -84,7 +81,9 @@ fn memory_projection(wire: &[u8], size: usize) -> Vec<u8> {
     let (payload_m, header_m) = ring.read().expect("published frame pending");
     assert_eq!(header_m.validate(), Ok(()), "memory tier header");
     let mut mem = vec![0u8; FRAME_HEADER_LEN + size];
-    header_m.encode_into(&mut mem).expect("encode memory header");
+    header_m
+        .encode_into(&mut mem)
+        .expect("encode memory header");
     mem[FRAME_HEADER_LEN..].copy_from_slice(payload_m);
     ring.release().expect("release");
     assert_eq!(ring.pending(), 0);
@@ -125,18 +124,37 @@ fn cross_lane_gate_admits_a04_frames_with_tier_identity_per_size() {
         );
 
         // -- gate tier (A14 dam over A04 frames, wire bytes) ----------------
-        let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+        let mut view = cgap_gate::penstock::FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         let st = ingress(&wire, wire.len(), Some(&mut view));
         assert_eq!(st, CGAP_OK, "dam must admit a valid frame, size={size}");
         // Identity: the admitted view is EXACTLY the frame payload region —
         // byte-for-byte equal to what the wire tier and cgap-core's own
         // payload view carry, and never a byte more or less.
-        assert_eq!(view.payload, &wire[FRAME_HEADER_LEN..], "gate view == wire payload region, size={size}");
-        assert_eq!(view.payload, core_view, "gate view == core payload view, size={size}");
-        assert_eq!(view.payload.len(), size, "admitted length is exact, size={size}");
+        assert_eq!(
+            view.payload,
+            &wire[FRAME_HEADER_LEN..],
+            "gate view == wire payload region, size={size}"
+        );
+        assert_eq!(
+            view.payload, core_view,
+            "gate view == core payload view, size={size}"
+        );
+        assert_eq!(
+            view.payload.len(),
+            size,
+            "admitted length is exact, size={size}"
+        );
 
         // -- gate tier over the memory projection ---------------------------
-        let mut view_m = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+        let mut view_m = cgap_gate::penstock::FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         let st_m = ingress(&mem, mem.len(), Some(&mut view_m));
         assert_eq!(
             st_m, CGAP_OK,
@@ -336,7 +354,11 @@ fn pinned_divergence_gate_admits_reserved_flag_bits_core_refuses() {
     patch(&mut frame, 5, |b| b[0] |= 0x10); // flags bit 4
 
     // gate side: ADMITTED (A14 row 6, recorded divergence).
-    let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+    let mut view = cgap_gate::penstock::FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
     assert_eq!(
         ingress(&frame, frame.len(), Some(&mut view)),
         CGAP_OK,

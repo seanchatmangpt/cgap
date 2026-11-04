@@ -65,7 +65,13 @@ fn prop_bools(rng: &mut Xs) -> usize {
         let len = 1 + rng.below(200) as usize; // 1..=200
         let forced_all_true = it % 8 == 0;
         let bools: Vec<bool> = (0..len)
-            .map(|_| if forced_all_true { true } else { rng.below(2) == 1 })
+            .map(|_| {
+                if forced_all_true {
+                    true
+                } else {
+                    rng.below(2) == 1
+                }
+            })
             .collect();
         let falses = bools.iter().filter(|&&b| !b).count();
 
@@ -129,7 +135,11 @@ fn prop_i64(rng: &mut Xs) -> usize {
         for j in 0..len {
             let is_null = with_nulls && rng.below(4) == 0;
             let v = if inject_extremes && j == 0 {
-                if rng.below(2) == 0 { i64::MIN } else { i64::MAX }
+                if rng.below(2) == 0 {
+                    i64::MIN
+                } else {
+                    i64::MAX
+                }
             } else {
                 rng.next_u64() as i64
             };
@@ -301,8 +311,11 @@ fn prop_views(rng: &mut Xs) -> usize {
             );
         }
         // Payload conservation: exactly the >12-byte rows land in the data block.
-        let foreign_total: usize =
-            expect.iter().filter(|e| e.len() > 12).map(|e| e.len()).sum();
+        let foreign_total: usize = expect
+            .iter()
+            .filter(|e| e.len() > 12)
+            .map(|e| e.len())
+            .sum();
         assert_eq!(
             vv.data().len(),
             foreign_total,

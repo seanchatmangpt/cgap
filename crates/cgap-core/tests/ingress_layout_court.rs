@@ -39,8 +39,14 @@ const _: () = assert!(ATTESTATION_LEN == 80 && FRAME_HEADER_LEN == 128);
 fn row_02_runtime_pins_size_128_align_64() {
     assert_eq!(core::mem::size_of::<CgapFrameHeader>(), 128);
     assert_eq!(core::mem::align_of::<CgapFrameHeader>(), 64);
-    assert_eq!(core::mem::size_of::<cgap_core::frame::P28LicenseAttestation>(), 80);
-    assert_eq!(core::mem::align_of::<cgap_core::frame::P28LicenseAttestation>(), 8);
+    assert_eq!(
+        core::mem::size_of::<cgap_core::frame::P28LicenseAttestation>(),
+        80
+    );
+    assert_eq!(
+        core::mem::align_of::<cgap_core::frame::P28LicenseAttestation>(),
+        8
+    );
     assert_eq!(FRAME_HEADER_LEN, 128);
     assert_eq!(ATTESTATION_LEN, 80);
 }
@@ -54,7 +60,8 @@ fn row_02_runtime_pins_size_128_align_64() {
 fn row_03_projection_is_zero_copy_addressable() {
     let region = leak_aligned_region(4 * FRAME_HEADER_LEN);
     let src = valid_header(0x0102_0304_0506_0708, [0xAA; 32], FLAG_BN3);
-    src.encode_into(&mut region[..FRAME_HEADER_LEN]).expect("encode");
+    src.encode_into(&mut region[..FRAME_HEADER_LEN])
+        .expect("encode");
     let slot: &[u8; FRAME_HEADER_LEN] = region[..FRAME_HEADER_LEN].try_into().expect("width");
     let view = CgapFrameHeader::project(slot).expect("64-aligned region");
     let base = region.as_ptr() as usize;
@@ -76,7 +83,10 @@ fn row_03_projection_is_zero_copy_addressable() {
         field_addr(&view.attestation as *const P28LicenseAttestation as *const u8),
         48
     );
-    assert_eq!(field_addr(view.attestation.upstream_receipt.as_ptr()), 48 + 48);
+    assert_eq!(
+        field_addr(view.attestation.upstream_receipt.as_ptr()),
+        48 + 48
+    );
     // and the values read through the view are the values encoded on the wire
     assert_eq!(view.magic, FRAME_MAGIC);
     assert_eq!(view.version, FRAME_VERSION);
@@ -97,7 +107,8 @@ fn row_04_alignment_invariance_across_addresses() {
     let src = valid_header(4096, [0x33; 32], FLAG_BN3);
     for s in 0..slots {
         let off = s * FRAME_HEADER_LEN;
-        src.encode_into(&mut region[off..off + FRAME_HEADER_LEN]).expect("encode");
+        src.encode_into(&mut region[off..off + FRAME_HEADER_LEN])
+            .expect("encode");
     }
     for s in 0..slots {
         let off = s * FRAME_HEADER_LEN;
@@ -129,11 +140,12 @@ fn row_04_alignment_invariance_across_addresses() {
 fn row_05_misaligned_ingress_refused_typed() {
     let region = leak_aligned_region(FRAME_HEADER_LEN + 128);
     let src = valid_header(8, [0x44; 32], FLAG_BN3);
-    src.encode_into(&mut region[..FRAME_HEADER_LEN]).expect("encode");
+    src.encode_into(&mut region[..FRAME_HEADER_LEN])
+        .expect("encode");
     for off in 1usize..64 {
         let slice: &[u8; FRAME_HEADER_LEN] = region[off..off + FRAME_HEADER_LEN]
             .try_into()
-        .expect("slice width");
+            .expect("slice width");
         let got = CgapFrameHeader::project(slice);
         assert_eq!(
             got,
@@ -152,7 +164,8 @@ fn row_05_misaligned_ingress_refused_typed() {
 fn row_06_region_mutation_is_visible_through_view() {
     let region = leak_aligned_region(FRAME_HEADER_LEN);
     let src = valid_header(0xFF, [0x55; 32], FLAG_BN3);
-    src.encode_into(&mut region[..FRAME_HEADER_LEN]).expect("encode");
+    src.encode_into(&mut region[..FRAME_HEADER_LEN])
+        .expect("encode");
     let slice: &[u8; FRAME_HEADER_LEN] = region[..FRAME_HEADER_LEN].try_into().unwrap();
     let before = CgapFrameHeader::project(slice).unwrap().payload_byte_len;
     assert_eq!(before, 0xFF);
@@ -184,7 +197,10 @@ fn row_07_wire_to_memory_ingress_identity() {
         region[..frame_len].copy_from_slice(&common::wire_frame(&hdr, &pl)[..frame_len]);
         let slot: &[u8; FRAME_HEADER_LEN] = region[..FRAME_HEADER_LEN].try_into().unwrap();
         let view = CgapFrameHeader::project(slot).expect("ingress");
-        assert_eq!(view, &hdr, "size {len}: projected view must equal the source");
+        assert_eq!(
+            view, &hdr,
+            "size {len}: projected view must equal the source"
+        );
         let back = CgapFrameHeader::decode(slot).unwrap();
         assert_eq!(back, hdr);
     }

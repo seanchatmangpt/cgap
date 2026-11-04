@@ -12,10 +12,8 @@
 
 extern crate std;
 
-use cgap_parquet::scan::{
-    ParquetFile, PhysType,
-};
 use cgap_parquet::scan::FixtureColumn;
+use cgap_parquet::scan::{ParquetFile, PhysType};
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -32,7 +30,12 @@ impl TempFile {
             .map(|d| d.as_nanos())
             .unwrap_or(0);
         let mut p = std::env::temp_dir();
-        p.push(format!("cgap_accessor_court_{}_{}_{}", name, std::process::id(), nanos));
+        p.push(format!(
+            "cgap_accessor_court_{}_{}_{}",
+            name,
+            std::process::id(),
+            nanos
+        ));
         fs::write(&p, bytes).expect("write fixture");
         TempFile { path: p }
     }
@@ -112,9 +115,5 @@ fn accessor_scan_16mib_under_ceiling() {
     let dt2 = start.elapsed();
     println!("second (warm-cache) scan: {:?}", dt2);
     assert_eq!(sink, sink2, "two scans of the same column agree");
-    assert!(
-        dt2.as_millis() < 500,
-        "warm scan took {:?}",
-        dt2
-    );
+    assert!(dt2.as_millis() < 500, "warm scan took {:?}", dt2);
 }

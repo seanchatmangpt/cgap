@@ -52,7 +52,9 @@ fn court_hash_vs_b3sum_small_batch_window() {
         lens.push(chunks * 1024);
     }
     // Ragged tails straddling the window edges.
-    lens.extend([4095, 4097, 6143, 6144, 6145, 16383, 16384, 16385, 65535, 65537]);
+    lens.extend([
+        4095, 4097, 6143, 6144, 6145, 16383, 16384, 16385, 65535, 65537,
+    ]);
 
     let max = *lens.iter().max().unwrap();
     let mut data = vec![0u8; max];
@@ -62,7 +64,8 @@ fn court_hash_vs_b3sum_small_batch_window() {
         let d_hash = cgap_blake3::hash(&data[..len]);
         let d_ref = b3sum(&data[..len]);
         assert_eq!(
-            d_hash, d_ref,
+            d_hash,
+            d_ref,
             "hash() != b3sum at len={} ({} chunks)",
             len,
             len.div_ceil(1024)

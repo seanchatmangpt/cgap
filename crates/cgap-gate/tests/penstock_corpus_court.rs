@@ -25,8 +25,8 @@
 //! never papered over.
 
 use cgap_gate::penstock::{
-    ingress, FrameView, HEADER_LEN, OFF_ATTESTATION, OFF_FLAGS, OFF_OABI_DIGEST,
-    OFF_PAYLOAD_BYTE_LEN, OFF_VERSION, OABI_DIGEST_LEN, P28_FLAG_ROOT, P28_LICENSE_MAGIC,
+    ingress, FrameView, HEADER_LEN, OABI_DIGEST_LEN, OFF_ATTESTATION, OFF_FLAGS, OFF_OABI_DIGEST,
+    OFF_PAYLOAD_BYTE_LEN, OFF_VERSION, P28_FLAG_ROOT, P28_LICENSE_MAGIC,
     P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION,
 };
 
@@ -143,9 +143,13 @@ fn corpus() -> Vec<Case> {
         cases.push(mk(&name, Exp::InvalidMagic, &mut |b, _| b[OFF_VERSION] = v));
     }
     // Row 3a: all-zero digest field.
-    cases.push(mk("row3a_digest_all_zero", Exp::OabiMismatch, &mut |b, _| {
-        b[OFF_OABI_DIGEST..OFF_OABI_DIGEST + OABI_DIGEST_LEN].fill(0);
-    }));
+    cases.push(mk(
+        "row3a_digest_all_zero",
+        Exp::OabiMismatch,
+        &mut |b, _| {
+            b[OFF_OABI_DIGEST..OFF_OABI_DIGEST + OABI_DIGEST_LEN].fill(0);
+        },
+    ));
     // Row 3b: declared-length lies - payload beyond the declared buffer.
     let lies: [u64; 4] = [9, 264, 1 << 20, u64::MAX];
     for (i, d) in lies.iter().enumerate() {
@@ -160,7 +164,11 @@ fn corpus() -> Vec<Case> {
     }));
     // Oversized-buffer leg: extra slice slack beyond the declared len is
     // never read; verdict unchanged on the declared geometry.
-    cases.push(mk("row0_oversized_buffer_slack_ignored", Exp::Ok, &mut |_, _| {}));
+    cases.push(mk(
+        "row0_oversized_buffer_slack_ignored",
+        Exp::Ok,
+        &mut |_, _| {},
+    ));
     cases
 }
 fn corpus_row4() -> Vec<Case> {
@@ -183,14 +191,17 @@ fn corpus_row5() -> Vec<Case> {
         ("att_reserved_bit", 6, vec![8, 0]),
         ("att_zero_lineage", 6, vec![0, 0]),
         ("att_two_lineage_bits", 6, vec![3, 0]),
-        ("att_ceiling_over", 8, 5_000_000_001u64.to_le_bytes().to_vec()),
+        (
+            "att_ceiling_over",
+            8,
+            5_000_000_001u64.to_le_bytes().to_vec(),
+        ),
         ("att_ceiling_u64_max", 8, u64::MAX.to_le_bytes().to_vec()),
     ];
     for (name, off, val) in att {
         let full = format!("row5_{name}");
         cases.push(mk(&full, Exp::Spoilation, &mut |b, _| {
-            b[OFF_ATTESTATION + off..OFF_ATTESTATION + off + val.len()]
-                .copy_from_slice(&val);
+            b[OFF_ATTESTATION + off..OFF_ATTESTATION + off + val.len()].copy_from_slice(&val);
         }));
     }
     cases
@@ -199,18 +210,30 @@ fn corpus_row5_receipts() -> Vec<Case> {
     let mut cases: Vec<Case> = Vec::new();
     // A17 receipt law: ROOT xor receipt-zero. Break it in both directions.
     // ROOT with a nonzero receipt (header bytes 96..128 written nonzero).
-    cases.push(mk("row5_root_with_receipt", Exp::Spoilation, &mut |b, _| {
-        b[96..128].fill(0xFF);
-    }));
+    cases.push(mk(
+        "row5_root_with_receipt",
+        Exp::Spoilation,
+        &mut |b, _| {
+            b[96..128].fill(0xFF);
+        },
+    ));
     // DERIVATIVE with a zero receipt: set lineage to DERIVATIVE; the base
     // frame's receipt is already all-zero.
-    cases.push(mk("row5_deriv_zero_receipt", Exp::Spoilation, &mut |b, _| {
-        b[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&2u16.to_le_bytes());
-    }));
+    cases.push(mk(
+        "row5_deriv_zero_receipt",
+        Exp::Spoilation,
+        &mut |b, _| {
+            b[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&2u16.to_le_bytes());
+        },
+    ));
     // TRANSPILED with a zero receipt.
-    cases.push(mk("row5_transpiled_zero_receipt", Exp::Spoilation, &mut |b, _| {
-        b[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&4u16.to_le_bytes());
-    }));
+    cases.push(mk(
+        "row5_transpiled_zero_receipt",
+        Exp::Spoilation,
+        &mut |b, _| {
+            b[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8].copy_from_slice(&4u16.to_le_bytes());
+        },
+    ));
     cases
 }
 
@@ -298,7 +321,9 @@ fn fail_rows(rows: &[(String, Exp, u32)]) {
     if !rows.is_empty() {
         let mut msg = format!("CORPUS MISMATCHES ({} rows):", rows.len());
         for (name, exp, obs) in rows {
-            msg.push_str(&format!("\n  FAIL row: input={name} expected={exp:?} observed={obs:#010x}"));
+            msg.push_str(&format!(
+                "\n  FAIL row: input={name} expected={exp:?} observed={obs:#010x}"
+            ));
         }
         panic!("{}", msg);
     }
@@ -406,11 +431,7 @@ fn corpus_split_frame_and_slack_converge_to_one_shot() {
             }
             let obs = classify(&reassembled, c.len);
             if obs != c.one_shot() {
-                rows.push((
-                    format!("{}_split_reassembly", c.name),
-                    c.exp,
-                    obs,
-                ));
+                rows.push((format!("{}_split_reassembly", c.name), c.exp, obs));
             }
         }
         // Trailing-slack leg: same declared geometry over a longer buffer.
@@ -440,18 +461,18 @@ fn corpus_admit_path_view_law() {
             escalate: false,
         };
         let st = ingress(&c.bytes, c.len, Some(&mut view));
-        assert_eq!(
-            st,
-            code_of(Exp::Ok),
-            "admit leg regressed on {}",
-            c.name
-        );
+        assert_eq!(st, code_of(Exp::Ok), "admit leg regressed on {}", c.name);
         let declared = u64::from_le_bytes(
             c.bytes[OFF_PAYLOAD_BYTE_LEN..OFF_PAYLOAD_BYTE_LEN + 8]
                 .try_into()
                 .unwrap(),
         );
-        assert_eq!(view.payload.len() as u64, declared, "view geometry on {}", c.name);
+        assert_eq!(
+            view.payload.len() as u64,
+            declared,
+            "view geometry on {}",
+            c.name
+        );
         assert_eq!(
             view.payload.as_ptr(),
             c.bytes[HEADER_LEN..].as_ptr(),
@@ -460,8 +481,7 @@ fn corpus_admit_path_view_law() {
         );
         let escalate_expected = c.bytes[OFF_FLAGS] & 0xF0 != 0;
         assert_eq!(
-            view.escalate,
-            escalate_expected,
+            view.escalate, escalate_expected,
             "escalate bit law on {}",
             c.name
         );
@@ -477,7 +497,9 @@ fn corpus_admit_path_view_law() {
 #[test]
 fn corpus_table_covers_every_taxonomy_row_and_class() {
     let cases = full_corpus();
-    for row in ["row0_", "row1_", "row2_", "row3a_", "row3b_", "row4_", "row5_", "row6_"] {
+    for row in [
+        "row0_", "row1_", "row2_", "row3a_", "row3b_", "row4_", "row5_", "row6_",
+    ] {
         assert!(
             cases.iter().any(|c| c.name.starts_with(row)),
             "corpus missing taxonomy family {row}"
@@ -495,7 +517,9 @@ fn corpus_table_covers_every_taxonomy_row_and_class() {
         );
     }
     assert_eq!(
-        (0..HEADER_LEN).filter(|off| flip_exp(*off) == Exp::Spoilation).count(),
+        (0..HEADER_LEN)
+            .filter(|off| flip_exp(*off) == Exp::Spoilation)
+            .count(),
         46,
         "flip mapping spoliation count drifted"
     );
@@ -504,4 +528,3 @@ fn corpus_table_covers_every_taxonomy_row_and_class() {
         "lying-caller case missing"
     );
 }
-

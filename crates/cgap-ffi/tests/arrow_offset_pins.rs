@@ -20,8 +20,14 @@ use std::process::Command;
 use cgap_arrow::c_abi::{ArrowArray, ArrowSchema};
 
 // ---- Rust-side pins (LP64 host: aarch64/x86_64 macOS/linux) ----
-const _: () = assert!(core::mem::size_of::<ArrowArray>() == 80, "ArrowArray size 80");
-const _: () = assert!(core::mem::size_of::<ArrowSchema>() == 72, "ArrowSchema size 72");
+const _: () = assert!(
+    core::mem::size_of::<ArrowArray>() == 80,
+    "ArrowArray size 80"
+);
+const _: () = assert!(
+    core::mem::size_of::<ArrowSchema>() == 72,
+    "ArrowSchema size 72"
+);
 const _: () = assert!(core::mem::offset_of!(ArrowArray, length) == 0);
 const _: () = assert!(core::mem::offset_of!(ArrowArray, null_count) == 8);
 const _: () = assert!(core::mem::offset_of!(ArrowArray, offset) == 16);
@@ -60,7 +66,10 @@ fn rust_offset_pins() {
         (core::mem::offset_of!(ArrowArray, children), "children"),
         (core::mem::offset_of!(ArrowArray, dictionary), "dictionary"),
         (core::mem::offset_of!(ArrowArray, release), "release"),
-        (core::mem::offset_of!(ArrowArray, private_data), "private_data"),
+        (
+            core::mem::offset_of!(ArrowArray, private_data),
+            "private_data",
+        ),
     ];
     for (i, (off, name)) in aa.iter().enumerate() {
         assert_eq!(*off, i * 8, "ArrowArray field {name} offset");
@@ -74,7 +83,10 @@ fn rust_offset_pins() {
         (core::mem::offset_of!(ArrowSchema, children), "children"),
         (core::mem::offset_of!(ArrowSchema, dictionary), "dictionary"),
         (core::mem::offset_of!(ArrowSchema, release), "release"),
-        (core::mem::offset_of!(ArrowSchema, private_data), "private_data"),
+        (
+            core::mem::offset_of!(ArrowSchema, private_data),
+            "private_data",
+        ),
     ];
     for (i, (off, name)) in as_.iter().enumerate() {
         assert_eq!(*off, i * 8, "ArrowSchema field {name} offset");
@@ -128,8 +140,10 @@ fn cc(c_file: &std::path::Path) -> std::process::Output {
     let inc = repo_root().join("include");
     Command::new("cc")
         .arg("-std=c11")
-        .arg("-I").arg(&inc)
-        .arg("-o").arg(c_file.with_extension("out"))
+        .arg("-I")
+        .arg(&inc)
+        .arg("-o")
+        .arg(c_file.with_extension("out"))
         .arg(c_file)
         .output()
         .expect("spawn cc")
@@ -176,8 +190,10 @@ fn c_pin_flip_on_header_mutation() {
     stage(&c, C_PIN_BLOCK);
     let out = Command::new("cc")
         .arg("-std=c11")
-        .arg("-I").arg(&inc)
-        .arg("-o").arg(c.with_extension("out"))
+        .arg("-I")
+        .arg(&inc)
+        .arg("-o")
+        .arg(c.with_extension("out"))
         .output()
         .expect("spawn cc");
     assert!(
@@ -219,7 +235,8 @@ fn rust_pin_flip_on_wrong_pin() {
     let out = Command::new("rustc")
         .arg("--edition=2021")
         .arg("--crate-type=lib")
-        .arg("--out-dir").arg(&dir)
+        .arg("--out-dir")
+        .arg(&dir)
         .arg(&w)
         .output()
         .expect("spawn rustc (wrong twin)");
@@ -244,7 +261,8 @@ fn control_handle(file: &std::path::Path, out_dir: &std::path::Path) -> std::pro
     Command::new("rustc")
         .arg("--edition=2021")
         .arg("--crate-type=lib")
-        .arg("--out-dir").arg(out_dir)
+        .arg("--out-dir")
+        .arg(out_dir)
         .arg(file)
         .output()
         .expect("spawn rustc (control twin)")

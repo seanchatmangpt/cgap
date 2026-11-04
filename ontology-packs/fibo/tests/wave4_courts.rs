@@ -15,10 +15,10 @@ use cgap_blake3::hash;
 use cgap_bont::oabi::{OabiError, OabiPackV1};
 use cgap_fibo::{
     ArRecord, BondRecord, ClassSlot, FiboCurrency, ACCT_RECV_SLOT, BOND_SLOT, CLASS_ACCT_RECV,
-    CLASS_BOND, CLASS_CORP_BOND, CLASS_DEBT_INSTR, COUPON_RATE_SLOT, CORP_BOND_SLOT,
-    DEBT_INSTR_SLOT, EUR_SLOT, JPY_SLOT, LEX_ACCT_RECV, LEX_BOND, LEX_COUPON_RATE,
-    LEX_CORP_BOND, LEX_DEBT_INSTR, LEX_EUR, LEX_JPY, LEX_MATURITY_DATE, LEX_USD,
-    MATURITY_DATE_SLOT, PACK_DIGEST, USD_SLOT,
+    CLASS_BOND, CLASS_CORP_BOND, CLASS_DEBT_INSTR, CORP_BOND_SLOT, COUPON_RATE_SLOT,
+    DEBT_INSTR_SLOT, EUR_SLOT, JPY_SLOT, LEX_ACCT_RECV, LEX_BOND, LEX_CORP_BOND, LEX_COUPON_RATE,
+    LEX_DEBT_INSTR, LEX_EUR, LEX_JPY, LEX_MATURITY_DATE, LEX_USD, MATURITY_DATE_SLOT, PACK_DIGEST,
+    USD_SLOT,
 };
 
 const BONT_NS_V1: &[u8] = b"bont\x01";
@@ -47,17 +47,29 @@ fn lex_hash(lexeme: &[u8]) -> [u8; 32] {
 fn t7_pack_digest_court() {
     let bytes = pack_bytes();
     assert_eq!(bytes.len(), 64 + 9 * 48, "pack length drifted");
-    assert_eq!(hash(&bytes), PACK_DIGEST, "pack digest drifted from PACK_DIGEST");
+    assert_eq!(
+        hash(&bytes),
+        PACK_DIGEST,
+        "pack digest drifted from PACK_DIGEST"
+    );
 
     // (a) flip one byte in record 0's LexHash field.
     let mut m = bytes.clone();
     m[64 + 0 * 48 + 16] ^= 0x01;
-    assert_ne!(hash(&m), PACK_DIGEST, "mutation (a) lex-byte flip not discriminated");
+    assert_ne!(
+        hash(&m),
+        PACK_DIGEST,
+        "mutation (a) lex-byte flip not discriminated"
+    );
 
     // (b) append one zero byte.
     let mut m = bytes.clone();
     m.push(0);
-    assert_ne!(hash(&m), PACK_DIGEST, "mutation (b) byte append not discriminated");
+    assert_ne!(
+        hash(&m),
+        PACK_DIGEST,
+        "mutation (b) byte append not discriminated"
+    );
 
     // (c) swap records 0 and 1 (48-byte blocks).
     let mut m = bytes.clone();
@@ -66,7 +78,11 @@ fn t7_pack_digest_court() {
     let b1 = bytes[r1.clone()].to_vec();
     m[r0].copy_from_slice(&b1);
     m[r1].copy_from_slice(&b0);
-    assert_ne!(hash(&m), PACK_DIGEST, "mutation (c) record swap not discriminated");
+    assert_ne!(
+        hash(&m),
+        PACK_DIGEST,
+        "mutation (c) record swap not discriminated"
+    );
 }
 
 /// T8 — currency enum court, both directions (§8 T8): forward (frozen
@@ -87,8 +103,15 @@ fn t8_currency_court() {
     };
     for (id, lex) in [(0x0348, &LEX_USD), (0x0349, &LEX_EUR), (0x034A, &LEX_JPY)] {
         let hits = by_enum(id);
-        assert_eq!(hits.len(), 1, "EnumId {id:#06x}: expected exactly one record");
-        assert_eq!(hits[0].lex.0, *lex, "EnumId {id:#06x}: LexHash join drifted");
+        assert_eq!(
+            hits.len(),
+            1,
+            "EnumId {id:#06x}: expected exactly one record"
+        );
+        assert_eq!(
+            hits[0].lex.0, *lex,
+            "EnumId {id:#06x}: LexHash join drifted"
+        );
     }
     // Reverse-join mutation witnesses: the USD record does not carry EUR's
     // discriminant and vice versa (the "swap Usd/Eur" mutation would fail
@@ -96,8 +119,14 @@ fn t8_currency_court() {
     let usd = by_enum(0x0348)[0];
     let eur = by_enum(0x0349)[0];
     assert_ne!(usd.lex.0, eur.lex.0, "USD/EUR records share a LexHash");
-    assert_ne!(usd.lex.0, LEX_EUR, "swap mutation not discriminated (USD carries EUR lex)");
-    assert_ne!(eur.lex.0, LEX_USD, "swap mutation not discriminated (EUR carries USD lex)");
+    assert_ne!(
+        usd.lex.0, LEX_EUR,
+        "swap mutation not discriminated (USD carries EUR lex)"
+    );
+    assert_ne!(
+        eur.lex.0, LEX_USD,
+        "swap mutation not discriminated (EUR carries USD lex)"
+    );
 }
 
 fn parse_pack() -> OabiPackV1 {
@@ -140,7 +169,10 @@ fn t9_determinism_court() {
         assert_eq!(rec.lex.0, *lex, "record {i}: LexHash drift");
         assert_eq!(rec.class.0, *class, "record {i}: ClassId drift");
         assert_eq!(rec.enum_.0, *enum_, "record {i}: EnumId drift");
-        assert_eq!(rec.slot.0, u64::from_le_bytes(rec.lex.0[0..8].try_into().unwrap()));
+        assert_eq!(
+            rec.slot.0,
+            u64::from_le_bytes(rec.lex.0[0..8].try_into().unwrap())
+        );
         assert_eq!(&live, lex, "record {i}: live re-derivation drifted");
     }
 }
@@ -165,10 +197,16 @@ fn lexeme_of(i: usize) -> &'static [u8] {
 /// compares byte-for-byte with the committed file (real subprocess).
 #[test]
 fn t9b_emitter_check_court() {
-    let out = Command::new(emitter()).arg("--check").output().expect("spawn emit-pack");
+    let out = Command::new(emitter())
+        .arg("--check")
+        .output()
+        .expect("spawn emit-pack");
     assert_eq!(out.status.code(), Some(0), "emit-pack --check exit drift");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("OK 496 bytes"), "unexpected --check output: {stdout}");
+    assert!(
+        stdout.contains("OK 496 bytes"),
+        "unexpected --check output: {stdout}"
+    );
 }
 
 /// T9c — default emit mode (the bare producer path, wave 5): `emit-pack`
@@ -184,8 +222,14 @@ fn t9c_default_emit_mode_court() {
     let out = Command::new(emitter()).output().expect("spawn emit-pack");
     assert_eq!(out.status.code(), Some(0), "default emit mode exit drift");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("(unchanged)"), "unexpected emit output: {stdout}");
-    assert!(stdout.contains("OK 496 bytes"), "unexpected emit output: {stdout}");
+    assert!(
+        stdout.contains("(unchanged)"),
+        "unexpected emit output: {stdout}"
+    );
+    assert!(
+        stdout.contains("OK 496 bytes"),
+        "unexpected emit output: {stdout}"
+    );
 }
 
 /// T10 — loader round-trip through A06's reader (§8 T10): the real pack
@@ -204,17 +248,34 @@ fn t10_loader_court() {
     assert_eq!(h.version_major, 1);
     assert_eq!(h.version_minor, 0);
     assert_eq!(h.flags, 0b11, "LE | LexHash-present flags must be set");
-    assert_eq!(h.class_count, 0x0022, "class_count must cover the frozen dense space");
-    assert_eq!(h.enum_count, 0x034B, "enum_count must cover the frozen EnumId space");
+    assert_eq!(
+        h.class_count, 0x0022,
+        "class_count must cover the frozen dense space"
+    );
+    assert_eq!(
+        h.enum_count, 0x034B,
+        "enum_count must cover the frozen EnumId space"
+    );
     assert_eq!(h.slot_count, GOLDEN.len() as u32);
     assert_eq!(h.record_size, 48);
     assert!(h.reserved.iter().all(|&b| b == 0));
 
-    let allowed: &[u32] =
-        &[0x0000_0000, 0x0000_0001, 0x0000_0002, 0x0000_0003, 0x0000_0010, 0x0000_0020, 0x0000_0021];
+    let allowed: &[u32] = &[
+        0x0000_0000,
+        0x0000_0001,
+        0x0000_0002,
+        0x0000_0003,
+        0x0000_0010,
+        0x0000_0020,
+        0x0000_0021,
+    ];
     for (i, rec) in pack.records().iter().enumerate() {
-        assert!(allowed.contains(&rec.class.0), "record {i}: ClassId outside frozen space");
-        rec.verify_slot_derivation().expect("per-record derivation must hold");
+        assert!(
+            allowed.contains(&rec.class.0),
+            "record {i}: ClassId outside frozen space"
+        );
+        rec.verify_slot_derivation()
+            .expect("per-record derivation must hold");
     }
 
     // Mutation 1: corrupt record 3's SlotId byte -> typed refusal.
@@ -278,9 +339,18 @@ fn t11_refusal_list_court() {
             .expect("spawn emit-pack");
         assert_eq!(out.status.code(), Some(3), "probe {lex:?} must be refused");
         let stdout = String::from_utf8_lossy(&out.stdout);
-        assert!(stdout.contains("[REFUSED]"), "probe {lex:?} not reported refused: {stdout}");
-        assert!(stdout.contains("TermRefused"), "probe {lex:?} refusal must be typed: {stdout}");
-        assert!(stdout.contains("section=2.2"), "probe {lex:?} refusal must name §2.2: {stdout}");
+        assert!(
+            stdout.contains("[REFUSED]"),
+            "probe {lex:?} not reported refused: {stdout}"
+        );
+        assert!(
+            stdout.contains("TermRefused"),
+            "probe {lex:?} refusal must be typed: {stdout}"
+        );
+        assert!(
+            stdout.contains("section=2.2"),
+            "probe {lex:?} refusal must name §2.2: {stdout}"
+        );
     }
 
     // The allowed control is admitted — the gate is not refuse-everything.
@@ -288,27 +358,51 @@ fn t11_refusal_list_court() {
         .args(["--probe", core::str::from_utf8(ALLOWED_CONTROL).unwrap()])
         .output()
         .expect("spawn emit-pack");
-    assert_eq!(out.status.code(), Some(0), "allowed control must be admitted");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "allowed control must be admitted"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("[ALLOWED] fibo:SecDbt:PerpetualBond (control)"), "{stdout}");
+    assert!(
+        stdout.contains("[ALLOWED] fibo:SecDbt:PerpetualBond (control)"),
+        "{stdout}"
+    );
 
     // (2) the literal T11 mutation: inject an equities term into the emit.
     let out = Command::new(emitter())
         .args(["--inject", "fibo:SecEqu:Equity"])
         .output()
         .expect("spawn emit-pack");
-    assert_eq!(out.status.code(), Some(3), "injected refused term must fail the emit");
+    assert_eq!(
+        out.status.code(),
+        Some(3),
+        "injected refused term must fail the emit"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("TermRefused"), "typed error must be printed: {stdout}");
-    assert!(stdout.contains("module=SecEqu"), "refusal must name the module: {stdout}");
-    assert!(stdout.contains("section=2.2"), "refusal must name §2.2: {stdout}");
+    assert!(
+        stdout.contains("TermRefused"),
+        "typed error must be printed: {stdout}"
+    );
+    assert!(
+        stdout.contains("module=SecEqu"),
+        "refusal must name the module: {stdout}"
+    );
+    assert!(
+        stdout.contains("section=2.2"),
+        "refusal must name §2.2: {stdout}"
+    );
 
     // (3) the control inject is admitted (gate is not refuse-everything).
     let out = Command::new(emitter())
         .args(["--inject", "fibo:SecDbt:PerpetualBond"])
         .output()
         .expect("spawn emit-pack");
-    assert_eq!(out.status.code(), Some(0), "allowed control inject must be admitted");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "allowed control inject must be admitted"
+    );
 
     // (4) no committed record carries a refused lexeme's LexHash.
     let pack = parse_pack();
@@ -376,8 +470,14 @@ fn t13_producer_quarantine_court() {
         );
     }
     // Probe scaffolding is gone with it.
-    assert!(!contains(b"<probe corpus>"), "probe scaffolding still embedded");
-    assert!(!contains(b"--probe-refused"), "retired batch probe mode still advertised");
+    assert!(
+        !contains(b"<probe corpus>"),
+        "probe scaffolding still embedded"
+    );
+    assert!(
+        !contains(b"--probe-refused"),
+        "retired batch probe mode still advertised"
+    );
 
     // (b) positive control 2: the refused lexemes DO live in this test
     // binary's bytes (court-owned corpus; the predicate discriminates).

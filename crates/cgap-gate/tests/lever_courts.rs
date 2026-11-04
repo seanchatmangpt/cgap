@@ -48,7 +48,11 @@ fn l1_attestation_byte_flip_escalates_to_spoliation() {
     // Baseline: the unmutated frame is ADMITTED (CGAP_OK), payload view
     // carved at the declared length.
     let frame = admitted_frame();
-    let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+    let mut view = cgap_gate::penstock::FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
     let v = ingress(&frame, frame.len(), Some(&mut view));
     assert_eq!(v, CGAP_OK, "baseline frame must be admitted pre-mutation");
     assert_eq!(view.payload.len(), 32);
@@ -66,7 +70,11 @@ fn l1_attestation_byte_flip_escalates_to_spoliation() {
         let mut spoliated = admitted_frame();
         let at = OFF_ATTESTATION + att_off;
         spoliated[at..at + patch.len()].copy_from_slice(patch);
-        let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+        let mut view = cgap_gate::penstock::FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         let verdict = ingress(&spoliated, spoliated.len(), Some(&mut view));
         assert_eq!(
             verdict, CGAP_ERR_P28_SPOLIATION,
@@ -84,7 +92,11 @@ fn l1_ceiling_law_flip_is_the_named_mutant() {
     let mut f = admitted_frame();
     let at = OFF_ATTESTATION + 8;
     f[at..at + 8].copy_from_slice(&u64::MAX.to_le_bytes());
-    let mut view = cgap_gate::penstock::FrameView { payload: &[], prefilter: 0, escalate: false };
+    let mut view = cgap_gate::penstock::FrameView {
+        payload: &[],
+        prefilter: 0,
+        escalate: false,
+    };
     assert_eq!(
         ingress(&f, f.len(), Some(&mut view)),
         CGAP_ERR_P28_SPOLIATION

@@ -152,22 +152,21 @@ impl AoqWriter {
         }
         let header = AoqHeader::new(epoch, key_id, self.next_ordinal, self.next_seq);
         // Segment 0: prefix (continuation + span).
-        self.scratch[PREFIX_AT..PREFIX_AT + 4]
-            .copy_from_slice(&CONTINUATION.to_le_bytes());
-        self.scratch[PREFIX_AT + 4..PREFIX_AT + 8]
-            .copy_from_slice(&META_SPAN_W64.to_le_bytes());
+        self.scratch[PREFIX_AT..PREFIX_AT + 4].copy_from_slice(&CONTINUATION.to_le_bytes());
+        self.scratch[PREFIX_AT + 4..PREFIX_AT + 8].copy_from_slice(&META_SPAN_W64.to_le_bytes());
         // Segment 1: sealed header via the landed codec.
-        codec::encode(&header, &mut self.scratch[HEADER_AT..HEADER_AT + SIZE_BYTES])?;
+        codec::encode(
+            &header,
+            &mut self.scratch[HEADER_AT..HEADER_AT + SIZE_BYTES],
+        )?;
         // Segment 2: pad = body_len u32 LE [0,4) + tag [4,20) + zero tail.
         // Pad segment byte j is window offset 72 + j (pin court A13).
         self.scratch[PAD_AT..PAD_AT + PAD_BYTES].fill(0);
-        self.scratch[PAD_AT..PAD_AT + 4]
-            .copy_from_slice(&(body.len() as u32).to_le_bytes());
+        self.scratch[PAD_AT..PAD_AT + 4].copy_from_slice(&(body.len() as u32).to_le_bytes());
         self.scratch[PAD_AT + 4..PAD_AT + 4 + TAG_BYTES].copy_from_slice(tag);
         // Segment 4: EOS (the body pad is not scratch-resident).
         let eos_at = EOS_AT;
-        self.scratch[eos_at..eos_at + 4]
-            .copy_from_slice(&CONTINUATION.to_le_bytes());
+        self.scratch[eos_at..eos_at + 4].copy_from_slice(&CONTINUATION.to_le_bytes());
         self.scratch[eos_at + 4..eos_at + 8].copy_from_slice(&EOS.to_le_bytes());
         Ok(Segments {
             prefix: &self.scratch[PREFIX_AT..PREFIX_AT + 8],

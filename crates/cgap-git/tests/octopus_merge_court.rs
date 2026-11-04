@@ -374,8 +374,8 @@ fn mutation_conflict_injection_flip() {
     );
     // Andon semantics witness: the child must name the refusal class
     // (libtest captures the panic text into its stdout).
-    let captured = String::from_utf8_lossy(&out.stdout).to_string()
-        + &String::from_utf8_lossy(&out.stderr);
+    let captured =
+        String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr);
     assert!(
         captured.contains("ANDON-REFUSAL"),
         "child must have taken the Andon refusal path, captured: {captured}"

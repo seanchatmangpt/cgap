@@ -46,9 +46,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use cgap_parquet::scan::{
-    write_fixture_file, FixtureColumn, ParquetFile, PhysType, ScanError,
-};
+use cgap_parquet::scan::{write_fixture_file, FixtureColumn, ParquetFile, PhysType, ScanError};
 use cgap_parquet::thrift::{
     ctype, read_page_header, write_binary_field, write_field_header, write_i32_field,
     write_i64_field,
@@ -76,9 +74,12 @@ const CASE_TIMEOUT: Duration = Duration::from_secs(5);
 /// scan.rs unit-test corpus. Returns the fixture columns and the pristine
 /// per-column payload bytes used as the "correct bytes" reference.
 fn corpus() -> (Vec<FixtureColumn>, Vec<Vec<u8>>) {
-    let a: Vec<u32> = (0..ROWS as u32).map(|i| i.wrapping_mul(0x9E37_79B9)).collect();
-    let b: Vec<u64> =
-        (0..ROWS as u64).map(|i| i.wrapping_mul(0xC2B2_AE3D_27D4_4EBF)).collect();
+    let a: Vec<u32> = (0..ROWS as u32)
+        .map(|i| i.wrapping_mul(0x9E37_79B9))
+        .collect();
+    let b: Vec<u64> = (0..ROWS as u64)
+        .map(|i| i.wrapping_mul(0xC2B2_AE3D_27D4_4EBF))
+        .collect();
     let c: Vec<u8> = (0..ROWS * 32).map(|i| ((i * 7 + 3) & 0xFF) as u8).collect();
     let cols = vec![
         FixtureColumn {
@@ -119,14 +120,16 @@ struct Layout {
 
 fn layout_of(file: &[u8]) -> Layout {
     let len = file.len();
-    assert!(len > 128, "fixture too small for 64 B boundary truncation: {len}");
+    assert!(
+        len > 128,
+        "fixture too small for 64 B boundary truncation: {len}"
+    );
     let header_len = match read_page_header(&file[4..]) {
         Ok((_, n)) => n,
         Err(e) => panic!("fixture page header must parse: {e:?}"),
     };
     let payload_len: usize = ROWS * WIDTHS.iter().sum::<usize>();
-    let meta_len =
-        u32::from_le_bytes(file[len - 8..len - 4].try_into().expect("4 bytes")) as usize;
+    let meta_len = u32::from_le_bytes(file[len - 8..len - 4].try_into().expect("4 bytes")) as usize;
     assert!(meta_len > 4, "fixture meta_len implausible: {meta_len}");
     let footer_start = len - 8 - meta_len;
     // The tiling is load-bearing for every region assertion below.
@@ -141,7 +144,14 @@ fn layout_of(file: &[u8]) -> Layout {
         col_spans[i] = (cum, cum + ROWS * w);
         cum += ROWS * w;
     }
-    Layout { len, header_len, payload_len, footer_start, meta_len, col_spans }
+    Layout {
+        len,
+        header_len,
+        payload_len,
+        footer_start,
+        meta_len,
+        col_spans,
+    }
 }
 
 /// The six corruption regions of the LCG corpus, stratified round-robin.
@@ -301,7 +311,10 @@ impl Lcg {
 }
 
 fn case_seed(i: usize) -> u64 {
-    MASTER_SEED ^ (i as u64).wrapping_mul(0xD1B5_4A32_D192_ED03).wrapping_add(1)
+    MASTER_SEED
+        ^ (i as u64)
+            .wrapping_mul(0xD1B5_4A32_D192_ED03)
+            .wrapping_add(1)
 }
 
 // ---------------------------------------------------------------------------
@@ -350,9 +363,14 @@ enum Outcome {
     /// `open()` refused: typed ScanError.
     OpenErr(ScanError),
     /// `open()` succeeded, column resolve refused: typed ScanError.
-    ColErr { col: usize, err: ScanError },
+    ColErr {
+        col: usize,
+        err: ScanError,
+    },
     /// All three columns resolved: their aliased bytes.
-    Resolved { cols: Vec<(usize, Vec<u8>)> },
+    Resolved {
+        cols: Vec<(usize, Vec<u8>)>,
+    },
     /// Universal-invariant breach short of a panic (typed outcomes that must
     /// not co-occur, e.g. an accessor refusing a column it already resolved).
     Invariant(String),
@@ -363,8 +381,7 @@ enum Outcome {
 fn probe(bytes: Vec<u8>) -> Outcome {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let outcome =
-            catch_unwind(AssertUnwindSafe(move || probe_inner(bytes)));
+        let outcome = catch_unwind(AssertUnwindSafe(move || probe_inner(bytes)));
         let outcome = match outcome {
             Ok(o) => o,
             Err(payload) => Outcome::Panic(panic_message(&payload)),
@@ -520,17 +537,13 @@ impl Ledger {
         let mut v: Vec<String> = Vec::new();
         match outcome {
             Outcome::Panic(msg) => v.push(format!("PANIC: {msg}")),
-            Outcome::Hang => {
-                v.push(format!("HANG: no return within {CASE_TIMEOUT:?}"))
-            }
+            Outcome::Hang => v.push(format!("HANG: no return within {CASE_TIMEOUT:?}")),
             Outcome::Invariant(msg) => v.push(format!("INVARIANT: {msg}")),
             Outcome::OpenErr(e) => {
                 self.open_err += 1;
                 if let Expect::Exact(want) = expect {
                     if e != want {
-                        v.push(format!(
-                            "expected Err({want:?}) at open, got Err({e:?})"
-                        ));
+                        v.push(format!("expected Err({want:?}) at open, got Err({e:?})"));
                     }
                 }
             }
@@ -552,8 +565,11 @@ impl Ledger {
             }
         }
         if !v.is_empty() {
-            self.failures
-                .push(format!("[class={}] [case={label}] => {}", self.class, v.join("; ")));
+            self.failures.push(format!(
+                "[class={}] [case={label}] => {}",
+                self.class,
+                v.join("; ")
+            ));
         }
     }
 }
@@ -570,8 +586,7 @@ fn footer_page_offset_corruption_sweep() {
     let lay = layout_of(&fixture);
     let full_len = lay.len;
     // The sweep re-frames THIS page region under hostile footers.
-    let page: Vec<u8> =
-        fixture[4..4 + lay.header_len + lay.payload_len].to_vec();
+    let page: Vec<u8> = fixture[4..4 + lay.header_len + lay.payload_len].to_vec();
 
     // Non-vacuity control: the sweep builder, given the LAWFUL offset (4 =
     // right after the leading PAR1), must behave exactly like the fixture
@@ -601,10 +616,26 @@ fn footer_page_offset_corruption_sweep() {
     let sweep: Vec<(&str, i64, Expect)> = vec![
         ("zero", 0, Expect::Exact(ScanError::OffsetMismatch)),
         ("one", 1, Expect::Exact(ScanError::OffsetMismatch)),
-        ("three (last magic byte)", 3, Expect::Exact(ScanError::OffsetMismatch)),
-        ("len-1", full_len as i64 - 1, Expect::Exact(ScanError::OffsetMismatch)),
-        ("len", full_len as i64, Expect::Exact(ScanError::OffsetMismatch)),
-        ("len+1", full_len as i64 + 1, Expect::Exact(ScanError::OffsetMismatch)),
+        (
+            "three (last magic byte)",
+            3,
+            Expect::Exact(ScanError::OffsetMismatch),
+        ),
+        (
+            "len-1",
+            full_len as i64 - 1,
+            Expect::Exact(ScanError::OffsetMismatch),
+        ),
+        (
+            "len",
+            full_len as i64,
+            Expect::Exact(ScanError::OffsetMismatch),
+        ),
+        (
+            "len+1",
+            full_len as i64 + 1,
+            Expect::Exact(ScanError::OffsetMismatch),
+        ),
         (
             "len-8 (the meta_len prefix)",
             full_len as i64 - 8,
@@ -657,14 +688,17 @@ fn footer_page_offset_corruption_sweep() {
     let mut led_ml = Ledger::new("footer_len_prefix");
     for (label, ml, expect) in [
         ("0", 0u32, Some(Expect::Exact(ScanError::FooterOverflow))),
-        ("u32::MAX", u32::MAX, Some(Expect::Exact(ScanError::FooterOverflow))),
+        (
+            "u32::MAX",
+            u32::MAX,
+            Some(Expect::Exact(ScanError::FooterOverflow)),
+        ),
         ("true-1", (lay.meta_len - 1) as u32, None),
         ("true+1", (lay.meta_len + 1) as u32, None),
     ] {
         let mut bytes = fixture.clone();
         bytes[full_len - 8..full_len - 4].copy_from_slice(&ml.to_le_bytes());
-        let expect =
-            expect.unwrap_or(Expect::Universal);
+        let expect = expect.unwrap_or(Expect::Universal);
         led_ml.check(&format!("meta_len={label}"), &probe(bytes), &expect);
     }
 
@@ -835,8 +869,7 @@ fn lcg_random_byte_corruption_corpus() {
         // byte-identical to the pristine payload. (Page-header flips may
         // shift the parsed header length and footer flips may rewrite the
         // offsets/schema, so equality is not sound there and is not pinned.)
-        if let (Region::Col(j), Outcome::Resolved { cols: resolved }) = (region, &outcome)
-        {
+        if let (Region::Col(j), Outcome::Resolved { cols: resolved }) = (region, &outcome) {
             for (col, got) in resolved {
                 if *col != j {
                     equality_checks += 1;

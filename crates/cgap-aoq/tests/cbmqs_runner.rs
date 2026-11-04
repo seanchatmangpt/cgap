@@ -112,13 +112,31 @@ struct GateResult {
 
 impl GateResult {
     fn pass(gate: &'static str, kind: &str, measured: &str, note: &str) -> Self {
-        Self { gate, status: "PASS", kind: kind.into(), measured: measured.into(), note: note.into() }
+        Self {
+            gate,
+            status: "PASS",
+            kind: kind.into(),
+            measured: measured.into(),
+            note: note.into(),
+        }
     }
     fn fail(gate: &'static str, kind: &str, measured: &str, note: &str) -> Self {
-        Self { gate, status: "FAIL", kind: kind.into(), measured: measured.into(), note: note.into() }
+        Self {
+            gate,
+            status: "FAIL",
+            kind: kind.into(),
+            measured: measured.into(),
+            note: note.into(),
+        }
     }
     fn skip(gate: &'static str, kind: &str, measured: &str, note: &str) -> Self {
-        Self { gate, status: "SKIP", kind: kind.into(), measured: measured.into(), note: note.into() }
+        Self {
+            gate,
+            status: "SKIP",
+            kind: kind.into(),
+            measured: measured.into(),
+            note: note.into(),
+        }
     }
 }
 
@@ -141,15 +159,24 @@ impl Report {
         let mut s = String::new();
         s.push_str("{\n");
         s.push_str(&format!("  \"runner\": \"cbmqs-runner\",\n"));
-        s.push_str(&format!("  \"runner_version\": \"{}\",\n", json_escape(RUNNER_VERSION)));
+        s.push_str(&format!(
+            "  \"runner_version\": \"{}\",\n",
+            json_escape(RUNNER_VERSION)
+        ));
         s.push_str(&format!("  \"standard\": \"{}\",\n", json_escape(STANDARD)));
         s.push_str(&format!("  \"subject_mode\": \"{}\",\n", self.subject_mode));
-        s.push_str(&format!("  \"subject_id\": \"{}\",\n", json_escape(&self.subject_id)));
+        s.push_str(&format!(
+            "  \"subject_id\": \"{}\",\n",
+            json_escape(&self.subject_id)
+        ));
         s.push_str(&format!(
             "  \"alloc_bound_per_op\": {},\n  \"time_budget_ns\": {},\n",
             self.alloc_bound_per_op, self.time_budget_ns
         ));
-        s.push_str(&format!("  \"gates_requested\": \"{}\",\n", json_escape(&self.gates_requested)));
+        s.push_str(&format!(
+            "  \"gates_requested\": \"{}\",\n",
+            json_escape(&self.gates_requested)
+        ));
         for g in &self.gates {
             s.push_str(&format!(
                 "  {{ \"gate\": \"{}\", \"status\": \"{}\", \"kind\": \"{}\", \"measured\": \"{}\", \"note\": \"{}\" }},\n",
@@ -177,29 +204,35 @@ impl Report {
 
     fn render(&self) -> String {
         let body = self.canonical_body();
-        body.replace("\"report_hash\": \"\"", &format!("\"report_hash\": \"{}\"", self.blake3_hex))
+        body.replace(
+            "\"report_hash\": \"\"",
+            &format!("\"report_hash\": \"{}\"", self.blake3_hex),
+        )
     }
 
     /// G7 verification law: strip the printed hash, re-canonicalize,
     /// re-hash; the printed hash must equal the recomputed one.
     fn verify_hash_law(report_json: &str) -> Result<(), String> {
         const MARK: &str = "\"report_hash\": \"";
-        let start = report_json
-            .find(MARK)
-            .ok_or("no report_hash field")?
-            + MARK.len();
+        let start = report_json.find(MARK).ok_or("no report_hash field")? + MARK.len();
         let end = report_json[start..]
             .find('"')
             .ok_or("unterminated report_hash")?
             + start;
         let printed = &report_json[start..end];
-        let body = report_json.replace(&format!("\"report_hash\": \"{}\"", printed), "\"report_hash\": \"\"");
+        let body = report_json.replace(
+            &format!("\"report_hash\": \"{}\"", printed),
+            "\"report_hash\": \"\"",
+        );
         let recomputed = cgap_blake3::hash(body.as_bytes());
         let hex: String = recomputed.iter().map(|b| format!("{:02x}", b)).collect();
         if hex == printed {
             Ok(())
         } else {
-            Err(format!("hash mismatch: printed {} recomputed {}", printed, hex))
+            Err(format!(
+                "hash mismatch: printed {} recomputed {}",
+                printed, hex
+            ))
         }
     }
 }
@@ -266,9 +299,15 @@ fn gate_g1_self() -> GateResult {
             &format!("ops={} allocs=0 bytes=0 control_allocs={}", CENSUS_OPS, control),
             "alloc-free codec law holds (bound 0 allocs/op); positive control witnessed the instrument live")
     } else {
-        GateResult::fail("G1", "OVERALLOC",
-            &format!("ops={} allocs={} bytes={} per_op={}", CENSUS_OPS, allocs, bytes, per_op),
-            "codec allocated inside the hot-path window")
+        GateResult::fail(
+            "G1",
+            "OVERALLOC",
+            &format!(
+                "ops={} allocs={} bytes={} per_op={}",
+                CENSUS_OPS, allocs, bytes, per_op
+            ),
+            "codec allocated inside the hot-path window",
+        )
     }
 }
 
@@ -290,28 +329,54 @@ fn gate_g2_self() -> GateResult {
     let p50 = per_op_ns[per_op_ns.len() / 2];
     let p99 = percentile_p99(&per_op_ns);
     if (p99 as u64) <= BUDGET_NS {
-        GateResult::pass("G2", "PASS",
-            &format!("ops={} p50_ns={} p99_ns={} budget_ns={}", CENSUS_OPS, p50, p99, BUDGET_NS),
-            "timing census within the disclosed budget (budget is a TARGET, not a truth claim)")
+        GateResult::pass(
+            "G2",
+            "PASS",
+            &format!(
+                "ops={} p50_ns={} p99_ns={} budget_ns={}",
+                CENSUS_OPS, p50, p99, BUDGET_NS
+            ),
+            "timing census within the disclosed budget (budget is a TARGET, not a truth claim)",
+        )
     } else {
-        GateResult::fail("G2", "TIME_BUDGET_EXCEEDED",
-            &format!("ops={} p50_ns={} p99_ns={} budget_ns={}", CENSUS_OPS, p50, p99, BUDGET_NS),
-            "p99 per-op latency exceeded the disclosed budget")
+        GateResult::fail(
+            "G2",
+            "TIME_BUDGET_EXCEEDED",
+            &format!(
+                "ops={} p50_ns={} p99_ns={} budget_ns={}",
+                CENSUS_OPS, p50, p99, BUDGET_NS
+            ),
+            "p99 per-op latency exceeded the disclosed budget",
+        )
     }
 }
 
 fn gate_g4_self() -> GateResult {
     aoq_op(0);
-    let a = census_window(|| for i in 0..CENSUS_OPS { aoq_op(i); });
-    let b = census_window(|| for i in 0..CENSUS_OPS { aoq_op(i); });
+    let a = census_window(|| {
+        for i in 0..CENSUS_OPS {
+            aoq_op(i);
+        }
+    });
+    let b = census_window(|| {
+        for i in 0..CENSUS_OPS {
+            aoq_op(i);
+        }
+    });
     if a.0 == b.0 && a.1 == b.1 && a.0 == 0 {
-        GateResult::pass("G4", "PASS",
+        GateResult::pass(
+            "G4",
+            "PASS",
             &format!("run1=({}a,{}B) run2=({}a,{}B)", a.0, a.1, b.0, b.1),
-            "two census windows byte-identical (timing is measured, not required replayable)")
+            "two census windows byte-identical (timing is measured, not required replayable)",
+        )
     } else {
-        GateResult::fail("G4", "CENSUS_REPLAY_DIVERGED",
+        GateResult::fail(
+            "G4",
+            "CENSUS_REPLAY_DIVERGED",
             &format!("run1=({}a,{}B) run2=({}a,{}B)", a.0, a.1, b.0, b.1),
-            "census windows diverged across replay")
+            "census windows diverged across replay",
+        )
     }
 }
 
@@ -320,8 +385,17 @@ fn gate_g4_self() -> GateResult {
 // ---------------------------------------------------------------------------
 
 const MOCK_PATTERNS: &[&str] = &[
-    "mockall", "mock!", "gmock", "jest.mock", "vi.mock", "unittest.mock",
-    "monkeypatch", "sinon.stub", "mock(", "double::", "faux::create",
+    "mockall",
+    "mock!",
+    "gmock",
+    "jest.mock",
+    "vi.mock",
+    "unittest.mock",
+    "monkeypatch",
+    "sinon.stub",
+    "mock(",
+    "double::",
+    "faux::create",
 ];
 const SCAN_SKIP_DIRS: &[&str] = &["target", "node_modules", ".git", "__pycache__", ".venv"];
 
@@ -337,7 +411,11 @@ fn scan_tree(root: &str) -> Result<Vec<String>, String> {
                 if !SCAN_SKIP_DIRS.contains(&name.as_str()) {
                     stack.push(p);
                 }
-            } else if p.extension().map(|x| x.to_string_lossy().len() <= 8).unwrap_or(false) {
+            } else if p
+                .extension()
+                .map(|x| x.to_string_lossy().len() <= 8)
+                .unwrap_or(false)
+            {
                 if let Ok(content) = std::fs::read(&p) {
                     if content.len() < 4 * 1024 * 1024 {
                         let hay = String::from_utf8_lossy(&content).to_lowercase();
@@ -357,13 +435,32 @@ fn scan_tree(root: &str) -> Result<Vec<String>, String> {
 
 fn gate_g3_scan(source_tree: &str, self_mode: bool) -> GateResult {
     match scan_tree(source_tree) {
-        Ok(hits) if hits.is_empty() => GateResult::pass("G3", "PASS",
-            &format!("tree={} files_scanned=ok patterns={}", source_tree, MOCK_PATTERNS.len()),
-            "no mock-framework patterns in the subject source tree"),
-        Ok(hits) => GateResult::fail("G3", "MOCK_DETECTED", &hits.join("; "),
-            "mock framework referenced in subject source; verdict REFUSED (anti-rigging)"),
-        Err(e) => GateResult::fail("G3", "SOURCE_TREE_UNREADABLE", &e,
-            if self_mode { "self-test source tree unreadable" } else { "pass --source-tree for foreign subjects (typed, never a silent skip)" }),
+        Ok(hits) if hits.is_empty() => GateResult::pass(
+            "G3",
+            "PASS",
+            &format!(
+                "tree={} files_scanned=ok patterns={}",
+                source_tree,
+                MOCK_PATTERNS.len()
+            ),
+            "no mock-framework patterns in the subject source tree",
+        ),
+        Ok(hits) => GateResult::fail(
+            "G3",
+            "MOCK_DETECTED",
+            &hits.join("; "),
+            "mock framework referenced in subject source; verdict REFUSED (anti-rigging)",
+        ),
+        Err(e) => GateResult::fail(
+            "G3",
+            "SOURCE_TREE_UNREADABLE",
+            &e,
+            if self_mode {
+                "self-test source tree unreadable"
+            } else {
+                "pass --source-tree for foreign subjects (typed, never a silent skip)"
+            },
+        ),
     }
 }
 
@@ -377,18 +474,30 @@ fn gate_g5_self() -> GateResult {
     good.header_digest = u32::from_le_bytes([wire[60], wire[61], wire[62], wire[63]]);
 
     let mut cases: Vec<(String, Vec<u8>, &'static str)> = Vec::new();
-    cases.push(("truncated_32B".into(), wire[0..32].to_vec(), "HeaderTooShort"));
+    cases.push((
+        "truncated_32B".into(),
+        wire[0..32].to_vec(),
+        "HeaderTooShort",
+    ));
     let mut oversized = vec![0u8; 128];
     oversized[0..64].copy_from_slice(&wire);
     oversized[10] ^= 0xFF; // tamper digest-covered span
-    cases.push(("oversized_128B_tampered".into(), oversized, "DigestMismatch"));
+    cases.push((
+        "oversized_128B_tampered".into(),
+        oversized,
+        "DigestMismatch",
+    ));
     let mut bad_magic = wire;
     bad_magic[0] = 0xDE;
     cases.push(("bad_magic".into(), bad_magic.to_vec(), "BadMagic"));
     let mut bad_epoch = wire;
     bad_epoch[6] = 0x7F; // 0x7FFF is outside the closed Epoch enum (0xFFFF = Retired sentinel, valid)
     bad_epoch[7] = 0xFF;
-    cases.push(("unknown_epoch".into(), bad_epoch.to_vec(), "UnknownEpochWire"));
+    cases.push((
+        "unknown_epoch".into(),
+        bad_epoch.to_vec(),
+        "UnknownEpochWire",
+    ));
     let mut digest = wire;
     digest[30] = 0x5A;
     cases.push(("digest_tamper".into(), digest.to_vec(), "DigestMismatch"));
@@ -415,13 +524,23 @@ fn gate_g5_self() -> GateResult {
         };
         observed.push(format!("{}={}", name, got_class));
         if got_class != *expected {
-            return GateResult::fail("G5", "WRONG_TYPED_CLASS",
+            return GateResult::fail(
+                "G5",
+                "WRONG_TYPED_CLASS",
                 &observed.join(" "),
-                &format!("storm frame {} expected class {}, got {}", name, expected, got_class));
+                &format!(
+                    "storm frame {} expected class {}, got {}",
+                    name, expected, got_class
+                ),
+            );
         }
     }
-    GateResult::pass("G5", "PASS", &observed.join(" "),
-        "storm feed fully typed; no panic, no silent accept")
+    GateResult::pass(
+        "G5",
+        "PASS",
+        &observed.join(" "),
+        "storm feed fully typed; no panic, no silent accept",
+    )
 }
 
 fn gate_g6_self() -> GateResult {
@@ -446,7 +565,12 @@ struct Subject {
 
 impl Subject {
     fn spawn(cmd: &str) -> Result<Self, String> {
-        let mut s = Self { cmd: cmd.into(), child: None, stdin: None, stdout: None };
+        let mut s = Self {
+            cmd: cmd.into(),
+            child: None,
+            stdin: None,
+            stdout: None,
+        };
         s.respawn()?;
         Ok(s)
     }
@@ -475,13 +599,19 @@ impl Subject {
     fn exchange(&mut self, line: &str) -> Result<String, String> {
         {
             let stdin = self.stdin.as_mut().ok_or("subject not running")?;
-            stdin.write_all(line.as_bytes()).map_err(|e| format!("write: {}", e))?;
-            stdin.write_all(b"\n").map_err(|e| format!("write: {}", e))?;
+            stdin
+                .write_all(line.as_bytes())
+                .map_err(|e| format!("write: {}", e))?;
+            stdin
+                .write_all(b"\n")
+                .map_err(|e| format!("write: {}", e))?;
             stdin.flush().map_err(|e| format!("flush: {}", e))?;
         }
         let mut reply = String::new();
         let stdout = self.stdout.as_mut().ok_or("subject not running")?;
-        let n = stdout.read_line(&mut reply).map_err(|e| format!("read: {}", e))?;
+        let n = stdout
+            .read_line(&mut reply)
+            .map_err(|e| format!("read: {}", e))?;
         if n == 0 {
             return Err("EOF: subject crashed or closed stdout".into());
         }
@@ -515,8 +645,14 @@ fn parse_census(reply: &str) -> Result<(u64, u64), String> {
         .split_whitespace()
         .find_map(|t| t.strip_prefix("bytes="))
         .ok_or_else(|| format!("malformed census reply: {:?}", reply))?;
-    Ok((allocs.parse().map_err(|_| format!("bad allocs: {:?}", reply))?,
-        bytes.parse().map_err(|_| format!("bad bytes: {:?}", reply))?))
+    Ok((
+        allocs
+            .parse()
+            .map_err(|_| format!("bad allocs: {:?}", reply))?,
+        bytes
+            .parse()
+            .map_err(|_| format!("bad bytes: {:?}", reply))?,
+    ))
 }
 
 fn census_delta(s: &mut Subject, ops: usize) -> Result<(u64, u64), String> {
@@ -541,13 +677,23 @@ fn gate_g1_foreign(s: &mut Subject, alloc_bound: u64) -> GateResult {
                     &format!("ops={} allocs={} bytes={} per_op={} bound_per_op={}", OPS, allocs, bytes, per_op, alloc_bound),
                     "subject-attested census within bound (see docs/cbmqs-runner.md for the attestation disclosure)")
             } else {
-                GateResult::fail("G1", "OVERALLOC",
-                    &format!("ops={} allocs={} bytes={} per_op={} bound_per_op={}", OPS, allocs, bytes, per_op, alloc_bound),
-                    "subject census exceeds the alloc-per-op bound")
+                GateResult::fail(
+                    "G1",
+                    "OVERALLOC",
+                    &format!(
+                        "ops={} allocs={} bytes={} per_op={} bound_per_op={}",
+                        OPS, allocs, bytes, per_op, alloc_bound
+                    ),
+                    "subject census exceeds the alloc-per-op bound",
+                )
             }
         }
-        Err(e) if e == "CONTRACT_UNSUPPORTED" => GateResult::fail("G1", "CONTRACT_UNSUPPORTED", "census frame refused",
-            "subject does not implement the CENSUS frame; loudly missing, never a silent skip"),
+        Err(e) if e == "CONTRACT_UNSUPPORTED" => GateResult::fail(
+            "G1",
+            "CONTRACT_UNSUPPORTED",
+            "census frame refused",
+            "subject does not implement the CENSUS frame; loudly missing, never a silent skip",
+        ),
         Err(e) => GateResult::fail("G1", "PROTOCOL_FAULT", &e, "census exchange failed"),
     }
 }
@@ -561,7 +707,9 @@ fn gate_g2_foreign(s: &mut Subject, budget_ns: u64) -> GateResult {
         let r = s.exchange(&format!("OP {}", OPS_PER_BATCH));
         match r {
             Ok(reply) if reply.starts_with("OPDONE") => {}
-            Ok(reply) => return GateResult::fail("G2", "PROTOCOL_FAULT", &reply, "OP reply malformed"),
+            Ok(reply) => {
+                return GateResult::fail("G2", "PROTOCOL_FAULT", &reply, "OP reply malformed")
+            }
             Err(e) => return GateResult::fail("G2", "CRASH", &e, "subject died during OP batch"),
         }
         let elapsed = t0.elapsed().as_nanos() as u64 / OPS_PER_BATCH as u64;
@@ -571,17 +719,33 @@ fn gate_g2_foreign(s: &mut Subject, budget_ns: u64) -> GateResult {
     let p50 = per_op_ns[per_op_ns.len() / 2];
     let p99 = percentile_p99_u64(&per_op_ns);
     if p99 <= budget_ns {
-        GateResult::pass("G2", "PASS",
-            &format!("batches={} ops_per_batch={} p50_ns_per_op={} p99_ns_per_op={} budget_ns={}", BATCHES, OPS_PER_BATCH, p50, p99, budget_ns),
-            "timing census within the disclosed budget")
+        GateResult::pass(
+            "G2",
+            "PASS",
+            &format!(
+                "batches={} ops_per_batch={} p50_ns_per_op={} p99_ns_per_op={} budget_ns={}",
+                BATCHES, OPS_PER_BATCH, p50, p99, budget_ns
+            ),
+            "timing census within the disclosed budget",
+        )
     } else {
-        GateResult::fail("G2", "TIME_BUDGET_EXCEEDED",
-            &format!("batches={} p50_ns_per_op={} p99_ns_per_op={} budget_ns={}", BATCHES, p50, p99, budget_ns),
-            "p99 per-op wall time exceeded the disclosed budget")
+        GateResult::fail(
+            "G2",
+            "TIME_BUDGET_EXCEEDED",
+            &format!(
+                "batches={} p50_ns_per_op={} p99_ns_per_op={} budget_ns={}",
+                BATCHES, p50, p99, budget_ns
+            ),
+            "p99 per-op wall time exceeded the disclosed budget",
+        )
     }
 }
 
-enum Expect { Ok, TypedErr, OkOrTypedErr }
+enum Expect {
+    Ok,
+    TypedErr,
+    OkOrTypedErr,
+}
 
 fn percentile_p99_u64(sorted: &[u64]) -> u64 {
     let idx = ((sorted.len() as u64 * 99) / 100).max(1) as usize - 1;
@@ -593,13 +757,21 @@ fn gate_g4_foreign(s: &mut Subject) -> GateResult {
     let a = census_delta(s, OPS);
     let b = census_delta(s, OPS);
     match (a, b) {
-        (Ok(a), Ok(b)) if a == b => GateResult::pass("G4", "PASS",
+        (Ok(a), Ok(b)) if a == b => GateResult::pass(
+            "G4",
+            "PASS",
             &format!("run1=({}a,{}B) run2=({}a,{}B)", a.0, a.1, b.0, b.1),
-            "two census windows identical across replay"),
-        (Ok(a), Ok(b)) => GateResult::fail("G4", "CENSUS_REPLAY_DIVERGED",
+            "two census windows identical across replay",
+        ),
+        (Ok(a), Ok(b)) => GateResult::fail(
+            "G4",
+            "CENSUS_REPLAY_DIVERGED",
             &format!("run1=({}a,{}B) run2=({}a,{}B)", a.0, a.1, b.0, b.1),
-            "census windows diverged across replay"),
-        (Err(e), _) | (_, Err(e)) => GateResult::fail("G4", "PROTOCOL_FAULT", &e, "census replay exchange failed"),
+            "census windows diverged across replay",
+        ),
+        (Err(e), _) | (_, Err(e)) => {
+            GateResult::fail("G4", "PROTOCOL_FAULT", &e, "census replay exchange failed")
+        }
     }
 }
 
@@ -634,9 +806,14 @@ fn gate_g5_foreign(s: &mut Subject) -> GateResult {
     for (name, payload, expect) in &frames {
         let reply = match s.exchange(&format!("FRAME {}", hex(payload))) {
             Ok(r) => r,
-            Err(e) => return GateResult::fail("G5", "CRASH",
-                &format!("{} {}=EOF:{}", observed.join(" "), name, e),
-                "subject crashed or went silent on a storm frame"),
+            Err(e) => {
+                return GateResult::fail(
+                    "G5",
+                    "CRASH",
+                    &format!("{} {}=EOF:{}", observed.join(" "), name, e),
+                    "subject crashed or went silent on a storm frame",
+                )
+            }
         };
         let is_ok = reply == "OK";
         let typed_err = reply.starts_with("ERR ") && reply != "ERR CRASH";
@@ -647,21 +824,33 @@ fn gate_g5_foreign(s: &mut Subject) -> GateResult {
             Expect::OkOrTypedErr => is_ok || typed_err,
         };
         if !ok {
-            fail_msg = Some(format!("storm-frame law: {} replied {:?}; expected {}", name, reply,
+            fail_msg = Some(format!(
+                "storm-frame law: {} replied {:?}; expected {}",
+                name,
+                reply,
                 match expect {
                     Expect::Ok => "OK",
                     Expect::TypedErr => "a typed ERR <CLASS>",
                     Expect::OkOrTypedErr => "OK or a typed ERR <CLASS>",
-                }));
+                }
+            ));
             break;
         }
     }
     if let Some(m) = fail_msg {
-        return GateResult::fail("G5", "WRONG_TYPED_CLASS", &observed.join(" "),
-            &format!("{}; contract law violated", m));
+        return GateResult::fail(
+            "G5",
+            "WRONG_TYPED_CLASS",
+            &observed.join(" "),
+            &format!("{}; contract law violated", m),
+        );
     }
-    GateResult::pass("G5", "PASS", &observed.join(" "),
-        "storm feed typed per contract; no crash, no silent accept")
+    GateResult::pass(
+        "G5",
+        "PASS",
+        &observed.join(" "),
+        "storm feed typed per contract; no crash, no silent accept",
+    )
 }
 
 fn gate_g6_foreign(s: &mut Subject, cycles: usize) -> GateResult {
@@ -671,8 +860,17 @@ fn gate_g6_foreign(s: &mut Subject, cycles: usize) -> GateResult {
         // again after respawn.
         match s.exchange("PING") {
             Ok(r) if r == "PONG" => {}
-            Ok(r) => return GateResult::fail("G6", "PROTOCOL_FAULT", &r, &format!("cycle {} pre-kill ping", i)),
-            Err(e) => return GateResult::fail("G6", "CRASH", &e, &format!("cycle {} pre-kill ping", i)),
+            Ok(r) => {
+                return GateResult::fail(
+                    "G6",
+                    "PROTOCOL_FAULT",
+                    &r,
+                    &format!("cycle {} pre-kill ping", i),
+                )
+            }
+            Err(e) => {
+                return GateResult::fail("G6", "CRASH", &e, &format!("cycle {} pre-kill ping", i))
+            }
         }
         s.kill();
         if let Err(e) = s.respawn() {
@@ -680,12 +878,25 @@ fn gate_g6_foreign(s: &mut Subject, cycles: usize) -> GateResult {
         }
         match s.exchange("PING") {
             Ok(r) if r == "PONG" => witnessed.push(format!("cycle{}=ok", i)),
-            Ok(r) => return GateResult::fail("G6", "NO_LIVENESS", &r, &format!("cycle {} post-kill ping", i)),
-            Err(e) => return GateResult::fail("G6", "CRASH", &e, &format!("cycle {} post-kill ping", i)),
+            Ok(r) => {
+                return GateResult::fail(
+                    "G6",
+                    "NO_LIVENESS",
+                    &r,
+                    &format!("cycle {} post-kill ping", i),
+                )
+            }
+            Err(e) => {
+                return GateResult::fail("G6", "CRASH", &e, &format!("cycle {} post-kill ping", i))
+            }
         }
     }
-    GateResult::pass("G6", "PASS", &format!("cycles={} {}", cycles, witnessed.join(" ")),
-        "kill-cycle: SIGKILL + respawn + frame liveness witnessed every cycle")
+    GateResult::pass(
+        "G6",
+        "PASS",
+        &format!("cycles={} {}", cycles, witnessed.join(" ")),
+        "kill-cycle: SIGKILL + respawn + frame liveness witnessed every cycle",
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -744,10 +955,22 @@ fn emit_report(
     let rendered = report.render();
     // G7 self-check: the runner must be able to verify its own seal.
     let g7 = match Report::verify_hash_law(&rendered) {
-        Ok(()) => GateResult::pass("G7", "PASS",
-            &format!("hash={} algo=blake3-32 runner_version={}", &report.blake3_hex[..16], RUNNER_VERSION),
-            "report seal verifies against the canonical body"),
-        Err(e) => GateResult::fail("G7", "SEAL_VERIFY_FAILED", &e, "report seal did not reproduce"),
+        Ok(()) => GateResult::pass(
+            "G7",
+            "PASS",
+            &format!(
+                "hash={} algo=blake3-32 runner_version={}",
+                &report.blake3_hex[..16],
+                RUNNER_VERSION
+            ),
+            "report seal verifies against the canonical body",
+        ),
+        Err(e) => GateResult::fail(
+            "G7",
+            "SEAL_VERIFY_FAILED",
+            &e,
+            "report seal did not reproduce",
+        ),
     };
     let mut report = report;
     if let Some(pos) = report.gates.iter().position(|g| g.gate == "G7") {
@@ -759,7 +982,9 @@ fn emit_report(
     let report = report.seal();
     let rendered = report.render();
     if let Some(p) = json_path {
-        std::fs::write(p, &rendered).map_err(|e| format!("write {}: {}", p, e)).expect("write report");
+        std::fs::write(p, &rendered)
+            .map_err(|e| format!("write {}: {}", p, e))
+            .expect("write report");
     }
     println!("{}", rendered);
     match report.verdict {
@@ -852,11 +1077,25 @@ fn run_self_test(alloc_bound: u64, budget_ns: u64, requested: &str, json: Option
             "G4" => gate_g4_self(),
             "G5" => gate_g5_self(),
             "G6" => gate_g6_self(),
-            "G7" => GateResult::skip("G7", "SEALED_AT_EMIT", "", "seal computed when the report is emitted"),
+            "G7" => GateResult::skip(
+                "G7",
+                "SEALED_AT_EMIT",
+                "",
+                "seal computed when the report is emitted",
+            ),
             _ => unreachable!(),
         });
     }
-    emit_report("self-test", &format!("cgap-aoq@{}", env!("CARGO_PKG_VERSION")), out, 0, budget_ns, requested, None, json)
+    emit_report(
+        "self-test",
+        &format!("cgap-aoq@{}", env!("CARGO_PKG_VERSION")),
+        out,
+        0,
+        budget_ns,
+        requested,
+        None,
+        json,
+    )
 }
 
 fn run_foreign(
@@ -880,16 +1119,36 @@ fn run_foreign(
             let r = gate_g3_scan(tree, false);
             let refused = r.kind == "MOCK_DETECTED";
             let measured = r.measured.clone();
-            (Some(r), if refused { Some(format!("MOCK_DETECTED: {}", measured)) } else { None })
+            (
+                Some(r),
+                if refused {
+                    Some(format!("MOCK_DETECTED: {}", measured))
+                } else {
+                    None
+                },
+            )
         }
         None => (
-            Some(GateResult::fail("G3", "SOURCE_TREE_REQUIRED", "no --source-tree given",
-                "mock scan requires the subject source tree; loudly missing")),
+            Some(GateResult::fail(
+                "G3",
+                "SOURCE_TREE_REQUIRED",
+                "no --source-tree given",
+                "mock scan requires the subject source tree; loudly missing",
+            )),
             None,
         ),
     };
     if refusal.is_some() {
-        return emit_report("subprocess", cmd, vec![g3_result.unwrap()], alloc_bound, budget_ns, requested, refusal, json);
+        return emit_report(
+            "subprocess",
+            cmd,
+            vec![g3_result.unwrap()],
+            alloc_bound,
+            budget_ns,
+            requested,
+            refusal,
+            json,
+        );
     }
 
     let mut s = match Subject::spawn(cmd) {
@@ -908,11 +1167,25 @@ fn run_foreign(
             "G4" => gate_g4_foreign(&mut s),
             "G5" => gate_g5_foreign(&mut s),
             "G6" => gate_g6_foreign(&mut s, 3),
-            "G7" => GateResult::skip("G7", "SEALED_AT_EMIT", "", "seal computed when the report is emitted"),
+            "G7" => GateResult::skip(
+                "G7",
+                "SEALED_AT_EMIT",
+                "",
+                "seal computed when the report is emitted",
+            ),
             _ => unreachable!(),
         });
     }
-    emit_report("subprocess", cmd, out, alloc_bound, budget_ns, requested, None, json)
+    emit_report(
+        "subprocess",
+        cmd,
+        out,
+        alloc_bound,
+        budget_ns,
+        requested,
+        None,
+        json,
+    )
 }
 
 /// Non-vacuity court: every gate must flip somewhere. Exit 0 = court pass.
@@ -922,54 +1195,137 @@ fn run_court() -> i32 {
     let good = format!("{}/cbmqs_subject_good.py", dir);
     let over = format!("{}/cbmqs_subject_overalloc.py", dir);
     let nocen = format!("{}/cbmqs_subject_nocensus.py", dir);
-    if let Err(e) = write_fixture(&good, true, false) { eprintln!("court: {}", e); return 1; }
-    if let Err(e) = write_fixture(&over, true, true) { eprintln!("court: {}", e); return 1; }
-    if let Err(e) = write_fixture(&nocen, false, false) { eprintln!("court: {}", e); return 1; }
+    if let Err(e) = write_fixture(&good, true, false) {
+        eprintln!("court: {}", e);
+        return 1;
+    }
+    if let Err(e) = write_fixture(&over, true, true) {
+        eprintln!("court: {}", e);
+        return 1;
+    }
+    if let Err(e) = write_fixture(&nocen, false, false) {
+        eprintln!("court: {}", e);
+        return 1;
+    }
 
     let mut failures: Vec<String> = Vec::new();
 
     // C1: self-test passes its own standard (typed G6 SKIP disclosed).
-    let rc = run_self_test(0, 10_000, "G1,G2,G3,G4,G5,G6,G7", Some("/tmp/cbmqs_self_report.json"));
-    if rc != 0 { failures.push(format!("C1 self-test exit={} (expected 0)", rc)); }
+    let rc = run_self_test(
+        0,
+        10_000,
+        "G1,G2,G3,G4,G5,G6,G7",
+        Some("/tmp/cbmqs_self_report.json"),
+    );
+    if rc != 0 {
+        failures.push(format!("C1 self-test exit={} (expected 0)", rc));
+    }
 
     // C2: overalloc fixture fails G1 typed OVERALLOC with real numbers.
-    let rc = run_foreign(&over, Some(dir), 0, 100_000_000, "G1", Some("/tmp/cbmqs_overalloc_report.json"));
+    let rc = run_foreign(
+        &over,
+        Some(dir),
+        0,
+        100_000_000,
+        "G1",
+        Some("/tmp/cbmqs_overalloc_report.json"),
+    );
     let over_json = std::fs::read_to_string("/tmp/cbmqs_overalloc_report.json").unwrap_or_default();
     if rc != 2 || !over_json.contains("\"kind\": \"OVERALLOC\"") {
-        failures.push(format!("C2 overalloc exit={} json_has_OVERALLOC={}", rc, over_json.contains("\"kind\": \"OVERALLOC\"")));
+        failures.push(format!(
+            "C2 overalloc exit={} json_has_OVERALLOC={}",
+            rc,
+            over_json.contains("\"kind\": \"OVERALLOC\"")
+        ));
     }
 
     // C3: missing-census fixture fails G1 typed CONTRACT_UNSUPPORTED.
-    let rc = run_foreign(&nocen, Some(dir), 0, 100_000_000, "G1", Some("/tmp/cbmqs_nocensus_report.json"));
+    let rc = run_foreign(
+        &nocen,
+        Some(dir),
+        0,
+        100_000_000,
+        "G1",
+        Some("/tmp/cbmqs_nocensus_report.json"),
+    );
     let nocen_json = std::fs::read_to_string("/tmp/cbmqs_nocensus_report.json").unwrap_or_default();
     if rc != 2 || !nocen_json.contains("CONTRACT_UNSUPPORTED") {
-        failures.push(format!("C3 nocensus exit={} json_has_CONTRACT_UNSUPPORTED={}", rc, nocen_json.contains("CONTRACT_UNSUPPORTED")));
+        failures.push(format!(
+            "C3 nocensus exit={} json_has_CONTRACT_UNSUPPORTED={}",
+            rc,
+            nocen_json.contains("CONTRACT_UNSUPPORTED")
+        ));
     }
 
     // C4: bound-flip pair — the same overalloc subject FAILS at bound 0
     // and PASSES at bound 2 (the bound actually binds; a gate that cannot
     // flip is decoration).
-    let rc0 = run_foreign(&over, Some(dir), 0, 100_000_000, "G1", Some("/tmp/cbmqs_good_b0.json"));
-    let rc2 = run_foreign(&over, Some(dir), 2, 100_000_000, "G1", Some("/tmp/cbmqs_good_b8.json"));
+    let rc0 = run_foreign(
+        &over,
+        Some(dir),
+        0,
+        100_000_000,
+        "G1",
+        Some("/tmp/cbmqs_good_b0.json"),
+    );
+    let rc2 = run_foreign(
+        &over,
+        Some(dir),
+        2,
+        100_000_000,
+        "G1",
+        Some("/tmp/cbmqs_good_b8.json"),
+    );
     if rc0 != 2 || rc2 != 0 {
-        failures.push(format!("C4 bound-flip pair did not flip: bound0_exit={} bound2_exit={}", rc0, rc2));
+        failures.push(format!(
+            "C4 bound-flip pair did not flip: bound0_exit={} bound2_exit={}",
+            rc0, rc2
+        ));
     }
 
     // C5: good fixture — storm feed + kill-cycles witness live machinery.
-    let rc = run_foreign(&good, Some(dir), 8, 100_000_000, "G5,G6", Some("/tmp/cbmqs_good_storm.json"));
+    let rc = run_foreign(
+        &good,
+        Some(dir),
+        8,
+        100_000_000,
+        "G5,G6",
+        Some("/tmp/cbmqs_good_storm.json"),
+    );
     let storm_json = std::fs::read_to_string("/tmp/cbmqs_good_storm.json").unwrap_or_default();
-    if rc != 0 || !storm_json.contains("\"gate\": \"G6\"") || storm_json.contains("\"kind\": \"CRASH\"") {
-        failures.push(format!("C5 storm/kill-cycles exit={} G6_present={}", rc, storm_json.contains("\"gate\": \"G6\"")));
+    if rc != 0
+        || !storm_json.contains("\"gate\": \"G6\"")
+        || storm_json.contains("\"kind\": \"CRASH\"")
+    {
+        failures.push(format!(
+            "C5 storm/kill-cycles exit={} G6_present={}",
+            rc,
+            storm_json.contains("\"gate\": \"G6\"")
+        ));
     }
 
     // C6: mock tree refusal.
     let mock_dir = "/tmp/cbmqs_mocktree";
     let _ = std::fs::create_dir_all(mock_dir);
-    let _ = std::fs::write(format!("{}/subject.rs", mock_dir), "use mockall::predicate::*;\n");
-    let rc = run_foreign(&good, Some(mock_dir), 8, 100_000_000, "G3", Some("/tmp/cbmqs_mock_report.json"));
+    let _ = std::fs::write(
+        format!("{}/subject.rs", mock_dir),
+        "use mockall::predicate::*;\n",
+    );
+    let rc = run_foreign(
+        &good,
+        Some(mock_dir),
+        8,
+        100_000_000,
+        "G3",
+        Some("/tmp/cbmqs_mock_report.json"),
+    );
     let mock_json = std::fs::read_to_string("/tmp/cbmqs_mock_report.json").unwrap_or_default();
     if rc != 3 || !mock_json.contains("MOCK_DETECTED") {
-        failures.push(format!("C6 mock refusal exit={} json_has_MOCK_DETECTED={}", rc, mock_json.contains("MOCK_DETECTED")));
+        failures.push(format!(
+            "C6 mock refusal exit={} json_has_MOCK_DETECTED={}",
+            rc,
+            mock_json.contains("MOCK_DETECTED")
+        ));
     }
 
     // C7: tamper court — a one-bit flip must break the seal.
@@ -995,7 +1351,10 @@ fn run_court() -> i32 {
 }
 
 fn usage() {
-    eprintln!("cbmqs-runner {} — CBMQS-7G/1 bake-off runner", RUNNER_VERSION);
+    eprintln!(
+        "cbmqs-runner {} — CBMQS-7G/1 bake-off runner",
+        RUNNER_VERSION
+    );
     eprintln!("  (no args)                     self-test against cgap-aoq");
     eprintln!("  --court                       non-vacuity court over /tmp fixtures");
     eprintln!("  --subject-cmd <shell cmd>     foreign subprocess subject");
@@ -1022,10 +1381,16 @@ fn main() {
             "--source-tree" => source_tree = args.next(),
             "--gates" => gates = args.next().unwrap_or_else(|| gates.clone()),
             "--alloc-bound" => {
-                alloc_bound = args.next().and_then(|v| v.parse().ok()).unwrap_or(alloc_bound);
+                alloc_bound = args
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(alloc_bound);
             }
             "--time-budget-ns" => {
-                budget_ns = args.next().and_then(|v| v.parse().ok()).unwrap_or(budget_ns);
+                budget_ns = args
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(budget_ns);
             }
             "--json" => json = args.next(),
             "--help" | "-h" => {
@@ -1042,7 +1407,14 @@ fn main() {
     let code = if court {
         run_court()
     } else if let Some(cmd) = subject_cmd {
-        run_foreign(&cmd, source_tree.as_deref(), alloc_bound, budget_ns, &gates, json.as_deref())
+        run_foreign(
+            &cmd,
+            source_tree.as_deref(),
+            alloc_bound,
+            budget_ns,
+            &gates,
+            json.as_deref(),
+        )
     } else {
         run_self_test(alloc_bound, budget_ns, &gates, json.as_deref())
     };

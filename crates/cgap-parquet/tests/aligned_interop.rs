@@ -24,8 +24,8 @@ use cgap_parquet::page::decode_page_into;
 use cgap_parquet::page_aligned::{aligned_decode, write_plain_page};
 use cgap_parquet::rle::write_varint;
 use cgap_parquet::thrift::{
-    write_binary_field, write_field_header, write_i32_field, write_i64_field,
-    write_zigzag_i32, ctype,
+    ctype, write_binary_field, write_field_header, write_i32_field, write_i64_field,
+    write_zigzag_i32,
 };
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,9 @@ fn round_trip_and_container_frame() {
     assert_eq!(&file[..4], b"PAR1");
     assert_eq!(&file[file.len() - 4..], b"PAR1");
     let meta_len = u32::from_le_bytes(
-        file[file.len() - 8..file.len() - 4].try_into().expect("u32"),
+        file[file.len() - 8..file.len() - 4]
+            .try_into()
+            .expect("u32"),
     );
     assert!(meta_len as usize + 12 <= file.len(), "meta len plausible");
 }

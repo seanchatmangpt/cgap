@@ -26,8 +26,8 @@
 
 use cgap_bn3::sigil::{encode_term, Sigil};
 use cgap_bn3::unify::{
-    unify_batch_probe, BodyAtom, DEFAULT_CHUNK_ROWS, EvalScratch, JoinProbeScratch, MatchSet,
-    Rule, RuleCompiler, StatementColumns,
+    unify_batch_probe, BodyAtom, EvalScratch, JoinProbeScratch, MatchSet, Rule, RuleCompiler,
+    StatementColumns, DEFAULT_CHUNK_ROWS,
 };
 use divan::counter::ItemsCount;
 use divan::{black_box, Bencher};
@@ -136,7 +136,7 @@ fn oracle_count(cols: &StatementColumns<'_>, hops: usize) -> usize {
                 let sk = cols.s[j] & 0x00FF_FFFF_FFFF_FFFF;
                 let ok = cols.o[j] & 0x00FF_FFFF_FFFF_FFFF;
                 *idx.entry(sk).or_default().entry(ok).or_insert(0) += 1;
-                }
+            }
         }
         let mut next: HashMap<u64, usize> = HashMap::new();
         for (k, cnt) in &cur {
@@ -164,11 +164,16 @@ fn build_bench(n: usize, hops: usize) -> BgpBench {
     let corpus = build_corpus(n, key_dom);
     let rule = bgp_rule(hops);
     let expected = oracle_count(&corpus.cols(), hops);
-    assert!(expected > 0, "oracle empty at N={n}: bench would be vacuous");
-    eprintln!(
-        "[bench-bgp] N={n} hops={hops} key_dom={key_dom} expected_matches={expected}"
+    assert!(
+        expected > 0,
+        "oracle empty at N={n}: bench would be vacuous"
     );
-    BgpBench { corpus, rule, expected }
+    eprintln!("[bench-bgp] N={n} hops={hops} key_dom={key_dom} expected_matches={expected}");
+    BgpBench {
+        corpus,
+        rule,
+        expected,
+    }
 }
 
 /// Timed closure: warm-scratch unify over the k-hop BGP, with the
@@ -181,20 +186,24 @@ fn run_hop<const N: usize>(b: Bencher, hops: usize) {
     let expected = bench.expected;
     let mut scratch = EvalScratch::default();
     let mut probe = JoinProbeScratch::default();
-    b.counter(ItemsCount::new(expected as u64)).bench_local(move || {
-        let mut out = MatchSet::default();
-        unify_batch_probe(
-            &compiled,
-            black_box(&cols),
-            DEFAULT_CHUNK_ROWS,
-            &mut scratch,
-            &mut out,
-            &mut probe,
-        )
-        .expect("unify_batch_probe succeeds");
-        assert_eq!(out.len, expected, "kernel vs oracle count, N={N} hops={hops}");
-        black_box(out.len);
-    });
+    b.counter(ItemsCount::new(expected as u64))
+        .bench_local(move || {
+            let mut out = MatchSet::default();
+            unify_batch_probe(
+                &compiled,
+                black_box(&cols),
+                DEFAULT_CHUNK_ROWS,
+                &mut scratch,
+                &mut out,
+                &mut probe,
+            )
+            .expect("unify_batch_probe succeeds");
+            assert_eq!(
+                out.len, expected,
+                "kernel vs oracle count, N={N} hops={hops}"
+            );
+            black_box(out.len);
+        });
 }
 
 /// 2-hop BGP equi-join chain.

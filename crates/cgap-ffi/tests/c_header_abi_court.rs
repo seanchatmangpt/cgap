@@ -163,7 +163,11 @@ fn parse_structs(src: &str) -> Vec<CStruct> {
             }
             j += 1;
         }
-        out.push(CStruct { name, fields, decls });
+        out.push(CStruct {
+            name,
+            fields,
+            decls,
+        });
         i = j + 1;
     }
     out
@@ -193,8 +197,7 @@ fn c_layout_from_decls(decls: &[String]) -> (Vec<(String, usize)>, usize, usize)
     let mut align = 1usize;
     let mut out = Vec::new();
     for decl in decls {
-        let kind = kind_of(decl)
-            .unwrap_or_else(|| panic!("unclassified C declarator: {}", decl));
+        let kind = kind_of(decl).unwrap_or_else(|| panic!("unclassified C declarator: {}", decl));
         let a = kind.size();
         off = (off + a - 1) & !(a - 1);
         out.push((field_name(decl), off));
@@ -249,9 +252,15 @@ fn rust_twin_layout(name: &str) -> Option<(Vec<(&'static str, usize)>, usize, us
         "cgap_frame_view" => Some((
             vec![
                 ("payload", core::mem::offset_of!(CgapFrameView, payload)),
-                ("payload_len", core::mem::offset_of!(CgapFrameView, payload_len)),
+                (
+                    "payload_len",
+                    core::mem::offset_of!(CgapFrameView, payload_len),
+                ),
                 ("schema_id", core::mem::offset_of!(CgapFrameView, schema_id)),
-                ("rule_count", core::mem::offset_of!(CgapFrameView, rule_count)),
+                (
+                    "rule_count",
+                    core::mem::offset_of!(CgapFrameView, rule_count),
+                ),
             ],
             core::mem::size_of::<CgapFrameView>(),
             core::mem::align_of::<CgapFrameView>(),
@@ -268,7 +277,10 @@ fn rust_twin_layout(name: &str) -> Option<(Vec<(&'static str, usize)>, usize, us
                 ("children", core::mem::offset_of!(ArrowArray, children)),
                 ("dictionary", core::mem::offset_of!(ArrowArray, dictionary)),
                 ("release", core::mem::offset_of!(ArrowArray, release)),
-                ("private_data", core::mem::offset_of!(ArrowArray, private_data)),
+                (
+                    "private_data",
+                    core::mem::offset_of!(ArrowArray, private_data),
+                ),
             ],
             core::mem::size_of::<ArrowArray>(),
             core::mem::align_of::<ArrowArray>(),
@@ -283,7 +295,10 @@ fn rust_twin_layout(name: &str) -> Option<(Vec<(&'static str, usize)>, usize, us
                 ("children", core::mem::offset_of!(ArrowSchema, children)),
                 ("dictionary", core::mem::offset_of!(ArrowSchema, dictionary)),
                 ("release", core::mem::offset_of!(ArrowSchema, release)),
-                ("private_data", core::mem::offset_of!(ArrowSchema, private_data)),
+                (
+                    "private_data",
+                    core::mem::offset_of!(ArrowSchema, private_data),
+                ),
             ],
             core::mem::size_of::<ArrowSchema>(),
             core::mem::align_of::<ArrowSchema>(),
@@ -376,9 +391,8 @@ fn mutate_swap_first_two_fields(src: &str) -> String {
 /// C99-compatible negative-array layout pins over offsetof/sizeof — the
 /// freestanding compile leg (CL1 gate0 pattern). Any drift => compile error.
 fn pins_c_source() -> String {
-    let mut s = String::from(
-        "#include <stddef.h>\n#include \"cgap_c_data.h\"\n#include \"cgap.h\"\n",
-    );
+    let mut s =
+        String::from("#include <stddef.h>\n#include \"cgap_c_data.h\"\n#include \"cgap.h\"\n");
     for (st, field, off) in [
         ("struct ArrowArray", "length", 0usize),
         ("struct ArrowArray", "null_count", 8),
@@ -402,7 +416,6 @@ fn pins_c_source() -> String {
     s
 }
 
-
 /// Compile a sandbox translation unit with cc, freestanding. Returns
 /// (success, combined stderr+stdout).
 fn cc_compile(dir: &PathBuf, c99: bool) -> (bool, String) {
@@ -419,7 +432,11 @@ fn cc_compile(dir: &PathBuf, c99: bool) -> (bool, String) {
         .arg(&out)
         .output()
         .expect("spawn cc");
-    let log = format!("{}{}", String::from_utf8_lossy(&res.stdout), String::from_utf8_lossy(&res.stderr));
+    let log = format!(
+        "{}{}",
+        String::from_utf8_lossy(&res.stdout),
+        String::from_utf8_lossy(&res.stderr)
+    );
     (res.status.success(), log)
 }
 
@@ -484,7 +501,10 @@ fn rust_twins_match_parsed_header_layout() {
         assert_eq!(names_c, names_r, "field order drift in {}", s.name);
         assert_eq!(
             offs,
-            offs_r.iter().map(|(f, o)| (f.to_string(), *o)).collect::<Vec<_>>(),
+            offs_r
+                .iter()
+                .map(|(f, o)| (f.to_string(), *o))
+                .collect::<Vec<_>>(),
             "field offset drift in {}",
             s.name
         );
@@ -501,9 +521,8 @@ fn c_compile_leg_flips_on_field_reorder() {
     let dir = sandbox();
     let (h1, h2) = repo_headers();
     let _ = stage(&dir, &h1, "cgap.h");
-    let mutated = mutate_swap_first_two_fields(
-        &std::fs::read_to_string(&h2).expect("read cgap_c_data.h"),
-    );
+    let mutated =
+        mutate_swap_first_two_fields(&std::fs::read_to_string(&h2).expect("read cgap_c_data.h"));
     std::fs::write(dir.join("cgap_c_data.h"), mutated).expect("write mutated header");
     std::fs::write(dir.join("pins.c"), pins_c_source()).expect("write pins.c");
     let (ok, log) = cc_compile(&dir, true);
@@ -542,7 +561,9 @@ fn rust_mirror_leg_flips_on_field_reorder() {
         assert_eq!(parsed.len(), 1, "ArrowArray missing after parse");
         let (offs, size, _align) = c_layout_from_decls(&parsed[0].decls);
         let (offs_r, size_r, _align_r) = rust_twin_layout("ArrowArray").unwrap();
-        offs.iter().zip(offs_r.iter()).all(|((a, ao), (b, bo))| a == b && ao == bo)
+        offs.iter()
+            .zip(offs_r.iter())
+            .all(|((a, ao), (b, bo))| a == b && ao == bo)
             && offs.len() == offs_r.len()
             && size == size_r
     };

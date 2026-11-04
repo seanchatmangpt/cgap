@@ -79,7 +79,11 @@ fn exhaustion_court_trap_observed_in_real_process() {
     }
     let exe = std::env::current_exe().expect("current_exe");
     let output = std::process::Command::new(exe)
-        .args(["exhaustion_court_trap_observed_in_real_process", "--exact", "--nocapture"])
+        .args([
+            "exhaustion_court_trap_observed_in_real_process",
+            "--exact",
+            "--nocapture",
+        ])
         .env("CGAP_A16_LEASE_PROBE", "exhaust")
         .output()
         .expect("spawn probe subprocess");
@@ -118,7 +122,11 @@ fn constructor_court_zero_ceiling_traps() {
     }
     let exe = std::env::current_exe().expect("current_exe");
     let output = std::process::Command::new(exe)
-        .args(["constructor_court_zero_ceiling_traps", "--exact", "--nocapture"])
+        .args([
+            "constructor_court_zero_ceiling_traps",
+            "--exact",
+            "--nocapture",
+        ])
         .env("CGAP_A16_LEASE_PROBE", "ceiling0")
         .output()
         .expect("spawn probe subprocess");
@@ -142,7 +150,11 @@ fn constructor_court_zero_ceiling_traps() {
 #[test]
 fn current_tick_read_is_pure_never_advances() {
     let mut lease = Lease::new([7u8; 32], 16, [9u8; 32]);
-    assert_eq!(lease.current_tick(), 0, "fresh lease starts at tick 0 (§3.2)");
+    assert_eq!(
+        lease.current_tick(),
+        0,
+        "fresh lease starts at tick 0 (§3.2)"
+    );
     for _ in 0..3 {
         let before = lease.current_tick();
         let _ = lease.current_tick();
@@ -181,8 +193,14 @@ fn phi_lease_codec_roundtrip_and_offsets() {
     let bytes = phi.to_bytes();
     assert_eq!(bytes.len(), PHI_LEASE_LEN);
     assert_eq!(&bytes[0..32], &[1u8; 32]);
-    assert_eq!(&bytes[32..40], &[0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]); // LE
-    assert_eq!(&bytes[40..48], &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]); // LE
+    assert_eq!(
+        &bytes[32..40],
+        &[0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]
+    ); // LE
+    assert_eq!(
+        &bytes[40..48],
+        &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
+    ); // LE
     assert_eq!(&bytes[48..80], &[2u8; 32]);
     assert_eq!(PhiLease::from_bytes(&bytes), phi);
 }

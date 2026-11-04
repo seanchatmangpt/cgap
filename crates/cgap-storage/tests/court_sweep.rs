@@ -13,8 +13,8 @@
 
 mod common;
 
-use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 use cgap_storage::atomic_commit::*;
+use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 
 /// Scenario S1: fresh journal, commit of seq 1 cut at `k`. Required: k < N →
 /// base root stands (C0-C3); k = N → new root committed (C4).
@@ -60,10 +60,7 @@ fn assert_invariants(out: RecoveryOutcome, prior: &NewRootDescriptor, new: &NewR
     );
     // Degradation law: Degraded ⇔ the journal tail was LOST (no record
     // applied) AND damage (non-conforming bytes) is present on the medium.
-    let damaged = out
-        .slot_verdicts
-        .iter()
-        .any(|&v| v == SlotVerdict::Damaged);
+    let damaged = out.slot_verdicts.iter().any(|&v| v == SlotVerdict::Damaged);
     assert_eq!(
         out.report == RecoveryReport::RecoveryDegraded,
         out.recovered_seq.is_none() && damaged,
@@ -125,11 +122,7 @@ fn sweep_per_offset_rollback() {
                 // C4 (commit, not corruption).
                 let class = tear_class_for_offset(k);
                 if k < n {
-                    assert_ne!(
-                        class,
-                        TearClass::CompleteRecord,
-                        "k={k} classified C4"
-                    );
+                    assert_ne!(class, TearClass::CompleteRecord, "k={k} classified C4");
                     assert_eq!(
                         out.recovered_seq,
                         if with_prior { Some(1u64) } else { None },

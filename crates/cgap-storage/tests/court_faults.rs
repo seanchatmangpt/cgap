@@ -11,8 +11,8 @@
 
 mod common;
 
-use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 use cgap_storage::atomic_commit::*;
+use common::{base_root, commit, flip_bit_file, new_payload, prior_payload, FileMedium};
 
 #[test]
 fn aging_corruption_flip() {
@@ -108,7 +108,10 @@ fn both_slots_damaged_reports_degraded() {
     let out = recover(&m).unwrap();
     assert_eq!(out.root, base_root());
     assert_eq!(out.report, RecoveryReport::RecoveryDegraded);
-    assert_eq!(out.slot_verdicts, [SlotVerdict::Damaged, SlotVerdict::Damaged]);
+    assert_eq!(
+        out.slot_verdicts,
+        [SlotVerdict::Damaged, SlotVerdict::Damaged]
+    );
 }
 
 #[test]
@@ -116,12 +119,13 @@ fn ambiguous_refuses() {
     // F3: identical SEQ in both slots. The commit path derives the slot from
     // the seq, so the court writes the raw encoded record into slot B
     // explicitly — modeling a replayed/mirrored write at the storage layer.
-    let raw_write_slot = |m: &mut FlashMedium, slot: usize, seq: u64, payload: &NewRootDescriptor| {
-        let bytes = encode_record(seq, payload);
-        for (i, b) in bytes.iter().enumerate() {
-            m.write_journal_byte(slot, i, *b).unwrap();
-        }
-    };
+    let raw_write_slot =
+        |m: &mut FlashMedium, slot: usize, seq: u64, payload: &NewRootDescriptor| {
+            let bytes = encode_record(seq, payload);
+            for (i, b) in bytes.iter().enumerate() {
+                m.write_journal_byte(slot, i, *b).unwrap();
+            }
+        };
 
     // Conflicting payloads → typed refusal, fail-closed, never a guess.
     let mut m = FlashMedium::new(base_root());

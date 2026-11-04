@@ -249,7 +249,13 @@ pub unsafe extern "C" fn cgap_aoq_session_step(
                     return w;
                 }
             };
-            match t.live.get_mut(&handle).expect("checked above").engine.step(&parsed) {
+            match t
+                .live
+                .get_mut(&handle)
+                .expect("checked above")
+                .engine
+                .step(&parsed)
+            {
                 Ok(()) => {
                     let w = AOQ_STATUS_OK;
                     set_last_error(w);

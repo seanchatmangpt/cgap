@@ -171,7 +171,6 @@ fn ref_transpose64(rows: [u64; 64]) -> [u64; 64] {
     out
 }
 
-
 // ---------------- courts: scan ----------------
 
 /// Boundary sweep for every scan primitive over the four corner
@@ -181,15 +180,35 @@ fn ref_transpose64(rows: [u64; 64]) -> [u64; 64] {
 fn scan_boundary_sweep_court() {
     for &p in &PATTERNS {
         let a = [p; 8];
-        assert_eq!(prefix_or_u64x8(a), ref_prefix_or(a), "prefix_or p={p:#018x}");
-        assert_eq!(prefix_and_u64x8(a), ref_prefix_and(a), "prefix_and p={p:#018x}");
-        assert_eq!(prefix_xor_u64x8(a), ref_prefix_xor(a), "prefix_xor p={p:#018x}");
+        assert_eq!(
+            prefix_or_u64x8(a),
+            ref_prefix_or(a),
+            "prefix_or p={p:#018x}"
+        );
+        assert_eq!(
+            prefix_and_u64x8(a),
+            ref_prefix_and(a),
+            "prefix_and p={p:#018x}"
+        );
+        assert_eq!(
+            prefix_xor_u64x8(a),
+            ref_prefix_xor(a),
+            "prefix_xor p={p:#018x}"
+        );
 
         let a32 = [p as u32; 8];
-        assert_eq!(prefix_sum_u32x8(a32), ref_prefix_sum(a32), "prefix_sum p={p:#018x}");
+        assert_eq!(
+            prefix_sum_u32x8(a32),
+            ref_prefix_sum(a32),
+            "prefix_sum p={p:#018x}"
+        );
 
         let a8 = [p as u8; 8];
-        assert_eq!(prefix_max_u8x8(a8), ref_prefix_max(a8), "prefix_max p={p:#018x}");
+        assert_eq!(
+            prefix_max_u8x8(a8),
+            ref_prefix_max(a8),
+            "prefix_max p={p:#018x}"
+        );
 
         // count_leading_eq against corner targets.
         for &t in &[0x00u8, 0xFF, 0x55, 0xAA, p as u8] {
@@ -239,9 +258,17 @@ fn scan_high_entropy_differential_court() {
 
         let mut a32 = [0u32; 8];
         for (i, lane) in a.iter().enumerate() {
-            a32[i] = if i % 2 == 0 { *lane as u32 } else { (*lane >> 32) as u32 };
+            a32[i] = if i % 2 == 0 {
+                *lane as u32
+            } else {
+                (*lane >> 32) as u32
+            };
         }
-        assert_eq!(prefix_sum_u32x8(a32), ref_prefix_sum(a32), "round {round} sum");
+        assert_eq!(
+            prefix_sum_u32x8(a32),
+            ref_prefix_sum(a32),
+            "round {round} sum"
+        );
 
         let mut flags = [false; 8];
         for (_i, f) in flags.iter_mut().enumerate() {
@@ -259,10 +286,13 @@ fn scan_high_entropy_differential_court() {
         }
         assert_eq!(prefix_max_u8x8(a8), ref_prefix_max(a8), "round {round} max");
         let t = (rng.next() & 0xFF) as u8;
-        assert_eq!(count_leading_eq_u8(a8, t), ref_leading_eq(a8, t), "round {round} cle");
+        assert_eq!(
+            count_leading_eq_u8(a8, t),
+            ref_leading_eq(a8, t),
+            "round {round} cle"
+        );
     }
 }
-
 
 // ---------------- courts: swar ----------------
 
@@ -276,21 +306,43 @@ fn swar_boundary_sweep_court() {
         // eq / has_zero on the corner words themselves.
         assert_eq!(swar_eq_u64(p, p), ref_swar_eq(p, p), "eq self p={p:#018x}");
         assert_eq!(swar_eq_u64(p, !p), ref_swar_eq(p, !p), "eq not p={p:#018x}");
-        assert_eq!(swar_eq_u64(p, ALL_ZEROS), ref_swar_eq(p, 0), "eq zero p={p:#018x}");
+        assert_eq!(
+            swar_eq_u64(p, ALL_ZEROS),
+            ref_swar_eq(p, 0),
+            "eq zero p={p:#018x}"
+        );
         assert_eq!(swar_has_zero_byte(p), ref_has_zero(p), "zero p={p:#018x}");
 
         for &e in &edges {
             let s = swar_splat(e);
-            assert_eq!(swar_eq_u64(p, s), ref_swar_eq(p, s), "eq splat p={p:#018x} e={e:#04x}");
-            assert_eq!(swar_eq_u64(s, p), ref_swar_eq(s, p), "eq rsplat p={p:#018x} e={e:#04x}");
-            assert_eq!(swar_has_zero_byte(s), ref_has_zero(s), "zero splat e={e:#04x}");
+            assert_eq!(
+                swar_eq_u64(p, s),
+                ref_swar_eq(p, s),
+                "eq splat p={p:#018x} e={e:#04x}"
+            );
+            assert_eq!(
+                swar_eq_u64(s, p),
+                ref_swar_eq(s, p),
+                "eq rsplat p={p:#018x} e={e:#04x}"
+            );
+            assert_eq!(
+                swar_has_zero_byte(s),
+                ref_has_zero(s),
+                "zero splat e={e:#04x}"
+            );
             // Full edge-pair range sweep: every (min, max) edge pair.
             for &m in &edges {
                 for &x in &edges {
                     let val = s;
                     let got = swar_range_mask(val, m.min(x), m.max(x));
                     let want = ref_range_mask(val, m.min(x), m.max(x));
-                    assert_eq!(got, want, "range e={e:#04x} [{:#04x},{:#04x}]", m.min(x), m.max(x));
+                    assert_eq!(
+                        got,
+                        want,
+                        "range e={e:#04x} [{:#04x},{:#04x}]",
+                        m.min(x),
+                        m.max(x)
+                    );
                 }
             }
             // Empty range must be all-zero on every lane.
@@ -308,7 +360,11 @@ fn swar_boundary_sweep_court() {
         let lo = (rng.next() & 0xFF) as u8;
         let hi = (rng.next() & 0xFF) as u8;
         let (mn, mx) = (lo.min(hi), lo.max(hi));
-        assert_eq!(swar_range_mask(x, mn, mx), ref_range_mask(x, mn, mx), "round {round} range");
+        assert_eq!(
+            swar_range_mask(x, mn, mx),
+            ref_range_mask(x, mn, mx),
+            "round {round} range"
+        );
     }
 }
 
@@ -320,7 +376,11 @@ fn swar_boundary_sweep_court() {
 fn transpose_boundary_sweep_court() {
     for &p in &PATTERNS {
         assert_eq!(transpose_8x8(p), ref_transpose8(p), "8x8 p={p:#018x}");
-        assert_eq!(transpose_8x8(transpose_8x8(p)), p, "8x8 involution p={p:#018x}");
+        assert_eq!(
+            transpose_8x8(transpose_8x8(p)),
+            p,
+            "8x8 involution p={p:#018x}"
+        );
     }
     // Identity: transpose is identity.
     let mut id = [0u64; 64];
@@ -355,10 +415,13 @@ fn transpose_boundary_sweep_court() {
     }
     for &p in &PATTERNS {
         let rows = [p; 64];
-        assert_eq!(transpose_64x64(rows), ref_transpose64(rows), "64x64 fill p={p:#018x}");
+        assert_eq!(
+            transpose_64x64(rows),
+            ref_transpose64(rows),
+            "64x64 fill p={p:#018x}"
+        );
     }
 }
-
 
 // ---------------- anti-vacuity twins ----------------
 

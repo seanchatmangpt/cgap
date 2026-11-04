@@ -102,7 +102,10 @@ mod tests {
         }
 
         let metal_buf = MetalSharedBuffer::from_buf(&buf);
-        assert!(metal_buf.is_some(), "Metal unified memory buffer creation failed");
+        assert!(
+            metal_buf.is_some(),
+            "Metal unified memory buffer creation failed"
+        );
         let metal_buf = metal_buf.unwrap();
         assert_eq!(metal_buf.len(), buf.len());
         assert!(!metal_buf.raw_handle().is_null());

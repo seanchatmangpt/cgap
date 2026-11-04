@@ -34,12 +34,12 @@
 //! line's basis) and Mrows/s (over logical rows walked). State the basis,
 //! never make the reader guess.
 
-use cgap_arrow::VERSION_C;
 use cgap_arrow::primitive::{Primitive, PrimitiveBuilder};
 use cgap_arrow::runend::RunEndEncodedBuilder;
 use cgap_arrow::slice::slice;
 use cgap_arrow::varlen::{Varlen, VarlenBuilder};
 use cgap_arrow::views::{ViewVec, ViewVecBuilder};
+use cgap_arrow::VERSION_C;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -131,7 +131,11 @@ fn fixed_row<const W: usize>(i: usize) -> [u8; W] {
 /// Foreign-row count for the i%10 pattern (`on_zero`: foreign iff i%10==0).
 fn foreign_count(rows: usize, on_zero: bool) -> usize {
     let zeros = rows.div_ceil(10); // i % 10 == 0 count
-    if on_zero { zeros } else { rows - zeros }
+    if on_zero {
+        zeros
+    } else {
+        rows - zeros
+    }
 }
 
 fn main() {
@@ -205,7 +209,11 @@ fn main() {
     ] {
         let mut b = ViewVecBuilder::new();
         for i in 0..rows {
-            let foreign = if foreign_on_zero { i % 10 == 0 } else { i % 10 != 0 };
+            let foreign = if foreign_on_zero {
+                i % 10 == 0
+            } else {
+                i % 10 != 0
+            };
             if foreign {
                 b.push(Some(&fixed_row::<FOREIGN_W>(i)));
             } else {
@@ -272,8 +280,8 @@ fn main() {
         drop(b);
         assert_eq!(arr.len(), I64_ROWS, "parent row count");
         assert!(arr.validity().is_none(), "all-valid parent drops bitmap");
-        let s = slice(&arr, SLICE_OFFSET, I64_ROWS - SLICE_OFFSET)
-            .expect("pre-flight slice bounds");
+        let s =
+            slice(&arr, SLICE_OFFSET, I64_ROWS - SLICE_OFFSET).expect("pre-flight slice bounds");
         assert_eq!(s.len(), I64_ROWS - SLICE_OFFSET);
         assert_eq!(s.get(0), Some(SLICE_OFFSET as i64), "window read-through");
         assert_eq!(

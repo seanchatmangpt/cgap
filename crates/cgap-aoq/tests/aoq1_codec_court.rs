@@ -68,10 +68,7 @@ fn wire_law_refusals_are_typed() {
     // Magic flip (anti-vacuity mutation named: wire[0..4] magic bytes).
     let mut m = wire;
     m[0] = 0x00;
-    assert!(matches!(
-        decode(&m),
-        Err(AoqError::BadMagic { .. })
-    ));
+    assert!(matches!(decode(&m), Err(AoqError::BadMagic { .. })));
 
     // Version flip (wire[4..6]).
     let mut v = wire;
@@ -108,10 +105,7 @@ fn wire_law_refusals_are_typed() {
     // stored-vs-computed mismatch).
     let mut d = wire;
     d[61] ^= 0x01;
-    assert!(matches!(
-        decode(&d),
-        Err(AoqError::DigestMismatch { .. })
-    ));
+    assert!(matches!(decode(&d), Err(AoqError::DigestMismatch { .. })));
 }
 
 #[test]

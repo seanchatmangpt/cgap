@@ -1,4 +1,3 @@
-
 //! Lane POSH-1 wire court: net.Buffers/writev scatter-gather simulation.
 //!
 //! An array of disjoint `&[u8]` slices (one `WireChunkHeader`-bearing chunk
@@ -24,7 +23,7 @@
 #![cfg(test)]
 
 use cgap_git::ingress_ring::{IngressError, IngressRing};
-use cgap_git::pack_demux::{DemuxError, Demux};
+use cgap_git::pack_demux::{Demux, DemuxError};
 
 /// Wire chunk header, cache-line aligned, C-repr so the byte layout is the
 /// contract (no Rust field reordering).
@@ -84,9 +83,7 @@ const _: () = assert!(core::mem::align_of::<WireChunkHeader>() == 64);
 /// the host; the court reads them back through the same repr, so the layout
 /// is self-consistent by construction).
 fn header_bytes(h: &WireChunkHeader) -> &[u8] {
-    unsafe {
-        core::slice::from_raw_parts(h as *const WireChunkHeader as *const u8, 64)
-    }
+    unsafe { core::slice::from_raw_parts(h as *const WireChunkHeader as *const u8, 64) }
 }
 
 /// Build a deterministic fact block: fact i is 16 bytes derived from i.
@@ -106,7 +103,11 @@ fn gather_validate(stream: &[u8], expect_facts: usize) {
     assert_eq!(trailer.len(), TRAILER_BYTES);
     for f in 0..expect_facts {
         for b in 0..FACT_BYTES {
-            assert_eq!(facts[f * FACT_BYTES + b], fact_byte(f, b), "fact {f} byte {b}");
+            assert_eq!(
+                facts[f * FACT_BYTES + b],
+                fact_byte(f, b),
+                "fact {f} byte {b}"
+            );
         }
     }
     assert!(trailer.iter().all(|&t| t == 0xAB), "trailer constant");
@@ -162,7 +163,6 @@ fn magic_flip_refusal_court() {
     assert_eq!(d2.feed(bad), Err(DemuxError::SubjectMissing));
 }
 
-
 /// Flip (2) AFTER witness: declared stride != the 16-byte fact width ->
 /// typed StrideMismatch refusal. The stride field sits at header offset
 /// 40..44 (4 magic + 32 tx_id + 4 fact_count); the mutation patches it to
@@ -186,9 +186,19 @@ fn stride_flip_refusal_court() {
 
     // AFTER: patch declared stride 16 -> 20 in a copied stream buffer.
     let mut mutant = stream;
-    assert_eq!(&mutant[40..44], &(16u32).to_ne_bytes(), "stride field offset pinned");
+    assert_eq!(
+        &mutant[40..44],
+        &(16u32).to_ne_bytes(),
+        "stride field offset pinned"
+    );
     mutant[40..44].copy_from_slice(&(20u32).to_ne_bytes());
-    assert_refusal(&mutant, WireRefusal::StrideMismatch { declared: 20, expected: 16 });
+    assert_refusal(
+        &mutant,
+        WireRefusal::StrideMismatch {
+            declared: 20,
+            expected: 16,
+        },
+    );
     // Clean stream still validates: refusal is data-dependent.
     gather_validate(&stream, facts);
 }

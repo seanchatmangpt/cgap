@@ -156,7 +156,10 @@ fn c_abi_getter_seals_and_typed_refuses_null() {
     let rc = unsafe { cgap_ffi::stats::cgap_stats_snapshot(&mut out as *mut _) };
     assert_eq!(rc, 0, "CGAP_OK expected");
     assert_eq!(out.magic, CGAS_STATS_MAGIC);
-    assert_eq!(out.ingress_admitted, 0, "getter must serve the global recorder");
+    assert_eq!(
+        out.ingress_admitted, 0,
+        "getter must serve the global recorder"
+    );
     assert_eq!(health(&out), Health::Healthy);
     let rc_null = unsafe { cgap_ffi::stats::cgap_stats_snapshot(core::ptr::null_mut()) };
     assert_ne!(rc_null, 0, "null out must be a typed refusal");

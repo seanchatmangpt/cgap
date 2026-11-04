@@ -113,9 +113,7 @@ fn consume_words(m: &[u64]) {
 }
 
 fn consume_bytes(b: &[u8]) {
-    black_box(
-        u64::from(b[0]) ^ u64::from(b[b.len() / 2]) ^ u64::from(b[b.len() - 1]),
-    );
+    black_box(u64::from(b[0]) ^ u64::from(b[b.len() / 2]) ^ u64::from(b[b.len() - 1]));
 }
 
 /// Ones across the byte-form validity mask (non-vacuity: the bench needle
@@ -217,19 +215,25 @@ fn main() {
         // ---- materialize-then-mask (unpack_bits_tight + per-row compare) ----
         // Mask zeroing is inside the timed region: form B must produce a
         // FRESH mask per round, exactly as a form B caller would.
-        let mrows_mat = bench_line("materialize-mask", w, PACKED_BYTES as u64, rows as u64, || {
-            let b: &[u8] = black_box(&packed);
-            let vals: &mut [u32] = black_box(&mut materialized);
-            unpack_bits_tight(b, w, vals).expect("tight decode");
-            let m: &mut [u8] = black_box(&mut mask_ref);
-            m.fill(0);
-            for (i, lane) in vals.iter().enumerate() {
-                if *lane == needle {
-                    set_bit(m, i);
+        let mrows_mat = bench_line(
+            "materialize-mask",
+            w,
+            PACKED_BYTES as u64,
+            rows as u64,
+            || {
+                let b: &[u8] = black_box(&packed);
+                let vals: &mut [u32] = black_box(&mut materialized);
+                unpack_bits_tight(b, w, vals).expect("tight decode");
+                let m: &mut [u8] = black_box(&mut mask_ref);
+                m.fill(0);
+                for (i, lane) in vals.iter().enumerate() {
+                    if *lane == needle {
+                        set_bit(m, i);
+                    }
                 }
-            }
-            consume_bytes(m);
-        });
+                consume_bytes(m);
+            },
+        );
 
         let speedup = mrows_packed / mrows_mat;
         println!(

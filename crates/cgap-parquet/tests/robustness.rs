@@ -119,9 +119,7 @@ fn run_case(src: Vec<u8>, out_len: usize) -> (Outcome, bool, Vec<u32>) {
         let mut buf = vec![SENTINEL; out_len + GUARD_LEN];
         let (out, _guard_shared) = buf.split_at_mut(out_len);
 
-        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            rle_decode(&src, out)
-        }));
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| rle_decode(&src, out)));
         let outcome = match res {
             Ok(Ok(())) => Outcome::Ok,
             Ok(Err(e)) => Outcome::Err(e),
@@ -465,7 +463,12 @@ fn fail_closed_adversarial_corpus() {
     // literal groups at the arithmetic extremes. Contract under test: typed
     // error, never a panic. A failure here names src/rle.rs's literal-record
     // slice arithmetic, not this corpus.
-    for groups in [(1usize << 61) - 1, 1usize << 61, 1usize << 62, (1usize << 63) - 1] {
+    for groups in [
+        (1usize << 61) - 1,
+        1usize << 61,
+        1usize << 62,
+        (1usize << 63) - 1,
+    ] {
         let mut src = vec![4u8];
         write_varint(&mut src, ((groups as u64) << 1) | 1);
         let seed = seed_for(4, idx);
@@ -625,7 +628,11 @@ fn fail_closed_adversarial_corpus() {
             Expect::Universal, // Ok: zero budget never reads records
         ));
         for fx in fixtures() {
-            v.push((format!("valid {}", fx.name), fx.encoded.clone(), Expect::Universal)); // Ok
+            v.push((
+                format!("valid {}", fx.name),
+                fx.encoded.clone(),
+                Expect::Universal,
+            )); // Ok
         }
         v
     };
@@ -804,9 +811,7 @@ fn partial_write_contract_observed() {
     println!("  partial_write run-truncation: out = {out:?}");
     assert_eq!(
         out,
-        vec![
-            7, 7, 7, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL
-        ],
+        vec![7, 7, 7, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL, SENTINEL],
         "observed contract: completed prefix intact, failing record wrote nothing"
     );
 
@@ -830,9 +835,7 @@ fn partial_write_contract_observed() {
     println!("  partial_write run-then-literal-overclaim: out = {out:?}");
     assert_eq!(
         out,
-        vec![
-            7, 7, 7, 9, 9, 9, 9, 9, SENTINEL, SENTINEL
-        ],
+        vec![7, 7, 7, 9, 9, 9, 9, 9, SENTINEL, SENTINEL],
         "observed contract: completed runs intact, failing literal record wrote nothing"
     );
 

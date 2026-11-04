@@ -139,10 +139,8 @@ fn main() {
 "#;
 
 fn probe_dir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "cgap-a04-guard-flip-{tag}-{}",
-        std::process::id()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("cgap-a04-guard-flip-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp dir");
     dir
 }
@@ -318,11 +316,7 @@ fn run() -> bool {
 "#,
         || {
             probe_shimmed_frame(
-                &replace_anchored(
-                    FRAME_SRC,
-                    "        self.attestation.validate()?;\n",
-                    "",
-                ),
+                &replace_anchored(FRAME_SRC, "        self.attestation.validate()?;\n", ""),
                 ROW_04_BODY,
             )
         },
@@ -422,10 +416,8 @@ fn run() -> bool {
 #[test]
 fn row_07_ring_overflow_guard_flip() {
     // §8.3: publish payload len > slot capacity → RingError::Overflow.
-    witness_flip(
-        ROW_07_BODY,
-        || {
-            probe_shimmed_dma(
+    witness_flip(ROW_07_BODY, || {
+        probe_shimmed_dma(
                 &replace_anchored(
                     DMA_SRC,
                     "        if len > self.slot_size {\n            return Err(RingError::Overflow);\n        }\n",
@@ -433,8 +425,7 @@ fn row_07_ring_overflow_guard_flip() {
                 ),
                 ROW_07_BODY,
             )
-        },
-    );
+    });
 }
 
 const ROW_07_BODY: &str = r#"
@@ -455,19 +446,16 @@ fn run() -> bool {
 #[test]
 fn row_08_read_unpublished_guard_flip() {
     // §8.3: read an unpublished slot → None (typed: no frame), never garbage.
-    witness_flip(
-        ROW_08_BODY,
-        || {
-            probe_shimmed_dma(
-                &replace_anchored(
-                    DMA_SRC,
-                    "        if head == tail {\n            return None;\n        }\n",
-                    "",
-                ),
-                ROW_08_BODY,
-            )
-        },
-    );
+    witness_flip(ROW_08_BODY, || {
+        probe_shimmed_dma(
+            &replace_anchored(
+                DMA_SRC,
+                "        if head == tail {\n            return None;\n        }\n",
+                "",
+            ),
+            ROW_08_BODY,
+        )
+    });
 }
 
 const ROW_08_BODY: &str = r#"
@@ -482,19 +470,16 @@ fn run() -> bool {
 fn row_09_identity_compare_guard_flip() {
     // §8.3 identity row: the byte-compare loop is the guard — neutering it
     // (divergence treated as equal) must silence the court's detection.
-    witness_flip(
-        ROW_09_BODY,
-        || {
-            probe_shimmed_iso(
-                &replace_anchored(
-                    ISO_SRC,
-                    "            return Err(report(i));\n",
-                    "            continue;\n",
-                ),
-                ROW_09_BODY,
-            )
-        },
-    );
+    witness_flip(ROW_09_BODY, || {
+        probe_shimmed_iso(
+            &replace_anchored(
+                ISO_SRC,
+                "            return Err(report(i));\n",
+                "            continue;\n",
+            ),
+            ROW_09_BODY,
+        )
+    });
 }
 
 const ROW_09_BODY: &str = r#"
@@ -515,10 +500,8 @@ fn row_10_read_u64_bound_guard_flip() {
     // read() builds an out-of-slot slice and PANICS; catch_unwind maps the
     // panic to run() == false → exit 42 (a panic exit 101 is mapped by the
     // probe itself, never a silent pass).
-    witness_flip(
-        ROW_10_BODY,
-        || {
-            probe_shimmed_dma(
+    witness_flip(ROW_10_BODY, || {
+        probe_shimmed_dma(
                 &replace_anchored(
                     DMA_SRC,
                     "        if header.payload_byte_len > (self.slot_size - SLOT_HEADER_LEN) as u64 {\n            return None;\n        }\n",
@@ -526,8 +509,7 @@ fn row_10_read_u64_bound_guard_flip() {
                 ),
                 ROW_10_BODY,
             )
-        },
-    );
+    });
 }
 
 const ROW_10_BODY: &str = r#"

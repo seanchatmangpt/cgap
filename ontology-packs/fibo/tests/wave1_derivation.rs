@@ -35,7 +35,10 @@ fn lex_hash(lexeme: &[u8]) -> [u8; 32] {
 fn generate_corpus_table() {
     let mut collisions: Vec<&str> = Vec::new();
     let mut seen: std::collections::HashMap<u64, &str> = std::collections::HashMap::new();
-    println!("// generated {} — cgap-blake3::hash over BONT_NS_V1 ++ lexeme", line!());
+    println!(
+        "// generated {} — cgap-blake3::hash over BONT_NS_V1 ++ lexeme",
+        line!()
+    );
     for (name, lexeme) in CORPUS {
         let d = lex_hash(lexeme);
         let slot = u64::from_le_bytes(d[0..8].try_into().unwrap());

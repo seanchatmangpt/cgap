@@ -81,11 +81,17 @@ impl fmt::Display for AoqError {
             Self::UnsupportedVersion { got } => write!(f, "unsupported version: {got}"),
             Self::UnknownEpochWire { got } => write!(f, "unknown AOQ epoch on wire: {got}"),
             Self::DigestMismatch { expected, got } => {
-                write!(f, "digest mismatch: stored 0x{expected:08X}, computed 0x{got:08X}")
+                write!(
+                    f,
+                    "digest mismatch: stored 0x{expected:08X}, computed 0x{got:08X}"
+                )
             }
             Self::ReservedNotZero => write!(f, "reserved tail not zero (canonical form)"),
             Self::FrameOrdinalRegression { expected, got } => {
-                write!(f, "frame ordinal regression: expected >= {expected}, got {got}")
+                write!(
+                    f,
+                    "frame ordinal regression: expected >= {expected}, got {got}"
+                )
             }
             Self::SeqGap { expected, got } => {
                 write!(f, "seq gap: expected {expected}, got {got}")

@@ -164,5 +164,5 @@ pub unsafe extern "C" fn audit_count_one_bits(bm: *const bitmap::Bitmap) -> u64 
 }
 
 // v26.11.1 moonshot lanes (coordinator-scaffolded, additive only):
-pub mod powl;
 pub mod ocel2_slab;
+pub mod powl;

@@ -62,27 +62,70 @@ pub struct HeaderFieldSpec {
 
 /// The landed field table, ORDER BY aoq:offset.
 pub const HEADER_FIELDS: [HeaderFieldSpec; 8] = [
-    HeaderFieldSpec { rust_name: "MAGIC", offset: 0, size_bytes: 4, wire_kind: WireKind::U32 },
-    HeaderFieldSpec { rust_name: "VERSION", offset: 4, size_bytes: 2, wire_kind: WireKind::U16 },
-    HeaderFieldSpec { rust_name: "EPOCH", offset: 6, size_bytes: 2, wire_kind: WireKind::U16 },
-    HeaderFieldSpec { rust_name: "KEY_ID", offset: 8, size_bytes: 8, wire_kind: WireKind::U64 },
-    HeaderFieldSpec { rust_name: "FRAME_ORDINAL", offset: 16, size_bytes: 4, wire_kind: WireKind::U32 },
-    HeaderFieldSpec { rust_name: "SEQ", offset: 20, size_bytes: 4, wire_kind: WireKind::U32 },
-    HeaderFieldSpec { rust_name: "RESERVED", offset: 24, size_bytes: 36, wire_kind: WireKind::ReservedZero },
-    HeaderFieldSpec { rust_name: "HEADER_DIGEST", offset: 60, size_bytes: 4, wire_kind: WireKind::Fnv1a32 },
+    HeaderFieldSpec {
+        rust_name: "MAGIC",
+        offset: 0,
+        size_bytes: 4,
+        wire_kind: WireKind::U32,
+    },
+    HeaderFieldSpec {
+        rust_name: "VERSION",
+        offset: 4,
+        size_bytes: 2,
+        wire_kind: WireKind::U16,
+    },
+    HeaderFieldSpec {
+        rust_name: "EPOCH",
+        offset: 6,
+        size_bytes: 2,
+        wire_kind: WireKind::U16,
+    },
+    HeaderFieldSpec {
+        rust_name: "KEY_ID",
+        offset: 8,
+        size_bytes: 8,
+        wire_kind: WireKind::U64,
+    },
+    HeaderFieldSpec {
+        rust_name: "FRAME_ORDINAL",
+        offset: 16,
+        size_bytes: 4,
+        wire_kind: WireKind::U32,
+    },
+    HeaderFieldSpec {
+        rust_name: "SEQ",
+        offset: 20,
+        size_bytes: 4,
+        wire_kind: WireKind::U32,
+    },
+    HeaderFieldSpec {
+        rust_name: "RESERVED",
+        offset: 24,
+        size_bytes: 36,
+        wire_kind: WireKind::ReservedZero,
+    },
+    HeaderFieldSpec {
+        rust_name: "HEADER_DIGEST",
+        offset: 60,
+        size_bytes: 4,
+        wire_kind: WireKind::Fnv1a32,
+    },
 ];
 
 /// Contiguity-chain invariants of the landed graph, as compiled asserts:
 /// first field at offset 0, last field ends exactly at byte 64.
 const _: () = {
     assert!(HEADER_FIELDS[0].offset == 0);
-    assert!(HEADER_FIELDS[HEADER_FIELDS.len() - 1].offset
-        + HEADER_FIELDS[HEADER_FIELDS.len() - 1].size_bytes
-        == AOQ1_SIZE_BYTES);
+    assert!(
+        HEADER_FIELDS[HEADER_FIELDS.len() - 1].offset
+            + HEADER_FIELDS[HEADER_FIELDS.len() - 1].size_bytes
+            == AOQ1_SIZE_BYTES
+    );
     let mut i = 0;
     while i + 1 < HEADER_FIELDS.len() {
-        assert!(HEADER_FIELDS[i].offset + HEADER_FIELDS[i].size_bytes
-            == HEADER_FIELDS[i + 1].offset);
+        assert!(
+            HEADER_FIELDS[i].offset + HEADER_FIELDS[i].size_bytes == HEADER_FIELDS[i + 1].offset
+        );
         i += 1;
     }
 };

@@ -11,11 +11,9 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 
 use cgap_arrow::blake3;
-use cgap_arrow::ipc::{
-    emit as raw_emit, read, seal_meta, window_len, IpcError, MetaHeader,
-};
+use cgap_arrow::ipc::{emit as raw_emit, read, seal_meta, window_len, IpcError, MetaHeader};
 use cgap_arrow::slab::{ArrowRecordSlab, SlabError};
-use cgap_arrow::stream_writer::{StreamWriter, StreamError, VectoredSink};
+use cgap_arrow::stream_writer::{StreamError, StreamWriter, VectoredSink};
 
 /// Real sealed 4-row slab (same shape as the witness fixture).
 fn sealed_4row() -> Result<ArrowRecordSlab<4>, SlabError> {
@@ -135,7 +133,12 @@ fn uds_handoff(seq: u32, alignment: u32, tag: &str) -> (Vec<u8>, usize) {
     let listener = UnixListener::bind(&path).expect("bind live UDS");
     let mut stream = UnixStream::connect(&path).expect("connect live UDS");
     let (mut peer, _addr) = listener.accept().expect("accept");
-    let mut writer = StreamWriter::with_seq(UdsSink { stream: &mut stream }, seq);
+    let mut writer = StreamWriter::with_seq(
+        UdsSink {
+            stream: &mut stream,
+        },
+        seq,
+    );
     let n = writer
         .emit(&mut scratch, meta, &body)
         .expect("type emit ok");
@@ -160,19 +163,11 @@ fn t1_writev_handoff_through_type_uds() {
     assert_eq!(u16::from_le_bytes([got[12], got[13]]), 1, "layout version");
     let body_at = 8 + 120usize;
     assert_eq!(body_at % 64, 0, "body starts 64-aligned");
-    let got_body_len = u32::from_le_bytes([
-        got[0x28 + 8],
-        got[0x29 + 8],
-        got[0x2A + 8],
-        got[0x2B + 8],
-    ]);
+    let got_body_len =
+        u32::from_le_bytes([got[0x28 + 8], got[0x29 + 8], got[0x2A + 8], got[0x2B + 8]]);
     assert_eq!(got_body_len as usize, body_len);
-    let got_align = u32::from_le_bytes([
-        got[0x2C + 8],
-        got[0x2D + 8],
-        got[0x2E + 8],
-        got[0x2F + 8],
-    ]);
+    let got_align =
+        u32::from_le_bytes([got[0x2C + 8], got[0x2D + 8], got[0x2E + 8], got[0x2F + 8]]);
     assert_eq!(got_align, 64);
     let slab = sealed_4row().expect("slab ok");
     assert_eq!(
@@ -203,7 +198,11 @@ fn t1b_received_window_decodes_via_read() {
     let mut out = vec![0u8; body_len];
     let n = read(&got, Some(&digest), &mut out).expect("read ok");
     assert_eq!(n, body_len);
-    assert_eq!(&out[..n], slab.as_bytes(), "socket bytes decode to the exact slab body");
+    assert_eq!(
+        &out[..n],
+        slab.as_bytes(),
+        "socket bytes decode to the exact slab body"
+    );
 }
 
 /// T1c: 8-alignment scatter through the type across a live UDS (the
@@ -292,7 +291,9 @@ fn t5_short_scratch_framing_truncated() {
     let need = window_len(body.len(), 64);
     let mut scratch = vec![0u8; need - 1];
     let mut writer = StreamWriter::new(MemSink::default());
-    let err = writer.emit(&mut scratch, meta, &body).expect_err("must refuse");
+    let err = writer
+        .emit(&mut scratch, meta, &body)
+        .expect_err("must refuse");
     assert!(matches!(
         err,
         StreamError::Framing(IpcError::Truncated { needed, .. }) if needed == need

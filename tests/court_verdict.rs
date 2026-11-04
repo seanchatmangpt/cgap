@@ -400,8 +400,8 @@ impl Sha256 {
     fn finish(mut self) -> [u8; 32] {
         let bit_len = self.total_len.wrapping_mul(8);
         let r = (self.total_len % 64) as usize; // bytes in the final partial block
-        // Tail = 0x80 || zeros || 8-byte big-endian bit length; sized so the
-        // padded message length is a multiple of 64 (zeros in 0..=63).
+                                                // Tail = 0x80 || zeros || 8-byte big-endian bit length; sized so the
+                                                // padded message length is a multiple of 64 (zeros in 0..=63).
         let zeros = if r + 1 <= 56 { 56 - r - 1 } else { 120 - r - 1 };
         let mut tail = [0u8; 72];
         tail[0] = 0x80;
@@ -751,10 +751,7 @@ fn corpus_determinism_receipt() {
     // The fourth family too (A20-finish repair: the mutation campaign's
     // :805 survivor showed the conjunct in bn3_closure_battery was the
     // normal-family population's only pin — single point of failure).
-    let normal = rows
-        .iter()
-        .filter(|r| r.bn3_class == bn3::NORMAL)
-        .count();
+    let normal = rows.iter().filter(|r| r.bn3_class == bn3::NORMAL).count();
     assert!(
         zero > 0 && extreme > 0 && dup > 0 && normal > 0,
         "§5.1: all four BN3 families must be present"
@@ -971,14 +968,19 @@ fn a05_interleave_engine() {
     // "every admitted row re-verifies" is a recomputation over the corpus,
     // not a comparison of the kernel's own output.
     let fold_range = |lo: usize, hi: usize| -> u64 {
-        rows[lo..hi]
-            .iter()
-            .fold(0u64, |acc, r| acc.wrapping_add(r.notional ^ r.instrument_id))
+        rows[lo..hi].iter().fold(0u64, |acc, r| {
+            acc.wrapping_add(r.notional ^ r.instrument_id)
+        })
     };
-    fn range_root(rows: &[SettlementRow], lo: usize, hi: usize, dag_seq: u64) -> a05::NewRootDescriptor {
-        let fold = rows[lo..hi]
-            .iter()
-            .fold(0u64, |acc, r| acc.wrapping_add(r.notional ^ r.instrument_id));
+    fn range_root(
+        rows: &[SettlementRow],
+        lo: usize,
+        hi: usize,
+        dag_seq: u64,
+    ) -> a05::NewRootDescriptor {
+        let fold = rows[lo..hi].iter().fold(0u64, |acc, r| {
+            acc.wrapping_add(r.notional ^ r.instrument_id)
+        });
         let count = (hi - lo) as u64;
         let mut oid = [0u8; 20];
         oid[0..8].copy_from_slice(&fold.to_le_bytes());
@@ -998,7 +1000,10 @@ fn a05_interleave_engine() {
     assert_eq!(prior.root, root1, "prior root resolved");
     assert_eq!(prior.recovered_seq, Some(1));
     assert_eq!(prior.report, a05::RecoveryReport::Clean);
-    assert_eq!(prior.slot_verdicts, [a05::SlotVerdict::Valid, a05::SlotVerdict::Empty]);
+    assert_eq!(
+        prior.slot_verdicts,
+        [a05::SlotVerdict::Valid, a05::SlotVerdict::Empty]
+    );
 
     // The stride sweep (§5.2): every adversarial truncation offset k of
     // txn 2's slot-B record, prior commit complete in slot A. The REAL
@@ -1046,11 +1051,19 @@ fn a05_interleave_engine() {
             "k={k}: a torn newer txn must never roll back the prior commit"
         );
         assert_eq!(outcome.root, expected_root, "k={k}: root resolution");
-        assert_eq!(outcome.recovered_seq, Some(expected_seq), "k={k}: applied seq");
+        assert_eq!(
+            outcome.recovered_seq,
+            Some(expected_seq),
+            "k={k}: applied seq"
+        );
 
         // §5.2: every admitted row under the recovered root re-verifies.
         let lo = if expected_seq == 1 { 0 } else { m1 };
-        let hi = if expected_seq == 1 { m1 } else { CORPUS_ROWS as usize };
+        let hi = if expected_seq == 1 {
+            m1
+        } else {
+            CORPUS_ROWS as usize
+        };
         let fold = fold_range(lo, hi);
         // NewRootDescriptor is repr(C, packed): copy packed fields through
         // locals (a plain copy compiles to an unaligned load; an
@@ -1062,7 +1075,11 @@ fn a05_interleave_engine() {
 
         // Zero-corruption observable: recovery reports Clean — the tear is
         // confined to the journal slot, the resolved root is a real commit.
-        assert_eq!(outcome.report, a05::RecoveryReport::Clean, "k={k}: clean recovery");
+        assert_eq!(
+            outcome.report,
+            a05::RecoveryReport::Clean,
+            "k={k}: clean recovery"
+        );
     }
     assert_eq!(
         torn_class_offsets,
@@ -1079,7 +1096,10 @@ fn a05_interleave_engine() {
     a05::write_record_cut(&mut tail, 2, &root2, a05::RECORD_SIZE).expect("full txn 2");
     a05::write_record_cut(&mut tail, 2, &root2, 0).expect("zero-byte cut is a no-op");
     let tail_out = a05::recover(&tail).expect("committed tail survives");
-    assert_eq!(tail_out.root, root2, "C4 state is monotone under a later no-op cut");
+    assert_eq!(
+        tail_out.root, root2,
+        "C4 state is monotone under a later no-op cut"
+    );
     assert_eq!(tail_out.recovered_seq, Some(2));
 
     // Anti-vacuity over the CONSUMED classifier (A05's own named mutation
@@ -1095,7 +1115,10 @@ fn a05_interleave_engine() {
     assert_eq!(strict.root, root2, "strict: highest seq wins");
     assert_eq!(strict.recovered_seq, Some(2));
     let m2 = a05::recover_mode(&both, a05::MutationMode::M2LowestSeq).expect("M2 recovery");
-    assert_eq!(m2.root, root1, "M2 flip witness: lowest seq resolved instead");
+    assert_eq!(
+        m2.root, root1,
+        "M2 flip witness: lowest seq resolved instead"
+    );
     assert_eq!(m2.recovered_seq, Some(1));
 
     let rollback = range_root(rows, 0, 1, 0); // dag_seq == base dag_seq (0)
@@ -1125,17 +1148,17 @@ fn a05_interleave_engine() {
 // ---------------------------------------------------------------------------
 
 use cgap_blake3::hash as blake3_hash;
+use cgap_bn3::sigil::{encode_term, Sigil};
+use cgap_bn3::unify as a12;
 use cgap_core::frame::{
     CgapFrameHeader, FrameError, P28LicenseAttestation, ATTESTATION_LEN, FLAG_BN3,
     FLAG_RESERVED_MASK, FRAME_HEADER_LEN, FRAME_MAGIC, FRAME_VERSION, LICENSE_FLAG_DERIVATIVE,
     LICENSE_FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_CENTS_MAX,
 };
 use cgap_gate::penstock::{
-    ingress, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
-    FrameView,
+    ingress, FrameView, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION,
+    CGAP_OK,
 };
-use cgap_bn3::sigil::{encode_term, Sigil};
-use cgap_bn3::unify as a12;
 use cgap_storage::atomic_commit::JournalWriter as _;
 
 /// §5.3/§8: unifier-court store sample — `SAMPLE_STRIDE`-th corpus row into
@@ -1192,8 +1215,14 @@ fn cross_lane_abi_pin() {
     assert_eq!(offset_of!(P28LicenseAttestation, license_magic), 0);
     assert_eq!(offset_of!(P28LicenseAttestation, version), 4);
     assert_eq!(offset_of!(P28LicenseAttestation, attestation_flags), 6);
-    assert_eq!(offset_of!(P28LicenseAttestation, safe_harbor_ceiling_cents), 8);
-    assert_eq!(offset_of!(P28LicenseAttestation, origin_authority_digest), 16);
+    assert_eq!(
+        offset_of!(P28LicenseAttestation, safe_harbor_ceiling_cents),
+        8
+    );
+    assert_eq!(
+        offset_of!(P28LicenseAttestation, origin_authority_digest),
+        16
+    );
     assert_eq!(offset_of!(P28LicenseAttestation, upstream_receipt), 48);
     assert_eq!(ATTESTATION_LEN, 80);
     assert_eq!(FRAME_HEADER_LEN, 128);
@@ -1235,7 +1264,10 @@ fn cross_lane_abi_pin() {
         a05::RecoveryError::SeqRegression,
     ];
     assert_ne!(refusals[0], refusals[1]);
-    let reports = [a05::RecoveryReport::Clean, a05::RecoveryReport::RecoveryDegraded];
+    let reports = [
+        a05::RecoveryReport::Clean,
+        a05::RecoveryReport::RecoveryDegraded,
+    ];
     assert_ne!(reports[0], reports[1]);
 }
 
@@ -1257,8 +1289,14 @@ fn a12_unifier_join_court() {
     //   (row0,row1): x=1 y=2 z=3      (row0,row3): x=1 y=2 z=5
     //   (row1,row2): x=2 y=3 z=4      (row3,row4): x=2 y=5 z=6
     //   (row5,row5): x=9 y=9 z=9
-    let store_s: Vec<u64> = [1u64, 2, 3, 2, 5, 9].iter().map(|&v| a12_const(v)).collect();
-    let store_o: Vec<u64> = [2u64, 3, 4, 5, 6, 9].iter().map(|&v| a12_const(v)).collect();
+    let store_s: Vec<u64> = [1u64, 2, 3, 2, 5, 9]
+        .iter()
+        .map(|&v| a12_const(v))
+        .collect();
+    let store_o: Vec<u64> = [2u64, 3, 4, 5, 6, 9]
+        .iter()
+        .map(|&v| a12_const(v))
+        .collect();
     let store_p: Vec<u64> = vec![p; 6];
     let cols = a12::StatementColumns::new(&store_s, &store_p, &store_o).expect("equal lengths");
 
@@ -1276,14 +1314,17 @@ fn a12_unifier_join_court() {
     // carries the rule's id into `DeltaBatch::rule_id`, the A15 collapse
     // key); an unpinned id drifts silently through the join path.
     // (Wave 5: kills the wave-3 campaign's `rule_id: 7 -> 6` survivor.)
-    assert_eq!(compiled.rule_id, 7, "compile preserves the emitting-rule id");
+    assert_eq!(
+        compiled.rule_id, 7,
+        "compile preserves the emitting-rule id"
+    );
     // The const pool interns the DISTINCT words the rule itself names:
     // p (both body atoms) and p2 (head) — exactly two; store words are
     // store-side, never rule-side.
     assert_eq!(compiled.const_pool.len(), 2);
 
-    let matches = a12::unify_batch(&compiled, &cols, a12::DEFAULT_CHUNK_ROWS)
-        .expect("hand-store unify");
+    let matches =
+        a12::unify_batch(&compiled, &cols, a12::DEFAULT_CHUNK_ROWS).expect("hand-store unify");
     assert_eq!(matches.len, 5, "hand-derived match count");
     // Per-match pin: atom rows, bound values, and the head derivation.
     let expected = [
@@ -1366,12 +1407,22 @@ fn a12_unifier_join_court() {
             oracle_big += rs.len();
         }
     }
-    assert_eq!(big.len as usize, oracle_big, "oracle agrees at corpus scale");
+    assert_eq!(
+        big.len as usize, oracle_big,
+        "oracle agrees at corpus scale"
+    );
 
     // -- Typed refusal surface (fail-closed boundaries, never silent) ------
     // Empty body.
-    let empty = a12::Rule { rule_id: 0, body: vec![], head: [p, p, p] };
-    assert_eq!(a12::RuleCompiler::compile(&empty), Err(a12::UnifyError::EmptyRuleBody));
+    let empty = a12::Rule {
+        rule_id: 0,
+        body: vec![],
+        head: [p, p, p],
+    };
+    assert_eq!(
+        a12::RuleCompiler::compile(&empty),
+        Err(a12::UnifyError::EmptyRuleBody)
+    );
     // FormulaRef in the p slot (A12 ban).
     let formula_p = encode_term(Sigil::FormulaRef, 11).expect("formula word");
     let bad_p = a12::Rule {
@@ -1443,8 +1494,8 @@ fn a12_unifier_fixpoint_court() {
         head: [a12_var(0), p, a12_var(2)],
     };
 
-    let batches =
-        a12::unify_to_fixpoint(&[rule_cloned(&rule)], &cols).expect("chain closure inside round budget");
+    let batches = a12::unify_to_fixpoint(&[rule_cloned(&rule)], &cols)
+        .expect("chain closure inside round budget");
     // Derived rows carry the body predicate, so derived-with-derived
     // composition compounds: after round r the store reaches distances
     // 1..2^r (round sizes 31, 59, 106, 164, 136 — sum 496), so 5
@@ -1499,16 +1550,20 @@ fn a12_unifier_fixpoint_court() {
     );
     // Distance histogram over derived pairs: exactly 33-d at distance d.
     for d in 2..=CHAIN_EDGES {
-        let count = derived
-            .iter()
-            .filter(|(i, _, j)| j - i == d)
-            .count() as u64;
-        assert_eq!(count, CHAIN_EDGES + 1 - d, "distance-{d} derived-pair count");
+        let count = derived.iter().filter(|(i, _, j)| j - i == d).count() as u64;
+        assert_eq!(
+            count,
+            CHAIN_EDGES + 1 - d,
+            "distance-{d} derived-pair count"
+        );
     }
 
     // -- Round-budget refusal is typed, never a hang ------------------------
     let budget = a12::unify_to_fixpoint_opt(&[rule_cloned(&rule)], &cols, 2, 4);
-    assert_eq!(budget, Err(a12::UnifyError::FixpointBudgetExceeded { rounds: 2 }));
+    assert_eq!(
+        budget,
+        Err(a12::UnifyError::FixpointBudgetExceeded { rounds: 2 })
+    );
 }
 
 /// Clone helper so the budget refusal above reads cleanly (Rule is
@@ -1556,7 +1611,8 @@ fn a14_dam_ingress_court() {
     assert_eq!(hdr.version, FRAME_VERSION);
     assert_eq!(hdr.flags, FLAG_BN3);
     assert_eq!(hdr.payload_byte_len, payload.len() as u64);
-    hdr.verify_payload(&payload, blake3_hash).expect("digest verifies");
+    hdr.verify_payload(&payload, blake3_hash)
+        .expect("digest verifies");
     let mut tampered = frame.clone();
     let last = tampered.len() - 1;
     tampered[last] ^= 0x01;
@@ -1568,7 +1624,10 @@ fn a14_dam_ingress_court() {
 
     // -- Taxonomy rows 1-6 over the SAME base frame (exact codes) ----------
     // row 1: truncated declared length; lying caller length.
-    assert_eq!(ingress(&frame, FRAME_HEADER_LEN - 1, None), CGAP_ERR_INVALID_MAGIC);
+    assert_eq!(
+        ingress(&frame, FRAME_HEADER_LEN - 1, None),
+        CGAP_ERR_INVALID_MAGIC
+    );
     assert_eq!(
         ingress(&frame, frame.len() + 1, None),
         CGAP_ERR_INVALID_MAGIC,
@@ -1577,39 +1636,73 @@ fn a14_dam_ingress_court() {
     // row 2: bad magic; bad version.
     let mut bad_magic = frame.clone();
     bad_magic[0] = b'X';
-    assert_eq!(ingress(&bad_magic, bad_magic.len(), None), CGAP_ERR_INVALID_MAGIC);
+    assert_eq!(
+        ingress(&bad_magic, bad_magic.len(), None),
+        CGAP_ERR_INVALID_MAGIC
+    );
     let mut bad_version = frame.clone();
     bad_version[4] = FRAME_VERSION + 1;
-    assert_eq!(ingress(&bad_version, bad_version.len(), None), CGAP_ERR_INVALID_MAGIC);
+    assert_eq!(
+        ingress(&bad_version, bad_version.len(), None),
+        CGAP_ERR_INVALID_MAGIC
+    );
     // row 3a: all-zero oabi digest.
     let mut zero_digest = frame.clone();
     zero_digest[16..48].fill(0);
-    assert_eq!(ingress(&zero_digest, zero_digest.len(), None), CGAP_ERR_OABI_MISMATCH);
+    assert_eq!(
+        ingress(&zero_digest, zero_digest.len(), None),
+        CGAP_ERR_OABI_MISMATCH
+    );
     // row 3b: declared payload longer than the buffer allows.
     let mut long_payload = frame.clone();
     long_payload[8..16].copy_from_slice(&(payload.len() as u64 + 1).to_le_bytes());
-    assert_eq!(ingress(&long_payload, long_payload.len(), None), CGAP_ERR_OABI_MISMATCH);
+    assert_eq!(
+        ingress(&long_payload, long_payload.len(), None),
+        CGAP_ERR_OABI_MISMATCH
+    );
     // row 4: attestation magic flipped.
     let mut bad_att_magic = frame.clone();
     bad_att_magic[48] = b'X';
-    assert_eq!(ingress(&bad_att_magic, bad_att_magic.len(), None), CGAP_ERR_P28_SPOLIATION);
+    assert_eq!(
+        ingress(&bad_att_magic, bad_att_magic.len(), None),
+        CGAP_ERR_P28_SPOLIATION
+    );
     // row 5: each A17 field law, one at a time. The att-magic law (byte 48)
     // is pinned here INDEPENDENTLY of row 4's magic flip (A20-finish repair:
     // the mutation campaign's :1574 survivor showed row 4 was the magic
     // law's only pin — one pin per law is a single point of failure).
     let spoliation_cases: [(&str, Box<dyn Fn(&mut [u8])>); 8] = [
         ("att magic", Box::new(|b: &mut [u8]| b[48] = b'X')),
-        ("att version", Box::new(|b: &mut [u8]| b[48 + 4..48 + 6].copy_from_slice(&2u16.to_le_bytes()))),
-        ("att reserved bit", Box::new(|b: &mut [u8]| b[48 + 6] |= 0x08)),
+        (
+            "att version",
+            Box::new(|b: &mut [u8]| b[48 + 4..48 + 6].copy_from_slice(&2u16.to_le_bytes())),
+        ),
+        (
+            "att reserved bit",
+            Box::new(|b: &mut [u8]| b[48 + 6] |= 0x08),
+        ),
         ("lineage zero", Box::new(|b: &mut [u8]| b[48 + 6] = 0)),
-        ("lineage two bits", Box::new(|b: &mut [u8]| b[48 + 6] = 0x03)),
-        ("ceiling over max", Box::new(|b: &mut [u8]| {
-            b[48 + 8..48 + 16].copy_from_slice(&(SAFE_HARBOR_CEILING_CENTS_MAX + 1).to_le_bytes())
-        })),
-        ("ROOT with receipt", Box::new(|b: &mut [u8]| b[48 + 48..48 + 80].fill(1))),
-        ("DERIVATIVE without receipt", Box::new(|b: &mut [u8]| {
-            b[48 + 6..48 + 8].copy_from_slice(&LICENSE_FLAG_DERIVATIVE.to_le_bytes())
-        })),
+        (
+            "lineage two bits",
+            Box::new(|b: &mut [u8]| b[48 + 6] = 0x03),
+        ),
+        (
+            "ceiling over max",
+            Box::new(|b: &mut [u8]| {
+                b[48 + 8..48 + 16]
+                    .copy_from_slice(&(SAFE_HARBOR_CEILING_CENTS_MAX + 1).to_le_bytes())
+            }),
+        ),
+        (
+            "ROOT with receipt",
+            Box::new(|b: &mut [u8]| b[48 + 48..48 + 80].fill(1)),
+        ),
+        (
+            "DERIVATIVE without receipt",
+            Box::new(|b: &mut [u8]| {
+                b[48 + 6..48 + 8].copy_from_slice(&LICENSE_FLAG_DERIVATIVE.to_le_bytes())
+            }),
+        ),
     ];
     for (name, mutate) in spoliation_cases {
         let mut f = frame.clone();
@@ -1623,7 +1716,10 @@ fn a14_dam_ingress_court() {
     // row 6 (A14 divergence note): reserved header flag bits ADMIT.
     let mut reserved_flags = frame.clone();
     reserved_flags[5] |= FLAG_RESERVED_MASK;
-    assert_eq!(ingress(&reserved_flags, reserved_flags.len(), None), CGAP_OK);
+    assert_eq!(
+        ingress(&reserved_flags, reserved_flags.len(), None),
+        CGAP_OK
+    );
 
     // -- Group order pinning (§4 normative order, first failure returns) ----
     let mut magic_and_att = frame.clone();
@@ -1650,10 +1746,10 @@ fn a14_dam_ingress_court() {
         let p = vec![0xA5u8; payload_len];
         let f = valid_frame(&p);
         let mut v = FrameView {
-        payload: &[],
-        prefilter: 0,
-        escalate: false,
-    };
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         assert_eq!(ingress(&f, f.len(), Some(&mut v)), CGAP_OK);
         assert_eq!(v.payload.len(), payload_len);
     }
@@ -1682,10 +1778,10 @@ fn a14_dam_ingress_court() {
             sweep_frame[24..32].copy_from_slice(&row.instrument_id.to_le_bytes());
             sweep_frame[FRAME_HEADER_LEN..].copy_from_slice(&row_enc);
             let mut view = FrameView {
-        payload: &[],
-        prefilter: 0,
-        escalate: false,
-    };
+                payload: &[],
+                prefilter: 0,
+                escalate: false,
+            };
             if ingress(&sweep_frame, sweep_frame.len(), Some(&mut view)) == CGAP_OK
                 && view.payload.len() == ROW_ENCODING_BYTES
             {
@@ -1995,16 +2091,14 @@ fn a04_identity_court() {
             let slot = ring.claim().expect("ring has room");
             slot[..A04_FRAME_BYTES].copy_from_slice(&wire);
         }
-        ring.publish(A04_FRAME_BYTES)
-            .expect("publish valid frame");
+        ring.publish(A04_FRAME_BYTES).expect("publish valid frame");
         let (payload_m, header_m) = ring.read().expect("published frame pending");
         assert_eq!(header_m.validate(), Ok(()), "mem tier must validate");
         header_m
             .encode_into(&mut mem_frame[..FRAME_HEADER_LEN])
             .expect("re-encode mem header");
         mem_frame[FRAME_HEADER_LEN..].copy_from_slice(payload_m);
-        identity_assert(&wire, Tier::Memory, &mem_frame)
-            .expect("memory tier diverged from wire");
+        identity_assert(&wire, Tier::Memory, &mem_frame).expect("memory tier diverged from wire");
         header_m
             .verify_payload(payload_m, blake3_hash)
             .expect("memory digest re-derivation");
@@ -2028,7 +2122,9 @@ fn a04_identity_court() {
         attestation,
     };
     let mut wire_w = [0u8; A04_FRAME_BYTES];
-    header_w.encode_into(&mut wire_w).expect("encode witness wire");
+    header_w
+        .encode_into(&mut wire_w)
+        .expect("encode witness wire");
     wire_w[FRAME_HEADER_LEN..].copy_from_slice(&payload_w);
     let mut mem_w = wire_w;
     mem_w[133] ^= 0x01;
@@ -2037,9 +2133,11 @@ fn a04_identity_court() {
     assert_eq!(m.offset, 133, "first divergent byte is payload byte 5");
     assert_eq!(m.wire, wire_w[133]);
     assert_eq!(m.mem, wire_w[133] ^ 0x01);
-    assert!(m
-        .to_string()
-        .starts_with("IDENTITY_COURT_FAIL tier=memory offset=133 "), "{m}");
+    assert!(
+        m.to_string()
+            .starts_with("IDENTITY_COURT_FAIL tier=memory offset=133 "),
+        "{m}"
+    );
 
     // (2) `payload_byte_len` +1 → Err at offset 8 (the u64 LE field's LSB;
     //     A04 §8.3 "shift payload_byte_len by +1 → FAILs at offset 8").
@@ -2099,8 +2197,8 @@ fn a04_identity_court() {
     );
 
     let sweep_region = leak_region::<A04_REGION_BYTES>();
-    let mut sweep_ring = DmaRing::new(sweep_region, A04_SLOT_POW2)
-        .expect("sweep ring construction");
+    let mut sweep_ring =
+        DmaRing::new(sweep_region, A04_SLOT_POW2).expect("sweep ring construction");
     let mut template = [0u8; A04_FRAME_BYTES];
     let template_header = CgapFrameHeader {
         magic: FRAME_MAGIC,
@@ -2127,17 +2225,13 @@ fn a04_identity_court() {
                 let slot = sweep_ring.claim().expect("ring has room");
                 slot[..A04_FRAME_BYTES].copy_from_slice(&template);
             }
-            sweep_ring
-                .publish(A04_FRAME_BYTES)
-                .expect("sweep publish");
-            let (payload_m, header_m) =
-                sweep_ring.read().expect("sweep frame pending");
+            sweep_ring.publish(A04_FRAME_BYTES).expect("sweep publish");
+            let (payload_m, header_m) = sweep_ring.read().expect("sweep frame pending");
             header_m
                 .encode_into(&mut mem_row[..FRAME_HEADER_LEN])
                 .expect("sweep re-encode");
             mem_row[FRAME_HEADER_LEN..].copy_from_slice(payload_m);
-            identity_assert(&template, Tier::Memory, &mem_row)
-                .expect("sweep row identity broke");
+            identity_assert(&template, Tier::Memory, &mem_row).expect("sweep row identity broke");
             header_m
                 .verify_payload(payload_m, blake3_hash)
                 .expect("sweep digest re-derivation");
@@ -2150,7 +2244,10 @@ fn a04_identity_court() {
         verified, CORPUS_ROWS,
         "§5 scale: every corpus row must cross both tiers"
     );
-    assert!(report.is_zero(), "1M-row identity sweep allocated: {report:?}");
+    assert!(
+        report.is_zero(),
+        "1M-row identity sweep allocated: {report:?}"
+    );
 }
 
 // ===========================================================================
@@ -2202,8 +2299,8 @@ fn a04_identity_court() {
 mod a19_seal {
     use super::{
         a12_const, a12_var, blake3_hash, corpus, encode_row, ingress, CgapFrameHeader,
-        CGAP_ERR_INVALID_MAGIC, CGAP_ERR_P28_SPOLIATION, CGAP_OK, CORPUS_ROWS, FLAG_BN3,
-        FRAME_HEADER_LEN, FRAME_MAGIC, FRAME_VERSION, P28LicenseAttestation, ROW_ENCODING_BYTES,
+        P28LicenseAttestation, CGAP_ERR_INVALID_MAGIC, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
+        CORPUS_ROWS, FLAG_BN3, FRAME_HEADER_LEN, FRAME_MAGIC, FRAME_VERSION, ROW_ENCODING_BYTES,
         SAFE_HARBOR_CEILING_CENTS_MAX,
     };
     use cgap_crypto::chatman::{
@@ -2216,8 +2313,8 @@ mod a19_seal {
         CGAP_ERR_SHACL_VIOLATION,
     };
     use cgap_p28::attestation::{
-        P28LicenseAttestation as SealAttestation, ATTESTATION_VERSION, FLAG_DERIVATIVE,
-        FLAG_ROOT, LICENSE_MAGIC as ATTEST_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
+        P28LicenseAttestation as SealAttestation, ATTESTATION_VERSION, FLAG_DERIVATIVE, FLAG_ROOT,
+        LICENSE_MAGIC as ATTEST_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
     };
     use cgap_parquet::footer::{block_digest, verify_seal, CorruptRegion, SealError};
     use cgap_parquet::mmap_writer::{FileSink, SlabView, StaticPageWriter};
@@ -2400,35 +2497,33 @@ mod a19_seal {
         template_header
             .encode_into(&mut template)
             .expect("template frame encode");
-        let (admitted, report) =
-            cgap_audit::alloc_counter::with_alloc_tracking(|| {
-                let mut admitted = 0u64;
-                let mut row_enc = [0u8; ROW_ENCODING_BYTES];
-                for row in rows.iter() {
-                    encode_row(row, &mut row_enc);
-                    template[16..48].copy_from_slice(&blake3_hash(&row_enc));
-                    assert_eq!(
-                        ingress(&template, template.len(), None),
-                        CGAP_OK,
-                        "every committed row's frame must be admitted"
-                    );
-                    admitted += 1;
-                }
-                admitted
-            });
+        let (admitted, report) = cgap_audit::alloc_counter::with_alloc_tracking(|| {
+            let mut admitted = 0u64;
+            let mut row_enc = [0u8; ROW_ENCODING_BYTES];
+            for row in rows.iter() {
+                encode_row(row, &mut row_enc);
+                template[16..48].copy_from_slice(&blake3_hash(&row_enc));
+                assert_eq!(
+                    ingress(&template, template.len(), None),
+                    CGAP_OK,
+                    "every committed row's frame must be admitted"
+                );
+                admitted += 1;
+            }
+            admitted
+        });
         assert_eq!(admitted, CORPUS_ROWS, "provenance: all 1M frames admitted");
         assert!(report.is_zero(), "provenance sweep allocated: {report:?}");
 
         // -- 4. COMMIT through the frozen cgap_commit_parquet signature.
         //       The coercion below is the compile-time signature pin; the
         //       call goes through the fn pointer (the frozen ABI itself). ---
-        let ledger_path = std::env::temp_dir()
-            .join(format!("cgap-seal-gate3-{}.par2", std::process::id()));
+        let ledger_path =
+            std::env::temp_dir().join(format!("cgap-seal-gate3-{}.par2", std::process::id()));
         let _ = std::fs::remove_file(&ledger_path);
         let ledger_cpath = format!("{}\0", ledger_path.display());
         let commit: CgapCommitParquetFn = seal_commit_parquet;
-        let status =
-            unsafe { commit(lanes.as_ptr(), lanes.len(), ledger_cpath.as_ptr().cast()) };
+        let status = unsafe { commit(lanes.as_ptr(), lanes.len(), ledger_cpath.as_ptr().cast()) };
         assert_eq!(
             status, CGAP_OK,
             "cgap_commit_parquet refused the 1M-row admitted batch"
@@ -2437,8 +2532,8 @@ mod a19_seal {
         // -- 5. Disk read-back: the committed file is the deterministic
         //       block. A second commit through the SAME ABI must be
         //       byte-identical (determinism), and the file must equal it. ---
-        let twin_path = std::env::temp_dir()
-            .join(format!("cgap-seal-gate3-twin-{}.par2", std::process::id()));
+        let twin_path =
+            std::env::temp_dir().join(format!("cgap-seal-gate3-twin-{}.par2", std::process::id()));
         let _ = std::fs::remove_file(&twin_path);
         let twin_cpath = format!("{}\0", twin_path.display());
         let status = unsafe { commit(lanes.as_ptr(), lanes.len(), twin_cpath.as_ptr().cast()) };
@@ -2540,10 +2635,7 @@ mod a19_seal {
         //        exactly — first AND last row groups. Any encode/decode drift
         //        or offset shift flips this leg. --------------------------------
         let decode_group = |group: usize, chunk: &[i32]| {
-            let expected = rle_encode(
-                &chunk.iter().map(|&v| v as u32).collect::<Vec<u32>>(),
-                8,
-            );
+            let expected = rle_encode(&chunk.iter().map(|&v| v as u32).collect::<Vec<u32>>(), 8);
             let span_start = if group == 0 {
                 // First page body ends at span0; the header occupies the rest.
                 let span0 = verified.spans[0] as usize;
@@ -2553,18 +2645,18 @@ mod a19_seal {
                 verified.body_len - expected.len()
             };
             let mut decoded = vec![0u32; chunk.len()];
-            rle_decode(&file_bytes[span_start..span_start + expected.len()], &mut decoded)
-                .expect("decode committed page body");
+            rle_decode(
+                &file_bytes[span_start..span_start + expected.len()],
+                &mut decoded,
+            )
+            .expect("decode committed page body");
             let round_trip: Vec<i32> = decoded.iter().map(|&v| v as i32).collect();
             assert_eq!(
                 round_trip, chunk,
                 "row group {group}: decoded lanes diverge from the committed batch"
             );
         };
-        decode_group(
-            0,
-            &lanes[..SEAL_ROWS_PER_GROUP as usize],
-        );
+        decode_group(0, &lanes[..SEAL_ROWS_PER_GROUP as usize]);
         decode_group(
             SEAL_ROW_GROUPS - 1,
             &lanes[lanes.len() - SEAL_ROWS_PER_GROUP as usize..],
@@ -2581,8 +2673,8 @@ mod a19_seal {
         assert_eq!(lease.current_tick(), 1, "seal consumes exactly one tick");
         verify_unsealed(&receipt).expect("sealed receipt must verify");
         let receipt_bytes = receipt.to_bytes();
-        let round_tripped = UnsealedReceipt::from_bytes(&receipt_bytes)
-            .expect("receipt wire round trip");
+        let round_tripped =
+            UnsealedReceipt::from_bytes(&receipt_bytes).expect("receipt wire round trip");
         verify_unsealed(&round_tripped).expect("round-tripped receipt must verify");
         let flipped = {
             let mut d = digest;
@@ -2600,10 +2692,13 @@ mod a19_seal {
         tampered[45] ^= 0x01;
         let bad_receipt = UnsealedReceipt::from_bytes(&tampered)
             .expect("tampered wire still parses (domain tag intact)");
-        assert!(matches!(
-            verify_unsealed(&bad_receipt),
-            Err(VerifyError::DigestMismatch)
-        ), "one flipped covered byte must flip the receipt verify");
+        assert!(
+            matches!(
+                verify_unsealed(&bad_receipt),
+                Err(VerifyError::DigestMismatch)
+            ),
+            "one flipped covered byte must flip the receipt verify"
+        );
         let _ = bad_receipt;
 
         // -- 10. VERIFY through the frozen cgap_verify_p28 signature: the
@@ -2615,16 +2710,18 @@ mod a19_seal {
         let expected_digest =
             u64::from_le_bytes(blake3_hash(&attest_bytes)[0..8].try_into().expect("8 B"));
         let mut digest_out: u64 = 0;
-        let status = unsafe {
-            verify(attest_bytes.as_ptr(), attest_bytes.len(), &mut digest_out)
-        };
+        let status = unsafe { verify(attest_bytes.as_ptr(), attest_bytes.len(), &mut digest_out) };
         assert_eq!(status, CGAP_OK, "valid ROOT record must verify");
         assert_eq!(
             digest_out, expected_digest,
             "digest predicate must be real BLAKE3 over the evidence"
         );
         let status = unsafe {
-            verify(attest_bytes.as_ptr(), attest_bytes.len(), core::ptr::null_mut())
+            verify(
+                attest_bytes.as_ptr(),
+                attest_bytes.len(),
+                core::ptr::null_mut(),
+            )
         };
         assert_eq!(status, CGAP_OK, "out_digest MAY be NULL (A19 §2)");
         // The SAME record read back from the COMMITTED FILE verifies with the
@@ -2745,13 +2842,13 @@ mod a19_seal {
     /// nothing (count 0); a reserved-sigil word refuses the compile (OABI).
     fn eval_rule_network() -> Vec<u8> {
         let words = [
-            1u64,                    // rule_count
-            0xFEEDu64,               // rule_id
-            a12_const(7),            // head (7, 8, ?1)
+            1u64,         // rule_count
+            0xFEEDu64,    // rule_id
+            a12_const(7), // head (7, 8, ?1)
             a12_const(8),
             a12_var(1),
-            1u64,                    // body_len
-            a12_var(0),              // body (?0, 7001, ?1)
+            1u64,       // body_len
+            a12_var(0), // body (?0, 7001, ?1)
             a12_const(EVAL_LANE_PRED),
             a12_var(1),
         ];
@@ -2788,7 +2885,8 @@ mod a19_seal {
     /// o = lane fold — the o word is what eval projects into the lane).
     fn eval_lane_triple(row: &super::SettlementRow) -> [u8; 24] {
         let mut t = [0u8; 24];
-        t[0..8].copy_from_slice(&a12_const(row.instrument_id & 0x00FF_FFFF_FFFF_FFFF).to_le_bytes());
+        t[0..8]
+            .copy_from_slice(&a12_const(row.instrument_id & 0x00FF_FFFF_FFFF_FFFF).to_le_bytes());
         t[8..16].copy_from_slice(&a12_const(EVAL_LANE_PRED).to_le_bytes());
         t[16..24].copy_from_slice(&a12_const(lane_of(row) as u64).to_le_bytes());
         t
@@ -2821,37 +2919,39 @@ mod a19_seal {
             upstream_receipt: [0u8; 32],
         };
         let admit: CgapAdmitFrameFn = cgap_admit_frame;
-        let (admitted, admit_report) =
-            cgap_audit::alloc_counter::with_alloc_tracking(|| {
-                let mut admitted = 0u64;
-                let mut view = CgapFrameView {
-                    payload: core::ptr::null(),
-                    payload_len: 0,
-                    schema_id: 0,
-                    rule_count: 0,
-                };
-                let mut frame = [0u8; FRAME_HEADER_LEN + 24];
-                for row in rows.iter() {
-                    let triple = eval_lane_triple(row);
-                    eval_lane_frame(&triple, frame_attestation, &mut frame);
-                    assert_eq!(
-                        unsafe { admit(frame.as_ptr(), frame.len(), &mut view) },
-                        CGAP_OK,
-                        "sovereign admit refused an admitted-row frame"
-                    );
-                    assert_eq!(view.payload_len, 24, "view payload_len");
-                    let base = frame.as_ptr() as usize;
-                    let p = view.payload as usize;
-                    assert!(
-                        p >= base + FRAME_HEADER_LEN && p < base + frame.len(),
-                        "admit view must borrow the frame payload (zero-copy)"
-                    );
-                    admitted += 1;
-                }
-                admitted
-            });
+        let (admitted, admit_report) = cgap_audit::alloc_counter::with_alloc_tracking(|| {
+            let mut admitted = 0u64;
+            let mut view = CgapFrameView {
+                payload: core::ptr::null(),
+                payload_len: 0,
+                schema_id: 0,
+                rule_count: 0,
+            };
+            let mut frame = [0u8; FRAME_HEADER_LEN + 24];
+            for row in rows.iter() {
+                let triple = eval_lane_triple(row);
+                eval_lane_frame(&triple, frame_attestation, &mut frame);
+                assert_eq!(
+                    unsafe { admit(frame.as_ptr(), frame.len(), &mut view) },
+                    CGAP_OK,
+                    "sovereign admit refused an admitted-row frame"
+                );
+                assert_eq!(view.payload_len, 24, "view payload_len");
+                let base = frame.as_ptr() as usize;
+                let p = view.payload as usize;
+                assert!(
+                    p >= base + FRAME_HEADER_LEN && p < base + frame.len(),
+                    "admit view must borrow the frame payload (zero-copy)"
+                );
+                admitted += 1;
+            }
+            admitted
+        });
         assert_eq!(admitted, CORPUS_ROWS, "admit stage: all 1M frames admitted");
-        assert!(admit_report.is_zero(), "admit stage allocated: {admit_report:?}");
+        assert!(
+            admit_report.is_zero(),
+            "admit stage allocated: {admit_report:?}"
+        );
 
         // -- 3. EVAL stage: the closure — per row, the SOVEREIGN admit view
         //       feeds the SOVEREIGN eval; the lane is the EVAL OUTPUT
@@ -2916,7 +3016,14 @@ mod a19_seal {
             let mut slot = [0i32; 1];
             let mut count = 0usize;
             let st2 = unsafe {
-                eval_fn(&view, net.as_ptr(), net.len(), slot.as_mut_ptr(), 1, &mut count)
+                eval_fn(
+                    &view,
+                    net.as_ptr(),
+                    net.len(),
+                    slot.as_mut_ptr(),
+                    1,
+                    &mut count,
+                )
             };
             (st2, count, slot)
         };
@@ -2963,12 +3070,20 @@ mod a19_seal {
                 schema_id: 0,
                 rule_count: 0,
             };
-            assert_eq!(unsafe { admit(frame.as_ptr(), frame.len(), &mut view) }, CGAP_OK);
+            assert_eq!(
+                unsafe { admit(frame.as_ptr(), frame.len(), &mut view) },
+                CGAP_OK
+            );
             let mut lane_slot = [0i32; 1];
             let mut count = 0usize;
             let status = unsafe {
                 eval_fn(
-                    &view, net_m.as_ptr(), net_m.len(), lane_slot.as_mut_ptr(), 1, &mut count,
+                    &view,
+                    net_m.as_ptr(),
+                    net_m.len(),
+                    lane_slot.as_mut_ptr(),
+                    1,
+                    &mut count,
                 )
             };
             assert_eq!(
@@ -2988,7 +3103,10 @@ mod a19_seal {
                 schema_id: 0,
                 rule_count: 0,
             };
-            assert_eq!(unsafe { admit(frame.as_ptr(), frame.len(), &mut view) }, CGAP_OK);
+            assert_eq!(
+                unsafe { admit(frame.as_ptr(), frame.len(), &mut view) },
+                CGAP_OK
+            );
             let mut count = 0usize;
             let status = unsafe {
                 eval_fn(
@@ -3000,7 +3118,10 @@ mod a19_seal {
                     &mut count,
                 )
             };
-            assert_eq!(status, CGAP_ERR_LEASE_EXHAUSTED, "M4: cap 0 must refuse LEASE");
+            assert_eq!(
+                status, CGAP_ERR_LEASE_EXHAUSTED,
+                "M4: cap 0 must refuse LEASE"
+            );
         }
         // M5: the admit-side digest pin feeding eval — flipping ONE payload
         // byte WITHOUT re-digesting refuses the frame at admit (the eval
@@ -3050,13 +3171,12 @@ mod a19_seal {
         // -- 4. COMMIT through the frozen CgapCommitParquetFn signature —
         //       the SAME 8-row-group body the existing court composes, fed
         //       the EVAL output (the closure: eval -> commit). --------------
-        let ledger_path = std::env::temp_dir()
-            .join(format!("cgap-eval-gate3-{}.par2", std::process::id()));
+        let ledger_path =
+            std::env::temp_dir().join(format!("cgap-eval-gate3-{}.par2", std::process::id()));
         let _ = std::fs::remove_file(&ledger_path);
         let ledger_cpath = format!("{}\0", ledger_path.display());
         let commit: CgapCommitParquetFn = seal_commit_parquet;
-        let status =
-            unsafe { commit(lanes.as_ptr(), lanes.len(), ledger_cpath.as_ptr().cast()) };
+        let status = unsafe { commit(lanes.as_ptr(), lanes.len(), ledger_cpath.as_ptr().cast()) };
         assert_eq!(
             status, CGAP_OK,
             "cgap_commit_parquet refused the 1M-lane eval output"
@@ -3064,8 +3184,8 @@ mod a19_seal {
 
         // -- 5. Twin determinism + disk read-back + the real post-commit
         //       read-back check over the FILE bytes. ------------------------
-        let twin_path = std::env::temp_dir()
-            .join(format!("cgap-eval-gate3-twin-{}.par2", std::process::id()));
+        let twin_path =
+            std::env::temp_dir().join(format!("cgap-eval-gate3-twin-{}.par2", std::process::id()));
         let _ = std::fs::remove_file(&twin_path);
         let twin_cpath = format!("{}\0", twin_path.display());
         let status = unsafe { commit(lanes.as_ptr(), lanes.len(), twin_cpath.as_ptr().cast()) };
@@ -3147,10 +3267,7 @@ mod a19_seal {
         //       the EVAL lanes (the closure witness — the disk carries the
         //       eval output, not the harness fold's separate life). ---------
         let decode_group = |group: usize, chunk: &[i32]| {
-            let expected = rle_encode(
-                &chunk.iter().map(|&v| v as u32).collect::<Vec<u32>>(),
-                8,
-            );
+            let expected = rle_encode(&chunk.iter().map(|&v| v as u32).collect::<Vec<u32>>(), 8);
             let span_start = if group == 0 {
                 let span0 = verified.spans[0] as usize;
                 super::span_start_of(span0, &expected, &file_bytes)
@@ -3158,8 +3275,11 @@ mod a19_seal {
                 verified.body_len - expected.len()
             };
             let mut decoded = vec![0u32; chunk.len()];
-            rle_decode(&file_bytes[span_start..span_start + expected.len()], &mut decoded)
-                .expect("decode committed page body");
+            rle_decode(
+                &file_bytes[span_start..span_start + expected.len()],
+                &mut decoded,
+            )
+            .expect("decode committed page body");
             assert_eq!(
                 decoded.iter().map(|&v| v as i32).collect::<Vec<i32>>(),
                 chunk,
@@ -3186,10 +3306,13 @@ mod a19_seal {
         tampered[45] ^= 0x01;
         let bad_receipt = UnsealedReceipt::from_bytes(&tampered)
             .expect("tampered wire still parses (domain tag intact)");
-        assert!(matches!(
-            verify_unsealed(&bad_receipt),
-            Err(VerifyError::DigestMismatch)
-        ), "one flipped covered byte must flip the receipt verify");
+        assert!(
+            matches!(
+                verify_unsealed(&bad_receipt),
+                Err(VerifyError::DigestMismatch)
+            ),
+            "one flipped covered byte must flip the receipt verify"
+        );
         let _ = bad_receipt;
 
         // -- 10. VERIFY stage through the frozen CgapVerifyP28Fn signature:
@@ -3201,16 +3324,18 @@ mod a19_seal {
         let expected_digest =
             u64::from_le_bytes(blake3_hash(&attest_bytes)[0..8].try_into().expect("8 B"));
         let mut digest_out: u64 = 0;
-        let status = unsafe {
-            verify(attest_bytes.as_ptr(), attest_bytes.len(), &mut digest_out)
-        };
+        let status = unsafe { verify(attest_bytes.as_ptr(), attest_bytes.len(), &mut digest_out) };
         assert_eq!(status, CGAP_OK, "valid ROOT record must verify");
         assert_eq!(
             digest_out, expected_digest,
             "digest predicate must be real BLAKE3 over the evidence"
         );
         let status = unsafe {
-            verify(attest_bytes.as_ptr(), attest_bytes.len(), core::ptr::null_mut())
+            verify(
+                attest_bytes.as_ptr(),
+                attest_bytes.len(),
+                core::ptr::null_mut(),
+            )
         };
         assert_eq!(status, CGAP_OK, "out_digest MAY be NULL (A19 §2)");
         let mut disk_digest: u64 = 0;
@@ -3233,7 +3358,10 @@ mod a19_seal {
         digest_flipped[16] ^= 0x01;
         let mut flipped_slot: u64 = 0;
         let status = unsafe { verify(digest_flipped.as_ptr(), 80, &mut flipped_slot) };
-        assert_eq!(status, CGAP_OK, "origin-digest flip is not an intrinsic refusal");
+        assert_eq!(
+            status, CGAP_OK,
+            "origin-digest flip is not an intrinsic refusal"
+        );
         assert_ne!(
             flipped_slot, expected_digest,
             "digest predicate must detect an evidence mutation"

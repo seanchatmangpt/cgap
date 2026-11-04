@@ -31,12 +31,8 @@ use std::time::Instant;
 
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
-use cgap_aoq::session::{
-    self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES,
-};
-use cgap_arrow::ipc::{
-    self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE,
-};
+use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
+use cgap_arrow::ipc::{self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE};
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{
     AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_OK,
@@ -64,10 +60,7 @@ fn shake32(parts: &[&[u8]]) -> [u8; 32] {
 struct CourtKem;
 
 impl KemSeam for CourtKem {
-    fn encapsulate(
-        &self,
-        ek: &[u8; EK_BYTES],
-    ) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
+    fn encapsulate(&self, ek: &[u8; EK_BYTES]) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
         let m = shake32(&[b"w2c/mlkem/m", ek]);
         let mut ct = [0u8; CT_BYTES];
         let mut ss = [0u8; 32];
@@ -75,12 +68,10 @@ impl KemSeam for CourtKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; 32], SessionError> {
-        let dk: &[u8; 2400] = dk.try_into().map_err(|_| SessionError::KemRefused { op: 1 })?;
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; 32], SessionError> {
+        let dk: &[u8; 2400] = dk
+            .try_into()
+            .map_err(|_| SessionError::KemRefused { op: 1 })?;
         Ok(cgap_crypto::kem::decaps(dk, ct))
     }
 
@@ -116,8 +107,10 @@ impl Drop for Sidecar {
 /// Stdin is PIPED and held open: stdin EOF is the sidecar's stop signal
 /// (ZD-56), so an inherited-closed stdin must not end the process mid-court.
 fn spawn_sidecar(tag: &str) -> Sidecar {
-    let sock_path: PathBuf = std::env::temp_dir()
-        .join(format!("aoq_sidecar_court_{tag}_{:?}.sock", std::process::id()));
+    let sock_path: PathBuf = std::env::temp_dir().join(format!(
+        "aoq_sidecar_court_{tag}_{:?}.sock",
+        std::process::id()
+    ));
     let _ = std::fs::remove_file(&sock_path);
     let mut child = Command::new(env!("CARGO_BIN_EXE_aoq_sidecar"))
         .arg(&sock_path)
@@ -154,7 +147,12 @@ fn spawn_sidecar(tag: &str) -> Sidecar {
             }
         }
     };
-    Sidecar { child, stream, sock_path, _stop_signal: Some(stop_signal) }
+    Sidecar {
+        child,
+        stream,
+        sock_path,
+        _stop_signal: Some(stop_signal),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -221,11 +219,20 @@ fn roundtrip(
     let mut prefix = [0u8; PREFIX_SIZE];
     stream.read_exact(&mut prefix).expect("response prefix");
     let meta_span = u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]) as usize;
-    assert_eq!(meta_span, META_SPAN, "response meta span is the align-64 span");
+    assert_eq!(
+        meta_span, META_SPAN,
+        "response meta span is the align-64 span"
+    );
     let mut meta_bytes = [0u8; META_SPAN];
-    stream.read_exact(&mut meta_bytes).expect("response metadata");
-    let blen = u32::from_le_bytes([meta_bytes[64], meta_bytes[65], meta_bytes[66],
-                                   meta_bytes[67]]) as usize;
+    stream
+        .read_exact(&mut meta_bytes)
+        .expect("response metadata");
+    let blen = u32::from_le_bytes([
+        meta_bytes[64],
+        meta_bytes[65],
+        meta_bytes[66],
+        meta_bytes[67],
+    ]) as usize;
     let pad = ipc::pad_to(blen, 64);
     let mut rest = vec![0u8; blen + pad + EOS_SIZE];
     stream.read_exact(&mut rest).expect("response body+pad+eos");
@@ -288,16 +295,28 @@ fn j1_sidecar_handshake_and_verified_appdata_roundtrip() {
     // re-derives with the court's own seam over the shared secret.
     let frame = sess::parse_frame(&body).expect("response frame parses");
     assert_eq!(frame.kind, FrameKind::AppData);
-    let rseq = u32::from_be_bytes([frame.payload[0], frame.payload[1],
-                                   frame.payload[2], frame.payload[3]]);
+    let rseq = u32::from_be_bytes([
+        frame.payload[0],
+        frame.payload[1],
+        frame.payload[2],
+        frame.payload[3],
+    ]);
     assert_eq!(rseq, 7, "echoed seq");
     // emit_verified frames carry a trailing 4-byte kdf tag after the
     // payload; strip it before the byte-identity assert.
-    assert_eq!(&frame.payload[4..frame.payload.len() - 4], payload, "echoed payload");
+    assert_eq!(
+        &frame.payload[4..frame.payload.len() - 4],
+        payload,
+        "echoed payload"
+    );
     let covered = &body[..body.len() - 4];
     let mut tag = [0u8; 4];
     tag.copy_from_slice(&body[body.len() - 4..]);
-    assert_eq!(kem.kdf(&[covered])[0..4], tag, "emit_verified kdf tag re-derives");
+    assert_eq!(
+        kem.kdf(&[covered])[0..4],
+        tag,
+        "emit_verified kdf tag re-derives"
+    );
     let _ = dk;
 }
 
@@ -352,8 +371,10 @@ fn j3_zero_and_short_windows_refused() {
     // ZD-56 sequential-serve change, the stop signal is stdin EOF: the court
     // pipes stdin and closes it after the zero-byte client close.)
     {
-        let sock = std::env::temp_dir()
-            .join(format!("aoq_sidecar_court_j3zero_{:?}.sock", std::process::id()));
+        let sock = std::env::temp_dir().join(format!(
+            "aoq_sidecar_court_j3zero_{:?}.sock",
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&sock);
         let mut child = Command::new(env!("CARGO_BIN_EXE_aoq_sidecar"))
             .arg(&sock)
@@ -372,15 +393,12 @@ fn j3_zero_and_short_windows_refused() {
         let _client = loop {
             match UnixStream::connect(&sock) {
                 Ok(s) => break s,
-                Err(e) => assert!(
-                    Instant::now() < deadline,
-                    "connect (zero leg): {e}"
-                ),
+                Err(e) => assert!(Instant::now() < deadline, "connect (zero leg): {e}"),
             }
         };
         drop(_client); // immediate zero-byte close
         drop(stop_signal); // stdin EOF: the sidecar's stop signal
-        // Bounded poll on the child's exit (observable: try_wait status).
+                           // Bounded poll on the child's exit (observable: try_wait status).
         let deadline = Instant::now() + std::time::Duration::from_secs(10);
         let status = loop {
             match child.try_wait().expect("try_wait") {
@@ -397,11 +415,20 @@ fn j3_zero_and_short_windows_refused() {
     // this sidecar must refuse with the typed INCOMPLETE_FRAME word.
     {
         let mut car = spawn_sidecar("j3short");
-        car.stream.write_all(&[0xFF, 0xFF, 0xFF, 0xFF]).expect("prefix write");
-        car.stream.shutdown(std::net::Shutdown::Write).expect("half-close");
+        car.stream
+            .write_all(&[0xFF, 0xFF, 0xFF, 0xFF])
+            .expect("prefix write");
+        car.stream
+            .shutdown(std::net::Shutdown::Write)
+            .expect("half-close");
         let mut word_b = [0u8; 4];
-        car.stream.read_exact(&mut word_b).expect("refusal word read");
+        car.stream
+            .read_exact(&mut word_b)
+            .expect("refusal word read");
         let word = u32::from_le_bytes(word_b);
-        assert_eq!(word, AOQ_STATUS_INCOMPLETE_FRAME, "short window refuses typed");
+        assert_eq!(
+            word, AOQ_STATUS_INCOMPLETE_FRAME,
+            "short window refuses typed"
+        );
     }
 }

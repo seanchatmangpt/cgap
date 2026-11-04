@@ -76,9 +76,7 @@ fn mutation_through_view_visible_through_ffi_view() {
     let addr = cgap_ffi::cgap_array_addr();
 
     // SAFETY: live export; values buffer holds n i32 lanes at offset 0.
-    let vals = unsafe {
-        core::slice::from_raw_parts(values_ptr(ptr) as *const i32, n as usize)
-    };
+    let vals = unsafe { core::slice::from_raw_parts(values_ptr(ptr) as *const i32, n as usize) };
     for (i, v) in vals.iter().enumerate() {
         assert_eq!(*v, i as i32, "view must alias the built memory, not a copy");
     }
@@ -131,7 +129,11 @@ fn exported_buffer_pointers_are_64_byte_aligned() {
         // SAFETY: live export, n_buffers == 2.
         unsafe {
             let vals = values_ptr(ptr) as usize;
-            assert_eq!(vals % 64, 0, "values buffer must be 64-byte aligned (n={n})");
+            assert_eq!(
+                vals % 64,
+                0,
+                "values buffer must be 64-byte aligned (n={n})"
+            );
             let validity = *(*ptr).buffers.add(0) as usize;
             if validity != 0 {
                 assert_eq!(

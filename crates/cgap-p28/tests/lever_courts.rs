@@ -24,13 +24,12 @@
 
 use cgap_crypto::lease::Lease;
 use cgap_p28::asc450::{
-    Asc450Meter, LeaseEpochSealer, GENESIS_PREV_PROOF_DIGEST, PROOF_LEN, STATE_LEN,
-    STATE_LATCHED_CLEAR, STATE_LATCHED_SET,
+    Asc450Meter, LeaseEpochSealer, GENESIS_PREV_PROOF_DIGEST, PROOF_LEN, STATE_LATCHED_CLEAR,
+    STATE_LATCHED_SET, STATE_LEN,
 };
 use cgap_p28::attestation::{
     instrument_header_span, origin_authority_digest, P28LicenseAttestation, ATTESTATION_LEN,
-    ATTESTATION_VERSION, FLAG_DERIVATIVE, FLAG_ROOT, LICENSE_MAGIC,
-    SAFE_HARBOR_CEILING_MAX_CENTS,
+    ATTESTATION_VERSION, FLAG_DERIVATIVE, FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_MAX_CENTS,
 };
 
 /// The REAL pinned instrument from the repo root.
@@ -125,7 +124,10 @@ fn l5_mixed_corpus_three_way_invariants() {
         } else {
             meter.record_unlicensed(amt, i as u64)
         };
-        assert!(res.is_ok(), "corpus event {i} must be accepted, not overflowed");
+        assert!(
+            res.is_ok(),
+            "corpus event {i} must be accepted, not overflowed"
+        );
         if let Ok(Some(p)) = res {
             emitted += 1;
             proofs.push(p);

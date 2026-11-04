@@ -137,8 +137,11 @@ fn court_rule() -> Rule {
 /// Corpus of `n` rows over per-lane pools `(s, p, o)`.
 fn corpus(n: usize, pools: (u64, u64, u64)) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
     let mut rng = CourtRng::new(SEED);
-    let (mut s, mut p, mut o) =
-        (Vec::with_capacity(n), Vec::with_capacity(n), Vec::with_capacity(n));
+    let (mut s, mut p, mut o) = (
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+        Vec::with_capacity(n),
+    );
     for _ in 0..n {
         s.push(rng.pooled(pools.0, 1));
         p.push(rng.pooled(pools.1, 2));
@@ -227,9 +230,15 @@ fn sp4_default_probe_is_radix_with_cache_hits() {
     let (s, p, o) = corpus(N_SELF_PLAY, (2048, 4, 4096));
     let cols = StatementColumns::new(&s, &p, &o).expect("columns");
     let mut probe = JoinProbeScratch::default();
-    assert!(probe.radix, "JoinProbeScratch::default() must be radix:true");
+    assert!(
+        probe.radix,
+        "JoinProbeScratch::default() must be radix:true"
+    );
     let keys = kernel_keys(&rule, &cols, 4096, &mut probe);
-    assert!(!keys.is_empty(), "anti-vacuity: 64K self-play corpus must yield joins");
+    assert!(
+        !keys.is_empty(),
+        "anti-vacuity: 64K self-play corpus must yield joins"
+    );
     assert!(
         probe.cache_hits > 0,
         "leased probe served zero chunks from the candidate cache (hits={})",

@@ -106,10 +106,7 @@ fn mix32(parts: &[&[u8]]) -> [u8; 32] {
 
 struct TestKem;
 impl KemSeam for TestKem {
-    fn encapsulate(
-        &self,
-        ek: &[u8; EK_BYTES],
-    ) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
+    fn encapsulate(&self, ek: &[u8; EK_BYTES]) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
         let ss = mix32(&[b"cgap-test/ss", ek]);
         let mut ct = [0u8; CT_BYTES];
         let mut chunk = mix32(&[b"cgap-test/ct", ek]);
@@ -124,11 +121,7 @@ impl KemSeam for TestKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; 32], SessionError> {
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; 32], SessionError> {
         if dk.len() != EK_BYTES {
             return Err(SessionError::KemRefused { op: 1 });
         }
@@ -232,10 +225,7 @@ use std::sync::mpsc;
 /// across worker kills; workers are concurrent parse-and-digest verifiers
 /// that are killed mid-stream (round 1, while bursts remain) and
 /// respawned (round 2). Returns each channel's receipt records.
-fn run_slot(
-    slot: usize,
-    tx: &mpsc::Sender<(usize, Vec<AoqChainRecord>)>,
-) {
+fn run_slot(slot: usize, tx: &mpsc::Sender<(usize, Vec<AoqChainRecord>)>) {
     let channels: Vec<usize> = (slot..CHANNELS).step_by(SLOTS).collect();
     let mut sessions: Vec<Session<'static, TestKem>> =
         channels.iter().map(|&c| handshake(c)).collect();
@@ -278,7 +268,12 @@ fn run_slot(
                         let body = radar_body(g as u32, c);
                         let mut w = vec![0u8; 64 + 1 + 4 + body.len() - 4];
                         codec::encode(
-                            &AoqHeader::new((c % 3) as u16, (c as u64) + 1, s.ordinal() + 1, g as u32),
+                            &AoqHeader::new(
+                                (c % 3) as u16,
+                                (c as u64) + 1,
+                                s.ordinal() + 1,
+                                g as u32,
+                            ),
                             &mut w,
                         )
                         .unwrap();
@@ -365,7 +360,10 @@ fn run_slot(
                     assert_eq!(sessions[i].state(), SessionState::Closed);
                     ABSORBED.fetch_add(1, Ordering::Relaxed);
                     let err = chains[i].append_verified(&w).unwrap_err();
-                    assert!(matches!(err, cgap_aoq::error::AoqError::DigestMismatch { .. }));
+                    assert!(matches!(
+                        err,
+                        cgap_aoq::error::AoqError::DigestMismatch { .. }
+                    ));
                     TAG_REFUSED.fetch_add(1, Ordering::Relaxed);
                 }
             }
@@ -379,7 +377,10 @@ fn run_slot(
         if round == 0 {
             KILLED.fetch_add(1, Ordering::Relaxed);
             if parsed != 24 * channels.len() {
-                panic!("slot {slot} round-1 worker parsed {parsed}, expected {}", 24 * channels.len());
+                panic!(
+                    "slot {slot} round-1 worker parsed {parsed}, expected {}",
+                    24 * channels.len()
+                );
             }
         } else {
             RESPAWNED.fetch_add(1, Ordering::Relaxed);
@@ -480,14 +481,30 @@ fn macro_defense_mesh() {
         eprintln!("channels: {CHANNELS} (dossier 1024 scaled 16x; TARGET-UNMEASURED)");
         eprintln!("telemetry frames absorbed: {telemetry_absorbed} (+4 lawful close frames)");
         eprintln!("chain records (per-channel chains): {}", attribution.len());
-        eprintln!("record bytes: {} ({} x {RECORD_BYTES}B)", attribution.len() * RECORD_BYTES, attribution.len());
+        eprintln!(
+            "record bytes: {} ({} x {RECORD_BYTES}B)",
+            attribution.len() * RECORD_BYTES,
+            attribution.len()
+        );
         eprintln!("attribution bleed: 0 (every digest maps to exactly one channel)");
-        eprintln!("refusal census: ordinal=12 truncation=12 session_closed=96 aead_seam={} close_tag=4", ld(&AEAD_REFUSED));
-        eprintln!("worker threads killed mid-stream: {} ; respawned: {}", ld(&KILLED), ld(&RESPAWNED));
-        eprintln!("worker digest operations: {}", WORK_DIGESTS.load(Ordering::Relaxed));
+        eprintln!(
+            "refusal census: ordinal=12 truncation=12 session_closed=96 aead_seam={} close_tag=4",
+            ld(&AEAD_REFUSED)
+        );
+        eprintln!(
+            "worker threads killed mid-stream: {} ; respawned: {}",
+            ld(&KILLED),
+            ld(&RESPAWNED)
+        );
+        eprintln!(
+            "worker digest operations: {}",
+            WORK_DIGESTS.load(Ordering::Relaxed)
+        );
         eprintln!("RSS delta: {rss_delta_kb} KB (before {rss_before}, after {rss_after})");
         eprintln!("fd delta: {fd_delta}");
         eprintln!("wall time: {elapsed:?}");
-        eprintln!("unmeasured here: no_os embedded-target run, EW survivability, 1024-channel scale");
+        eprintln!(
+            "unmeasured here: no_os embedded-target run, EW survivability, 1024-channel scale"
+        );
     });
 }

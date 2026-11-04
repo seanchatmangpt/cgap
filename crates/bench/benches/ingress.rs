@@ -258,18 +258,17 @@ fn cgap_admit_frame<const FRAMES: usize>(b: Bencher) {
     let (frames, manifest, expected_fold) = build_a04_corpus(FRAMES);
     preflight_a04(&frames, &manifest, expected_fold);
 
-    b.counter(ItemsCount::new(FRAMES as u64))
-        .bench(|| {
-            let mut acc: u64 = 0;
-            for i in 0..FRAMES {
-                acc = acc.wrapping_add(admit_a04(frames.region(i)));
-            }
-            black_box(acc);
-            assert_eq!(
-                acc, expected_fold,
-                "A04 pass checksum drifted from manifest fold"
-            );
-        });
+    b.counter(ItemsCount::new(FRAMES as u64)).bench(|| {
+        let mut acc: u64 = 0;
+        for i in 0..FRAMES {
+            acc = acc.wrapping_add(admit_a04(frames.region(i)));
+        }
+        black_box(acc);
+        assert_eq!(
+            acc, expected_fold,
+            "A04 pass checksum drifted from manifest fold"
+        );
+    });
 }
 
 /// Dam-corpus expectation (A14 §8.1 manifest shape): exact A19 code, or
@@ -290,10 +289,10 @@ enum DamExpect {
 fn gen_dam_frame(seed: u64, i: u64, buf: &mut [u8]) -> (usize, DamExpect) {
     use dam::{
         CGAP_ERR_INVALID_MAGIC, CGAP_ERR_OABI_MISMATCH, CGAP_ERR_P28_SPOLIATION, CGAP_OK,
-        FLAG_ARROW, FLAG_BN3, FLAG_GITPACK, FLAG_PARQUET, HEADER_LEN, MAGIC, OFF_ATTESTATION,
-        OFF_FLAGS, OFF_MAGIC, OFF_OABI_DIGEST, OFF_PAYLOAD_BYTE_LEN, OFF_VERSION,
-        OABI_DIGEST_LEN, P28_FLAG_DERIVATIVE, P28_FLAG_ROOT, P28_FLAG_TRANSPILED,
-        P28_LICENSE_MAGIC, P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION,
+        FLAG_ARROW, FLAG_BN3, FLAG_GITPACK, FLAG_PARQUET, HEADER_LEN, MAGIC, OABI_DIGEST_LEN,
+        OFF_ATTESTATION, OFF_FLAGS, OFF_MAGIC, OFF_OABI_DIGEST, OFF_PAYLOAD_BYTE_LEN, OFF_VERSION,
+        P28_FLAG_DERIVATIVE, P28_FLAG_ROOT, P28_FLAG_TRANSPILED, P28_LICENSE_MAGIC,
+        P28_SAFE_HARBOR_CEILING_CENTS, P28_VERSION,
     };
     let mut rng = SplitMix64(seed ^ i.wrapping_mul(0x2544_5491_4F6C_DD1D));
     buf.fill(0);
@@ -394,8 +393,7 @@ fn gen_dam_frame(seed: u64, i: u64, buf: &mut [u8]) -> (usize, DamExpect) {
                         // MC_ATT_RANGE: reserved bit / zero lineage / over-ceiling.
                         match rng.next() % 3 {
                             0 => {
-                                let f =
-                                    lineage | (1u16 << (3 + rng.next() % 13));
+                                let f = lineage | (1u16 << (3 + rng.next() % 13));
                                 buf[OFF_ATTESTATION + 6..OFF_ATTESTATION + 8]
                                     .copy_from_slice(&f.to_le_bytes());
                             }
@@ -413,9 +411,8 @@ fn gen_dam_frame(seed: u64, i: u64, buf: &mut [u8]) -> (usize, DamExpect) {
                                     .copy_from_slice(&f.to_le_bytes());
                             }
                             _ => {
-                                let over = P28_SAFE_HARBOR_CEILING_CENTS
-                                    + 1
-                                    + rng.next() % 1_000_000;
+                                let over =
+                                    P28_SAFE_HARBOR_CEILING_CENTS + 1 + rng.next() % 1_000_000;
                                 buf[OFF_ATTESTATION + 8..OFF_ATTESTATION + 16]
                                     .copy_from_slice(&over.to_le_bytes());
                             }
@@ -472,7 +469,11 @@ fn build_dam_pool(seed: u64, pool: usize) -> (Vec<u8>, Vec<(u32, u32)>, u64) {
         let off = packed.len();
         packed.extend_from_slice(&scratch[..len]);
         table.push((off as u32, len as u32));
-        let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
+        let mut view = dam::FrameView {
+            payload: &[],
+            prefilter: 0,
+            escalate: false,
+        };
         let got = dam::ingress(&packed[off..off + len], len, Some(&mut view));
         match expected {
             DamExpect::Code(code) => assert_eq!(
@@ -492,7 +493,8 @@ fn build_dam_pool(seed: u64, pool: usize) -> (Vec<u8>, Vec<(u32, u32)>, u64) {
                     .expect("u64 at offset 8"),
             );
             assert_eq!(
-                view.payload.len() as u64, declared,
+                view.payload.len() as u64,
+                declared,
                 "dam pool frame {i}: view geometry drifted"
             );
             assert_eq!(
@@ -520,22 +522,25 @@ fn a14_penstock_admission<const FRAMES: usize>(b: Bencher) {
     let laps = (FRAMES / POOL) as u64;
     let expected_pass_fold = pool_fold.wrapping_mul(laps);
 
-    b.counter(ItemsCount::new(FRAMES as u64))
-        .bench(|| {
-            let mut acc: u64 = 0;
-            for i in 0..FRAMES {
-                let (off, len) = table[i & (POOL - 1)];
-                let frame = &packed[off as usize..off as usize + len as usize];
-                let mut view = dam::FrameView { payload: &[], prefilter: 0, escalate: false };
-                let st = dam::ingress(frame, len as usize, Some(&mut view));
-                acc = acc.wrapping_add(st as u64);
-            }
-            black_box(acc);
-            assert_eq!(
-                acc, expected_pass_fold,
-                "dam pass checksum drifted from preflight fold"
-            );
-        });
+    b.counter(ItemsCount::new(FRAMES as u64)).bench(|| {
+        let mut acc: u64 = 0;
+        for i in 0..FRAMES {
+            let (off, len) = table[i & (POOL - 1)];
+            let frame = &packed[off as usize..off as usize + len as usize];
+            let mut view = dam::FrameView {
+                payload: &[],
+                prefilter: 0,
+                escalate: false,
+            };
+            let st = dam::ingress(frame, len as usize, Some(&mut view));
+            acc = acc.wrapping_add(st as u64);
+        }
+        black_box(acc);
+        assert_eq!(
+            acc, expected_pass_fold,
+            "dam pass checksum drifted from preflight fold"
+        );
+    });
 }
 
 fn main() {

@@ -8,7 +8,7 @@
 //! at the AB-8 integration seam); this codec speaks header law only.
 
 use crate::error::AoqError;
-use crate::header::{AoqHeader, Epoch, UnknownEpoch, SIZE_BYTES, VERSION, MAGIC};
+use crate::header::{AoqHeader, Epoch, UnknownEpoch, MAGIC, SIZE_BYTES, VERSION};
 
 /// FNV-1a32 (32-bit FNV-1: multiply then xor). Not a cryptographic
 /// primitive — it is the header integrity digest named by the landed graph

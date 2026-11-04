@@ -54,11 +54,9 @@ impl Rng {
 }
 
 fn gen_values(n: usize, w: u8) -> Vec<u32> {
-    let mut rng = Rng(
-        0x9E37_79B9_7F4A_7C15
-            ^ (n as u64).wrapping_mul(0xFF51_AFD7_ED55_8CCD)
-            ^ (w as u64) << 32,
-    );
+    let mut rng = Rng(0x9E37_79B9_7F4A_7C15
+        ^ (n as u64).wrapping_mul(0xFF51_AFD7_ED55_8CCD)
+        ^ (w as u64) << 32);
     (0..n).map(|_| rng.next_bounded(mask_of(w))).collect()
 }
 
@@ -168,7 +166,9 @@ fn main() {
     } else {
         "release"
     };
-    println!("# bitslice_bench v26.10.29 lane HWL1: rows={ROWS} widths={WIDTHS:?} profile={profile}");
+    println!(
+        "# bitslice_bench v26.10.29 lane HWL1: rows={ROWS} widths={WIDTHS:?} profile={profile}"
+    );
     println!(
         "# min-of-{ROUNDS} rounds, MIN is the receipt; rates = packed input bytes (groups*w*8);"
     );
@@ -207,8 +207,7 @@ fn main() {
                 &format!("unpruned vs reference w={w} class={name}"),
             );
 
-            let touched =
-                scan_range_vertical_counted(&packed, w, lo, hi, &mut pruned);
+            let touched = scan_range_vertical_counted(&packed, w, lo, hi, &mut pruned);
             let skip = 1.0 - touched as f64 / (groups * w as usize) as f64;
 
             // --- timing: pruned ---
@@ -224,12 +223,7 @@ fn main() {
                 unprnd.iter().map(|x| x.count_ones() as u64).sum::<u64>()
             });
 
-            digest = digest.wrapping_add(
-                pruned
-                    .iter()
-                    .map(|x| x.count_ones() as u64)
-                    .sum::<u64>(),
-            );
+            digest = digest.wrapping_add(pruned.iter().map(|x| x.count_ones() as u64).sum::<u64>());
 
             let gp = bytes as f64 / secs_p / GIB;
             let gu = bytes as f64 / secs_u / GIB;

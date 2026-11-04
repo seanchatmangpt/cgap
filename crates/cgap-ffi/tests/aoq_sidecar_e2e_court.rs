@@ -41,12 +41,8 @@ use std::time::{Duration, Instant};
 
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
-use cgap_aoq::session::{
-    self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES,
-};
-use cgap_arrow::ipc::{
-    self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE,
-};
+use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
+use cgap_arrow::ipc::{self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE};
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_OK};
 
@@ -70,10 +66,7 @@ fn shake32(parts: &[&[u8]]) -> [u8; 32] {
 struct CourtKem;
 
 impl KemSeam for CourtKem {
-    fn encapsulate(
-        &self,
-        ek: &[u8; EK_BYTES],
-    ) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
+    fn encapsulate(&self, ek: &[u8; EK_BYTES]) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
         let m = shake32(&[b"w2c/mlkem/m", ek]);
         let mut ct = [0u8; CT_BYTES];
         let mut ss = [0u8; 32];
@@ -81,12 +74,10 @@ impl KemSeam for CourtKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; 32], SessionError> {
-        let dk: &[u8; 2400] = dk.try_into().map_err(|_| SessionError::KemRefused { op: 1 })?;
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; 32], SessionError> {
+        let dk: &[u8; 2400] = dk
+            .try_into()
+            .map_err(|_| SessionError::KemRefused { op: 1 })?;
         Ok(cgap_crypto::kem::decaps(dk, ct))
     }
 
@@ -122,8 +113,8 @@ impl Drop for Sidecar {
 /// Spawn the real sidecar binary (stdin piped = the stop-signal pipe) and
 /// bounded-poll for its socket, then connect (deadline-checked, no sleep).
 fn spawn_sidecar(tag: &str) -> Sidecar {
-    let sock_path: PathBuf = std::env::temp_dir()
-        .join(format!("aoq_e2e_{tag}_{:?}.sock", std::process::id()));
+    let sock_path: PathBuf =
+        std::env::temp_dir().join(format!("aoq_e2e_{tag}_{:?}.sock", std::process::id()));
     let _ = std::fs::remove_file(&sock_path);
     let mut child = Command::new(env!("CARGO_BIN_EXE_aoq_sidecar"))
         .arg(&sock_path)
@@ -220,11 +211,20 @@ fn roundtrip(
     let mut prefix = [0u8; PREFIX_SIZE];
     stream.read_exact(&mut prefix).expect("response prefix");
     let meta_span = u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]) as usize;
-    assert_eq!(meta_span, META_SPAN, "response meta span is the align-64 span");
+    assert_eq!(
+        meta_span, META_SPAN,
+        "response meta span is the align-64 span"
+    );
     let mut meta_bytes = [0u8; META_SPAN];
-    stream.read_exact(&mut meta_bytes).expect("response metadata");
-    let blen = u32::from_le_bytes([meta_bytes[64], meta_bytes[65], meta_bytes[66],
-                                   meta_bytes[67]]) as usize;
+    stream
+        .read_exact(&mut meta_bytes)
+        .expect("response metadata");
+    let blen = u32::from_le_bytes([
+        meta_bytes[64],
+        meta_bytes[65],
+        meta_bytes[66],
+        meta_bytes[67],
+    ]) as usize;
     let pad = ipc::pad_to(blen, 64);
     let mut rest = vec![0u8; blen + pad + EOS_SIZE];
     stream.read_exact(&mut rest).expect("response body+pad+eos");
@@ -267,7 +267,10 @@ fn handshake(kem: &CourtKem, stream: &mut UnixStream) -> ([u8; 2400], [u8; CT_BY
     assert_eq!(word, AOQ_STATUS_OK, "HandshakeEk accepted");
     let fin_win = seal_window(&wire_frame(FrameKind::HandshakeFinish, 1, 0, &ct_c), 1, 0);
     let (word, _w) = roundtrip(stream, &fin_win, false);
-    assert_eq!(word, AOQ_STATUS_OK, "HandshakeFinish accepted (Established)");
+    assert_eq!(
+        word, AOQ_STATUS_OK,
+        "HandshakeFinish accepted (Established)"
+    );
     (dk, ct_c)
 }
 
@@ -301,17 +304,28 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
     // re-derives over the whole covered frame (the session's decrypt gate).
     let frame = sess::parse_frame(&body).expect("response frame parses");
     assert_eq!(frame.kind, FrameKind::AppData);
-    let rseq = u32::from_be_bytes([frame.payload[0], frame.payload[1],
-                                   frame.payload[2], frame.payload[3]]);
+    let rseq = u32::from_be_bytes([
+        frame.payload[0],
+        frame.payload[1],
+        frame.payload[2],
+        frame.payload[3],
+    ]);
     assert_eq!(rseq, 7, "echoed seq");
     let covered = &body[..body.len() - 4];
     let mut tag = [0u8; 4];
     tag.copy_from_slice(&body[body.len() - 4..]);
-    assert_eq!(kem.kdf(&[covered])[0..4], tag, "emit_verified kdf tag re-derives");
+    assert_eq!(
+        kem.kdf(&[covered])[0..4],
+        tag,
+        "emit_verified kdf tag re-derives"
+    );
 
     // THE RUNG-8 WITNESS: the recovered payload equals the pre-seal bytes.
-    assert_eq!(&frame.payload[4..frame.payload.len() - 4], &preseal[..],
-        "decrypted (echoed) payload == pre-seal bytes");
+    assert_eq!(
+        &frame.payload[4..frame.payload.len() - 4],
+        &preseal[..],
+        "decrypted (echoed) payload == pre-seal bytes"
+    );
     // Transcript digests for the receipt (blake3, 32-byte).
     let d_pre = cgap_arrow::blake3::hash(preseal);
     let d_post = cgap_arrow::blake3::hash(&frame.payload[4..frame.payload.len() - 4]);
@@ -348,7 +362,11 @@ fn e2_flipped_byte_fires_tag_gate() {
     assert!(win.is_none(), "no window follows a refusal");
     // Mutation B non-vacuity: the refusal was NOT an echo of the request.
     let mut probe = vec![0u8; request_len];
-    let n = car.stream.as_mut().expect("conn 2").read(&mut probe)
+    let n = car
+        .stream
+        .as_mut()
+        .expect("conn 2")
+        .read(&mut probe)
         .expect("post-refusal read");
     assert_eq!(n, 0, "refusal was NOT an echo");
     let _ = dk;
@@ -389,8 +407,11 @@ fn e3_process_reuse_then_stdin_eof_stop() {
     let mut body = vec![0u8; blen];
     ipc::read_verified(&win, None, &mut body).expect("conn-3 tag gate");
     let frame = sess::parse_frame(&body).expect("conn-3 frame parses");
-    assert_eq!(&frame.payload[4..frame.payload.len() - 4], &preseal[..],
-        "conn-3 echo == pre-seal bytes");
+    assert_eq!(
+        &frame.payload[4..frame.payload.len() - 4],
+        &preseal[..],
+        "conn-3 echo == pre-seal bytes"
+    );
 
     // STOP SIGNAL: drop the client, then stdin EOF -> exit 0 (bounded poll
     // on try_wait; the runtime owns time).

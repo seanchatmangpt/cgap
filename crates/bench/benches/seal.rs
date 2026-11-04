@@ -122,8 +122,9 @@ fn p28_corpus(n: usize) -> P28Corpus {
     fill_splitmix(&mut instrument[..88], CORPUS_SEED);
     instrument[87] = b'\n'; // the `---` line starts at 88, whatever the stream
     instrument[88..92].copy_from_slice(b"---\n");
-    let instrument_span =
-        instrument_header_span(&instrument).expect("appended --- guarantees a span").to_vec();
+    let instrument_span = instrument_header_span(&instrument)
+        .expect("appended --- guarantees a span")
+        .to_vec();
     let parent = P28LicenseAttestation {
         license_magic: cgap_p28::attestation::LICENSE_MAGIC,
         version: cgap_p28::attestation::ATTESTATION_VERSION,
@@ -138,8 +139,7 @@ fn p28_corpus(n: usize) -> P28Corpus {
         .map(|i| {
             let mut ceiling_bytes = [0u8; 8];
             fill_splitmix(&mut ceiling_bytes, record_seed(i));
-            let ceiling =
-                u64::from_le_bytes(ceiling_bytes) % (SAFE_HARBOR_CEILING_MAX_CENTS + 1);
+            let ceiling = u64::from_le_bytes(ceiling_bytes) % (SAFE_HARBOR_CEILING_MAX_CENTS + 1);
             let rec = P28LicenseAttestation {
                 license_magic: cgap_p28::attestation::LICENSE_MAGIC,
                 version: cgap_p28::attestation::ATTESTATION_VERSION,
@@ -151,7 +151,11 @@ fn p28_corpus(n: usize) -> P28Corpus {
             rec.to_bytes()
         })
         .collect();
-    P28Corpus { instrument_span, parent, records }
+    P28Corpus {
+        instrument_span,
+        parent,
+        records,
+    }
 }
 
 /// MEASURES the A17 spoliation-check cost: parse + §5 full ordered validate
@@ -264,7 +268,9 @@ fn attestation_for_frames() -> CoreP28 {
         upstream_receipt: [0u8; 32],
     };
     let mut parent_wire = [0u8; ATTESTATION_LEN];
-    parent.encode_into(&mut parent_wire).expect("80 B out: encode cannot fail");
+    parent
+        .encode_into(&mut parent_wire)
+        .expect("80 B out: encode cannot fail");
     CoreP28 {
         license_magic: cgap_core::frame::LICENSE_MAGIC,
         version: 1, // A17 §2.1 pin: attestation version 1
@@ -355,8 +361,7 @@ fn frame_corpus(n: usize) -> Vec<u8> {
         header
             .encode_into(&mut frames[base..base + FRAME_HEADER_LEN])
             .expect("stride >= FRAME_HEADER_LEN");
-        frames[base + FRAME_HEADER_LEN..base + FRAME_STRIDE]
-            .copy_from_slice(&payload);
+        frames[base + FRAME_HEADER_LEN..base + FRAME_STRIDE].copy_from_slice(&payload);
     }
     frames
 }
@@ -396,7 +401,8 @@ fn ffi_rust_boundary_pair_roundtrip<const N: usize>(b: Bencher) {
             ok += (st_verify == CGAP_OK) as u64;
         }
         assert_eq!(
-            ok, (2 * N) as u64,
+            ok,
+            (2 * N) as u64,
             "boundary round trip: every admit+verify verdict must be CGAP_OK"
         );
         black_box(checksum);

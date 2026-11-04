@@ -6,8 +6,7 @@
 
 use cgap_core::frame::{
     CgapFrameHeader, P28LicenseAttestation, ATTESTATION_LEN, FLAG_BN3, FRAME_HEADER_LEN,
-    FRAME_MAGIC, FRAME_VERSION, LICENSE_FLAG_ROOT, LICENSE_MAGIC,
-    SAFE_HARBOR_CEILING_CENTS_MAX,
+    FRAME_MAGIC, FRAME_VERSION, LICENSE_FLAG_ROOT, LICENSE_MAGIC, SAFE_HARBOR_CEILING_CENTS_MAX,
 };
 
 /// §8.2 step 1 payload sizes (exact doc list, incl. the 1 MiB bound).
@@ -32,7 +31,10 @@ pub fn payload(len: usize) -> Vec<u8> {
 /// allocation; the crate source stays alloc-free (source_scan_gate.rs).
 pub fn leak_aligned_region(len: usize) -> &'static mut [u8] {
     use std::alloc::{alloc_zeroed, Layout};
-    assert!(len > 0 && len % 64 == 0, "region must be a 64-byte multiple");
+    assert!(
+        len > 0 && len % 64 == 0,
+        "region must be a 64-byte multiple"
+    );
     unsafe {
         let layout = Layout::from_size_align(len, 64).expect("layout");
         let ptr = alloc_zeroed(layout);

@@ -14,8 +14,8 @@
 //! RLE shapes run at the canonical nibble width (4 bits).
 
 use cgap_parquet::rle::rle_encode;
-use cgap_parquet::unpack::unpack_bits;
 use cgap_parquet::rle_decode;
+use cgap_parquet::unpack::unpack_bits;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -98,7 +98,11 @@ fn main() {
             (word >> shift) & ((1u64 << w) - 1)
         };
         assert_eq!(out[0], lane(0), "w={w} lane 0");
-        assert_eq!(out[UNPACK_LANES - 1], lane(UNPACK_LANES - 1), "w={w} last lane");
+        assert_eq!(
+            out[UNPACK_LANES - 1],
+            lane(UNPACK_LANES - 1),
+            "w={w} last lane"
+        );
 
         bench("unpack", "random64", w, unpack_bytes, || {
             let s: &[u64] = black_box(&src);
@@ -117,7 +121,9 @@ fn main() {
         (
             "literal",
             Box::new(|vmax: u32| {
-                (0..RLE_LANES).map(|i| (i as u32) & vmax).collect::<Vec<u32>>()
+                (0..RLE_LANES)
+                    .map(|i| (i as u32) & vmax)
+                    .collect::<Vec<u32>>()
             }) as Box<dyn Fn(u32) -> Vec<u32>>,
         ),
         (

@@ -112,9 +112,8 @@ fn main() {
         ),
         (
             "literal",
-            Box::new(|vmax: u32| {
-                (0..LANES).map(|i| (i as u32) & vmax).collect::<Vec<u32>>()
-            }) as Box<dyn Fn(u32) -> Vec<u32>>,
+            Box::new(|vmax: u32| (0..LANES).map(|i| (i as u32) & vmax).collect::<Vec<u32>>())
+                as Box<dyn Fn(u32) -> Vec<u32>>,
         ),
         (
             "mix50",

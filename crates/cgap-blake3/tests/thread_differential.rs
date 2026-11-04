@@ -104,7 +104,11 @@ fn b3sum(bytes: &[u8]) -> String {
         .split_whitespace()
         .next()
         .expect("b3sum prints '<hex>  <name>'");
-    assert_eq!(line.len(), 64, "b3sum digest hex must be 64 chars: {line:?}");
+    assert_eq!(
+        line.len(),
+        64,
+        "b3sum digest hex must be 64 chars: {line:?}"
+    );
     line.to_ascii_lowercase()
 }
 
@@ -210,7 +214,11 @@ fn merge_tree_from_threads(corpus: &[u8]) -> [u8; 32] {
     // Serial sanity: each thread's leaf CV must equal the serial computation.
     for (i, cv) in level.iter().enumerate() {
         let out = hash_chunk(&corpus[i * 1024..(i + 1) * 1024], i as u64, false);
-        assert_eq!(&out[0..8], &cv[..], "leaf CV {i} diverged from serial hash_chunk");
+        assert_eq!(
+            &out[0..8],
+            &cv[..],
+            "leaf CV {i} diverged from serial hash_chunk"
+        );
     }
 
     // In-order pairwise reduction; the single merge at the final level is the

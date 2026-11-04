@@ -33,7 +33,9 @@ fn oracle_us_per_link(path: &str) -> Result<(f64, String), String> {
         .skip_while(|c| !c.is_ascii_digit() && *c != '.')
         .take_while(|c| c.is_ascii_digit() || *c == '.')
         .collect();
-    let ms: f64 = num.parse().map_err(|e| format!("unparsable '{num}': {e}"))?;
+    let ms: f64 = num
+        .parse()
+        .map_err(|e| format!("unparsable '{num}': {e}"))?;
     Ok((ms * 1000.0 / 50_000.0, format!("{ms:.2} ms")))
 }
 
@@ -85,19 +87,28 @@ fn court_g7_derivation_flips_on_mutated_receipt_copies() {
     let under = real.replace("50k span 1276.01 ms", "50k span 1200.00 ms");
     let p1 = std::env::temp_dir().join("rx5-court-under.md");
     std::fs::write(&p1, under).expect("write tmp copy");
-    assert!(matches!(g7_leg_b_from_receipt(p1.to_str().unwrap()), Verdict::Pass));
+    assert!(matches!(
+        g7_leg_b_from_receipt(p1.to_str().unwrap()),
+        Verdict::Pass
+    ));
 
     // 1300.00 ms -> 26.0 µs/link > 25 -> Fail (flip witness DOWN).
     let over = real.replace("50k span 1276.01 ms", "50k span 1300.00 ms");
     let p2 = std::env::temp_dir().join("rx5-court-over.md");
     std::fs::write(&p2, over).expect("write tmp copy");
-    assert!(matches!(g7_leg_b_from_receipt(p2.to_str().unwrap()), Verdict::Fail { .. }));
+    assert!(matches!(
+        g7_leg_b_from_receipt(p2.to_str().unwrap()),
+        Verdict::Fail { .. }
+    ));
 
     // Disclosure stripped -> Skip (fail-closed degradation).
     let stripped = real.replace("min-of-3", "min-of-X");
     let p3 = std::env::temp_dir().join("rx5-court-stripped.md");
     std::fs::write(&p3, stripped).expect("write tmp copy");
-    assert!(matches!(g7_leg_b_from_receipt(p3.to_str().unwrap()), Verdict::Skip { .. }));
+    assert!(matches!(
+        g7_leg_b_from_receipt(p3.to_str().unwrap()),
+        Verdict::Skip { .. }
+    ));
 
     // A SKIP-class G7 row refuses the certificate typed, fail-closed.
     let mut table = scorecard_table(43);

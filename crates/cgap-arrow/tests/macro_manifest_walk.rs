@@ -23,10 +23,10 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use cgap_arrow::batch::{BatchBuilder, ColumnBuilder};
-use cgap_arrow::blake3;
 use cgap_aoq::chain::{verify_records, AoqChain, AoqChainRecord, ChainDigest};
 use cgap_aoq::error::AoqError;
+use cgap_arrow::batch::{BatchBuilder, ColumnBuilder};
+use cgap_arrow::blake3;
 
 // ---------------------------------------------------------------------------
 // Alloc census: counting global allocator over the whole test process.
@@ -284,12 +284,13 @@ fn macro_manifest_walk() {
     let t0 = Instant::now();
     let s0 = snap();
     for b in 0..n_batches {
-        let rows = if b == n_batches - 1 { last_rows } else { BATCH_CAP };
+        let rows = if b == n_batches - 1 {
+            last_rows
+        } else {
+            BATCH_CAP
+        };
         let mut bb = BatchBuilder::default();
-        bb = bb.with_column(
-            "manifest_id",
-            ColumnBuilder::Utf8(Default::default()),
-        );
+        bb = bb.with_column("manifest_id", ColumnBuilder::Utf8(Default::default()));
         bb = bb.with_column("origin", ColumnBuilder::Utf8(Default::default()));
         bb = bb.with_column("dest", ColumnBuilder::Utf8(Default::default()));
         bb = bb.with_column("po_number", ColumnBuilder::Utf8(Default::default()));
@@ -314,7 +315,10 @@ fn macro_manifest_walk() {
             let idx = chain
                 .append(EPOCH, &p.canon)
                 .unwrap_or_else(|e| panic!("chain append refused lawful row {i}: {e:?}"));
-            assert_eq!(idx as usize, admitted, "chain index must equal admitted count");
+            assert_eq!(
+                idx as usize, admitted,
+                "chain index must equal admitted count"
+            );
 
             // Batch columns come from the PROJECTION output, not from the
             // generator's variables — the admitted form is what lands.

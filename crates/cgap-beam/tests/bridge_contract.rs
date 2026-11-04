@@ -17,10 +17,17 @@ fn nif_dylib_path() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let target_root = std::env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| manifest_dir.join("../../target").canonicalize().unwrap_or(manifest_dir.join("../../target")));
+        .unwrap_or_else(|| {
+            manifest_dir
+                .join("../../target")
+                .canonicalize()
+                .unwrap_or(manifest_dir.join("../../target"))
+        });
     for profile in ["debug", "release"] {
         for ext in ["dylib", "so"] {
-            let p = target_root.join(profile).join(format!("libcgap_beam.{ext}"));
+            let p = target_root
+                .join(profile)
+                .join(format!("libcgap_beam.{ext}"));
             if p.exists() {
                 return p;
             }
@@ -36,7 +43,10 @@ fn nif_dylib_path() -> PathBuf {
         .env_remove("CARGO_TARGET_DIR")
         .status()
         .expect("spawn cargo build -p cgap-beam");
-    assert!(status.success(), "cargo build -p cgap-beam failed: {status}");
+    assert!(
+        status.success(),
+        "cargo build -p cgap-beam failed: {status}"
+    );
     let p = target_root.join("debug").join("libcgap_beam.dylib");
     assert!(p.exists(), "dylib missing after build: {}", p.display());
     p
@@ -604,7 +614,8 @@ fn beam_bridge_contract_end_to_end() {
     let dylib = nif_dylib_path();
     let erl = std::env::var("ESCRIPT").unwrap_or_else(|_| "escript".to_string());
 
-    let script_dir = std::env::temp_dir().join(format!("cgap_beam_contract_{}", std::process::id()));
+    let script_dir =
+        std::env::temp_dir().join(format!("cgap_beam_contract_{}", std::process::id()));
     std::fs::create_dir_all(&script_dir).expect("create temp script dir");
     let script = script_dir.join("cgap_beam");
     std::fs::write(&script, ESCRIPT_SRC).expect("write escript");
@@ -645,6 +656,9 @@ fn beam_bridge_contract_end_to_end() {
         "ok persist_roundtrip",
         "ok open_scan",
     ] {
-        assert!(stdout.contains(expected), "missing contract proof `{expected}` in:\n{stdout}");
+        assert!(
+            stdout.contains(expected),
+            "missing contract proof `{expected}` in:\n{stdout}"
+        );
     }
 }

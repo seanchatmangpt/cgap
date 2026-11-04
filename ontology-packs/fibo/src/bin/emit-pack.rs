@@ -62,8 +62,8 @@ use std::process::ExitCode;
 use cgap_blake3::hash;
 
 use cgap_fibo::{
-    ACCT_RECV_SLOT, BOND_SLOT, COUPON_RATE_SLOT, CORP_BOND_SLOT, DEBT_INSTR_SLOT, EUR_SLOT,
-    JPY_SLOT, LEX_ACCT_RECV, LEX_BOND, LEX_COUPON_RATE, LEX_CORP_BOND, LEX_DEBT_INSTR, LEX_EUR,
+    ACCT_RECV_SLOT, BOND_SLOT, CORP_BOND_SLOT, COUPON_RATE_SLOT, DEBT_INSTR_SLOT, EUR_SLOT,
+    JPY_SLOT, LEX_ACCT_RECV, LEX_BOND, LEX_CORP_BOND, LEX_COUPON_RATE, LEX_DEBT_INSTR, LEX_EUR,
     LEX_JPY, LEX_MATURITY_DATE, LEX_USD, MATURITY_DATE_SLOT, USD_SLOT,
 };
 
@@ -134,15 +134,51 @@ struct Term {
 /// bump, never a patch.
 fn corpus() -> Vec<Term> {
     vec![
-        Term { lexeme: b"fibo:FndUtlCur:USD".to_vec(), class: CLASS_NONE, enum_id: Some(ENUM_USD) },
-        Term { lexeme: b"fibo:FndUtlCur:EUR".to_vec(), class: CLASS_NONE, enum_id: Some(ENUM_EUR) },
-        Term { lexeme: b"fibo:FndUtlCur:JPY".to_vec(), class: CLASS_NONE, enum_id: Some(ENUM_JPY) },
-        Term { lexeme: b"fibo:SecDbt:CorporateBond".to_vec(), class: CLASS_CORP_BOND, enum_id: None },
-        Term { lexeme: b"fibo:SecDbt:Bond".to_vec(), class: CLASS_BOND, enum_id: None },
-        Term { lexeme: b"fibo:SecDbt:DebtInstrument".to_vec(), class: CLASS_DEBT_INSTR, enum_id: None },
-        Term { lexeme: b"fibo:ClAcct:AccountsReceivable".to_vec(), class: CLASS_ACCT_RECV, enum_id: None },
-        Term { lexeme: b"fibo:SecDbt:hasMaturityDate".to_vec(), class: ATTR_MATURITY_DATE, enum_id: None },
-        Term { lexeme: b"fibo:SecDbt:hasCouponRate".to_vec(), class: ATTR_COUPON_RATE, enum_id: None },
+        Term {
+            lexeme: b"fibo:FndUtlCur:USD".to_vec(),
+            class: CLASS_NONE,
+            enum_id: Some(ENUM_USD),
+        },
+        Term {
+            lexeme: b"fibo:FndUtlCur:EUR".to_vec(),
+            class: CLASS_NONE,
+            enum_id: Some(ENUM_EUR),
+        },
+        Term {
+            lexeme: b"fibo:FndUtlCur:JPY".to_vec(),
+            class: CLASS_NONE,
+            enum_id: Some(ENUM_JPY),
+        },
+        Term {
+            lexeme: b"fibo:SecDbt:CorporateBond".to_vec(),
+            class: CLASS_CORP_BOND,
+            enum_id: None,
+        },
+        Term {
+            lexeme: b"fibo:SecDbt:Bond".to_vec(),
+            class: CLASS_BOND,
+            enum_id: None,
+        },
+        Term {
+            lexeme: b"fibo:SecDbt:DebtInstrument".to_vec(),
+            class: CLASS_DEBT_INSTR,
+            enum_id: None,
+        },
+        Term {
+            lexeme: b"fibo:ClAcct:AccountsReceivable".to_vec(),
+            class: CLASS_ACCT_RECV,
+            enum_id: None,
+        },
+        Term {
+            lexeme: b"fibo:SecDbt:hasMaturityDate".to_vec(),
+            class: ATTR_MATURITY_DATE,
+            enum_id: None,
+        },
+        Term {
+            lexeme: b"fibo:SecDbt:hasCouponRate".to_vec(),
+            class: ATTR_COUPON_RATE,
+            enum_id: None,
+        },
     ]
 }
 
@@ -195,11 +231,13 @@ fn classify(lexeme: &[u8]) -> Result<(), EmitError> {
         section: REFUSAL_SECTION,
         module: "<non-utf8>".to_string(),
     })?;
-    let rest = text.strip_prefix("fibo:").ok_or_else(|| EmitError::TermRefused {
-        lexeme: text.to_string(),
-        section: REFUSAL_SECTION,
-        module: "<no fibo: prefix>".to_string(),
-    })?;
+    let rest = text
+        .strip_prefix("fibo:")
+        .ok_or_else(|| EmitError::TermRefused {
+            lexeme: text.to_string(),
+            section: REFUSAL_SECTION,
+            module: "<no fibo: prefix>".to_string(),
+        })?;
     let module = rest.split(':').next().unwrap_or("");
     if ALLOWED_MODULES.contains(&module) {
         Ok(())
@@ -217,7 +255,11 @@ fn classify(lexeme: &[u8]) -> Result<(), EmitError> {
 #[derive(Debug, PartialEq, Eq)]
 enum EmitError {
     /// Closed-world refusal (lane doc §2.2, T11).
-    TermRefused { lexeme: String, section: &'static str, module: String },
+    TermRefused {
+        lexeme: String,
+        section: &'static str,
+        module: String,
+    },
     /// A06 §5 producer obligation (DoD 11).
     SlotCollision { slot: u64, a: Vec<u8>, b: Vec<u8> },
     /// T9 emit half: derivation drifted from the committed facade consts.
@@ -227,7 +269,11 @@ enum EmitError {
     WireReDerivation { index: usize },
     /// --check / emit drift guard: committed pack bytes differ from a fresh
     /// deterministic emit.
-    PackDrift { first_diff: Option<usize>, committed_len: usize, fresh_len: usize },
+    PackDrift {
+        first_diff: Option<usize>,
+        committed_len: usize,
+        fresh_len: usize,
+    },
     /// Filesystem/argument failure (typed, never a silent pass).
     Io(String),
 }
@@ -321,9 +367,18 @@ fn build_pack(corpus: &[Term]) -> Result<(Vec<u8>, [u8; 32]), EmitError> {
             }
         }
         if let Some(prev) = seen.insert(slot, term.lexeme.clone()) {
-            return Err(EmitError::SlotCollision { slot, a: prev, b: term.lexeme.clone() });
+            return Err(EmitError::SlotCollision {
+                slot,
+                a: prev,
+                b: term.lexeme.clone(),
+            });
         }
-        records.push(record_bytes(slot, term.class, term.enum_id.unwrap_or(0), &lex));
+        records.push(record_bytes(
+            slot,
+            term.class,
+            term.enum_id.unwrap_or(0),
+            &lex,
+        ));
     }
     // DoD 4 second half: re-derive from the WIRE bytes (defense against an
     // encoding-order bug the derivation-side check cannot see).
@@ -395,7 +450,11 @@ fn run() -> Result<(), EmitError> {
                 .next()
                 .ok_or_else(|| EmitError::Io("--inject needs a lexeme".to_string()))?;
             let mut full = corpus();
-            full.push(Term { lexeme: lexeme.clone().into_bytes(), class: CLASS_NONE, enum_id: None });
+            full.push(Term {
+                lexeme: lexeme.clone().into_bytes(),
+                class: CLASS_NONE,
+                enum_id: None,
+            });
             match build_pack(&full) {
                 Err(e @ EmitError::TermRefused { .. }) => {
                     println!("[REFUSED] {e}");
@@ -409,15 +468,20 @@ fn run() -> Result<(), EmitError> {
                 Err(e) => Err(e),
             }
         }
-        Some(other) => Err(EmitError::Io(format!("unknown mode {other:?} (see module docs)"))),
+        Some(other) => Err(EmitError::Io(format!(
+            "unknown mode {other:?} (see module docs)"
+        ))),
         None => {
             let (bytes, digest) = build_pack(&corpus())?;
             let path = pack_path();
             if path.exists() {
-                let committed =
-                    std::fs::read(&path).map_err(|e| EmitError::Io(e.to_string()))?;
+                let committed = std::fs::read(&path).map_err(|e| EmitError::Io(e.to_string()))?;
                 drift_guard(&committed, &bytes)?;
-                println!("OK {} bytes (unchanged), digest {}", bytes.len(), hex(&digest));
+                println!(
+                    "OK {} bytes (unchanged), digest {}",
+                    bytes.len(),
+                    hex(&digest)
+                );
                 return Ok(());
             }
             // A05 crash-consistent first emit (wave 9): full temporary
@@ -426,16 +490,12 @@ fn run() -> Result<(), EmitError> {
             let tmp = path.with_extension("oabi.w9tmp");
             let emit_tmp = || -> Result<(), EmitError> {
                 use std::io::Write;
-                let io = |ctx: &str, e: std::io::Error| {
-                    EmitError::Io(format!("{ctx}: {e}"))
-                };
-                let mut f = std::fs::File::create(&tmp)
-                    .map_err(|e| io("temp create", e))?;
+                let io = |ctx: &str, e: std::io::Error| EmitError::Io(format!("{ctx}: {e}"));
+                let mut f = std::fs::File::create(&tmp).map_err(|e| io("temp create", e))?;
                 f.write_all(&bytes).map_err(|e| io("temp write", e))?;
                 f.sync_all().map_err(|e| io("temp sync", e))?;
                 drop(f);
-                std::fs::rename(&tmp, &path)
-                    .map_err(|e| io("atomic rename", e))
+                std::fs::rename(&tmp, &path).map_err(|e| io("atomic rename", e))
             };
             if let Err(e) = emit_tmp() {
                 // Orphaned temporary is garbage outside the identity
@@ -443,7 +503,12 @@ fn run() -> Result<(), EmitError> {
                 let _ = std::fs::remove_file(&tmp);
                 return Err(e);
             }
-            println!("emitted {} ({} bytes), digest {}", path.display(), bytes.len(), hex(&digest));
+            println!(
+                "emitted {} ({} bytes), digest {}",
+                path.display(),
+                bytes.len(),
+                hex(&digest)
+            );
             Ok(())
         }
     }

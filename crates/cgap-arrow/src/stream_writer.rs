@@ -64,9 +64,7 @@ impl<E: fmt::Display> fmt::Display for StreamError<E> {
         match self {
             StreamError::Framing(e) => write!(f, "framing: {e}"),
             StreamError::Sink(e) => write!(f, "sink: {e}"),
-            StreamError::ZeroProgress => {
-                f.write_str("sink accepted zero bytes (would spin)")
-            }
+            StreamError::ZeroProgress => f.write_str("sink accepted zero bytes (would spin)"),
         }
     }
 }

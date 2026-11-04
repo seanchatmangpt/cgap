@@ -107,12 +107,7 @@ fn corpus_wide(n: usize) -> (Vec<u64>, Vec<u64>, Vec<u64>) {
 /// One match as a canonical tuple.
 type MatchKey = (u32, u32, u64, u64, u64);
 
-fn run(
-    cols: &StatementColumns<'_>,
-    rule: &Rule,
-    chunk: usize,
-    radix: bool,
-) -> HashSet<MatchKey> {
+fn run(cols: &StatementColumns<'_>, rule: &Rule, chunk: usize, radix: bool) -> HashSet<MatchKey> {
     let compiled = RuleCompiler::compile(rule).expect("compile");
     let mut scratch = EvalScratch::default();
     let mut out = MatchSet::default();

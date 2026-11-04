@@ -404,12 +404,7 @@ mod guard_courts {
         let mut cryptos = std::vec::Vec::new();
         let mut blakes = std::vec::Vec::new();
         for (crate_dir, name, ext, out) in [
-            (
-                "cgap-crypto",
-                "libcgap_crypto",
-                ".rmeta",
-                &mut cryptos,
-            ),
+            ("cgap-crypto", "libcgap_crypto", ".rmeta", &mut cryptos),
             ("cgap-blake3", "libcgap_blake3", ".rlib", &mut blakes),
         ] {
             let _ = crate_dir;
@@ -514,9 +509,10 @@ mod guard_courts {
                 if !matches {
                     continue;
                 }
-                let mtime = e.metadata().and_then(|m| m.modified()).unwrap_or(
-                    std::time::SystemTime::UNIX_EPOCH,
-                );
+                let mtime = e
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                 if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
                     best = Some((mtime, p));
                 }

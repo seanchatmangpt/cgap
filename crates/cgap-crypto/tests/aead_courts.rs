@@ -11,9 +11,7 @@
 //! wire-shm scan-court shape (baseline -> sandbox mutation -> scan MUST
 //! flip -> byte-exact restore witness).
 
-use cgap_crypto::aead::{
-    self, Nonce96, AAD_LEN, EpochExhausted, KEY_LEN, Mismatch, TAG_LEN,
-};
+use cgap_crypto::aead::{self, EpochExhausted, Mismatch, Nonce96, AAD_LEN, KEY_LEN, TAG_LEN};
 use cgap_crypto::poly1305;
 
 // `hex` decoding without a hex dev-dep.
@@ -29,11 +27,10 @@ fn unhex(s: &str) -> std::vec::Vec<u8> {
 /// Tag a8:06:1d:c1:30:51:36:c6:c2:2b:8b:af:0c:01:27:a9.
 #[test]
 fn poly1305_rfc8439_2_5_2_fixture() {
-    let key: [u8; poly1305::KEY_LEN] = unhex(
-        "85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b",
-    )
-    .try_into()
-    .expect("32-byte key");
+    let key: [u8; poly1305::KEY_LEN] =
+        unhex("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b")
+            .try_into()
+            .expect("32-byte key");
     let msg = b"Cryptographic Forum Research Group";
     let expected: [u8; 16] = unhex("a8061dc1305136c6c22b8baf0c0127a9")
         .try_into()
@@ -65,11 +62,10 @@ fn poly1305_rfc8439_2_5_2_fixture() {
 /// published tag `1a:e1:0b:59:...:06:91`.
 #[test]
 fn aead_rfc8439_2_8_2_fixture() {
-    let key: [u8; KEY_LEN] = unhex(
-        "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
-    )
-    .try_into()
-    .expect("32-byte key");
+    let key: [u8; KEY_LEN] =
+        unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+            .try_into()
+            .expect("32-byte key");
     let nonce = Nonce96::new(0x0000_0007, 0x4746_4544_4342_4140).expect("lawful epoch");
     // Wire nonce bytes = epoch le || counter le = 07 00 00 00 40..47.
     assert_eq!(
@@ -161,13 +157,17 @@ fn cross_check_rustcrypto_byte_identical_both_directions() {
         let nonce = Nonce96::new(full[0] as u32, u64::from_le_bytes(full)).expect("lawful epoch");
         let aad: [u8; AAD_LEN] = aad36(&mut state);
 
-        let pt: std::vec::Vec<u8> = (0..len)
-            .map(|_| splitmix64(&mut state) as u8)
-            .collect();
+        let pt: std::vec::Vec<u8> = (0..len).map(|_| splitmix64(&mut state) as u8).collect();
 
         // RustCrypto (attached ct||tag wire form).
         let expected_wire = xcipher(&key)
-            .encrypt(&xnonce(&nonce), Payload { msg: pt.as_slice(), aad: &aad })
+            .encrypt(
+                &xnonce(&nonce),
+                Payload {
+                    msg: pt.as_slice(),
+                    aad: &aad,
+                },
+            )
             .expect("rustcrypto encrypt");
         let (xct, xtag) = expected_wire.split_at(len);
         let xtag: [u8; TAG_LEN] = xtag.try_into().expect("16-byte tag");
@@ -195,7 +195,10 @@ fn cross_check_rustcrypto_byte_identical_both_directions() {
         let round = xcipher(&key)
             .decrypt(
                 &xnonce(&nonce),
-                Payload { msg: wire.as_slice(), aad: &aad },
+                Payload {
+                    msg: wire.as_slice(),
+                    aad: &aad,
+                },
             )
             .expect("rustcrypto open of local seal");
         assert_eq!(round, pt);
@@ -219,8 +222,7 @@ fn seal_open_round_trip(len: usize, state: &mut u64) {
 
     let mut back = std::vec::Vec::with_capacity(len);
     back.resize(len, 0);
-    aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce)
-        .expect("round trip must open");
+    aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce).expect("round trip must open");
     assert_eq!(back.as_slice(), pt.as_slice(), "round trip (len {len})");
 }
 
@@ -314,7 +316,10 @@ fn flip_kills_are_mismatch() {
 /// (the bypass path is separately killed by the count-law scan below).
 #[test]
 fn epoch_exhausted_boundary() {
-    assert_eq!(Nonce96::new(0xFFFF_FFFE, 0x1111_2222_3333_4444).is_ok(), true);
+    assert_eq!(
+        Nonce96::new(0xFFFF_FFFE, 0x1111_2222_3333_4444).is_ok(),
+        true
+    );
     assert_eq!(Nonce96::new(0xFFFF_FFFF, 0), Err(EpochExhausted));
     // 0xFFFF_FFFE seals and opens end-to-end.
     let key = [0xA5u8; KEY_LEN];
@@ -324,7 +329,10 @@ fn epoch_exhausted_boundary() {
     let mut tag = [0u8; TAG_LEN];
     aead::seal_detached(&mut ct, &mut tag, &[0u8; 64], &aad, &key, &nonce);
     let mut back = [0u8; 64];
-    assert_eq!(aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce), Ok(()));
+    assert_eq!(
+        aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce),
+        Ok(())
+    );
     assert_eq!(back, [0u8; 64]);
 }
 

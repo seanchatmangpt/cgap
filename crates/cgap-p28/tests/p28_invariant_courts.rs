@@ -81,21 +81,14 @@ fn predicted_ceiling_survivors(good: &[u8; 80]) -> Vec<(usize, u8)> {
 
 /// The real §5 verdict a consumer runs: wire bytes -> parse -> full ordered
 /// validation against the real pinned instrument span.
-fn real_verdict(
-    wire: &[u8; 80],
-    parent: Option<&P28LicenseAttestation>,
-    span: &[u8],
-) -> bool {
+fn real_verdict(wire: &[u8; 80], parent: Option<&P28LicenseAttestation>, span: &[u8]) -> bool {
     P28LicenseAttestation::from_bytes(wire)
         .and_then(|r| r.validate(span, parent))
         .is_ok()
 }
 
 /// Parent-side child spawn for the strip court (§7.4 subprocess mechanics).
-fn spawn_strip_child(
-    exe: &std::path::Path,
-    artifact: &std::path::Path,
-) -> (bool, bool, bool) {
+fn spawn_strip_child(exe: &std::path::Path, artifact: &std::path::Path) -> (bool, bool, bool) {
     let out = Command::new(exe)
         .args(["--exact", "strip_halt_child", "--nocapture"])
         .env("CGAP_P28_STRIP_CHILD", "1")
@@ -177,8 +170,7 @@ fn ceiling_boundary_court() {
     // Same boundary in WIRE form: the refused value serialized, parsed back,
     // and re-validated — the boundary lives in the bytes, not the struct.
     let wire = root.to_bytes();
-    let reparsed =
-        P28LicenseAttestation::from_bytes(&wire).expect("80 bytes always parse");
+    let reparsed = P28LicenseAttestation::from_bytes(&wire).expect("80 bytes always parse");
     assert!(
         reparsed.validate(&span, None).is_err(),
         "wire-form 5_000_000_001 must be refused"
@@ -202,7 +194,10 @@ fn run_sweep(
     let mut survivors = Vec::new();
     for k in 0..limit {
         let (i, j) = (k / 8, (k % 8) as u8);
-        assert!(i < ATTESTATION_LEN, "bit index {k} within the 640-bit record");
+        assert!(
+            i < ATTESTATION_LEN,
+            "bit index {k} within the 640-bit record"
+        );
         let mut mutated = *good;
         mutated[i] ^= 1 << j;
         executed += 1;
@@ -331,18 +326,14 @@ fn strip_halt_child() {
     if std::env::var("CGAP_P28_STRIP_CHILD").as_deref() != Ok("1") {
         return; // normal suite run: inert entry point
     }
-    let path =
-        std::env::var("CGAP_P28_ARTIFACT").expect("CGAP_P28_ARTIFACT set in child mode");
+    let path = std::env::var("CGAP_P28_ARTIFACT").expect("CGAP_P28_ARTIFACT set in child mode");
     let bytes = std::fs::read(&path).expect("artifact file readable");
     let rec = match P28LicenseAttestation::from_bytes(&bytes) {
         Ok(r) => r,
         Err(Spoliation) => {
             // Header stripped entirely: stage the discriminator, print it
             // (post-mortem witness), take the real halt (§6.1/§6.2).
-            STAGED_DISCRIMINATOR.store(
-                ERR_P28_SPOLIATION,
-                core::sync::atomic::Ordering::SeqCst,
-            );
+            STAGED_DISCRIMINATOR.store(ERR_P28_SPOLIATION, core::sync::atomic::Ordering::SeqCst);
             println!(
                 "staged={:#010x}",
                 STAGED_DISCRIMINATOR.load(core::sync::atomic::Ordering::SeqCst)
@@ -372,7 +363,10 @@ fn strip_header_entirely_halts() {
     let (ok, sig, staged) = spawn_strip_child(&exe, &full);
     assert!(ok, "full record must admit (exit 0), got clean=false");
     assert!(!sig, "admission must not abort");
-    assert!(!staged, "admission must not stage a spoliation discriminator");
+    assert!(
+        !staged,
+        "admission must not stage a spoliation discriminator"
+    );
 
     // §7.2: header stripped entirely (0-byte artifact) -> real death.
     let empty = dir.join("empty.art");

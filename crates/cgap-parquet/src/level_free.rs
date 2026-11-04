@@ -16,8 +16,8 @@
 
 use crate::thrift::{
     ctype, encoding, page_type, read_binary, read_field_header, read_i32, skip_value,
-    write_binary_field, write_field_header, write_i32_field, write_i64_field,
-    write_page_header, DataPageHeaderV2, PageHeader, ThriftError,
+    write_binary_field, write_field_header, write_i32_field, write_i64_field, write_page_header,
+    DataPageHeaderV2, PageHeader, ThriftError,
 };
 use alloc::vec::Vec;
 use core::fmt;
@@ -89,7 +89,11 @@ impl fmt::Display for LevelFreeError {
                  admitted type or extend the projection",
                 alloc::string::String::from_utf8_lossy(name)
             ),
-            LevelFreeError::UnsupportedWidth { index, name, length } => write!(
+            LevelFreeError::UnsupportedWidth {
+                index,
+                name,
+                length,
+            } => write!(
                 f,
                 "field {index} ('{}'): FIXED_LEN_BYTE_ARRAY length {length} is not the admitted \
                  width 32 — change the schema width to 32 or extend the projection",
@@ -295,7 +299,9 @@ pub fn parse_schema_elements(src: &[u8]) -> Result<Vec<WireSchemaElement>, Thrif
 /// may also be the leaf-only slice returned by [`parse_schema_elements`]
 /// over leaf structs. A root-shaped element (no type, `num_children > 0`)
 /// is consumed as the root and not admitted as a column.
-pub fn admit_schema(elements: &[WireSchemaElement]) -> Result<Vec<LevelFreeColumn>, LevelFreeError> {
+pub fn admit_schema(
+    elements: &[WireSchemaElement],
+) -> Result<Vec<LevelFreeColumn>, LevelFreeError> {
     let mut cols = Vec::new();
     for (i, e) in elements.iter().enumerate() {
         // Root/group shape: no physical type with children.
@@ -319,7 +325,13 @@ pub fn admit_schema(elements: &[WireSchemaElement]) -> Result<Vec<LevelFreeColum
             Some(repetition::REPEATED) => {
                 return Err(LevelFreeError::RepeatedField { index: i, name })
             }
-            Some(code) => return Err(LevelFreeError::UnknownRepetition { index: i, name, code }),
+            Some(code) => {
+                return Err(LevelFreeError::UnknownRepetition {
+                    index: i,
+                    name,
+                    code,
+                })
+            }
         }
         let ty = match e.field_type {
             Some(ptype::INT32) => LevelFreeType::U32,
@@ -373,7 +385,10 @@ pub fn write_page(
     let width = ty.width();
     let expected = num_rows * width;
     if payload.len() != expected {
-        return Err(LevelFreeError::PayloadMismatch { expected, actual: payload.len() });
+        return Err(LevelFreeError::PayloadMismatch {
+            expected,
+            actual: payload.len(),
+        });
     }
     let header = PageHeader {
         page_type: page_type::DATA_PAGE_V2,
@@ -482,7 +497,13 @@ pub fn write_row_group_page(
 /// 9 `data_page_offset`) for column `col` of a row group whose shared page
 /// sits at `page_offset` with byte length `page_len`. The scan side
 /// (`crate::scan::read_column_meta_data`) loads exactly field 9.
-fn write_column_meta_data(dst: &mut Vec<u8>, col: &LevelFreeColumn, num_rows: usize, page_offset: i64, page_len: i64) {
+fn write_column_meta_data(
+    dst: &mut Vec<u8>,
+    col: &LevelFreeColumn,
+    num_rows: usize,
+    page_offset: i64,
+    page_len: i64,
+) {
     let mut prev: i16 = 0;
     write_i32_field(dst, 1, prev, col.ty.code());
     prev = 1;
@@ -503,7 +524,12 @@ fn size_i64(v: usize) -> i64 {
 /// Emit one `RowGroup` struct: a `columns` list (field 1) holding one
 /// `ColumnChunk` per column (each pointing its `ColumnMetaData` at the
 /// shared page), `total_byte_size` (field 2), `num_rows` (field 3).
-fn write_row_group(dst: &mut Vec<u8>, cols: &[LevelFreeColumn], num_rows: usize, rg: &FooterRowGroup) {
+fn write_row_group(
+    dst: &mut Vec<u8>,
+    cols: &[LevelFreeColumn],
+    num_rows: usize,
+    rg: &FooterRowGroup,
+) {
     write_field_header(dst, 1, 0, ctype::LIST);
     write_list_header(dst, cols.len(), ctype::STRUCT);
     for c in cols {
@@ -557,7 +583,10 @@ pub fn write_file(
     let footer = write_footer(
         cols,
         num_rows,
-        &[FooterRowGroup { page_offset: 4, page_len: page.len() as i64 }],
+        &[FooterRowGroup {
+            page_offset: 4,
+            page_len: page.len() as i64,
+        }],
     );
     let mut out = Vec::with_capacity(4 + page.len() + footer.len() + 8);
     out.extend_from_slice(b"PAR1");
@@ -573,10 +602,12 @@ pub fn write_file(
 /// expectation of the projection is re-asserted on the way in: V2 page
 /// type, zero level byte lengths, uncompressed, PLAIN.
 pub fn read_page_payload(page: &[u8], ty: LevelFreeType) -> Result<(&[u8], usize), LevelFreeError> {
-    let (header, header_len) = crate::thrift::read_page_header(page)
-        .map_err(|_| LevelFreeError::UndecodablePage)?;
+    let (header, header_len) =
+        crate::thrift::read_page_header(page).map_err(|_| LevelFreeError::UndecodablePage)?;
     let width = ty.width();
-    let v2 = header.data_page_header_v2.ok_or(LevelFreeError::UndecodablePage)?;
+    let v2 = header
+        .data_page_header_v2
+        .ok_or(LevelFreeError::UndecodablePage)?;
     if header.page_type != page_type::DATA_PAGE_V2
         || v2.definition_levels_byte_length != 0
         || v2.repetition_levels_byte_length != 0
@@ -589,7 +620,9 @@ pub fn read_page_payload(page: &[u8], ty: LevelFreeType) -> Result<(&[u8], usize
         return Err(LevelFreeError::UndecodablePage);
     }
     let rows = usize::try_from(v2.num_rows).map_err(|_| LevelFreeError::UndecodablePage)?;
-    let payload = page.get(header_len..).ok_or(LevelFreeError::UndecodablePage)?;
+    let payload = page
+        .get(header_len..)
+        .ok_or(LevelFreeError::UndecodablePage)?;
     if payload.len() != rows * width {
         return Err(LevelFreeError::PayloadMismatch {
             expected: rows * width,
@@ -604,16 +637,36 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    fn elem(name: &[u8], ty: Option<i32>, rep: Option<i32>, tlen: Option<i32>) -> WireSchemaElement {
-        WireSchemaElement { field_type: ty, type_length: tlen, repetition_type: rep, name: name.to_vec(), num_children: None }
+    fn elem(
+        name: &[u8],
+        ty: Option<i32>,
+        rep: Option<i32>,
+        tlen: Option<i32>,
+    ) -> WireSchemaElement {
+        WireSchemaElement {
+            field_type: ty,
+            type_length: tlen,
+            repetition_type: rep,
+            name: name.to_vec(),
+            num_children: None,
+        }
     }
 
     #[test]
     fn schema_wire_round_trip_and_admission() {
         let cols = vec![
-            LevelFreeColumn { name: b"a_u32".to_vec(), ty: LevelFreeType::U32 },
-            LevelFreeColumn { name: b"b_u64".to_vec(), ty: LevelFreeType::U64 },
-            LevelFreeColumn { name: b"h_256".to_vec(), ty: LevelFreeType::Bytes32 },
+            LevelFreeColumn {
+                name: b"a_u32".to_vec(),
+                ty: LevelFreeType::U32,
+            },
+            LevelFreeColumn {
+                name: b"b_u64".to_vec(),
+                ty: LevelFreeType::U64,
+            },
+            LevelFreeColumn {
+                name: b"h_256".to_vec(),
+                ty: LevelFreeType::Bytes32,
+            },
         ];
         let mut wire = Vec::new();
         write_schema_list(&mut wire, &cols);
@@ -627,19 +680,35 @@ mod tests {
 
     #[test]
     fn refuses_optional_field() {
-        let els = vec![elem(b"opt", Some(ptype::INT32), Some(repetition::OPTIONAL), None)];
+        let els = vec![elem(
+            b"opt",
+            Some(ptype::INT32),
+            Some(repetition::OPTIONAL),
+            None,
+        )];
         assert_eq!(
             admit_schema(&els),
-            Err(LevelFreeError::OptionalField { index: 0, name: b"opt".to_vec() })
+            Err(LevelFreeError::OptionalField {
+                index: 0,
+                name: b"opt".to_vec()
+            })
         );
     }
 
     #[test]
     fn refuses_repeated_field() {
-        let els = vec![elem(b"rep", Some(ptype::INT64), Some(repetition::REPEATED), None)];
+        let els = vec![elem(
+            b"rep",
+            Some(ptype::INT64),
+            Some(repetition::REPEATED),
+            None,
+        )];
         assert_eq!(
             admit_schema(&els),
-            Err(LevelFreeError::RepeatedField { index: 0, name: b"rep".to_vec() })
+            Err(LevelFreeError::RepeatedField {
+                index: 0,
+                name: b"rep".to_vec()
+            })
         );
     }
 
@@ -654,18 +723,34 @@ mod tests {
         }];
         assert_eq!(
             admit_schema(&els),
-            Err(LevelFreeError::NestedField { index: 0, name: b"grp".to_vec() })
+            Err(LevelFreeError::NestedField {
+                index: 0,
+                name: b"grp".to_vec()
+            })
         );
     }
 
     #[test]
     fn refuses_unsupported_type_and_width() {
-        let els = vec![elem(b"f", Some(ptype::DOUBLE), Some(repetition::REQUIRED), None)];
+        let els = vec![elem(
+            b"f",
+            Some(ptype::DOUBLE),
+            Some(repetition::REQUIRED),
+            None,
+        )];
         assert!(matches!(
             admit_schema(&els),
-            Err(LevelFreeError::UnsupportedType { code: ptype::DOUBLE, .. })
+            Err(LevelFreeError::UnsupportedType {
+                code: ptype::DOUBLE,
+                ..
+            })
         ));
-        let els = vec![elem(b"g", Some(ptype::FIXED_LEN_BYTE_ARRAY), Some(repetition::REQUIRED), Some(16))];
+        let els = vec![elem(
+            b"g",
+            Some(ptype::FIXED_LEN_BYTE_ARRAY),
+            Some(repetition::REQUIRED),
+            Some(16),
+        )];
         assert!(matches!(
             admit_schema(&els),
             Err(LevelFreeError::UnsupportedWidth { length: 16, .. })
@@ -706,7 +791,10 @@ mod tests {
         let payload = vec![0u8; 40];
         assert_eq!(
             write_page(LevelFreeType::U32, &payload, 9),
-            Err(LevelFreeError::PayloadMismatch { expected: 36, actual: 40 })
+            Err(LevelFreeError::PayloadMismatch {
+                expected: 36,
+                actual: 40
+            })
         );
     }
 
