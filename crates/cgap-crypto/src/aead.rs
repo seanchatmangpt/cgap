@@ -26,8 +26,6 @@
 //! Zero dependencies, no handwritten assembly, no unguarded memory access
 //! (crate-level forbidden).
 
-#![allow(dead_code)] // PG-A3 wave: surface lands ahead of its consumers.
-
 use crate::poly1305::{self, Poly1305};
 
 /// ChaCha20 key width: 32 bytes.
@@ -203,6 +201,7 @@ fn chacha20_block(key: &[u8; KEY_LEN], counter: u32, nonce: [u32; 3]) -> [u8; BL
 
 /// One-time Poly1305 key from ChaCha20 block counter 0 (RFC 8439 §2.6:
 /// first 32 keystream bytes of block 0).
+#[inline]
 fn poly1305_key(key: &[u8; KEY_LEN], nonce: &Nonce96) -> [u8; poly1305::KEY_LEN] {
     let block = chacha20_block(key, 0, nonce.nonce_words());
     let mut k = [0u8; poly1305::KEY_LEN];
@@ -226,11 +225,12 @@ fn keystream_xor(data: &mut [u8], key: &[u8; KEY_LEN], nonce: &Nonce96) {
 
 /// Folded constant-time byte-slice equality: diff accumulates over every
 /// byte (no early exit), then folds to one bit. Flat control flow.
+#[inline]
 fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     debug_assert_eq!(a.len(), b.len());
     let mut diff: u8 = 0;
-    for i in 0..a.len() {
-        diff |= a[i] ^ b[i];
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
     }
     diff == 0
 }
@@ -238,6 +238,7 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 /// RFC 8439 §2.8 `mac_data` layout without allocation: absorb
 /// `aad || pad16(aad) || ct || pad16(ct) || len(aad) u64le || len(ct) u64le`
 /// into the Poly1305 state via chunked `push` (16-byte buffer, no alloc).
+#[inline]
 fn absorb_mac_data(poly: &mut Poly1305, aad: &[u8], ct: &[u8]) {
     poly1305::push(poly, aad);
     let aad_pad = (16 - (aad.len() % 16)) % 16;
