@@ -1,5 +1,7 @@
 # ZD-3: alloc_report_scopes_and_error_path red (XA-2 census red #5)
 
+Standing: ALIVE (green release + debug)
+
 Date: 2026-11-04 · Lane: zd-3 · Status: ALIVE (green release + debug)
 
 ## Subject

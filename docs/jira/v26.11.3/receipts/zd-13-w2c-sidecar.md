@@ -1,5 +1,7 @@
 # ZD-13 / W2-C — AoQ kernel sidecar (bin target + end-to-end court)
 
+Standing: ALIVE (courts ran this session; exact commands+exits below)
+
 **Status**: ALIVE (courts ran this session; exact commands+exits below).
 **Lane**: Wave-2 lane W2-C, `docs/jira/v26.11.3/plans/wave-2-membrane-plan.md` §1 W2-C.
 **Owner files**: `crates/cgap-ffi/src/bin/aoq_sidecar.rs` (new),

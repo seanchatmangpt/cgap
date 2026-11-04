@@ -1,5 +1,7 @@
 # cgap Blake3 Pin Re-Mint Receipt (status_maps + cscb-targets)
 
+Standing: b3sum exit 0; ggen sync x2 exit 0 (written:[]); tri court exit 0 (6/6)
+
 ## Subject
 
 FIX lane re-mint of 2 stale blake3 freeze pins (E-s findings), mirroring D62's

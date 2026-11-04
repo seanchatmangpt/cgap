@@ -1,5 +1,7 @@
 # ZD-36: DoD ladder second pass (post-ZD-4 / post-dod-006-flake-classification)
 
+Standing: all 12 gates run this session; dod-011/012 raw commands exit 1 (typed FM-LAW-015), standing per checklist MEASURED
+
 Verification lane. Re-run of dod-001..dod-012 per
 `docs/jira/v26.11.3/dod-checklist.md` (MEASURED dod-006 row present at
 run time, checked before and re-checked after the syncs — no revert).

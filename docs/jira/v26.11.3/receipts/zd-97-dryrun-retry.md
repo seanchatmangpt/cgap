@@ -1,5 +1,7 @@
 # ZD-97: Dry-Run Publish Retry for ZD-43's BLOCKED Crates
 
+Standing: 7 green + 12 registry-dep self-healing + 0 unclassified; zero crates remain BLOCKED
+
 - **Subject**: cgap @ 95821317bb09419a71f34e93e2995ace49574fe1 (clean tree, verified `git status --porcelain` empty)
 - **Scope**: re-run of the 2 crates BLOCKED in ZD-43's 20-crate dry-run ladder (`cgap-audit`, `cgap-ffi`) — blocked at that run by a dirty worktree, now committed.
 - **Mode**: `cargo publish --dry-run` only. No publish occurred, no edits, no git transitions.

@@ -1,5 +1,7 @@
 # AF-35 — Unified Transit Budget, Measured Not Summed
 
+Standing: ALIVE — Verdict: REFUTED as stated
+
 - **Subject**: `crates/cgap-aoq/tests/macro_transit_bench.rs` (new)
 - **Status**: ALIVE — `cargo test -p cgap-aoq --test macro_transit_bench --release` exit 0, green ×2 on the final file (2026-11-03)
 - **Claim audited**: dossier arithmetic `<10 ns admission + 41.5 ns decode + 34.7 ns slab push + 167 ns BLAKE3 ≈ 253.2 ns transit (3.9M frames/s)`

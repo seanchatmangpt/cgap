@@ -1,5 +1,7 @@
 # YD-7: DoD Blocking-Ladder Re-hearsal at HEAD (XP-2 Phase 2 gate)
 
+Standing: 11 of 12 gates green; one red: dod-006
+
 - Date: 2026-11-04
 - Subject: /Users/sac/cgap @ 528ef2ec93e170eae3cc306c68f078729d1cbf65 (main)
 - Lane: YD-7 (verification lane; owned file: this receipt only)

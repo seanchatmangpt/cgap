@@ -1,5 +1,7 @@
 # RX-3 — RFC-0089 §6 Scorecard (measured)
 
+Standing: exit 0; honest overall DISQUALIFIED (unmet: G7)
+
 - **Lane**: RX-3 IMPLEMENTATION, RFC-0089 §6 automated G1–G7 evaluation
   table generator. Repo: cgap. No git operations. Diff is one new test
   file + one cross-ref line (arcus standard) + this receipt.

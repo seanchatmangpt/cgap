@@ -1,5 +1,7 @@
 # XC-9 Receipt: cgap main CI triage (courts + verify red runs)
 
+Standing: 1 REAL, FIXED; 7 CONTENTION FLAKE — passes isolated
+
 Lane: XC-9 (implementation). Date: 2026-11-04. Repo: /Users/sac/cgap.
 Constraint honored: no git commands run.
 

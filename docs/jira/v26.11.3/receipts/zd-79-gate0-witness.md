@@ -1,5 +1,7 @@
 # ZD-79 — gate0 Witness Receipt (ZD-63 rung 7)
 
+Standing: BLOCKED — exit 2 twice, identical refusal (deterministic)
+
 Status: **BLOCKED** — gate0 refuses at the EA admission gate before reaching the byte-stable replay proof or header compile.
 
 ## Subject

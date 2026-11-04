@@ -1,5 +1,7 @@
 # ZP-17: Gate-10 Settling Receipt (min-of-7, 50k re-measure)
 
+Standing: ALIVE (exit 0 on all 7)
+
 Status: **ALIVE** (measured this session, 2026-11-04, single continuous batch of 7 runs, exit 0 on all 7)
 
 ## Plane disclosure

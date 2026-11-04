@@ -1,5 +1,7 @@
 # ZD-76 — Terminal Sweep Verification Receipt
 
+Standing: gates PASS; the committed subject is green
+
 - **Subject**: cgap @ `e32331919e2e45aa1015c53cd89b497870c75141` (committed tree; 4 dirty files:
   untracked `crates/cgap-ffi/src/bin/aoq_sidecar.rs` + `crates/cgap-ffi/tests/aoq_sidecar_court.rs`
   — ZD-56 in-flight).

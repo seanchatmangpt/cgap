@@ -1,5 +1,7 @@
 # ZD-119: cgap pre-publish preflight (ZP-9 Part 3 Stage 0)
 
+Standing: PARTIAL — token present, registry reachable
+
 Date: 2026-11-04. Repo: /Users/sac/cgap, workspace version 26.11.3.
 Read-only preflight — no publishes, no manifest edits, no commits.
 
