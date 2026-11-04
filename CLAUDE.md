@@ -1,13 +1,15 @@
 # cgap
 
-Sovereign `#![no_std]` columnar/deductive substrate; 25-member root
-workspace at 26.11.3 by `cargo metadata` (23 `crates/` members + 2
+Sovereign `#![no_std]` columnar/deductive substrate; 26-member root
+workspace at 26.11.3 by `cargo metadata` (24 `crates/` members + 2
 ontology packs); registry census (zd-119, 2026-11-04): cgap-aoq is
 NAME-FREE (first-publish candidate), wasm-footprint max 26.11.1, all
 other censused publish=true crates at 26.11.2, 26.11.3 free everywhere
 (`bench` there is a name
 collision, not ours; `cgap-verification` is on disk, not a root member;
-`cgap-integration`/`cgap-court`/`cgap-beam` carry `publish = false`).
+`cgap-court`/`cgap-beam`/`cbmqs-cli`/`wire-shm` carry
+`publish = false`; `cgap-integration` flipped to `publish = true`
+per P3-10, 2026-11-01).
 cgap-datafusion was removed
 (`docs/jira/v26.11.1/waves/cgap-datafusion-removal.md:6`) — do not
 re-scaffold. Campaign: v26.11.2 starDF (`docs/jira/v26.11.2/
@@ -51,15 +53,16 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   registry state).
 - `publish = false` (explicit, on disk, re-derived 2026-11-04): bench
   (registry name collision), beam, court (structural
-  [[test]]-only), wire-shm (YD-3, 2026-11-04). gate/p28/crypto/
+  [[test]]-only), cbmqs-cli (std host tool), wire-shm (YD-3,
+  2026-11-04). gate/p28/crypto/
   branchless carry `publish = true` explicitly (branchless flipped to
   true by lane DOD-02, 2026-11-02: first-publish candidate,
   `lanes/lane-dod-02-branchless-pub.md`).
-  25/25 members declare an explicit flag (21 true, 4 false) as of
+  26/26 members declare an explicit flag (21 true, 5 false) as of
   2026-11-04 (`cargo metadata --no-deps` + per-manifest grep; prior
   23/23 = 20 true / 3 false as of 2026-11-02, superseded by cgap-aoq
-  and the two ontology packs joining the true set and wire-shm joining
-  the false set). `cgap-mcp` (YD-3)/
+  and the two ontology packs joining the true set and cbmqs-cli and
+  wire-shm joining the false set). `cgap-mcp` (YD-3)/
   `cgap-ocel2`/`cgap-fleet-ops`/`cgap-verification`/`csct`/`cli`
   are on disk but NOT root members.
 
@@ -77,7 +80,7 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
 - `crates/{cgap-core,cgap-storage,cgap-bont,cgap-bosym,cgap-bn3,
   cgap-gate,cgap-crypto,cgap-p28}` — moonshot lane crates
 - `crates/{cgap-ffi,cgap-beam,cgap-gpu,audit,integration,cgap-court}` — membranes, court harness
-- `crates/cgap-verification` — on disk, NOT in the 25-member `cargo metadata` list
+- `crates/cgap-verification` — on disk, NOT in the 26-member `cargo metadata` list
 - `crates/wire-shm` — root member, `publish = false` (YD-3),
   ORPHANED-DATUM-FROZEN: no production-data-path consumer;
   `cgap-mcp` consumes it as a runtime path dep (bridge surface),
