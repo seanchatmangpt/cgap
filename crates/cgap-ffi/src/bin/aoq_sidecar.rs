@@ -159,6 +159,7 @@ mod imp {
     // ---------------------------------------------------------------------------
 
     /// Why the request leg refuses to produce a window.
+    #[derive(Debug)]
     enum ReadFault {
         /// Peer closed before the first byte (clean end of service).
         CleanClose,
@@ -207,12 +208,18 @@ mod imp {
             return Err(ReadFault::Oversize);
         }
         let body_pad = ipc::pad_to(body_len, 64);
-        let mut rest = vec![0u8; body_len + body_pad + EOS_SIZE];
-        read_full(stream, &mut rest)?;
-        let mut window = Vec::with_capacity(PREFIX_SIZE + META_SPAN + rest.len());
-        window.extend_from_slice(&prefix);
-        window.extend_from_slice(&meta);
-        window.extend_from_slice(&rest);
+        // SINGLE-ALLOC SHAPE (alloc-elimination lane): one zeroed window
+        // allocation; the 128-byte head (prefix + meta) is memcpy'd into
+        // place and the body+pad+EOS bytes stream-read directly into the
+        // tail. Fault semantics EXACT: the prefix loop above keeps its
+        // CleanClose-on-zero-byte-at-offset-0 vs Short law, the meta read
+        // and the tail read keep `read_full`'s Short-on-any-zero-read law,
+        // and the Oversize gate fired before this allocation, so an
+        // oversize body_len still refuses without allocating.
+        let mut window = vec![0u8; PREFIX_SIZE + META_SPAN + body_len + body_pad + EOS_SIZE];
+        window[..PREFIX_SIZE].copy_from_slice(&prefix);
+        window[PREFIX_SIZE..PREFIX_SIZE + META_SPAN].copy_from_slice(&meta);
+        read_full(stream, &mut window[PREFIX_SIZE + META_SPAN..])?;
         Ok(window)
     }
 
@@ -341,22 +348,29 @@ mod imp {
                 // cgap-aoq codec AoqHeader (FNV-1a32 at 60) plus the
                 // body_len/tag pad. Everything outside [8,128) is verbatim.
                 let (plo, phi) = (PREFIX_SIZE, PREFIX_SIZE + 120usize);
-                let pieces = if abs_hi <= plo || abs_lo >= phi {
-                    vec![IoSlice::new(seg)]
+                // Stack-resident piece array (alloc-elimination lane):
+                // write_vectored pieces are built in place — never a heap
+                // Vec — so the per-segment scatter stays alloc-free.
+                let mut pieces = [IoSlice::new(&[][..]), IoSlice::new(&[][..]), IoSlice::new(&[][..])];
+                let mut n_pieces = 0usize;
+                if abs_hi <= plo || abs_lo >= phi {
+                    pieces[0] = IoSlice::new(seg);
+                    n_pieces = 1;
                 } else {
                     let lo = plo.max(abs_lo);
                     let hi = phi.min(abs_hi);
-                    let mut v = Vec::with_capacity(3);
                     if lo > abs_lo {
-                        v.push(IoSlice::new(&seg[..lo - abs_lo]));
+                        pieces[n_pieces] = IoSlice::new(&seg[..lo - abs_lo]);
+                        n_pieces += 1;
                     }
-                    v.push(IoSlice::new(&self.meta[lo - plo..hi - plo]));
+                    pieces[n_pieces] = IoSlice::new(&self.meta[lo - plo..hi - plo]);
+                    n_pieces += 1;
                     if abs_hi > hi {
-                        v.push(IoSlice::new(&seg[hi - abs_lo..]));
+                        pieces[n_pieces] = IoSlice::new(&seg[hi - abs_lo..]);
+                        n_pieces += 1;
                     }
-                    v
-                };
-                let n = self.stream.write_vectored(&pieces)?;
+                }
+                let n = self.stream.write_vectored(&pieces[..n_pieces])?;
                 self.sent += n;
                 written += n;
                 if n < seg.len() {
@@ -385,6 +399,15 @@ mod imp {
     fn serve(mut stream: UnixStream) {
         let kem = SidecarKem;
         let mut session = Session::new(&kem, EPOCH, KEY_ID, ORDINAL0);
+        // Per-connection reused buffers (alloc-elimination lane): allocated
+        // on first use and RESIZED (capacity retained) per frame — the
+        // steady-state frame path performs zero heap allocations. Split
+        // into caller slices downstream (read_verified / open_verified /
+        // emit_verified / StreamWriter all write caller buffers).
+        let mut body = Vec::new();
+        let mut plain = Vec::new();
+        let mut frame_buf = Vec::new();
+        let mut scratch = Vec::new();
         loop {
             let window = match read_window(&mut stream) {
                 Ok(w) => w,
@@ -403,7 +426,8 @@ mod imp {
             // carried body and refuse unless it equals the stored tag.
             let body_len =
                 u32::from_le_bytes([window[72], window[73], window[74], window[75]]) as usize;
-            let mut body = vec![0u8; body_len];
+            body.clear();
+            body.resize(body_len, 0u8);
             if let Err(err) = ipc::read_verified(&window, None, &mut body) {
                 let _ = send_status(&mut stream, framing_status(&err));
                 return;
@@ -437,18 +461,19 @@ mod imp {
                 // carries the DECRYPTED payload (rung-8 witness: pre-seal
                 // bytes survive to echo) — open under recv_key at accept.
                 let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
-                let mut plain = vec![0u8; ct_len];
+                plain.clear();
+                plain.resize(ct_len, 0u8);
                 if let Err(err) = session.open_verified(&body, &mut plain) {
                     let _ = send_status(&mut stream, session_status(&err));
                     return;
                 }
                 let payload = &plain;
                 // v3 wire law: emit writes [header][kind][seq][ct][tag 16B].
-                let mut frame_buf = vec![
-                    0u8;
-                    FRAME_HEADER_BYTES + 1 + 4 + payload.len()
-                        + cgap_aoq::aead::TAG_LEN
-                ];
+                frame_buf.clear();
+                frame_buf.resize(
+                    FRAME_HEADER_BYTES + 1 + 4 + payload.len() + cgap_aoq::aead::TAG_LEN,
+                    0u8,
+                );
                 match session.emit_verified(seq, payload, &mut frame_buf) {
                     Ok(written) => {
                         let _ = send_status(&mut stream, AOQ_STATUS_OK);
@@ -457,6 +482,7 @@ mod imp {
                             &frame_buf[..written],
                             frame.header.frame_ordinal,
                             seq,
+                            &mut scratch,
                         ) {
                             let word = match &err {
                                 StreamError::ZeroProgress => AOQ_STATUS_BUSY,
@@ -497,6 +523,7 @@ mod imp {
         frame: &[u8],
         ordinal: u32,
         seq: u32,
+        scratch: &mut Vec<u8>,
     ) -> Result<usize, StreamError<io::Error>> {
         let tag = {
             let d = cgap_arrow::blake3::hash(frame);
@@ -523,9 +550,10 @@ mod imp {
             header_digest: 0,
             pad_tail: [0; 4],
         };
-        let mut scratch = vec![0u8; window_len(frame.len(), 64)];
+        scratch.clear();
+        scratch.resize(window_len(frame.len(), 64), 0u8);
         let mut writer = StreamWriter::new(PatchSink::new(stream, meta));
-        writer.emit(&mut scratch, ipc_meta, frame)
+        writer.emit(scratch, ipc_meta, frame)
     }
 
     /// Binary entry: one UDS path argument; bind, then accept connections
@@ -622,6 +650,295 @@ mod imp {
                     exit(2);
                 }
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Courts (#[cfg(test)]): fault matrix + alloc census, same-binary
+    // (the sidecar functions are private to this bin; driving them over a
+    // real socketpair keeps the court Chicago — real collaborator, final
+    // state asserted, no mocks).
+    // -------------------------------------------------------------------------
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn socketpair() -> (UnixStream, UnixStream) {
+            let (a, b) = std::os::unix::net::UnixStream::pair().expect("socketpair");
+            (a, b)
+        }
+
+        /// blake3(body)[..16] — the tamper-tier AOQ1 wire tag.
+        fn wire_tag(body: &[u8]) -> [u8; 16] {
+            let d = cgap_arrow::blake3::hash(body);
+            let mut t = [0u8; 16];
+            t.copy_from_slice(&d[..16]);
+            t
+        }
+
+        /// One align-64 AOQ1 window carrying `frame` (header law bytes at
+        /// 72..92: body_len u32 LE, tag at 76..92).
+        fn seal_window(frame: &[u8], ordinal: u32, seq: u32) -> Vec<u8> {
+            let tag = wire_tag(frame);
+            let mut w = vec![0u8; 8 + 120 + frame.len() + ipc::pad_to(frame.len(), 64) + 8];
+            w[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+            w[4..8].copy_from_slice(&120u32.to_le_bytes());
+            let mut hdr = [0u8; 64];
+            codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut hdr)
+                .expect("codec::encode");
+            w[8..72].copy_from_slice(&hdr);
+            w[72..76].copy_from_slice(&(frame.len() as u32).to_le_bytes());
+            w[76..92].copy_from_slice(&tag);
+            w[128..128 + frame.len()].copy_from_slice(frame);
+            let eos_at = 8 + 120 + frame.len() + ipc::pad_to(frame.len(), 64);
+            w[eos_at..eos_at + 4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+            w
+        }
+
+        /// [64B header][kind][body] session-frame builder.
+        fn wire_frame(kind: sess::FrameKind, ordinal: u32, seq: u32, body: &[u8]) -> Vec<u8> {
+            let mut buf = vec![0u8; FRAME_HEADER_BYTES + 1 + body.len()];
+            let h = AoqHeader::new(EPOCH, KEY_ID, ordinal, seq);
+            codec::encode(&h, &mut buf).expect("codec::encode");
+            buf[FRAME_HEADER_BYTES] = kind.id();
+            buf[FRAME_HEADER_BYTES + 1..].copy_from_slice(body);
+            buf
+        }
+
+        // ---------------------------------------------------------------------
+        // FAULT MATRIX — every ReadFault arm, over a real socketpair
+        // ---------------------------------------------------------------------
+
+        /// Ok path: a lawful window round-trips byte-identical.
+        #[test]
+        fn fault_matrix_ok_window() {
+            let (mut a, mut b) = socketpair();
+            let win = seal_window(
+                &wire_frame(sess::FrameKind::HandshakeEk, 0, 0, &[7u8; 8]),
+                0,
+                0,
+            );
+            a.write_all(&win).expect("write window");
+            let got = read_window(&mut b).expect("read_window Ok");
+            assert_eq!(got, win, "window round-trips byte-identical");
+        }
+
+        /// Zero bytes at offset 0 -> CleanClose (never Short).
+        #[test]
+        fn fault_matrix_clean_close() {
+            let (a, mut b) = socketpair();
+            drop(a); // immediate EOF, zero bytes written
+            match read_window(&mut b) {
+                Err(ReadFault::CleanClose) => {}
+                other => panic!("expected CleanClose, got {other:?}"),
+            }
+        }
+
+        /// Partial prefix then EOF -> Short.
+        #[test]
+        fn fault_matrix_short_prefix() {
+            let (mut a, mut b) = socketpair();
+            a.write_all(&[0xFFu8; 4]).expect("partial prefix");
+            drop(a);
+            match read_window(&mut b) {
+                Err(ReadFault::Short) => {}
+                other => panic!("expected Short, got {other:?}"),
+            }
+        }
+
+        /// Full prefix + meta with body_len > MAX_BODY -> Oversize (no
+        /// window allocation — the gate fires before the single alloc).
+        #[test]
+        fn fault_matrix_oversize() {
+            let (mut a, mut b) = socketpair();
+            let mut w = vec![0u8; 8 + 120];
+            w[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+            w[4..8].copy_from_slice(&120u32.to_le_bytes());
+            w[72..76].copy_from_slice(&((MAX_BODY + 1) as u32).to_le_bytes());
+            a.write_all(&w).expect("prefix+meta");
+            match read_window(&mut b) {
+                Err(ReadFault::Oversize) => {}
+                other => panic!("expected Oversize, got {other:?}"),
+            }
+        }
+
+        /// Prefix with a non-align-64 meta_span -> BadFraming.
+        #[test]
+        fn fault_matrix_bad_framing() {
+            let (mut a, mut b) = socketpair();
+            let mut w = vec![0u8; 8];
+            w[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+            w[4..8].copy_from_slice(&119u32.to_le_bytes());
+            a.write_all(&w).expect("bad prefix");
+            match read_window(&mut b) {
+                Err(ReadFault::BadFraming) => {}
+                other => panic!("expected BadFraming, got {other:?}"),
+            }
+        }
+
+        /// Oversize is measured under the counting allocator: the gate
+        /// refuses BEFORE any window allocation (0 allocs on the fault path).
+        #[test]
+        fn oversize_refuses_alloc_free() {
+            let (mut a, mut b) = socketpair();
+            let mut w = vec![0u8; 8 + 120];
+            w[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+            w[4..8].copy_from_slice(&120u32.to_le_bytes());
+            w[72..76].copy_from_slice(&((MAX_BODY + 1) as u32).to_le_bytes());
+            a.write_all(&w).expect("prefix+meta");
+            let (res, report) =
+                cgap_audit::alloc_counter::with_alloc_tracking(|| read_window(&mut b));
+            assert!(matches!(res, Err(ReadFault::Oversize)));
+            assert_eq!(
+                report.count, 0,
+                "Oversize refusal must not allocate (gate before alloc)"
+            );
+        }
+
+        // ---------------------------------------------------------------------
+        // ALLOC CENSUS — the single-alloc read_window shape
+        // ---------------------------------------------------------------------
+
+        /// One window == ONE heap allocation (the window Vec itself; the
+        /// 8+120-byte head is stack + memcpy into place). Before the
+        /// alloc-elimination lane this was 2 allocs + 3 memcpys (a body
+        /// Vec, then three extend_from_slice copies into a second Vec).
+        #[test]
+        fn read_window_single_alloc_census() {
+            let (mut a, mut b) = socketpair();
+            let win = seal_window(
+                &wire_frame(sess::FrameKind::HandshakeEk, 0, 0, &[9u8; 40]),
+                0,
+                0,
+            );
+            a.write_all(&win).expect("write window");
+            let (got, report) =
+                cgap_audit::alloc_counter::with_alloc_tracking(|| read_window(&mut b));
+            assert_eq!(got.expect("Ok"), win);
+            assert_eq!(
+                report.count, 1,
+                "read_window: exactly ONE allocation per window (report: {report:?})"
+            );
+            assert_eq!(report.bytes as usize, win.len(), "the alloc IS the window");
+        }
+
+        // ---------------------------------------------------------------------
+        // WARM SERVE CENSUS — steady-state frames are alloc-free
+        // ---------------------------------------------------------------------
+
+        /// Full client leg over one serve() connection: real handshake
+        /// (Ek + Finish under the sidecar's own deterministic seam) then
+        /// `n` same-size AppData frames, then clean close. Returns the
+        /// allocation count observed on the SERVE thread.
+        fn serve_census(n_appdata: usize) -> usize {
+            let (server, mut client) = socketpair();
+            let handle = std::thread::spawn(move || {
+                let ((), report) =
+                    cgap_audit::alloc_counter::with_alloc_tracking(move || serve(server));
+                report.count
+            });
+
+            // Handshake (mirrors J1 in aoq_sidecar_court.rs; same pinned
+            // constants — the sidecar seam is deterministic).
+            let d = shake32(&[b"w2c/mlkem/d"]);
+            let z = shake32(&[b"w2c/mlkem/z"]);
+            let mut ek = [0u8; EK_BYTES];
+            let mut dk = [0u8; 2400];
+            cgap_crypto::kem::keygen(&d, &z, &mut ek, &mut dk);
+            let kem = SidecarKem;
+            let (ct_c, ss) = kem.encapsulate(&ek).expect("encapsulate");
+            let ek_win = seal_window(&wire_frame(sess::FrameKind::HandshakeEk, 0, 0, &ek), 0, 0);
+            client.write_all(&ek_win).expect("ek write");
+            let mut word = [0u8; 4];
+            client.read_exact(&mut word).expect("ek word");
+            assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+
+            let transcript = sess::transcript_tag(&kem, &ek, &ss, EPOCH);
+            let hs_master = sess::derive(&kem, sess::CTX_HANDSHAKE, &ss, &ek);
+            let recv_key = kem.kdf(&[sess::CTX_RECV, &hs_master]);
+            let confirm = sess::confirm_tag(&kem, &recv_key, &transcript, &ct_c);
+            let mut fin_body = [0u8; CT_BYTES + 16];
+            fin_body[..CT_BYTES].copy_from_slice(&ct_c);
+            fin_body[CT_BYTES..].copy_from_slice(&confirm);
+            let fin_win =
+                seal_window(&wire_frame(sess::FrameKind::HandshakeFinish, 1, 0, &fin_body), 1, 0);
+            client.write_all(&fin_win).expect("fin write");
+            client.read_exact(&mut word).expect("fin word");
+            assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+
+            // n same-size AppData frames (seq/ordinal advance per frame).
+            let payload = [0xA5u8; 64];
+            for i in 0..n_appdata {
+                let ordinal = 2 + i as u32;
+                let seq = 7 + i as u32;
+                let mut prefix = [0u8; FRAME_HEADER_BYTES + 5];
+                codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix)
+                    .expect("encode");
+                prefix[FRAME_HEADER_BYTES] = sess::FrameKind::AppData.id();
+                prefix[FRAME_HEADER_BYTES + 1..FRAME_HEADER_BYTES + 5]
+                    .copy_from_slice(&seq.to_le_bytes());
+                let mut app_body = vec![0u8; 4 + payload.len() + cgap_aoq::aead::TAG_LEN];
+                app_body[..4].copy_from_slice(&seq.to_le_bytes());
+                let nonce = cgap_aoq::aead::Nonce96::new(
+                    u32::from(EPOCH),
+                    (u64::from(ordinal) << 32) | u64::from(seq),
+                )
+                .expect("nonce");
+                let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+                cgap_aoq::aead::seal_detached(
+                    &mut app_body[4..4 + payload.len()],
+                    &mut aead_tag,
+                    &payload,
+                    &prefix,
+                    &recv_key,
+                    &nonce,
+                );
+                app_body[4 + payload.len()..].copy_from_slice(&aead_tag);
+                let app_win = seal_window(
+                    &wire_frame(sess::FrameKind::AppData, ordinal, seq, &app_body),
+                    ordinal,
+                    seq,
+                );
+                client.write_all(&app_win).expect("app write");
+                client.read_exact(&mut word).expect("app word");
+                assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+                // Drain the response window (status OK precedes it).
+                let mut pfx = [0u8; 8];
+                client.read_exact(&mut pfx).expect("resp prefix");
+                let span = u32::from_le_bytes([pfx[4], pfx[5], pfx[6], pfx[7]]) as usize;
+                assert_eq!(span, 120);
+                let mut meta = [0u8; 120];
+                client.read_exact(&mut meta).expect("resp meta");
+                let blen = u32::from_le_bytes([meta[64], meta[65], meta[66], meta[67]]) as usize;
+                let mut rest = vec![0u8; blen + ipc::pad_to(blen, 64) + 8];
+                client.read_exact(&mut rest).expect("resp body");
+            }
+
+            drop(client); // CleanClose: serve returns
+            let _ = dk;
+            handle.join().expect("serve thread")
+        }
+
+        /// Steady-state law: each additional same-size AppData frame costs
+        /// EXACTLY ONE heap allocation — the single window Vec of
+        /// [`read_window`] (the alloc-elimination target shape; one alloc
+        /// + two head memcpys, body streamed in place). The response leg
+        /// (open/emit/send_window/PatchSink) contributes ZERO: buffers are
+        /// hoisted per connection and resized in place, so frames 2..n
+        /// never allocate. Before the lane, the per-frame cost was 2
+        /// allocs in read_window plus 4 per-frame `vec!`s in the
+        /// request/response path; the delta here proves the warm path is
+        /// window-alloc-only.
+        #[test]
+        fn serve_warm_frames_window_alloc_only() {
+            let one = serve_census(1);
+            let eight = serve_census(8);
+            assert_eq!(
+                eight,
+                one + 7,
+                "per-frame delta must be EXACTLY the 1 window alloc (1 frame: {one}, 8 frames: {eight})"
+            );
         }
     }
 }
