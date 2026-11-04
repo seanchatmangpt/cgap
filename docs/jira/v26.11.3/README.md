@@ -13,6 +13,14 @@ without a failed-count is not an exit record.
 
 Standing words re-read from each receipt body on disk (cl-close-2 lane,
 2026-11-03), never from memory. Lane file: `lanes/cg-1-wire-tier-gates.md`.
+Refreshed 2026-11-04 (yd-5 index lane): the table now covers ALL 55
+receipt files in `receipts/` — standing words re-read from each body
+again at refresh time; UNSTATED where a receipt carries no standing word
+(ab-19, af-12, af-24, xc-9). At refresh start no `yd-*` receipt existed
+in `receipts/` (disclosed; none to index); the lane's own receipt
+(yd-5-cgap-index.md) and the concurrent lanes' yd-1-licenses-clarify.md + yd-3-publish-lines.md
+landed during the pass and are indexed (YD-5 self-index, YD-3) — the
+count closes over the dir exactly, both disclosed.
 
 | Lane | Receipt | Standing | Gate (exit record) |
 |---|---|---|---|
@@ -22,6 +30,57 @@ Standing words re-read from each receipt body on disk (cl-close-2 lane,
 | SA-4 | receipts/sa-4.md | ALIVE | `cargo check` (crates/cli standalone) exit 0; `cargo test` 44 passed, 0 failed; `cargo test -p cgap-arrow` 228 passed, 0 failed |
 | AF-30 | receipts/af-30-contender-a.md | ALIVE | `cargo test -p cgap-aoq --test af30_cage_match --release -- --nocapture` exit 0 x2, 1 passed / 0 failed (0.5630 / 0.5551 us per frame; census 0 allocs / 0 bytes); AF-14 cbmqs_runner self-scan exit 0 verdict PASS |
 | SA-5 | receipts/sa-5.md | ALIVE (gates 170/180) / pre-existing gap disclosed | gates 170/180 executed at sync time with flipping-court non-vacuity, positive-path exit-0 sync receipt; `gate-court.toml` names runner `qualification/verify.py` which does not exist (prior-lane state, left as-is) |
+| AB-1 | receipts/ab-1.md | ALIVE (AB-1-owned courts) / crate-wide suite BLOCKED on sibling in-flight files at write time | `cargo check -p cgap-aoq` exit 0; purity gate 8 passed + codec court 7 passed exit 0; wasm32 check exit 0; `just aoq-check` exit 0; `just aoq-gate` exit 0 GREEN |
+| AB-2 | receipts/ab-2-fips202.md | ALIVE | fips202 gates ran and passed this session (exact subject) |
+| AB-3 | receipts/ab-3-chacha.md | ALIVE | every gate command exit 0 this session |
+| AB-4 | receipts/ab-4-aead.md | PARTIAL_ALIVE | all owned gates green this session; whole-crate `cargo test -p cgap-crypto` blocked by AB-3's in-flight files at write time |
+| AB-5 | receipts/ab-5-mlkem.md | ALIVE | all gates ran this session, commands + exits in body (mlkem gates); rekey-cost and on-target estimates UNVERIFIED (disclosed) |
+| AB-6 | receipts/ab-6-header.md | ALIVE | header gates green this session; AF-10/AB-6 reconciliation items recorded UNVERIFIED by AB-6 |
+| AB-7 | receipts/ab-7-chain-session.md | ALIVE | `cargo test -p cgap-aoq` GREEN ×2 (run 2: 16 targets, 71 tests, 0 failures) |
+| AB-8 | receipts/ab-8-wire.md | ALIVE (owned deliverables) / crate-level PARTIAL on AF-10's G2 fence | full `cargo test -p cgap-arrow` ALIVE exit 0, 0 failed; A10-A13 compiled-only (manifest freeze) |
+| AB-9 | receipts/ab-9-ipc-stress.md | ALIVE | `cargo test -p cgap-arrow --test ipc_stress` exit 0, 4 passed / 0 failed; full crate 216 tests green; neighbors 5 + 17 passed |
+| AB-10 | receipts/ab-10-writerv-stress.md | ALIVE | `cargo test -p cgap-arrow --test stream_writer_stress` exit 0 ×2 (pass 2: 4 passed / 0 failed); full suite exit 0 |
+| AB-11 | receipts/ab-11-ring-stress.md | ALIVE | `ring_stress` exit 0, 4 passed, GREEN ×2; wire-shm full suite exit 0 (lib 1 + ring 4 + wire_courts 8) |
+| AB-12 | receipts/ab-12-blake3-stress.md | ALIVE | `cargo test --release -p cgap-blake3 --test blake3_scale_stress` green; full `cargo test -p cgap-blake3` debug green; AVX2 path UNVERIFIED-on-host (target-gated) |
+| AB-15 | receipts/ab-15-ffi-stress.md | ALIVE | `cargo test -p cgap-ffi --test ffi_stress` 4 passed / 0 failed (re-run green); full 7-binary sweep 28 passed / 0 failed; pytest 4 passed |
+| AB-19 | receipts/ab-19-slab-stress.md | UNSTATED (body defers standing to the Verification Ladder; no standing word in body) | src/ untouched; fragmentation-gate mutation flips census (advance `len` on refused op) |
+| AF-1 | receipts/af-1-corridor.md | ALIVE for the compiled subset / one typed BLOCKED row (AF1-KD-1 KEM, since CLOSED by BK-1) | corridor_join_court 3 passed / 0 failed ×2; regression sweep all ok (52 tests); mlkem_sanity exit 1 recorded as AF1-KD-1 |
+| AF-3 | receipts/af-3-simd-profile.md | ALIVE | af3_court.sh exit 0 (AFTER=PASS BEFORE=FAIL); `cargo test -p cgap-blake3 --release` ×2, 9/9 targets ok; `cargo build --workspace` exit 0 |
+| AF-4 | receipts/af-4-parse-meta.md | ALIVE | `cargo test -p cgap-arrow` full suite ×2 exit 0, all targets 0 failed |
+| AF-6 | receipts/af-6-version-binding.md | ALIVE | `ggen sync run` exit 0 (`written: [generated_version.rs]`), second sync exit 0 `written: []` (determinism); 20/21 python binding tests pass, lone skip loud + typed |
+| AF-8 | receipts/af-8-sandbox-e0583.md | ALIVE | cgap-ffi sandbox-court fix: BEFORE 4 failed / FINAL 58 passed exit 0; cgap-crypto ×2 green (closed via BK-3 takeover unblocks + BK-1 mlkem768 restructure) |
+| AF-10 | receipts/af-10-cbmqs.md | ALIVE | cbmqs_gates release GREEN ×2 (8 PASS / 0 FAIL); debug pass disclosed 6 PASS / 1 FAIL / 1 SKIP before driver fix |
+| AF-12 | receipts/af-12-flip-demo.md | UNSTATED (courts green; no standing word in body) | kat_flip_demo 4 passed / 0 failed ×2; meta-court flips 324 == 324, restore_ok=true |
+| AF-14 | receipts/af-14-cbmqs-runner.md | ALIVE | runner self-test exit 0; `--court` exit 0 PASS with flipping witnesses (exit 2/0 bound test, MOCK_DETECTED exit 3); full suite exit 0 |
+| AF-21 | receipts/af-21-g7-perlink.md | ALIVE | `receipt_link_bench --release` `1 passed` ×2 exit 0; G7-row append LANDED (supersedes earlier PARTIAL/BLOCKED on the append) |
+| AF-22 | receipts/af-22-percall-latency.md | ALIVE | `cargo test --release -p cgap-blake3 --test percall_latency` green this session |
+| AF-24 | receipts/af-24-narrative.md | UNSTATED (doc-propagation receipt; no standing word in body) | POST-FIX sections appended to ab-12 / arcus audit / prompt library; no existing text altered |
+| AF-25 | receipts/af-25-g2-convergence.md | ALIVE (release) / loud-SKIP (debug, by design) | cbmqs_gates release exit 0 with amortized path inside the G2 gate; debug SKIP typed, never a fake pass |
+| AF-26 | receipts/af-26-clearing.md | ALIVE | scaled 1M ×2 + full 10M, exit 0; src/ untouched; falsifier = census drift / alloc > 0 reproduces as loud assert |
+| AF-27 | receipts/af-27-defense-mesh.md | ALIVE (mesh bench) / no_os+EW+1024-scale claims UNVERIFIED | macro_defense_mesh exit 0 ×2 (1 passed / 0 failed); full crate exit 0 |
+| AF-29 | receipts/af-29-federation.md | PARTIAL_ALIVE (scenario) / composes ALIVE surfaces | federation scenario gates exit 0 this session; 50M scale TARGET-UNMEASURED (falsifier: any 50M/500-endpoint run) |
+| AF-32 | receipts/af-32-saturation.md | ALIVE (scaled runs) / 1B run UNVERIFIED (documented estimate, executed: NO) | scaled 10M exit 0 ×3 (debug 2, release 1: 278,630 frames/s); 200k smoke exit 0 |
+| AF-33 | receipts/af-33-density.md | ALIVE | macro_density_bench exit 0 ×2 debug + ×2 release; host ELF linked-truth BLOCKED on this host (macOS `_start`), disclosed |
+| AF-34 | receipts/af-34-perf-audit.md | PARTIAL_ALIVE | wall-clock + IPC measured; PMU counters UNVERIFIED (3 independent PMU routes probed and refused); af34_perf_audit.sh exit 0 MEASURED |
+| AF-35 | receipts/af-35-transit.md | ALIVE | macro_transit_bench --release exit 0 ×2; 10M mode exit 0; conservation 900,000 + 100,000 = 1,000,000 |
+| AF-37 | receipts/af-37-p99-torture.md | ALIVE | macro_p99_torture release ×2 + debug ×2 exit 0 (serial); 22/22 integration binaries ok; one PRE-EXISTING doc-test failure exit 1 (not this lane's) |
+| AF-43 | receipts/af-43-cgap-publish.md | ALIVE | macro_p99_torture rc=0 ×2; cgap-ffi lib 58/58; certificate 3/3 exit 0; `cargo test --workspace` 55 `ok` lines |
+| BK-1 | receipts/bk-1-takeover.md | ALIVE (AB-4 + AB-5 + corridor join on real KEM); AF1-KD-1 CLOSED | `cargo test -p cgap-crypto` GREEN ×2 (75 passed / 0 failed); riscv32imc + wasm32 checks exit 0; corridor_join_court 3/3 ×2 |
+| BR-2 | receipts/br-2-receipt-lint.md | ALIVE | receipt_lint.sh --self-check PASS (known-good 0 / shorthand 1 / missing-cite 1); known-good corpus CLEAN exit 0 |
+| GD-1 | receipts/gd-1-dod-pack.md | ALIVE (pack surface) / PARTIAL overall (dod-006 AB-5 ML-KEM TARGET-UNMEASURED in the DoD graph) | `ggen sync run` ×2 exit 0 (2 dod projections); witness court green + FAIL witness via SHIM-COURT probe (FM-PACK-013); shim-court flip green |
+| RX-2 | receipts/rx-2-conformance.md | ALIVE | rfc0089_conformance release ×2 + debug ×2 exit 0 (4 passed / 0 failed); lib courts 14/0 ×2; CBMQS 1/0 ×2; AF-30 1/0 |
+| RX-3 | receipts/rx-3-scorecard.md | ALIVE (honest DISQUALIFIED verdict: unmet G7) | rfc0089_scorecard --release exit 0 ×2 (3 passed / 0 failed) + flake-margin pass 3; overall DISQUALIFIED (unmet G7), never rounded up |
+| RX-4 | receipts/rx-4-profile-guard.md | ALIVE | profile_guard courts green: lib 14/0 debug + release; CBMQS 1/0 debug + release; riscv32imc check exit 0; pre-existing failures disclosed as not-this-lane's |
+| RX-5 | receipts/rx-5-certificate.md | ALIVE | rfc0089_certificate 5 passed / 0 failed ×2 exit 0; tamper mutations typed-refused |
+| RX-5C | receipts/rx-5-correction.md | ALIVE | rfc0089_certificate 5/0 ×2 + certificate_gate_table_court 7/0 ×2 exit 0 |
+| XC-9 | receipts/xc-9-cgap-main.md | UNSTATED (triage receipt; no standing word in body) | verify_v26 fix: `-p cgap-cli` → `--manifest-path crates/cli/Cargo.toml`, battery exit 0 (7 rows, 0 FAIL, typed skip FR-07); 4 contention-flake gates pass isolated ×1 each; residual re-flake risk disclosed (shared-host fleet co-tenancy) |
+| XD-1 | receipts/xd-1-deny-toml.md | ALIVE | `cargo deny check advisories licenses` exit 1 (licenses FAILED — the finding, not a gate gap); ci.yml yaml.safe_load exit 0 |
+| XD-5 | receipts/xd-5-error-taxonomy.md | ALIVE | `cargo check -p cgap-aoq` exit 0 for the taxonomy doc edits; attack-scenario population disclosed |
+| YD-5 | receipts/yd-5-cgap-index.md | ALIVE (this row is the index's own receipt; census commands cited in the receipt ran this session) | `ls receipts/ \| wc -l` = 55; awk table-row census = 55 receipt rows (self-index closure: the receipt indexes itself); `uniq -d` → no duplicate lane labels |
+| YD-3 | receipts/yd-3-publish-lines.md | ALIVE | `publish = false` added to cgap-mcp + wire-shm Cargo.tomls (crates.io accidentally-publishable fix); `cargo check -p wire-shm` exit 0; `cargo check` in crates/cgap-mcp exit 0; workspace grep census cited |
+| YD-1 | receipts/yd-1-licenses-clarify.md | ALIVE (XD-1 licenses divergence CLOSED via clarify, not allow-list laxity) | `cargo deny check licenses` exit 4 → clarify entry added → exit 0; advisories exit 0; mutation re-run exit 4 (gate flips); wrong-hash clarify FAILS; advisories gate stays BLOCKING |
+
+## Placement notes (pointer-only)
 
 ## Placement notes (pointer-only)
 

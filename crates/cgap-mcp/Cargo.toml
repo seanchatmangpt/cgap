@@ -6,6 +6,7 @@ version = "26.11.3"
 edition = "2021"
 license = "Apache-2.0"
 description = "MCP-JSON to wire-shm binary-frame translation daemon (cgap Wave-3 bridge)"
+publish = false
 
 [[bin]]
 name = "cgap-mcpd"

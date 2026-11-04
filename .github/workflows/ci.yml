@@ -167,16 +167,9 @@ jobs:
       - name: cargo deny check advisories
         run: cargo deny check advisories
 
-      # NON-BLOCKING by registered divergence (see workflow header + receipt).
-      # Annotate loudly either way so the gap is never read as silent.
-      - name: cargo deny check licenses (NON-BLOCKING, P28-SIL has no SPDX key)
-        continue-on-error: true
+      # BLOCKING since YD-1 (2026-11-04): deny.toml [[licenses.clarify]]
+      # entries bind every workspace crate's `license-file = LICENSE.md`
+      # (P28-SIL) to LicenseRef-P28-SIL, so the SPDX scanner can read it.
+      # Any license-file/hash drift fails the job loudly.
+      - name: cargo deny check licenses (BLOCKING, clarified via LicenseRef-P28-SIL)
         run: cargo deny check licenses
-      - name: licenses gate provenance annotation
-        if: always()
-        run: |
-          if cargo deny check licenses >/dev/null 2>&1; then
-            echo "::notice::licenses check GREEN (unexpected — divergence may be closed; re-check the receipt)."
-          else
-            echo "::warning::licenses check RED by registered divergence (P28-SIL license-file, no SPDX key). Blocking gate is advisories only."
-          fi

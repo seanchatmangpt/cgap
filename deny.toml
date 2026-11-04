@@ -3,12 +3,20 @@
 # two sections wired into CI: advisories + licenses.
 #
 # cgap's kernel crates are zero-external-dependency (E=0), so the advisory
-# check comes back clean. The licenses check FAILS by design: every cgap
-# workspace crate declares `license-file = LICENSE.md` (the P28-SIL sovereign
-# license, deliberately no SPDX key per lane-A04 DoD), which cargo-deny's
-# SPDX allowlist cannot express. CI therefore gates on `advisories` and runs
-# `licenses` with continue-on-error + a loud annotation; see
-# docs/jira/v26.11.3/receipts/xd-1-deny-toml.md for the registered divergence.
+# check comes back clean. XD-1 history: the licenses check used to FAIL by
+# design (license-file = LICENSE.md, no SPDX key, unexpressible in the SPDX
+# allowlist) and ran NON-BLOCKING in CI per
+# docs/jira/v26.11.3/receipts/xd-1-deny-toml.md.
+#
+# XD-1 close condition (2026-11-04): the licenses check is taught the
+# P28-SIL license-file via `[[licenses.clarify]]` — one entry per
+# workspace crate, each bound to the custom identifier
+# `LicenseRef-P28-SIL` (the SPDX-compliant form for a non-SPDX license).
+# The crates' licensing INTENT is unchanged: they still declare
+# `license-file = LICENSE.md`; clarify only teaches the scanner how to
+# read it. The clarify license-files hash 0x8273ca50 pins the LICENSE.md
+# text — a license-text change re-breaks the check loudly. See
+# docs/jira/v26.11.3/receipts/yd-1-licenses-clarify.md.
 #
 # Docs: https://embarkstudios.github.io/cargo-deny/
 
@@ -31,6 +39,10 @@ ignore = [
 allow = [
     "MIT",
     "Apache-2.0",
+    # P28-SIL sovereign license, custom identifier (LicenseRef- prefix is
+    # the SPDX-compliant way to express a non-SPDX license); reached via
+    # the [[licenses.clarify]] entries below.
+    "LicenseRef-P28-SIL",
 ]
 # Confidence threshold for detecting a license from its text.
 confidence-threshold = 0.8
@@ -47,6 +59,132 @@ exceptions = [
 #license-files = [
     #{ path = "LICENSE", hash = 0xbd0eed23 }
 #]
+
+# One clarify entry per license-file workspace crate (21 total). Each binds
+# the crate's `license-file = LICENSE.md` (P28-SIL) to LicenseRef-P28-SIL.
+# `license-files.path` is crate-root-relative and `hash` pins the exact
+# LICENSE.md text cargo-deny computed (0x8273ca50, uniform across all 21
+# crates) — a license-text edit re-breaks the check loudly rather than
+# passing silently.
+[[licenses.clarify]]
+crate = "cgap"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-aoq"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-arrow"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-audit"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-blake3"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-bn3"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-bont"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-bosym"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-branchless"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-cloud"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-core"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-crypto"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-ffi"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-fibo"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-fleet-ops"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-gate"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-git"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-gpu"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-integration"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-ocel2"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-p28"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-parquet"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "cgap-storage"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
+
+[[licenses.clarify]]
+crate = "bench"
+expression = "LicenseRef-P28-SIL"
+license-files = [{ path = "../../LICENSE.md", hash = 0x8273ca50 }]
 
 [licenses.private]
 # Ignore workspace crates that aren't published / only published privately.

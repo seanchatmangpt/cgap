@@ -73,6 +73,19 @@ never-run-git law — coordinator commits as state.
    `gofmt -w` applied (corpus/gen.go, ffi/mutation_court_test.go,
    shm/shm.go); now clean (`gofmt -l` empty).
 
+10. **macro_transit_bench `composed_transit_1m` alloc census** — same
+    contamination class as item 8: the run took 87s under sibling-lane
+    load, crossing libtest's 60s mark whose in-process progress
+    reporter allocates into the census window (the earlier 54s run
+    stayed under and passed). Same `census_isolated` re-exec guard
+    applied (SLA unblock on AF-35's file, disclosed here).
+11. **profile_guard doctest** — pre-existing (RX-4's file): the
+    `assert_release` doctest panics by design under the debug-profile
+    doctest runner, so `cargo test -p cgap-aoq --doc` failed. Fence
+    changed to `no_run` (the example documents the caller pattern;
+    verification lives in the cfg(test) unit tests). Doctest green
+    1/1 after. Disclosed as SLA unblock.
+
 ## Gates (exact commands, observed exits)
 
 - `cargo test -p cgap-aoq --test macro_p99_torture` — rc=0 ×2 green
