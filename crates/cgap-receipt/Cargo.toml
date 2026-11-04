@@ -1,0 +1,26 @@
+# cgap-receipt — forensic receipt header engine (LANE-1, 2026-11-04).
+#
+# Deliberately a STANDALONE single-crate workspace (same pattern as
+# crates/cli): the root Cargo.toml members list is coordinator-scaffolded
+# and lanes never edit it. Workspace members consume it via path
+# dependency, e.g. cgap-receipt = { path = "../cgap-receipt" } — a path
+# dependency across a workspace boundary is lawful cargo.
+#
+# Zero dependencies, std-only. Profile detection mirrors
+# crates/cgap-aoq/src/profile_guard.rs axes exactly
+# (cfg!(debug_assertions) + option_env!("OPT_LEVEL")).
+
+[workspace]
+# Standalone single-crate workspace: deliberately NOT a member of the root
+# workspace (the root members list is coordinator-scaffolded; lanes never
+# edit it). Workspace members consume this crate via path dependency.
+
+[package]
+name = "cgap-receipt"
+version = "26.11.4"
+edition = "2021"
+license-file = "../../LICENSE.md"
+description = "Forensic receipt header engine: byte-faithful bench/court receipt headers, fail-closed on non-release profiles"
+
+[profile.release]
+# Keep cargo defaults; the crate itself carries the fail-closed profile law.
