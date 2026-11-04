@@ -128,6 +128,14 @@ run_gate test-integration  cargo test -p cgap-integration
 # cgap-beam spawns a real BEAM VM; timeout-guard at 10 min, loud skip on
 # timeout so a hung BEAM never silently fails or silently passes.
 BEAM_RC=0
+if [ "${CGAP_SKIP_BEAM:-}" = "1" ]; then
+  # Loud skip (CGAP_SKIP_BEAM=1): the row lands in the table like any gate,
+  # never a silent omission. Used by CI until the BEAM gate is proven there.
+  printf '| `test-cgap-beam` | SKIP | CGAP_SKIP_BEAM |\n' >> "$TABLE"
+  printf '%s\n' "test-cgap-beam" >> "$NAMES"
+  : > "$TMPDIR_V/tail_test-cgap-beam"
+  echo "GATE test-cgap-beam       SKIP (CGAP_SKIP_BEAM=1) exit=skip" >&2
+else
 run_timeout 600 "$TMPDIR_V/beam.out" cargo test -p cgap-beam || BEAM_RC=$?
 if [ "$BEAM_RC" -eq 0 ]; then
   printf '| `test-cgap-beam` | PASS | 0 |\n' >> "$TABLE"
@@ -146,6 +154,8 @@ else
   FAIL_ANY=1
   echo "GATE test-cgap-beam       FAIL              exit=$BEAM_RC" >&2
 fi
+fi # CGAP_SKIP_BEAM
+
 
 if [ -x scripts/audit_branchless.sh ]; then
   run_gate audit-branchless scripts/audit_branchless.sh --selftest

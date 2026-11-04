@@ -60,28 +60,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       # BEAM gate: cgap-beam spawns a real BEAM VM, so the gate needs
-      # erlang/otp. OTP setup is best-effort (continue-on-error) until the
-      # gate is proven on a CI runner. A missing `erl` makes test-cgap-beam
-      # fail or timeout-skip LOUDLY inside the verify script (it is
-      # timeout-guarded at 600s there) — never silently.
-      - name: Install Erlang/OTP (best-effort — BEAM gate unproven on CI)
+      # erlang/otp. Pinned to OTP 28 to match the local canonical
+      # 28.3.1 the gate was proven against.
+      - name: Install Erlang/OTP
         uses: erlef/setup-beam@v1
-        continue-on-error: true
         with:
-          otp-version: '27'
+          otp-version: '28'
           install-hex: false
           install-rebar: false
-
-      # Loud annotation either way, so the BEAM gate's CI provenance is never
-      # read as established when it is not.
-      - name: BEAM gate provenance annotation
-        if: always()
-        run: |
-          if command -v erl >/dev/null 2>&1; then
-            echo "::warning::BEAM gate: OTP installed best-effort. test-cgap-beam is UNPROVEN on CI runners until a green run witnesses it — the local gate stays canonical."
-          else
-            echo "::warning::BEAM gate: OTP NOT available — test-cgap-beam inside verify_v26.10.31.sh is expected to fail/skip. Disclosed gap; qualify OTP on CI before treating CI as authoritative for cgap-beam."
-          fi
 
       # FIXED (zd-141): the classify branch's in-place table edit is now a
       # portable sed-to-temp + mv (no `sed -i ''`); works on BSD and GNU sed.
