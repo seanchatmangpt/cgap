@@ -28,8 +28,8 @@ crates.io versions verified live 2026-11-01 via
 | crates/cgap-storage | cgap-storage | not published | PROPOSED | campaign ledger |
 | crates/integration | cgap-integration | not published | PROPOSED (membrane) | `waves/` receipts |
 | crates/wasm-footprint | wasm-footprint | not published | local-only | `crates/wasm-footprint/` |
-| ontologies/cloud | cgap-cloud | not published | O-ABI pack (A10) | `ontologies/cloud/` |
-| ontologies/fibo | cgap-fibo | not published | O-ABI pack (A09) | `ontologies/fibo/` |
+| ontology-packs/cloud | cgap-cloud | not published | O-ABI pack (A10) | `ontology-packs/cloud/` |
+| ontology-packs/fibo | cgap-fibo | not published | O-ABI pack (A09) | `ontology-packs/fibo/` |
 
 Notes.
 

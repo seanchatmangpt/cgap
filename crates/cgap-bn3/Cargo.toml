@@ -20,7 +20,7 @@ keywords = ['datalog', 'unifier', 'sigil', 'no_std']
 # (crates/audit/Cargo.toml precedent). Coordinator: review or revert this
 # edge; the lane did not touch the root workspace manifest.
 [dependencies]
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 
 [package.metadata.docs.rs]
 all-features = true

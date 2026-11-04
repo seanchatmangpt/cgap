@@ -3,7 +3,7 @@
 ## 1. Pipeline inventory (measured)
 
 Graph sources (one graph, one source of truth). `ontology/cgap.ttl` (20 ln) — project identity + release facts only;
-  header states the Arrow domain graph lives canonically in cgap-pack (ggen-marketplace), no duplicated domain facts. `ontologies/{fibo,cloud}/`
+  header states the Arrow domain graph lives canonically in cgap-pack (ggen-marketplace), no duplicated domain facts. `ontology-packs/{fibo,cloud}/`
   are O-ABI packs, not .ttl graphs: fibo = Cargo.toml(41)+README(36)+fibo_sec_dbt_v1.oabi(1); cloud = Cargo.toml(22)+README(34)+tosca_cimi_v1.oabi(9)+RECEIPT.md(410). Arrow domain pack graph is outside the repo: /Users/sac/ggen-marketplace/packs/cgap-pack (path dep).
 
 Two ggen projects:

@@ -1,7 +1,7 @@
 [package]
 name = "csct"
 rust-version = "1.85"
-version = "26.11.2" # CALVER-01: was 0.1.0 (dod-01 F1)
+version = "26.11.3" # CALVER-01: was 0.1.0 (dod-01 F1)
 edition = "2021"
 publish = false
 description = "Sovereign code-signing court tool (csct) for cgap sealed-evidence verification."

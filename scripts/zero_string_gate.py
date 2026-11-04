@@ -17,7 +17,7 @@ Vocabulary resolution order:
                     see the emit_real_vocabulary_archive_when_gated court)
   2. $CGAP_BOSYM_VOCAB
   3. <root>/gen/bosym/symbols.bosym
-  4. derivation from <root>/ontologies/*/src/lib.rs `fibo:` tokens (the
+  4. derivation from <root>/ontology-packs/*/src/lib.rs `fibo:` tokens (the
      pre-archive path the lane doc lines 217-219 sanction)
 
 Fail-closed contract (lane doc lines 240-255): the gate never exits 0 on an
@@ -60,7 +60,7 @@ vocabulary it mints — ADR-002's producer role — so a full-workspace scan
 could never go green while the producer's own binary embeds the strings.
 The class is:
   - ARTIFACT-SCOPED: keyed (package, bin), never crate- or name-prefix —
-    the pair form because ontologies/fibo/Cargo.toml records a witnessed
+    the pair form because ontology-packs/fibo/Cargo.toml records a witnessed
     bin-name collision between two lanes' emitters (A09 `emit-fibo-pack`
     vs A10's former `emit-pack`); a bare bin-name key would exempt BOTH
     packages' bins. The narrowest grant that fixes the finding.
@@ -354,11 +354,11 @@ FIBO_TOKEN_RE = re.compile(r"fibo:[A-Za-z0-9_]+(?::[A-Za-z0-9_]+)*")
 def derive_vocab_from_graph(root: Path) -> dict:
     """Pre-archive vocabulary derivation (lane doc lines 217-219): the same
     graph export the generator consumes — the ontology facades at
-    ontologies/*/src/lib.rs. Same token rule as slab.rs::extract_fibo_tokens."""
+    ontology-packs/*/src/lib.rs. Same token rule as slab.rs::extract_fibo_tokens."""
     vocab = {}
-    sources = sorted(root.glob("ontologies/*/src/lib.rs"))
+    sources = sorted(root.glob("ontology-packs/*/src/lib.rs"))
     if not sources:
-        raise GateRefused("vocab-missing", f"{root}/ontologies/*/src/lib.rs",
+        raise GateRefused("vocab-missing", f"{root}/ontology-packs/*/src/lib.rs",
                           "no ontology facades to derive from and no archive found")
     for src in sources:
         text = src.read_text(encoding="utf-8", errors="strict")
@@ -388,8 +388,8 @@ def resolve_vocabulary(root: Path, vocab_path) -> tuple:
         raise GateRefused("vocab-missing", str(candidates[0]))
     vocab = derive_vocab_from_graph(root)
     if not vocab:
-        raise GateRefused("vocab-missing", f"{root}/ontologies/*/src/lib.rs")
-    return vocab, "graph-derivation:ontologies/*/src/lib.rs"
+        raise GateRefused("vocab-missing", f"{root}/ontology-packs/*/src/lib.rs")
+    return vocab, "graph-derivation:ontology-packs/*/src/lib.rs"
 
 
 # ---------------------------------------------------------------------------
@@ -878,7 +878,7 @@ def a07_register() -> dict:
                 "--vocab PATH (.bosym v0 archive, Rust-generator canonical)",
                 "$CGAP_BOSYM_VOCAB",
                 "<root>/gen/bosym/symbols.bosym",
-                "ontologies/*/src/lib.rs fibo: token derivation",
+                "ontology-packs/*/src/lib.rs fibo: token derivation",
             ],
             "allowlist": [
                 {"match": e.pattern_or_exact(),
@@ -910,7 +910,7 @@ def a07_register() -> dict:
             "Wave-7: the producer exemption class is the audit's option "
             "(a); option (b) — quarantining the emitter's own strings "
             "through the .bosym projection — remains open with A09 "
-            "(ontologies/fibo is A09-owned); until then emit-fibo-pack "
+            "(ontology-packs/fibo is A09-owned); until then emit-fibo-pack "
             "legitimately embeds the vocabulary and the exit-gate claim "
             "scopes to the consumption path",
         ],
@@ -2440,7 +2440,7 @@ def main(argv=None) -> int:
     ap.add_argument("--profile", default="debug", choices=["debug", "release", "audit"])
     ap.add_argument("--vocab", default=None, help=".bosym v0 vocabulary archive "
                     "(default: $CGAP_BOSYM_VOCAB, then <root>/gen/bosym/symbols.bosym, "
-                    "then ontologies/*/src/lib.rs derivation)")
+                    "then ontology-packs/*/src/lib.rs derivation)")
     ap.add_argument("--no-cross-check", action="store_true",
                     help="disable the strings(1) cross-extractor (not recommended)")
     modes = ap.add_mutually_exclusive_group()

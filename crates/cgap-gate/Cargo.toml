@@ -22,3 +22,10 @@ cgap-branchless = { workspace = true }
 [package.metadata.docs.rs]
 all-features = true
 rustc-args = ["--cfg", "docsrs"]
+
+# CG-1 (v26.11.3, G6): dev-only — the Wave-1 frozen mirror structs in
+# penstock.rs are checked BYTE-FOR-BYTE against the canonical cgap-core
+# types (tests/frame_abi_mirror_court.rs). Never a runtime dep: the gate
+# kernel stays zero-dep on the publish surface.
+[dev-dependencies]
+cgap-core = { path = "../cgap-core" }

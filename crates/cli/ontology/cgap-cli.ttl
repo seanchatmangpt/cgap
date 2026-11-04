@@ -3,7 +3,7 @@
 cnv:CgapCli a cnv:Cli ;
     cnv:crateName "cgap-cli" ;
     cnv:binaryName "cgap" ;
-    cnv:version "26.11.2" ;
+    cnv:version "26.11.3" ;
     cnv:edition "2021" ;
     cnv:rustVersion "1.85" ;
     cnv:about "cgap CLI over the cgap columnar kernels, generated from this graph by ggen." ;

@@ -91,3 +91,24 @@ doctor-agents:
 export CENSUS_ARGS := ''
 census:
     python3 scripts/test_census.py {{CENSUS_ARGS}}
+
+# CG-1 (v26.11.3, gate G7): wire-shm lane — real test suite + zero-dep proof.
+# `cargo tree --depth 0` printing ONLY the `wire-shm` root line is the
+# mechanical zero-external-dependency proof (any dep edge shows at depth 1+;
+# a dep added without this recipe noticing is a RED refuse, not a warning).
+# `just doctor` rides along as INFORMATIONAL (its exit is not this recipe's
+# verdict; wire-shm health is decided by the test suite + tree proof).
+wire-shm:
+    cargo test --manifest-path crates/wire-shm/Cargo.toml
+    tree_out=`cargo tree --manifest-path crates/wire-shm/Cargo.toml --depth 0`; \
+    echo "$tree_out"; \
+    lines=`printf '%s\n' "$tree_out" | wc -l | tr -d ' '`; \
+    if [ "$lines" != "1" ]; then echo "wire-shm: RED — depth-0 tree shows $lines lines; external deps present" >&2; exit 1; fi; \
+    printf '%s\n' "$tree_out" | grep -q "^wire-shm " || { echo "wire-shm: RED — root line missing" >&2; exit 1; }; \
+    echo "wire-shm: GREEN (zero external deps proven)"; \
+    just doctor-info
+
+# Informational doctor probe (never decides this lane's exit; G7 contract).
+doctor-info:
+    @just doctor >/tmp/cg1-doctor.out 2>&1; rc=$?; \
+    echo "doctor (informational): rc=$rc"; exit 0

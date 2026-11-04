@@ -12,7 +12,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.2" }
-cgap-git = { path = "../cgap-git", version = "26.11.2" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.3" }
+cgap-git = { path = "../cgap-git", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }

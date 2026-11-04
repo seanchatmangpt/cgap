@@ -878,7 +878,7 @@ COVERED_CRATES = (
     "crates/cgap-blake3",
     "crates/cgap-git",
     "crates/cgap-parquet",
-    "ontologies/fibo",
+    "ontology-packs/fibo",
 )
 
 # §6.4 string gate input: the A07 register (Wave 6, item 11). A20 maintains
@@ -1482,7 +1482,7 @@ def mode_cross_gate_court(report=None):
           with scanned>=1.
       R (real red) — a fixture workspace is built with real cargo: a probe
           bin crate embedding a real ontology token (read from the real
-          ontologies/fibo/src/lib.rs) plus a clean `cgap-fibo` bin crate
+          ontology-packs/fibo/src/lib.rs) plus a clean `cgap-fibo` bin crate
           named so the canonical gate's emitter-exemption key
           ("cgap-fibo", "emit-fibo-pack") resolves. The REAL canonical gate
           (--root fixture) must report a REAL red: exit 1, SUMMARY
@@ -1541,13 +1541,13 @@ def mode_cross_gate_court(report=None):
     # --- Arm R: real cargo-built fixture -> real canonical RED ---------------
     token = None
     try:
-        with open(os.path.join(REPO, "ontologies/fibo/src/lib.rs"),
+        with open(os.path.join(REPO, "ontology-packs/fibo/src/lib.rs"),
                   encoding="utf-8") as f:
             tokens = sorted(set(token_re.findall(f.read())))
         visible = [t for t in tokens if len(t) >= min_run]
         if not visible:
             fail("arm R: no ontology token >= %d chars in the real "
-                 "ontologies/fibo/src/lib.rs" % min_run)
+                 "ontology-packs/fibo/src/lib.rs" % min_run)
         token = visible[0]
     except OSError as exc:
         fail("arm R: cannot read the real ontology source: %s" % exc)
@@ -1561,7 +1561,7 @@ def mode_cross_gate_court(report=None):
             onto_dir = os.path.join(fixture, "ontologies", "fibo", "src")
             os.makedirs(onto_dir)
             shutil.copyfile(
-                os.path.join(REPO, "ontologies/fibo/src/lib.rs"),
+                os.path.join(REPO, "ontology-packs/fibo/src/lib.rs"),
                 os.path.join(onto_dir, "lib.rs"))
             with open(os.path.join(fixture, "Cargo.toml"), "w") as f:
                 f.write('[workspace]\nmembers = ["cgap-probe", "cgap-fibo"]\n'
@@ -1622,7 +1622,7 @@ def mode_cross_gate_court(report=None):
                 for entry in os.listdir(fixture):
                     if entry == "ontologies":
                         # the COVERED_CRATES clone below provides the REAL
-                        # ontologies/fibo tree (incl. src/lib.rs) — the
+                        # ontology-packs/fibo tree (incl. src/lib.rs) — the
                         # fixture's single-file copy would collide with it
                         continue
                     src_entry = os.path.join(fixture, entry)
@@ -1648,9 +1648,9 @@ def mode_cross_gate_court(report=None):
                         ignore=shutil.ignore_patterns(
                             "target*", "*.rlib", "*.rmeta", "*.d"))
                 if not os.path.isfile(
-                        os.path.join(sandbox, "ontologies/fibo/src/lib.rs")):
+                        os.path.join(sandbox, "ontology-packs/fibo/src/lib.rs")):
                     fail("arm F: sandbox vocab source missing after the "
-                         "crate clone (ontologies/fibo/src/lib.rs)")
+                         "crate clone (ontology-packs/fibo/src/lib.rs)")
                 gate_src = open(
                     os.path.join(sandbox, "scripts/boundary_gate.py"),
                     encoding="utf-8").read()

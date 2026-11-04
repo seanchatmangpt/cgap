@@ -21,12 +21,12 @@ license-file = "../../LICENSE.md"
 # engine in `src/chatman.rs` binds cgap-blake3's public `compress_scalar`
 # + chunk/parent/root flags. cgap-blake3 itself exposes NO keyed API (its
 # external-vector test says so loudly); the keyed mode lives here.
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 
 [dev-dependencies]
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -29,22 +29,22 @@ members = [
     "crates/cgap-gate",
     "crates/cgap-crypto",
     "crates/cgap-p28",
-    # v26.11.2 starDF MW4: semi-naive Datalog closure kernel (lane W3-R4).
+    # v26.11.3 starDF MW4: semi-naive Datalog closure kernel (lane W3-R4).
     "crates/cgap-court",
-    # v26.11.2 W6 lane B1: centralized branchless ALU/SWAR mechanics.
+    # v26.11.3 W6 lane B1: centralized branchless ALU/SWAR mechanics.
     "crates/cgap-branchless",
-    "ontologies/fibo",
-    "ontologies/cloud",
+    "ontology-packs/fibo",
+    "ontology-packs/cloud",
 ]
 
 
 [workspace.dependencies]
-# v26.11.2 W6 lane W1: centralized branchless ALU/SWAR mechanics.
-cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.2", default-features = false }
+# v26.11.3 W6 lane W1: centralized branchless ALU/SWAR mechanics.
+cgap-branchless = { path = "crates/cgap-branchless", version = "26.11.3", default-features = false }
 
 [workspace.package]
 license-file = "LICENSE.md"
-version = "26.11.2"
+version = "26.11.3"
 edition = "2021"
 # MSRV-02 (DOD-01 F2): workspace-scope MSRV. Matches crates/cli's declared
 # 1.85 (edition-2021-era stable features). Members opt in via

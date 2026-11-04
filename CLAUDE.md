@@ -64,7 +64,7 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
   cgap-gate,cgap-crypto,cgap-p28}` — moonshot lane crates
 - `crates/{cgap-ffi,cgap-beam,cgap-gpu,audit,integration,cgap-court}` — membranes, court harness
 - `crates/cgap-verification` — on disk, NOT in the 23-member `cargo metadata` list
-- `crates/cli` — standalone ggen CLI (above); `ontologies/{fibo,cloud}` — O-ABI packs
+- `crates/cli` — standalone ggen CLI (above); `ontology-packs/{fibo,cloud}` — O-ABI packs
 - `docs/jira/v26.11.1/{lanes,waves}/` — A01-A20 specs + 152 receipts
   (`docs/jira/v26.11.2/waves/v2-07-census.md:9`)
 - `docs/jira/v26.11.2/` — starDF campaign (00..05, OVERNIGHT-LOOP.md, waves/)

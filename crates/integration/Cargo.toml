@@ -13,15 +13,15 @@ keywords = ['integration', 'roundtrip', 'cabi', 'wire-parity']
 # cgap-arrow is consumed ONLY by tests/ (dev-dep below); declaring it in
 # [dependencies] too tripped the unused_dependencies manifest warning (W15/W6-b7).
 [dev-dependencies]
-cgap-arrow = "26.11.2"
+cgap-arrow = "26.11.2" # CALVER-BUMP-26.11.3: minimum-bound pin; ^26.11.2 already admits 26.11.3; registry-only dev-dep (no path), ^26.11.3 breaks offline root resolve until 26.11.3 publish lift
 # path+version dev-dep: cargo strips the path on publish (dev-deps are
 # resolved but never compiled by `cargo publish` verify); kept local because
 # cgap-audit is not yet on crates.io (404, witnessed 2026-11-01).
-cgap-audit = { path = "../audit", version = "26.11.2" }
-cgap-blake3 = "26.11.2"
+cgap-audit = { path = "../audit", version = "26.11.3" }
+cgap-blake3 = "26.11.2" # CALVER-BUMP-26.11.3: minimum-bound pin, see cgap-arrow note
 # std: the scan module (mmap scanner + ScanError surface) is feature-gated.
-cgap-parquet = { version = "26.11.2", features = ["std"] }
-cgap-git = "26.11.2"
+cgap-parquet = { version = "26.11.2", features = ["std"] } # CALVER-BUMP-26.11.3: minimum-bound pin, see cgap-arrow note
+cgap-git = "26.11.2" # CALVER-BUMP-26.11.3: minimum-bound pin, see cgap-arrow note
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1158,7 +1158,7 @@ const _: () = assert!(P28_INVARIANT_CHECK_UNSUPPORTED.len() > 128);
 //   1. a07-wave6 §5 (coverage hygiene: two gates, two coverage sets) —
 //      the §6.2 ledger walk descended into lane build roots (`target*`,
 //      e.g. `crates/cgap-bont/target-a06/` and
-//      `ontologies/fibo/target-a09/`, both on the wave-7 tree with ZERO
+//      `ontology-packs/fibo/target-a09/`, both on the wave-7 tree with ZERO
 //      .rs files inside — latent, not live). Repair: walk skips `target*`,
 //      the real tree is pinned pollution-free in the ledger, and
 //      `ledger_walk_build_root_pollution_court` executes the named mutation
@@ -2033,17 +2033,17 @@ int main() {
             "CGAP_ERR_P28_SPOLIATION",
         ];
         // Bounded walk of ALL workspace-member .rs sources (real on-disk
-        // files): `crates/` AND `ontologies/` — fibo/cloud are workspace
-        // members (root Cargo.toml), so a producer landing in ontologies/ is
+        // files): `crates/` AND `ontology-packs/` — fibo/cloud are workspace
+        // members (root Cargo.toml), so a producer landing in ontology-packs/ is
         // as landed as one in crates/. Wave-6 repair: the walk previously
-        // covered `crates/` only, so a producer landing in ontologies/ would
+        // covered `crates/` only, so a producer landing in ontology-packs/ would
         // have been SILENTLY INVISIBLE — the pinned-skip guard below could
         // not flip on a state it cannot see. Driven by the Wave-5 audit
         // method (a20-wave5 receipt divergence 3: sites outside the scan are
         // uncounted, not nonexistent). Wave-7 repair (a07-wave6 §5: two
         // gates, two coverage sets): lane build roots — directory names
         // starting with `target`, e.g. `crates/cgap-bont/target-a06/` and
-        // `ontologies/fibo/target-a09/`, both present on the wave-7 tree —
+        // `ontology-packs/fibo/target-a09/`, both present on the wave-7 tree —
         // are NEVER descended: build roots are leases, not workspace source
         // (same-checkout-fanout cleanup law), so build-artifact text can
         // never count as a workspace production. The skip is proven
@@ -2082,10 +2082,10 @@ int main() {
         // EXECUTED in-court by the crates-only negative control directly
         // below — this block previously pointed at "the lane report", but no
         // waves/ receipt file exists for A19; waves/ is coordinator-owned.)
-        let ontologies_member = repo_root().join("ontologies/cloud/src/lib.rs");
+        let ontologies_member = repo_root().join("ontology-packs/cloud/src/lib.rs");
         assert!(
             files.iter().any(|f| f == &ontologies_member),
-            "ledger walk lost ontologies/cloud/src/lib.rs — walk scope regressed below the Wave-6 repair (workspace members are crates/ + ontologies/)"
+            "ledger walk lost ontology-packs/cloud/src/lib.rs — walk scope regressed below the Wave-6 repair (workspace members are crates/ + ontology-packs/)"
         );
         // The widening's own negative control, executed EVERY run: the
         // pre-Wave-6 crates/-only scope must NOT contain the ontologies

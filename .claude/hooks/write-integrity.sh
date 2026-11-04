@@ -2,7 +2,7 @@
 # write-integrity.sh — PostToolUse Edit|Write corruption scan (DX-2).
 # Scope: CODE files only — .rs .py .sh .toml .c .h .cc .cpp .hpp .js .ts
 # that are >100 lines OR live under crates/ or scripts/. Never fires on
-# docs prose (.md/.txt/.rst/.adoc, docs/, ontologies/) — false-positive
+# docs prose (.md/.txt/.rst/.adoc, docs/, ontology-packs/) — false-positive
 # breeding ground (lane DX-2 dispatch).
 # Checks: (a) NUL/control bytes (excl \n\t); (b) brace/paren balance
 # DELTA vs pre-edit HEAD state (tracked only; untracked -> typed skip);
@@ -21,7 +21,7 @@ except Exception:
 ')"
 [ -n "$FP" ] && [ -f "$FP" ] || exit 0
 case "$FP" in
-  *.md|*.txt|*.rst|*.adoc|*/docs/*|*/ontologies/*) exit 0 ;;
+  *.md|*.txt|*.rst|*.adoc|*/docs/*|*/ontology-packs/*) exit 0 ;;
 esac
 case "$FP" in
   *.rs|*.py|*.sh|*.bash|*.zsh|*.toml|*.c|*.h|*.cc|*.cpp|*.hpp|*.js|*.ts) ;;

@@ -3,7 +3,7 @@
 All numbers from wc/find/grep/sed run on /Users/sac/cgap at HEAD.
 
 ## 1. Workspace members (root Cargo.toml)
-- 24 members: 22 "crates/*" + 2 "ontologies/*" (ontologies/fibo, ontologies/cloud).
+- 24 members: 22 "crates/*" + 2 "ontology-packs/*" (ontology-packs/fibo, ontology-packs/cloud).
 - Note: crates/cli has its own [workspace]; not a member (comment in root Cargo.toml).
 - crates/cgap-court: 0 src files, 0 LOC (empty scaffold).
 
@@ -50,7 +50,7 @@ cgap-parquet | 23 | 15,452 | 13 | 3,930 | kernel
 cgap-storage | 5 | 2,075 | 11 | 1,688 | storage
 cgap-verification | 5 | 650 | 1 | 217 | tooling
 cli (non-member) | 12 | 4,458 | 3 | 765 (tests/) | tooling
-ontologies/fibo+cloud | — | 4,057 | (in total) | — | ontology
+ontology-packs/fibo+cloud | — | 4,057 | (in total) | — | ontology
 wasm-footprint | 1 | 505 | 1 | 127 | tooling
 
 Totals: kernel src (arrow+blake3+bn3+bont+bosym+branchless+core+court+crypto+ffi+gate+git+p28+parquet+storage): 65,776 LOC src.
@@ -85,5 +85,5 @@ blake3, clap-noun-verb, clap-noun-verb-macros, linkme, serde, serde_json.
 - In-src cfg(test) LOC: awk from `#[cfg(test)]` marker to EOF per file; approximate
   (marker may not be at a file boundary).
 - testsLOC = wc -l over crate's tests/ dir only; excludes dev-dep-driven tests elsewhere.
-- ontologies/fibo & cloud are Rust crates (src+tests), 4,057 .rs LOC; only 20 LOC of .ttl exists
-  (ontology/cgap.ttl) — the "ontologies/*.ttl" class is effectively empty.
+- ontology-packs/fibo & cloud are Rust crates (src+tests), 4,057 .rs LOC; only 20 LOC of .ttl exists
+  (ontology/cgap.ttl) — the "ontology-packs/*.ttl" class is effectively empty.

@@ -808,13 +808,13 @@ mod tests {
         (bytes, pack)
     }
 
-    /// Wave 9 — A09 ingestion court: `ontologies/fibo/fibo_sec_dbt_v1.oabi`
+    /// Wave 9 — A09 ingestion court: `ontology-packs/fibo/fibo_sec_dbt_v1.oabi`
     /// (A09's committed pack, dev-depending on this crate) loads through the
     /// real loader; M-W9P: one flipped LexHash byte in record 0 must be
     /// refused typed.
     #[test]
     fn w9_fibo_pack_ingestion_court() {
-        let (bytes, pack) = load_producer_pack("../../ontologies/fibo/fibo_sec_dbt_v1.oabi");
+        let (bytes, pack) = load_producer_pack("../../ontology-packs/fibo/fibo_sec_dbt_v1.oabi");
         assert_eq!(pack.header().version_major, OABI_VERSION_MAJOR);
         assert_ne!(
             pack.header().flags & OABI_FLAG_LEXHASH_PRESENT,
@@ -829,11 +829,11 @@ mod tests {
         }
     }
 
-    /// Wave 9 — A10 ingestion court: `ontologies/cloud/tosca_cimi_v1.oabi`
+    /// Wave 9 — A10 ingestion court: `ontology-packs/cloud/tosca_cimi_v1.oabi`
     /// through the same real-loader law; M-W9P as in the A09 court.
     #[test]
     fn w9_cloud_pack_ingestion_court() {
-        let (bytes, pack) = load_producer_pack("../../ontologies/cloud/tosca_cimi_v1.oabi");
+        let (bytes, pack) = load_producer_pack("../../ontology-packs/cloud/tosca_cimi_v1.oabi");
         assert_eq!(pack.header().version_major, OABI_VERSION_MAJOR);
         assert_ne!(pack.header().flags & OABI_FLAG_LEXHASH_PRESENT, 0);
         let mut mutated = bytes.clone();

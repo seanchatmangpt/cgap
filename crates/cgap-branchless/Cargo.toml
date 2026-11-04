@@ -1,7 +1,7 @@
 [package]
 name = "cgap-branchless"
 rust-version.workspace = true
-version = "26.11.2"
+version = "26.11.3"
 edition = "2021"
 license-file = "../../LICENSE.md"
 description = "Centralized branchless ALU/SWAR/bit-plane mechanics for cgap"

@@ -20,16 +20,16 @@ name = "bench_self_play_datalog_git"
 harness = false
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
-cgap-git = { path = "../cgap-git", version = "26.11.2", default-features = false }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.2" }
-cgap-gate = { path = "../cgap-gate", version = "26.11.2", default-features = false }
-cgap-p28 = { path = "../cgap-p28", version = "26.11.2", default-features = false }
-cgap-branchless = { path = "../cgap-branchless", version = "26.11.2", default-features = false }
-cgap-bn3 = { path = "../cgap-bn3", version = "26.11.2", default-features = false }
-cgap-core = { path = "../cgap-core", version = "26.11.2", default-features = false, optional = true }
-cgap-storage = { path = "../cgap-storage", version = "26.11.2", default-features = false, optional = true }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-git = { path = "../cgap-git", version = "26.11.3", default-features = false }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.3" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.3", default-features = false }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.3", default-features = false }
+cgap-branchless = { path = "../cgap-branchless", version = "26.11.3", default-features = false }
+cgap-bn3 = { path = "../cgap-bn3", version = "26.11.3", default-features = false }
+cgap-core = { path = "../cgap-core", version = "26.11.3", default-features = false, optional = true }
+cgap-storage = { path = "../cgap-storage", version = "26.11.3", default-features = false, optional = true }
 
 [dev-dependencies]
 # SP8 lane (DISCLOSED MINIMAL UNBLOCK, lane lease was tests/self_play_

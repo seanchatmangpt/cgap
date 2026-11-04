@@ -733,7 +733,7 @@ fn index_of(export: &GraphExport, sym_id: u64) -> usize {
 
 /// Extract the `fibo:`-family ontology tokens from an ontology facade
 /// source (the in-repo "graph export" — the ontology layer here is Rust
-/// facade crates, `ontologies/*/src/lib.rs`). Token rule: the literal
+/// facade crates, `ontology-packs/*/src/lib.rs`). Token rule: the literal
 /// `fibo:` followed by `A-Za-z0-9_`/`:` characters. This is the same
 /// derivation the zero-string gate performs pre-archive (lane doc lines
 /// 217-219); it lives here so the generator and the gate consume one rule.
@@ -777,7 +777,7 @@ pub fn extract_fibo_tokens(source: &str) -> Vec<String> {
 }
 
 /// Build the graph export for the in-repo FIBO facade: read
-/// `ontologies/fibo/src/lib.rs` (path resolved from this crate's manifest
+/// `ontology-packs/fibo/src/lib.rs` (path resolved from this crate's manifest
 /// dir), extract ontology tokens, mint PROVISIONAL sym_ids as the low 64
 /// bits of SHA-256 over `b"bosym\0" ++ token`.
 ///
@@ -1331,7 +1331,7 @@ mod tests {
         let fibo_lib = manifest
             .parent()
             .and_then(|p| p.parent())
-            .map(|p| p.join("ontologies/fibo/src/lib.rs"))
+            .map(|p| p.join("ontology-packs/fibo/src/lib.rs"))
             .expect("crate two levels under repo root");
         let export = fibo_graph_export(&fibo_lib).expect("graph export");
         assert!(export.len() >= 8, "expected the real FIBO vocabulary, got {}", export.len());

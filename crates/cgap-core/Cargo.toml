@@ -12,7 +12,7 @@ license-file = "../../LICENSE.md" # DOD-01 F3a / DOD-05 FLAG flip: branchless pa
 # P28-SIL v2.1.0 sovereign licensing instrument (no SPDX-shaped keys per
 # lane-A04 DoD 10 / tests/manifest_court.rs — the URN is the only lawful
 # instrument pointer; FIX-01's key reverted, see
-# docs/jira/v26.11.2/lanes/lane-dod-01-spdx.md):
+# docs/jira/v26.11.3/lanes/lane-dod-01-spdx.md):
 #   urn:avec:license:p28-sil:v2.1.0-sovereign
 # (canonical spec identifier per LICENSE-P28-SIL.md; URN frozen per
 # docs/jira/v26.11.1/03-rename-receipt.md decision D2; cited per lane-A04
@@ -27,12 +27,12 @@ license-file = "../../LICENSE.md" # DOD-01 F3a / DOD-05 FLAG flip: branchless pa
 # runtime library keeps E=0 externals (dev-dependencies never compile into
 # the lib target).
 [dev-dependencies]
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.2" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 # Wave 9 cross-lane integration: the A14 dam (cgap-gate penstock `ingress`)
 # consumes real A04 frames in tests/cross_lane_gate_court.rs. Same §3 named
 # exception as cgap-blake3 — dev-only, never compiled into the lib target;
 # the runtime library stays E=0 externals.
-cgap-gate = { path = "../cgap-gate", version = "26.11.2" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.3" }
 
 
 [package.metadata.docs.rs]

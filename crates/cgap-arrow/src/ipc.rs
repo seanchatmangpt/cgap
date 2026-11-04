@@ -27,8 +27,34 @@
 //! truncation, missing EOS). A future lane may swap the flatbuffer in
 //! behind the same emit/read signatures.
 //!
+//! WITNESS TIERS (G3, CG-1 v26.11.3; PG-6 decision: NO shared digest
+//! seam). The fleet's wire surfaces use deliberately different digests and
+//! they must not be confused:
+//! - `wire-shm` CRC-32 = TRANSPORT tier: accidental bit-flip detection on
+//!   a shared-memory ring; a checksum, forgeable by an adversary —
+//!   correct for its threat model.
+//! - this module's blake3 = TAMPER tier: adversarial body-integrity on the
+//!   verified path ([`read_verified`]).
+//! - plain [`read`] is NOT a verifying tier: it never re-hashes the body
+//!   (see BODY INTEGRITY CONTRACT above); body integrity is the
+//!   consumer's duty on that path.
+//! Anti-confusion is courted, not narrated: `tests/ipc_courts.rs` C13
+//! asserts zero checksum-tier contamination in this file's source, and
+//! wire-shm's court asserts zero "blake3" in its sources, each with a
+//! sandbox-add-token anti-vacuity kill.
+//!
 //! Zero external deps, `no_std`, no `alloc`: emit/read operate on caller
 //! buffers, so the module is allocation-free and panic-free on inputs.
+//!
+//! BODY INTEGRITY CONTRACT (v26.11.3, CL-L finding #1 / witness W4): the
+//! framing layer's [`read`] never re-hashes the body — a body-corrupted
+//! window passes a digest-bearing read, and body integrity is the
+//! consumer's duty on that path. [`emit_verified`]/[`read_verified`] raise
+//! body integrity into the framing layer (blake3 digest carried in the
+//! alignment-64 metadata padding, which `read` never inspects); windows
+//! from plain [`emit`] refuse on `read_verified` with
+//! [`IpcError::BodyDigestMissing`]. Compat window: both paths remain
+//! published, legacy `read`/`emit` unchanged, existing courts green.
 
 use core::fmt;
 
@@ -111,6 +137,19 @@ pub enum IpcError {
         /// Magic observed.
         got: u32,
     },
+    /// Layout version is not [`LAYOUT_VERSION`]. Checked after
+    /// [`IpcError::BadMagic`], in PG-6's gate order.
+    BadVersion {
+        /// Version observed.
+        got: u16,
+    },
+    /// Reserved flag word is not zero (0x0001 reserved: tamper-evident
+    /// body-digest-present bit is the first candidate meaning). Checked
+    /// after [`IpcError::BadVersion`].
+    BadFlags {
+        /// Flag word observed.
+        got: u16,
+    },
     /// FNV-1a header digest mismatch.
     HeaderDigestMismatch {
         /// Digest observed in the header.
@@ -141,6 +180,23 @@ pub enum IpcError {
     /// Frame does not end in the 8-byte EOS.
     MissingEos {
         /// Final 4 bytes observed as u32 (LE).
+        got: u32,
+    },
+    /// Verified read: the metadata padding carries no body digest (all
+    /// zero) — the window was emitted by [`emit`], not [`emit_verified`].
+    /// Consumers that verify downstream should use [`read`].
+    BodyDigestMissing,
+    /// Verified read: blake3(body) disagrees with the digest the metadata
+    /// padding carried.
+    BodyDigestMismatch {
+        /// Digest observed in the metadata padding.
+        got: [u8; 32],
+    },
+    /// Verified emit: a blake3 body digest needs 32 metadata-padding bytes,
+    /// which only alignment-64 windows have (56 pad bytes; alignment 8 has
+    /// none).
+    BodyDigestNoRoom {
+        /// Alignment requested.
         got: u32,
     },
 }
@@ -285,14 +341,21 @@ pub fn emit(out: &mut [u8], meta: &MetaHeader, body: &[u8]) -> Result<usize, Ipc
     Ok(w)
 }
 
-/// Read an encapsulated message: validate every framing class and copy the
-/// exact body into `body_out`. Returns the body length. `expected_schema`
-/// is the O-ABI schema digest the caller requires; `None` skips the check.
-pub fn read(
-    buf: &[u8],
-    expected_schema: Option<&[u8; 32]>,
-    body_out: &mut [u8],
-) -> Result<usize, IpcError> {
+/// The parse_meta seam (G4, CG-1 v26.11.3): every window-shape gate shared
+/// by `read` and `read_verified` lives HERE, once. Both entrypoints
+/// delegate to it, so their classifications of the same window can never
+/// diverge (the N-window classification-identity court pins this).
+///
+/// Gates, in PG-6's order: truncation-to-prefix -> continuation ->
+/// metadata span -> truncation-to-header -> magic -> reserved fields ->
+/// header digest -> version -> flags -> alignment field.
+struct ParsedMeta {
+    alignment: usize,
+    body_at: usize,
+    meta: MetaHeader,
+}
+
+fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
     if buf.len() < PREFIX_SIZE {
         return Err(IpcError::Truncated {
             needed: PREFIX_SIZE,
@@ -333,11 +396,52 @@ pub fn read(
             got: meta.header_digest,
         });
     }
+    if meta.version != LAYOUT_VERSION {
+        return Err(IpcError::BadVersion { got: meta.version });
+    }
+    if meta.flags != 0 {
+        return Err(IpcError::BadFlags { got: meta.flags });
+    }
     if meta.alignment as usize != alignment {
         return Err(IpcError::BadAlignment {
             got: meta.alignment,
         });
     }
+    Ok(ParsedMeta { alignment, body_at, meta })
+}
+
+/// Sequence-pair law (G2): a strictly-advancing, wrap-safe successor test
+/// over the wire `seq` words. `(prev, next)` is a lawful ordered pair iff
+/// `next == prev + 1 (mod 2^32)` — exactly one step, wrapping silently at
+/// the u32 boundary. Reordered, replayed, or skipped messages refuse.
+#[must_use]
+pub fn seq_ok(prev: u32, next: u32) -> bool {
+    next == prev.wrapping_add(1)
+}
+
+/// Read an encapsulated message: validate every framing class and copy the
+/// exact body into `body_out`. Returns the body length. `expected_schema`
+/// is the O-ABI schema digest the caller requires; `None` skips the check.
+pub fn read(
+    buf: &[u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+) -> Result<usize, IpcError> {
+    read_with_meta(buf, expected_schema, body_out).map(|(n, _)| n)
+}
+
+/// [`read`] plus the sealed metadata header: returns `(body_len, meta)`.
+/// The header carries the emitter's `seq` (pair it with [`seq_ok`] to
+/// detect reorder/replay/skip) and `schema_digest` for streaming readers.
+pub fn read_with_meta(
+    buf: &[u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+) -> Result<(usize, MetaHeader), IpcError> {
+    let p = parse_meta(buf)?;
+    let meta = p.meta;
+    let alignment = p.alignment;
+    let body_at = p.body_at;
     if let Some(exp) = expected_schema {
         for i in 0..32 {
             if exp[i] != meta.schema_digest[i] {
@@ -386,9 +490,8 @@ pub fn read(
     if cont2 != CONTINUATION || tail != EOS {
         return Err(IpcError::MissingEos { got: tail });
     }
-    Ok(body_len)
+    Ok((body_len, meta))
 }
-
 /// Body length implied by a window of `buf_len` bytes at metadata end
 /// `body_at` and `alignment`.
 fn expected_body(buf_len: usize, body_at: usize, alignment: usize) -> u32 {
@@ -396,4 +499,67 @@ fn expected_body(buf_len: usize, body_at: usize, alignment: usize) -> u32 {
         return 0;
     }
     ((buf_len - body_at) / (alignment + 1)) as u32
+}
+
+/// Offset (from window start) of the 32-byte blake3 body digest that
+/// `emit_verified` writes into the metadata padding. Alignment-64 windows
+/// carry 56 zero pad bytes there (`meta_span_for(64) == 120`), and `read`
+/// never inspects metadata padding, so a verified window stays readable
+/// through the legacy path.
+pub const BODY_DIGEST_AT: usize = PREFIX_SIZE + META_HEADER_SIZE;
+
+/// The all-zero digest marks "no body digest carried".
+const BODY_DIGEST_ABSENT: [u8; 32] = [0; 32];
+
+/// Emit a verified encapsulated message: identical framing to [`emit`]
+/// plus a blake3 body digest in the metadata padding. Alignment-64 only
+/// (see [`IpcError::BodyDigestNoRoom`]).
+///
+/// COMPAT WINDOW: [`read`] does NOT check the body digest — a
+/// body-corrupted verified window still passes `read` (documented
+/// consumer duty; witness W4, `tests/stream_writev_witness.rs`). Use
+/// [`read_verified`] to refuse corruption at the framing layer.
+pub fn emit_verified(
+    out: &mut [u8],
+    meta: &MetaHeader,
+    body: &[u8],
+) -> Result<usize, IpcError> {
+    if meta.alignment != 64 {
+        return Err(IpcError::BodyDigestNoRoom { got: meta.alignment });
+    }
+    let n = emit(out, meta, body)?;
+    let digest = crate::blake3::hash(body);
+    out[BODY_DIGEST_AT..BODY_DIGEST_AT + 32].copy_from_slice(&digest);
+    Ok(n)
+}
+
+/// Read with body integrity: every framing class [`read`] checks, plus the
+/// metadata padding must carry a blake3 body digest matching `body`.
+/// Alignment-64 windows only ([`IpcError::BodyDigestNoRoom`] for align 8;
+/// [`IpcError::BodyDigestMissing`] for windows emitted by plain [`emit`]).
+pub fn read_verified(
+    buf: &[u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+) -> Result<usize, IpcError> {
+    // The seam answers window shape FIRST, so a truncated window classifies
+    // as `Truncated` (typed, exact `needed`/`got`), never the wrong-class
+    // `BodyDigestNoRoom { got: 8 }` the pre-seam alignment guess produced.
+    let p = parse_meta(buf)?;
+    if p.alignment != 64 {
+        return Err(IpcError::BodyDigestNoRoom { got: p.meta.alignment });
+    }
+    let (n, meta) = read_with_meta(buf, expected_schema, body_out)?;
+    let stored_slice = &buf[BODY_DIGEST_AT..BODY_DIGEST_AT + 32];
+    let mut stored = [0u8; 32];
+    stored.copy_from_slice(stored_slice);
+    if stored == BODY_DIGEST_ABSENT {
+        return Err(IpcError::BodyDigestMissing);
+    }
+    let digest = crate::blake3::hash(&body_out[..n]);
+    if digest != stored {
+        return Err(IpcError::BodyDigestMismatch { got: stored });
+    }
+    let _ = meta;
+    Ok(n)
 }

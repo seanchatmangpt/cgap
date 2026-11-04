@@ -12,7 +12,7 @@
 //! Byte provenance (cited, not redefined — one calculus, one kernel):
 //!
 //! * `.oabi` = the committed A09 producer pack
-//!   `ontologies/fibo/fibo_sec_dbt_v1.oabi` (496 B: 64 B A06 §6 header +
+//!   `ontology-packs/fibo/fibo_sec_dbt_v1.oabi` (496 B: 64 B A06 §6 header +
 //!   9 x 48 B records; slot_count=9, class_count=34, enum_count=843). The
 //!   container law is A06 §6 (`crates/cgap-bont/src/oabi.rs`:
 //!   `OABI_MAGIC` / `OABI_HEADER_LEN` / `OABI_RECORD_SIZE` / `OabiPackV1`);
@@ -47,18 +47,18 @@
 //! @lane W2-10 (Wave R2 item 10), 2026-11-01, repo /Users/sac/cgap.
 //!
 //! File assembled mechanically (python) from the real bytes: hex text is
-//! machine-generated from `ontologies/fibo/fibo_sec_dbt_v1.oabi` and from
+//! machine-generated from `ontology-packs/fibo/fibo_sec_dbt_v1.oabi` and from
 //! the scratch derivation run (exit 0, /tmp/w210-derive), never hand-typed.
 
 /// Committed byte length of the A09 `.oabi` producer pack
-/// (`ontologies/fibo/fibo_sec_dbt_v1.oabi`): 64 B header + 9 x 48 B.
+/// (`ontology-packs/fibo/fibo_sec_dbt_v1.oabi`): 64 B header + 9 x 48 B.
 pub const OABI_PACK_LEN: usize = 496;
 
 /// Byte length of the A11 arena image below (8 + 4x24 + 3x16).
 pub const BN3_NETWORK_LEN: usize = 152;
 
 /// The REAL A06 `.oabi` slot table: the committed A09 pack bytes,
-/// byte-identical to `ontologies/fibo/fibo_sec_dbt_v1.oabi` on disk
+/// byte-identical to `ontology-packs/fibo/fibo_sec_dbt_v1.oabi` on disk
 /// (asserted every run by `r2_courts::r2_oabi_table_identity_court`).
 
 pub const OABI_PACK_FIBO_SEC_DBT_V1: [u8; OABI_PACK_LEN] = [
@@ -199,7 +199,7 @@ mod r2_courts {
     /// Fresh read of the committed A09 producer pack (canonical tree,
     /// read-only; never mutated — mutations run on copies).
     fn committed_oabi_bytes() -> Vec<u8> {
-        let p = repo_root().join("ontologies/fibo/fibo_sec_dbt_v1.oabi");
+        let p = repo_root().join("ontology-packs/fibo/fibo_sec_dbt_v1.oabi");
         fs::read(&p)
             .unwrap_or_else(|e| panic!("committed producer pack {} unreadable: {e}", p.display()))
     }

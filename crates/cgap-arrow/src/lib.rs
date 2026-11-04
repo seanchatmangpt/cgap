@@ -42,6 +42,9 @@ pub mod blake3;
 pub mod chase_lev;
 pub mod ipc;
 pub mod slab;
+// StreamWriter (lane e80-06, v26.11.3): writev scatter of IPC1 windows to
+// a generic VectoredSink — core-only, so it stays in the embedded surface.
+pub mod stream_writer;
 
 #[cfg(not(target_os = "none"))]
 pub mod batch;
@@ -90,6 +93,12 @@ pub mod views;
 
 #[cfg(not(target_os = "none"))]
 mod generated_layout;
+#[cfg(not(target_os = "none"))]
+mod generated_arrow_primitives;
+// G1 courts (CG-1, v26.11.3): hand-law courts for the never-edit generated
+// module above; live OUTSIDE it so regeneration cannot overwrite them.
+#[cfg(all(not(target_os = "none"), test))]
+mod generated_arrow_primitives_courts;
 mod generated_version;
 pub use generated_version::VERSION_C;
 

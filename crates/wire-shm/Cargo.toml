@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "wire-shm"
+version = "26.11.3"
+edition = "2021"
+license = "Apache-2.0"
+description = "Zero-dependency binary-frame shared-memory ring segment (host wire tier)"
+
+[lib]
+path = "src/lib.rs"

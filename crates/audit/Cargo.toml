@@ -19,8 +19,8 @@ keywords = ['branch-audit', 'machine-code', 'audit']
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.2" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.2" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.3" }
 
 [package.metadata.docs.rs]
 all-features = true
