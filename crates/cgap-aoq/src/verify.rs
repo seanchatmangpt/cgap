@@ -141,15 +141,13 @@ pub fn verify_window(
     let body_len = u32::from_le_bytes(body_len_bytes) as usize;
     let mut tag = [0u8; TAG_BYTES];
     tag.copy_from_slice(&buf[TAG_AT..TAG_AT + TAG_BYTES]);
-    for (i, &b) in buf[HEADER_AT + crate::header::SIZE_BYTES..body_at]
-        .iter()
-        .enumerate()
-    {
-        let in_law_region = HEADER_AT + crate::header::SIZE_BYTES + i >= BODY_LEN_AT
-            && HEADER_AT + crate::header::SIZE_BYTES + i < TAG_AT + TAG_BYTES;
-        if b != 0 && !in_law_region {
-            return Err(AoqError::ReservedNotZero);
-        }
+    // Fixed-range pad law: the scan span is [HEADER_AT + 64, body_at)
+    // (= [72, 128)); the law region [BODY_LEN_AT, TAG_AT + TAG_BYTES)
+    // (= [72, 92)) is the head of that span and carries body_len + tag,
+    // so the single clean range is the tail [TAG_AT + TAG_BYTES, body_at).
+    // Ranges are compile-time fixed — no per-byte offset recomputation.
+    if !buf[TAG_AT + TAG_BYTES..body_at].iter().all(|&b| b == 0) {
+        return Err(AoqError::ReservedNotZero);
     }
     // 8: tag presence + match (host supplies the expected tag; R-K1).
     if tag == [0u8; TAG_BYTES] {
@@ -177,15 +175,13 @@ pub fn verify_window(
             got: buf.len() as u16,
         });
     }
-    // [AB-1 SLA MINIMAL UNBLOCK 2026-11-03] enumerate-destructure pattern
-    // fix; owning lane may restyle. Disclosed in ab-1.md.
-    for (_i, &b) in buf[body_at + body_len..body_at + body_len + body_pad]
+    // Body pad cleanliness: one fixed range, all-zero gate (restyled from
+    // the AB-1 SLA minimal unblock; disclosed in ab-1.md).
+    if !buf[body_at + body_len..body_at + body_len + body_pad]
         .iter()
-        .enumerate()
+        .all(|&b| b == 0)
     {
-        if b != 0 {
-            return Err(AoqError::ReservedNotZero);
-        }
+        return Err(AoqError::ReservedNotZero);
     }
     let eos_at = body_at + body_len + body_pad;
     let eos_cont = u32::from_le_bytes([
