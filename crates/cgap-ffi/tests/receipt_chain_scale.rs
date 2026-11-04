@@ -28,11 +28,20 @@
 //!    link still recomputes over real committed bytes.
 //! 3. Alloc tracking: linking `cgap-audit` installs `CountingAlloc` for
 //!    this test binary only (same pattern as tests/alloc_courts.rs).
+//! 4. PROFILE (ZP-17): pre-ZP-17 runs of this file were dev-profile; the
+//!    25.5202 µs/link ab-14 figure inherits that profile and is not a
+//!    release measurement. The ZP-17 re-measure (min-of-7, release)
+//!    supersedes it. Since the fence below, every test in this file
+//!    loud-SKIPs under a dev profile via `cgap_aoq::profile_guard::
+//!    assert_release()` — green-but-loud unmeasured, never a fake pass.
+//!    The two measurement tests additionally fence digest INPUTS and
+//!    OUTPUTS with `profile_guard::fence` (anti-DCE, AF-10 G1b).
 
 #![cfg(not(target_os = "none"))]
 
 use std::time::Instant;
 
+use cgap_aoq::profile_guard::{assert_release, fence};
 use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_blake3::hash;
 use cgap_ffi::receipt_chain::{ReceiptChainRefusal, RingReceiptChain, GENESIS};
@@ -162,8 +171,18 @@ fn ms(ns: u128) -> f64 {
 
 #[test]
 fn scale_append_verify_100k_census() {
+    if let Err(v) = assert_release() {
+        eprintln!("LOUD-SKIP receipt_chain_scale: non-release profile ({v})");
+        return;
+    }
     let license = root_license();
     let pool = block_pool();
+    // Anti-DCE: fence the digest INPUTS (pool block payloads + license
+    // bytes) so the link law cannot constant-fold over them.
+    for b in &pool {
+        fence(b.bytes());
+    }
+    fence(license.to_bytes());
     let mut best = None;
     let mut verify_runs: Vec<f64> = Vec::new();
     let mut span10_runs: Vec<f64> = Vec::new();
@@ -174,6 +193,11 @@ fn scale_append_verify_100k_census() {
         let t_verify = Instant::now();
         let verdict = chain.verify(&blocks, &license);
         let verify_ms = ms(t_verify.elapsed().as_nanos());
+        // Fence the OUTPUTS (chain + blocks + verdict) so verify work
+        // cannot be folded away.
+        fence(&chain);
+        fence(&blocks);
+        fence(&verdict);
         assert_eq!(verdict, Ok(()), "run {run}: full-chain verify must pass");
         assert_eq!(chain.len(), N_LINKS);
         // Genesis law intact at scale: link 0 anchors the all-zeros digest.
@@ -185,7 +209,9 @@ fn scale_append_verify_100k_census() {
         // against an independent best-case baseline, never an absolute ms
         // bound or a single-shot ratio).
         let t10 = Instant::now();
-        verify_span(&chain, &blocks, &license, 0, 10_000).expect("prefix span");
+        let span_verdict = verify_span(&chain, &blocks, &license, 0, 10_000);
+        fence(&span_verdict);
+        span_verdict.expect("prefix span");
         let span10_ms = ms(t10.elapsed().as_nanos());
         span10_runs.push(span10_ms);
         verify_runs.push(verify_ms);
@@ -232,10 +258,24 @@ fn scale_append_verify_100k_census() {
 
 #[test]
 fn verify_span_from_checkpoints_o_span_curve() {
+    if let Err(v) = assert_release() {
+        eprintln!("LOUD-SKIP receipt_chain_scale: non-release profile ({v})");
+        return;
+    }
     let license = root_license();
     let pool = block_pool();
+    // Anti-DCE: fence digest INPUTS.
+    for b in &pool {
+        fence(b.bytes());
+    }
+    fence(license.to_bytes());
     let (chain, blocks, _) = build_chain(N_LINKS, &pool, &license);
-    assert_eq!(chain.verify(&blocks, &license), Ok(()));
+    // Fence the built OUTPUTS before the clean-verify gate.
+    fence(&chain);
+    fence(&blocks);
+    let verdict = chain.verify(&blocks, &license);
+    fence(&verdict);
+    assert_eq!(verdict, Ok(()));
 
     let spans = [1_000usize, 10_000, 50_000];
     // 20 checkpoints for the small spans; the 50k span samples every 4th
@@ -265,7 +305,10 @@ fn verify_span_from_checkpoints_o_span_curve() {
         );
     }
     // O(span) law measured: 50k-span cost must dominate 1k-span cost on
-    // the same chain (>= 20x for a 50x span; loose floor).
+    // the same chain (>= 20x for a 50x span; loose floor). Fence the
+    // curve values BEFORE the O(span) assertions (anti-DCE).
+    fence(curve.get(&1_000).expect("1k curve cell"));
+    fence(curve.get(&50_000).expect("50k curve cell"));
     let t1k = curve[&1_000];
     let t50k = curve[&50_000];
     assert!(
@@ -281,7 +324,9 @@ fn verify_span_from_checkpoints_o_span_curve() {
     let cp = N_LINKS - 1_000;
     for _ in 0..3 {
         let t = Instant::now();
-        verify_span(&chain, &blocks, &license, cp, cp + 1_000).expect("tail span");
+        let v = verify_span(&chain, &blocks, &license, cp, cp + 1_000);
+        fence(&v);
+        v.expect("tail span");
         tail = tail.min(t.elapsed().as_nanos());
     }
     assert!(
@@ -293,6 +338,12 @@ fn verify_span_from_checkpoints_o_span_curve() {
 
 #[test]
 fn tamper_at_50k_prefix_integrity_at_scale() {
+    // Profile guard only — the tamper court asserts refusal RESULTS, not
+    // wall-clock, so no fence here.
+    if let Err(v) = assert_release() {
+        eprintln!("LOUD-SKIP receipt_chain_scale: non-release profile ({v})");
+        return;
+    }
     let license = root_license();
     let pool = block_pool();
     let (chain, blocks, _) = build_chain(N_LINKS, &pool, &license);

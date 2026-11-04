@@ -238,14 +238,48 @@ fn roundtrip(
 /// Open the NEXT sequential connection on the SAME sidecar process (the
 /// ZD-56 serve-loop surface; a one-connection sidecar refuses this).
 fn next_connection(car: &mut Sidecar) {
+    // minimal-unblock (2026-11-04 core LE lane, disclosed): the landed
+    // PL7 multiplex-refusal drain BUSY-closes any peer that queues while
+    // a serve round (or its post-close backlog drain) is live. Drop
+    // conn-N first, then bounded-probe until the sidecar is back in its
+    // blocking accept: a probe window (tag-gate refusal, never a session
+    // fault) that survives with a non-BUSY word proves the accept loop
+    // is serving again; BUSY or a broken probe is a queued-drain victim,
+    // so close and retry. Probe refusals return serve() to the accept
+    // loop, leaving no session state behind.
+    car.stream = None;
     let deadline = Instant::now() + Duration::from_secs(10);
     let stream = loop {
-        match UnixStream::connect(&car.sock_path) {
-            Ok(s) => break s,
+        let mut s = match UnixStream::connect(&car.sock_path) {
+            Ok(s) => s,
             Err(e) => {
                 if Instant::now() > deadline {
                     panic!("sequential connect failed: {e}");
                 }
+                continue;
+            }
+        };
+        let probe_window = [0u8; 8 + 120];
+        let ready = (|| -> Option<u32> {
+            s.write_all(&probe_window).ok()?;
+            let mut word_b = [0u8; 4];
+            s.read_exact(&mut word_b).ok()?;
+            Some(u32::from_le_bytes(word_b))
+        })()
+        .filter(|word| *word != cgap_ffi::aoq::status_maps::AOQ_STATUS_BUSY);
+        match ready {
+            // The probe's refusal ended its serve round; the sidecar is
+            // back in blocking accept. Drop the probe stream and connect
+            // fresh: the new connect is served immediately (never queued).
+            Some(_) => {
+                drop(s);
+                break UnixStream::connect(&car.sock_path).expect("post-probe connect");
+            }
+            None => {
+                if Instant::now() > deadline {
+                    panic!("sequential connect: sidecar never returned to accept");
+                }
+                drop(s);
             }
         }
     };
@@ -287,7 +321,7 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
     // Pre-seal payload: the bytes the caller wants carried end to end.
     let preseal = b"rung-8 e2e witness: cgap-side sealed feed payload \x00\x01\xff";
     let mut app_body = Vec::with_capacity(4 + preseal.len());
-    app_body.extend_from_slice(&7u32.to_be_bytes());
+    app_body.extend_from_slice(&7u32.to_le_bytes());
     app_body.extend_from_slice(preseal);
     let app = wire_frame(FrameKind::AppData, 2, 7, &app_body);
     let app_win = seal_window(&app, 2, 7);
@@ -304,7 +338,7 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
     // re-derives over the whole covered frame (the session's decrypt gate).
     let frame = sess::parse_frame(&body).expect("response frame parses");
     assert_eq!(frame.kind, FrameKind::AppData);
-    let rseq = u32::from_be_bytes([
+    let rseq = u32::from_le_bytes([
         frame.payload[0],
         frame.payload[1],
         frame.payload[2],
@@ -346,7 +380,6 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
 #[test]
 fn e2_flipped_byte_fires_tag_gate() {
     let mut car = spawn_sidecar("e2");
-    let kem = CourtKem;
 
     // Connection 2: lawful HandshakeEk window with ONE flipped tag byte.
     let d = shake32(&[b"w2c/mlkem/d"]);
@@ -396,7 +429,7 @@ fn e3_process_reuse_then_stdin_eof_stop() {
     // Established AppData hop on connection 3 (same-process reuse end to end).
     let preseal = b"conn-3 reuse payload";
     let mut app_body = Vec::with_capacity(4 + preseal.len());
-    app_body.extend_from_slice(&9u32.to_be_bytes());
+    app_body.extend_from_slice(&9u32.to_le_bytes());
     app_body.extend_from_slice(preseal);
     let app = wire_frame(FrameKind::AppData, 2, 9, &app_body);
     let app_win = seal_window(&app, 2, 9);

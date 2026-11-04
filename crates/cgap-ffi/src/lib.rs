@@ -364,6 +364,26 @@ pub mod aoq;
 #[cfg(not(target_os = "none"))]
 pub mod aoq_session;
 
+/// aoq_bridge (AB-5 / P2-Q1 resolution lane): the host crypto bridge —
+/// real ML-KEM-768 `KemSeam` (`BridgeKem`, OS entropy wired at this layer),
+/// the AEAD seam surface over `cgap_crypto::aead`, and the OS randomness
+/// seam (`OsEntropy`/`os_fill`, fail-closed /dev/urandom). Compiled out on
+/// `target_os = "none"` like `aoq_session`; the dep edges
+/// `cgap-ffi -> {cgap-aoq, cgap-crypto}` already exist in the manifest (no
+/// manifest edit). DISCLOSED: KDF is plain `keyed_digest` over a
+/// length-prefixed concat until CG8's `keyed_digest_parts` lands.
+#[cfg(not(target_os = "none"))]
+pub mod aoq_bridge;
+
+/// PL16 caller-side AoQ event tap (v26.11.3 IMPLEMENTATION lane): an
+/// append-only, overwrite-on-full 64-byte-row event ring over accepted
+/// `Session::step` transitions. CALLER-SIDE LAW: never wired inside
+/// `session.rs`/`step` — the machine stays pure (no mutation on refusal,
+/// refusals emit nothing; the caller taps only the `Ok(())` arm). Host-gated
+/// like `aoq_session` (depends on the host-gated `cgap-aoq` edge).
+#[cfg(not(target_os = "none"))]
+pub mod aoq_events;
+
 /// XIP glue (lane doc §5): a `target_os = "none"` staticlib needs a panic
 /// handler and no `std`. Host targets use std's handler — this item does not
 /// exist there, so host builds are untouched (the slot-surface cfg gates

@@ -22,6 +22,8 @@
 //! Gates this file answers: `cargo test -p cgap-ffi` (unregressed) with this
 //! file green. Receipt: docs/jira/v26.11.2/lanes/ab-15-ffi-stress.md.
 
+use cgap_aoq::profile_guard::assert_release;
+use cgap_aoq::profile_guard::fence;
 use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_blake3::hash as oabi_digest;
 use cgap_core::frame::{
@@ -102,6 +104,9 @@ fn fresh_view() -> CgapFrameView {
 // ---------------------------------------------------------------------------
 
 fn bench_round(frame: &[u8], view: &mut CgapFrameView) -> f64 {
+    // Anti-DCE (ZP-18): fence the digest/attestation INPUTS so the admit
+    // loop cannot constant-fold over them.
+    fence(frame.as_ptr() as usize);
     let n = 100_000usize;
     let f: CgapAdmitFrameFn = cgap_admit_frame;
     let ptr = frame.as_ptr();
@@ -120,6 +125,14 @@ fn bench_round(frame: &[u8], view: &mut CgapFrameView) -> f64 {
 /// the measured loop, not stripped).
 #[test]
 fn bench_admit_frame_call_overhead_100k_min_of_3() {
+    // Profile guard (ZP-18): loud-SKIP under a dev profile — green-but-loud
+    // unmeasured, never a fake pass.
+    if let Err(v) = assert_release() {
+        eprintln!(
+            "LOUD-SKIP bench_admit_frame_call_overhead_100k_min_of_3: non-release profile ({v})"
+        );
+        return;
+    }
     let payload: Vec<u8> = (0..64u16).map(|i| (i * 7) as u8).collect();
     let frame = wire_frame(&payload);
     // 64-byte-aligned staging (the A04 projection path).
@@ -135,6 +148,9 @@ fn bench_admit_frame_call_overhead_100k_min_of_3() {
         println!("round {round}: {:.1} ns/call over 100k admits", ns);
         min = min.min(ns);
     }
+    // Anti-DCE: fence the measured OUTPUT (min ns/call) so the loop cannot
+    // be folded away.
+    fence(min);
     println!("ADMIT-OVERHEAD: min-of-3 = {:.1} ns/call", min);
     assert!(min > 0.0, "bench must measure a positive duration");
     // View postcondition from the last call of the last round.

@@ -106,6 +106,9 @@ const fn status_of(err: &SessionError) -> u32 {
         SessionError::Wire(AoqError::BadMagic { .. })
         | SessionError::Wire(AoqError::UnsupportedVersion { .. })
         | SessionError::Wire(AoqError::DigestMismatch { .. })
+        // AoqError::AeadMismatch appended mid-wave by lane CG8 (0x00_0D):
+        // authenticity failure -> same frozen digest-mismatch status.
+        | SessionError::Wire(AoqError::AeadMismatch)
         | SessionError::Wire(AoqError::ReservedNotZero)
         | SessionError::UnknownFrameKind { .. }
         | SessionError::TranscriptMismatch => AOQ_STATUS_DIGEST_MISMATCH,
@@ -116,7 +119,9 @@ const fn status_of(err: &SessionError) -> u32 {
         // KEM / table identity law (also serves stale/unknown handles).
         SessionError::Wire(AoqError::KemKernelNotAdmitted { .. })
         | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
-        | SessionError::KemRefused { .. } => AOQ_STATUS_KEY_UNKNOWN,
+        | SessionError::KemRefused { .. }
+        // AEAD open refused: an authenticity failure (P2 M1 typed landing).
+        | SessionError::AeadMismatch => AOQ_STATUS_DIGEST_MISMATCH,
         // Counted budget exhausted; a rekey is required first.
         SessionError::RekeyRequired { .. } => AOQ_STATUS_BUSY,
         // Terminal session; nothing is lawful (retired = read-only).
@@ -124,6 +129,7 @@ const fn status_of(err: &SessionError) -> u32 {
         // Wire cursor law (truncated envelope, regressed ordinal/seq).
         SessionError::Wire(AoqError::HeaderTooShort { .. })
         | SessionError::Wire(AoqError::BufferTooShort { .. })
+        | SessionError::Wire(AoqError::SlabFull { .. })
         | SessionError::Wire(AoqError::FrameOrdinalRegression { .. })
         | SessionError::Wire(AoqError::SeqGap { .. })
         | SessionError::OrdinalMismatch { .. } => AOQ_STATUS_INCOMPLETE_FRAME,

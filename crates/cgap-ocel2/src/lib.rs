@@ -70,6 +70,7 @@ use cgap_ffi::receipt_chain::{ReceiptChainRefusal, RingReceiptChain};
 use cgap_p28::attestation::P28LicenseAttestation;
 use cgap_parquet::footer::SealedBlock;
 
+pub mod tap;
 pub mod view;
 
 /// The activity label for a verified chain-link append (the only

@@ -90,7 +90,7 @@ fn app_frame(ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
     let mut buf = vec![0u8; SIZE_BYTES + 1 + 4 + payload.len()];
     codec::encode(&header(ordinal, seq), &mut buf).expect("header encode");
     buf[SIZE_BYTES] = FrameKind::AppData.id();
-    buf[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&seq.to_be_bytes());
+    buf[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&seq.to_le_bytes());
     buf[SIZE_BYTES + 5..].copy_from_slice(payload);
     buf
 }
@@ -117,7 +117,7 @@ fn assert_in_band(w: u32) {
 /// Drive the session to Established with the REAL ML-KEM handshake.
 fn establish() -> u64 {
     let (ek, _dk) = peer_keypair();
-    let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
+    let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     assert_ne!(h, 0, "session_new returned 0");
     let ek_wire = ek_frame(0, &ek);
     let st =
@@ -145,7 +145,7 @@ fn fingerprint(h: u64) -> [u8; 32] {
 #[test]
 fn court1_happy_path_handshake_and_emit_round_trip() {
     let (ek, _dk) = peer_keypair();
-    let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
+    let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     assert_ne!(h, 0, "session_new returned 0");
 
     // HandshakeInit -> HandshakeWait on the peer ek frame.
@@ -189,7 +189,7 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
         "emit uses the current ordinal"
     );
     assert_eq!(frame.header.seq, seq);
-    assert_eq!(frame.payload[..4], seq.to_be_bytes(), "seq prefix");
+    assert_eq!(frame.payload[..4], seq.to_le_bytes(), "seq prefix");
     assert_eq!(
         &frame.payload[4..4 + payload.len()],
         &payload,
@@ -219,7 +219,7 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
 #[test]
 fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
     let (ek, _dk) = peer_keypair();
-    let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
+    let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     let ek_wire = ek_frame(0, &ek);
     let st =
         unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
@@ -250,7 +250,7 @@ fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
 #[test]
 fn court3_fingerprint_identity_after_every_refused_step() {
     let (ek, _dk) = peer_keypair();
-    let h = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
+    let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
 
     let mut refused: Vec<u32> = Vec::new();
     let fp0 = fingerprint(h);
@@ -366,7 +366,7 @@ fn court4_stale_handle_refused_everywhere() {
     assert_eq!(st_never, AOQ_STATUS_KEY_UNKNOWN);
 
     // Monotone handles: a fresh session never reuses the freed id.
-    let h2 = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0) };
+    let h2 = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     assert_ne!(h2, 0);
     assert_ne!(h2, h, "handle reuse after free");
     let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_free(h2) };

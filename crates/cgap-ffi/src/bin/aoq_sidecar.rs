@@ -28,6 +28,20 @@
 //!   `cgap_aoq_session_new(epoch, key_id, ordinal)` inputs become pinned
 //!   constants here; arcus W2-B/D will pass them on the wire in a later
 //!   lane).
+//!
+//! # Named exits (panic=abort rationale, workspace [profile.release])
+//!
+//! The sidecar has exactly three exits:
+//! 1. **abort** — a panic escapes the serve loop: `panic = "abort"` turns
+//!    it into SIGABRT; the arcus supervisor reaps the abnormal death and
+//!    respawns a fresh generation. This is the process-boundary twin of the
+//!    in-process `catch_unwind` -> BUSY surface in
+//!    `cgap-ffi/src/aoq_session.rs:202-401`; do not flip to unwind — an
+//!    unwind would make a poisoned serve loop keep serving.
+//! 2. **stdin EOF** — the lawful stop signal: the watcher thread observes
+//!    EOF, unlinks the socket, exits 0.
+//! 3. **poison** — an unrecoverable accept/bind fault: exit 2, fail-closed,
+//!    never a fallback.
 
 // XIP safety (coordinator call 2026-11-04): the riscv32imc XIP build
 // (`target_os = "none"`) compiles bin targets too; std/alloc are unresolved
@@ -61,7 +75,7 @@ mod imp {
     use cgap_crypto::fips202::Shake256;
     use cgap_ffi::aoq::status_maps::{
         AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
-        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_KEY_UNKNOWN,
+        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME,
         AOQ_STATUS_OK,
     };
 
@@ -118,6 +132,17 @@ mod imp {
     // ---------------------------------------------------------------------------
 
     /// The sidecar session's epoch (closed enum {0,1,2,65535}).
+    ///
+    /// LOAD-BEARING LAW: the epoch is PINNED, never derived from the
+    /// supervisor's generation counter. Each respawned sidecar generation
+    /// re-establishes the same epoch (1 = `AoqEpoch::ROTATED_1` in the
+    /// frozen enum `cgap_ffi::aoq::kind_enums::AoqEpoch` — frozen labeled
+    /// enums projected from `aoq:Epoch`; the supervisor's generation is a
+    /// process-lifecycle counter with NO wire meaning). Deriving the epoch
+    /// from the generation would make every respawn land on an epoch the
+    /// frozen enum refuses, so the sequential single-tenant serve loop plus
+    /// this pinned constant is the law the supervisor's derive-on-respawn
+    /// contract rests on.
     const EPOCH: u16 = 1;
     /// The sidecar session's key id.
     const KEY_ID: u64 = 0xA0_71;
@@ -240,6 +265,9 @@ mod imp {
             SessionError::Wire(AoqError::BadMagic { .. })
             | SessionError::Wire(AoqError::UnsupportedVersion { .. })
             | SessionError::Wire(AoqError::DigestMismatch { .. })
+            // AoqError::AeadMismatch appended mid-wave by lane CG8 (0x00_0D):
+            // authenticity failure -> same frozen digest-mismatch status.
+            | SessionError::Wire(AoqError::AeadMismatch)
             | SessionError::Wire(AoqError::ReservedNotZero)
             | SessionError::UnknownFrameKind { .. }
             | SessionError::TranscriptMismatch => AOQ_STATUS_DIGEST_MISMATCH,
@@ -248,11 +276,14 @@ mod imp {
             | SessionError::UnexpectedFrame { .. } => AOQ_STATUS_EPOCH_MISMATCH,
             SessionError::Wire(AoqError::KemKernelNotAdmitted { .. })
             | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
-            | SessionError::KemRefused { .. } => AOQ_STATUS_KEY_UNKNOWN,
+            | SessionError::KemRefused { .. }
+            // AEAD open refused: an authenticity failure (P2 M1 typed landing).
+            | SessionError::AeadMismatch => AOQ_STATUS_DIGEST_MISMATCH,
             SessionError::RekeyRequired { .. } => AOQ_STATUS_BUSY,
             SessionError::SessionClosed => AOQ_STATUS_EPOCH_RETIRED,
             SessionError::Wire(AoqError::HeaderTooShort { .. })
             | SessionError::Wire(AoqError::BufferTooShort { .. })
+            | SessionError::Wire(AoqError::SlabFull { .. })
             | SessionError::Wire(AoqError::FrameOrdinalRegression { .. })
             | SessionError::Wire(AoqError::SeqGap { .. })
             | SessionError::OrdinalMismatch { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
@@ -394,7 +425,7 @@ mod imp {
             // window: the session's own emit_verified echo (same seq, same
             // payload) scattered via StreamWriter over the pad-law sink.
             if frame.kind == sess::FrameKind::AppData {
-                let seq = u32::from_be_bytes([
+                let seq = u32::from_le_bytes([
                     frame.payload[0],
                     frame.payload[1],
                     frame.payload[2],
@@ -529,9 +560,49 @@ mod imp {
         });
         loop {
             match listener.accept() {
-                Ok((stream, _)) => serve(stream),
+                Ok((stream, _)) => {
+                    serve(stream);
+                    // MULTIPLEX-REFUSAL DRAIN (PL7): a connection that
+                    // queued in the backlog DURING the sequential serve is
+                    // refused, not silently queued for a next round — a
+                    // silently-queued peer would wait unbounded for a turn
+                    // the single-tenant loop never grants. Nonblocking
+                    // accept until the backlog drains (WouldBlock = empty);
+                    // every queued peer gets the frozen-band BUSY word
+                    // (0x4347A003) and a close. The listener returns to
+                    // blocking mode for the next serve round.
+                    if let Err(e) = listener.set_nonblocking(true) {
+                        eprintln!("listener nonblocking: {e}");
+                        exit(2);
+                    }
+                    loop {
+                        match listener.accept() {
+                            Ok((mut queued, _)) => {
+                                // The peer may have already closed (the
+                                // connect-then-instant-close churn class):
+                                // the BUSY write is best-effort, the close
+                                // (drop) is the law.
+                                let _ = send_status(&mut queued, AOQ_STATUS_BUSY);
+                            }
+                            // WouldBlock = backlog drained; re-block.
+                            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
+                            // A peer that aborted between connect and
+                            // accept is a per-connection fault, not poison:
+                            // skip it and keep draining.
+                            Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted => continue,
+                            Err(e) => {
+                                eprintln!("accept: {e}");
+                                exit(2);
+                            }
+                        }
+                    }
+                    if let Err(e) = listener.set_nonblocking(false) {
+                        eprintln!("listener re-blocking: {e}");
+                        exit(2);
+                    }
+                }
                 Err(e) => {
-                    eprintln!("accept: {e}");
+                    eprintln!("accept: {e}: poisoned listener");
                     exit(2);
                 }
             }

@@ -23,7 +23,7 @@
 // SOURCE-SCAN-EXEMPT: vec! : integration-court-only collaborator
 // SOURCE-SCAN-EXEMPT: Command: spawns the real sidecar binary under test
 
-use std::io::{IoSlice, Read, Write};
+use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -189,9 +189,6 @@ fn seal_window(frame: &[u8], ordinal: u32, now_seq: u32) -> Vec<u8> {
     w
 }
 
-fn pad64(n: usize) -> usize {
-    (n + 63) & !63
-}
 /// AOQ1 session-frame builder ([64B header][kind][payload], codec::encode).
 fn wire_frame(kind: FrameKind, ordinal: u32, seq: u32, body: &[u8]) -> Vec<u8> {
     let mut buf = vec![0u8; cgap_aoq::header::SIZE_BYTES + 1 + body.len()];
@@ -277,7 +274,9 @@ fn j1_sidecar_handshake_and_verified_appdata_roundtrip() {
     // HOP 3: AppData (ordinal 2, seq 7) -> OK + one verified response window.
     let payload = b"corridor payload w2c";
     let mut app_body = Vec::with_capacity(4 + payload.len());
-    app_body.extend_from_slice(&7u32.to_be_bytes());
+    // minimal-unblock (2026-11-04 core LE lane, disclosed): seq word is
+    // LE post-migration; builder was the last BE holdout (J1 was red).
+    app_body.extend_from_slice(&7u32.to_le_bytes());
     app_body.extend_from_slice(payload);
     let app = wire_frame(FrameKind::AppData, 2, 7, &app_body);
     let app_win = seal_window(&app, 2, 7);
@@ -295,7 +294,11 @@ fn j1_sidecar_handshake_and_verified_appdata_roundtrip() {
     // re-derives with the court's own seam over the shared secret.
     let frame = sess::parse_frame(&body).expect("response frame parses");
     assert_eq!(frame.kind, FrameKind::AppData);
-    let rseq = u32::from_be_bytes([
+    // minimal-unblock (2026-11-04 soak lane, disclosed): emit_verified
+    // writes the seq word LITTLE-endian (session.rs `seq.to_le_bytes()`,
+    // pinned lawful by arcus TestAoqDriftSeqEndianness; witnessed
+    // 117440512 = 0x07000000 = LE 7 read BE). Was from_be_bytes.
+    let rseq = u32::from_le_bytes([
         frame.payload[0],
         frame.payload[1],
         frame.payload[2],

@@ -7,7 +7,9 @@
 //! naming and NEVER substitutes it for time.
 
 /// The Events table DDL.
-pub const EVENTS_DDL: &str = "CREATE TABLE event_table (\n  event_id BIGINT NOT NULL, -- receipt-chain ordinal; NOT a wall clock\n  activity VARCHAR NOT NULL,\n  receipt_digest VARCHAR NOT NULL, -- hex BLAKE3 link hash\n  block_digest VARCHAR NOT NULL,\n  prev_hash VARCHAR NOT NULL\n);";
+pub const EVENTS_DDL: &str = "CREATE TABLE event_table (\n  event_id BIGINT NOT NULL, -- receipt-chain ordinal; NOT a wall clock\n  activity VARCHAR NOT NULL, -- closed value list: 'receipt.append' |
+                             --   'session.step' | 'session.refuse' |
+                             --   'boundary.poison' (tap::ACTIVITY_*)\n  receipt_digest VARCHAR NOT NULL, -- hex BLAKE3 link hash\n  block_digest VARCHAR NOT NULL,\n  prev_hash VARCHAR NOT NULL\n);";
 
 /// The Objects table DDL.
 pub const OBJECTS_DDL: &str = "CREATE TABLE object_table (\n  object_id VARCHAR NOT NULL, -- 'file:<dev>:<ino>' or 'block:<hex8>'\n  object_type VARCHAR NOT NULL,\n  dev BIGINT, -- NULL for block-derived objects\n  ino BIGINT, -- NULL for block-derived objects\n  lease_id BIGINT NOT NULL\n);";

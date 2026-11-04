@@ -20,3 +20,8 @@ cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 cgap-parquet = { path = "../cgap-parquet", version = "26.11.3", features = ["std"] }
 cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
+
+# Chicago court collaborator (tests only): the conformance court drives
+# the REAL 4x5 session machine to mint lawful tap rows.
+[dev-dependencies]
+cgap-aoq = { path = "../cgap-aoq", version = "26.11.3" }
