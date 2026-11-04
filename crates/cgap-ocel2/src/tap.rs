@@ -298,7 +298,7 @@ impl TapEvent {
     ///
     /// # Errors
     /// [`TapRefusal::ResealShape`] if the real writer refuses the slab.
-    pub fn seal_static(&self) -> Result<&'static SealedBlock<'static>, TapRefusal> {
+    fn seal_static(&self) -> Result<&'static SealedBlock<'static>, TapRefusal> {
         let values = row_values(self);
         let lanes = [&values[..]];
         let slab = SlabView { lanes: &lanes, rows: TAP_ROW_BYTES as u32, bits: 8 };

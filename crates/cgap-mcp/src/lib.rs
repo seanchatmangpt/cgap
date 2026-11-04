@@ -206,7 +206,7 @@ fn wire_error_data(e: &WireError) -> Json {
 }
 
 /// JSON-RPC error object builder.
-pub fn error_response(id: Json, code: f64, msg: &str, data: Option<Json>) -> Json {
+fn error_response(id: Json, code: f64, msg: &str, data: Option<Json>) -> Json {
     let mut err = vec![
         ("code", Json::Num(code)),
         ("message", Json::Str(msg.to_string())),

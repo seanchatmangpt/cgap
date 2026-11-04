@@ -2,7 +2,7 @@ defmodule CgapPagesTest do
   @moduledoc """
   Page-pipeline language-surface tests for the cgap-beam NIF surface.
 
-  Lane OPT20-L11 (version law 26.10.29). The page pipeline (write page ->
+  Lane OPT20-L11 (version law 26.11.3, bumped 2026-11-04 from 26.10.29). The page pipeline (write page ->
   RLE-encode -> decode -> read back) has NO servable NIF surface: the
   cgap-beam NIF (crates/cgap-beam/src/lib.rs) exposes only the integer
   batch surface (cgap_new/cgap_get/cgap_len/cgap_free/cgap_version and the
@@ -29,7 +29,7 @@ defmodule CgapPagesTest do
 
   use ExUnit.Case, async: true
 
-  @version "26.10.29"
+  @version "26.11.3"
 
   @banned_exports [:cgap_rle_decode_into, :cgap_write_page, :cgap_read_page]
 

@@ -123,7 +123,7 @@ defmodule CgapEx do
   repo's `target/debug` (`../target/debug` relative to the ex/ dir).
   """
 
-  @version "26.10.29"
+  @version "26.11.3"
 
   @doc "NIF module version (cgap-arrow VERSION; version law #{@version})."
   def version, do: nif(fn -> :cgap_beam.cgap_version() end)

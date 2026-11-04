@@ -4,7 +4,7 @@ defmodule CgapExTest do
   # cannot collide (ids are monotonic slot indexes, never assumed absolute).
   use ExUnit.Case, async: true
 
-  @version "26.10.29"
+  @version "26.11.3"
 
   test "version is the cgap-arrow version law" do
     ver = CgapEx.version()
