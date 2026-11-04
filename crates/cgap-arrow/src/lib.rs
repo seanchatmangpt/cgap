@@ -80,6 +80,11 @@ pub mod runend;
 pub mod silicon;
 #[cfg(not(target_os = "none"))]
 pub mod slice;
+// Hand-law producer for the DictionaryUInt32Utf8 import kind (AOQ frozen
+// status band); layout law lives in generated_arrow_primitives.rs, this is
+// the never-generated sibling (see module doc for the allow-with-reason).
+#[cfg(not(target_os = "none"))]
+pub mod status_dictionary;
 #[cfg(all(not(target_os = "none"), feature = "nested-types"))]
 pub mod timestamps;
 #[cfg(not(target_os = "none"))]

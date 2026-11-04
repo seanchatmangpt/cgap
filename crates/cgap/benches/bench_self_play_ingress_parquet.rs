@@ -212,6 +212,12 @@ fn bench_leg(frames: &[Vec<u8>], pre_leased: bool) -> (f64, u64) {
 }
 
 fn main() {
+    // ZP-18 timing fence: min-of-5 Instant throughput legs; under a dev
+    // profile this loud-SKIPs instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_self_play_ingress_parquet: {v}");
+        return;
+    }
     // Corpus: FRAMES admissible frames, splitmix64 lanes seeded from the
     // frozen corpus constant. Wire bytes/frame = 128 B header + 64 B payload.
     let lanes = lane_corpus();

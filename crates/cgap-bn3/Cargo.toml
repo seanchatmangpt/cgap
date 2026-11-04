@@ -22,6 +22,11 @@ keywords = ['datalog', 'unifier', 'sigil', 'no_std']
 [dependencies]
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 
+# ZP-18: timing fences for benches/tests (dev-only edge; the lib surface
+# stays zero-dep no_std).
+[dev-dependencies]
+cgap-aoq = { path = "../cgap-aoq" }
+
 [package.metadata.docs.rs]
 all-features = true
 rustc-args = ["--cfg", "docsrs"]

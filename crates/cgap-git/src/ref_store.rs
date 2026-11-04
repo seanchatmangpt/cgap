@@ -44,6 +44,9 @@
 //! narrower accumulator) - chains are width-local ordering witnesses,
 //! not cross-target invariants.
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): ref_store_court / ref_store_width_arms_court / ref_store_reentrancy_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 /// No hardware map exists in-tree binding this address; see module
 /// provenance note. Named only so the constant is citable and falsifiable.
 pub const SEAL_REGISTER_ADDR: u64 = 0x0001_FF80;

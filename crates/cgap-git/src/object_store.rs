@@ -16,6 +16,9 @@
 //! index rebuilt on insert), zero heap. Lookup is a real Eytzinger
 //! binary search over `eyt[1..=count]`.
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): object_store_court / e2e_wire_substrate_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 use core::cmp::Ordering;
 
 /// Fixed object capacity of [`ObjectStore`].

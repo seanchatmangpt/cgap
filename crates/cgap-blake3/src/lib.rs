@@ -972,6 +972,54 @@ pub fn hash_many_simd_x2(data: &[u8]) -> [u8; 32] {
     finalize_root(&mut stack, stack_len)
 }
 
+/// Hashes each payload INDEPENDENTLY (each payload is its own BLAKE3 stream,
+/// its own 32-byte digest) — the multi-input analogue of calling [`hash`]
+/// once per payload, swept 4 payloads at a time through the independent-batch
+/// leaf kernel [`multi_chunk::hash_blocks_4way_independent`] when every
+/// payload in the group is <= 1024 bytes.
+///
+/// PL15 law: distinct from [`hash_many_simd`] (which hashes ONE stream under
+/// one Merkle tree) — the names must never conflate.
+///
+/// Mixed-batch honesty: any payload > 1024 bytes routes per-payload through
+/// the existing single-hash law ([`hash`]); groups are only taken 4-at-a-time
+/// when all four members are kernel-eligible.
+///
+/// `out.len()` must equal `payloads.len()`. no_std-clean: writes into the
+/// caller's slice, zero allocation.
+pub fn hash_many_independent_into(payloads: &[&[u8]], out: &mut [[u8; 32]]) {
+    debug_assert_eq!(payloads.len(), out.len());
+    let mut i = 0;
+    while i < payloads.len() {
+        if i + 4 <= payloads.len()
+            && payloads[i..i + 4].iter().all(|p| p.len() <= 1024)
+        {
+            // minimal-unblock (2026-11-04 soak lane, disclosed): g held
+            // double-refs ([&&[u8];4]); hash_blocks_4way_independent takes
+            // &[&[u8]]. Owned-ref copy, same four payloads, no behavior change.
+            let g = [payloads[i], payloads[i + 1], payloads[i + 2], payloads[i + 3]];
+            let digests = multi_chunk::hash_blocks_4way_independent(&g);
+            out[i..i + 4].copy_from_slice(&digests);
+            i += 4;
+        } else {
+            out[i] = hash(payloads[i]);
+            i += 1;
+        }
+    }
+}
+
+/// Allocating form of [`hash_many_independent_into`] (std feature).
+#[cfg(feature = "std")]
+extern crate std;
+
+/// Allocating form of [`hash_many_independent_into`] (std feature).
+#[cfg(feature = "std")]
+pub fn hash_many_independent(payloads: &[&[u8]]) -> ::std::vec::Vec<[u8; 32]> {
+    let mut out = ::std::vec![[0u8; 32]; payloads.len()];
+    hash_many_independent_into(payloads, &mut out);
+    out
+}
+
 /// Identical per-chunk stack-merge logic as in [`hash`].
 #[inline(always)]
 fn merge_into_stack(

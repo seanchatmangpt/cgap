@@ -22,6 +22,9 @@
 //! so no slot is sacrificed). Zero heap: the buffer is an inline
 //! `[u8; CAP]`. `#![forbid(unsafe_code)]`.
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): ingress_ring_court / posh_wire_court / posh_alloc_sentry_court / posh_refusal_matrix_court / breach_regression_court / soc_full_chip_court / quota_alloc_purity_court / andon_liveness_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 #![forbid(unsafe_code)]
 
 use core::sync::atomic::{AtomicUsize, Ordering};

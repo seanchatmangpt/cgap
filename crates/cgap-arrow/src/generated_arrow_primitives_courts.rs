@@ -59,6 +59,10 @@ fn schema_with_format(f: *const c_char) -> ArrowSchema {
 /// 64-byte-aligned backing store (the Arrow buffer alignment law the
 /// import scaffold checks).
 #[repr(align(64))]
+// Field 0 is never read by value: it exists only to give the repr(align(64))
+// struct its 64-byte size and to back the two statics' address law (this
+// file's court fixtures consume the statics by pointer, never by value).
+#[allow(dead_code)]
 struct Align64([u64; 8]);
 
 /// Two real 64-byte-aligned static buffers. Statics: the alignment is
@@ -72,8 +76,8 @@ struct AlignedBuffers;
 impl AlignedBuffers {
     fn slots() -> [*const c_void; 2] {
         [
-            unsafe { &raw const BACKING_A }.cast::<u8>() as *const c_void,
-            unsafe { &raw const BACKING_B }.cast::<u8>() as *const c_void,
+            (&raw const BACKING_A).cast::<u8>() as *const c_void,
+            (&raw const BACKING_B).cast::<u8>() as *const c_void,
         ]
     }
 

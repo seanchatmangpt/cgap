@@ -50,6 +50,9 @@
 //! zero heap: insertion sort over the caller's slice plus fixed
 //! 80-byte stack scratch per comparison.
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): tree_synth_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 use core::fmt;
 
 /// Maximum entries a single synthesis pass accepts.

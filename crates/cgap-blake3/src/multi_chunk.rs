@@ -235,6 +235,266 @@ unsafe fn compress_chunks_4way_neon(data: &[u8], base_chunk_idx: u64) -> [[u32; 
     }
 }
 
+/// Hashes 4 INDEPENDENT payloads (each 0..=1024 bytes) as root chunks in
+/// parallel across NEON v128 lanes - one lane per payload, every lane at
+/// counter 0 with CHUNK_START|CHUNK_END|ROOT flags. Outputs are the 32-byte
+/// digests, byte-identical to [`crate::hash`] on each payload by
+/// construction (same compress math, lane-transposed; per-lane done-masking
+/// freezes a lane's CV after its final block so unequal payload lengths in
+/// one group hash correctly).
+///
+/// PL15 law: this is the INDEPENDENT-batch kernel (4 distinct payloads ->
+/// 4 distinct digests) - deliberately distinct from
+/// [`compress_chunks_4way`], which hashes 4 consecutive chunks of ONE
+/// stream under one Merkle tree.
+///
+/// Requires exactly 4 payloads (the 4-lane contract); each payload must be
+/// <= 1024 bytes (debug-asserted).
+pub fn hash_blocks_4way_independent(payloads: &[&[u8]]) -> [[u8; 32]; 4] {
+    debug_assert_eq!(payloads.len(), 4);
+    debug_assert!(payloads.iter().all(|p| p.len() <= 1024));
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        // SAFETY: aarch64 implies NEON; length contract debug-asserted above.
+        unsafe { hash_blocks_4way_independent_neon(payloads) }
+    }
+
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        let mut out = [[0u8; 32]; 4];
+        for l in 0..4 {
+            let words = crate::hash_chunk(payloads[l], 0, true);
+            for i in 0..8 {
+                out[l][i * 4..(i + 1) * 4].copy_from_slice(&words[i].to_le_bytes());
+            }
+        }
+        out
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+unsafe fn hash_blocks_4way_independent_neon(payloads: &[&[u8]]) -> [[u8; 32]; 4] {
+    use core::arch::aarch64::*;
+
+    #[inline(always)]
+    unsafe fn rot16(v: uint32x4_t) -> uint32x4_t {
+        unsafe { vreinterpretq_u32_u16(vrev32q_u16(vreinterpretq_u16_u32(v))) }
+    }
+    #[inline(always)]
+    unsafe fn rot12(v: uint32x4_t) -> uint32x4_t {
+        unsafe { vorrq_u32(vshrq_n_u32::<12>(v), vshlq_n_u32::<20>(v)) }
+    }
+    #[inline(always)]
+    unsafe fn rot8(v: uint32x4_t) -> uint32x4_t {
+        unsafe { vorrq_u32(vshrq_n_u32::<8>(v), vshlq_n_u32::<24>(v)) }
+    }
+    #[inline(always)]
+    unsafe fn rot7(v: uint32x4_t) -> uint32x4_t {
+        unsafe { vorrq_u32(vshrq_n_u32::<7>(v), vshlq_n_u32::<25>(v)) }
+    }
+    #[inline(always)]
+    unsafe fn g4(
+        s: &mut [uint32x4_t; 16],
+        a: usize,
+        b: usize,
+        c: usize,
+        d: usize,
+        x: uint32x4_t,
+        y: uint32x4_t,
+    ) {
+        unsafe {
+            s[a] = vaddq_u32(vaddq_u32(s[a], s[b]), x);
+            s[d] = rot16(veorq_u32(s[d], s[a]));
+            s[c] = vaddq_u32(s[c], s[d]);
+            s[b] = rot12(veorq_u32(s[b], s[c]));
+            s[a] = vaddq_u32(vaddq_u32(s[a], s[b]), y);
+            s[d] = rot8(veorq_u32(s[d], s[a]));
+            s[c] = vaddq_u32(s[c], s[d]);
+            s[b] = rot7(veorq_u32(s[b], s[c]));
+        }
+    }
+    #[inline(always)]
+    unsafe fn round4(s: &mut [uint32x4_t; 16], m: &[uint32x4_t; 16]) {
+        unsafe {
+            g4(s, 0, 4, 8, 12, m[0], m[1]);
+            g4(s, 1, 5, 9, 13, m[2], m[3]);
+            g4(s, 2, 6, 10, 14, m[4], m[5]);
+            g4(s, 3, 7, 11, 15, m[6], m[7]);
+            g4(s, 0, 5, 10, 15, m[8], m[9]);
+            g4(s, 1, 6, 11, 12, m[10], m[11]);
+            g4(s, 2, 7, 8, 13, m[12], m[13]);
+            g4(s, 3, 4, 9, 14, m[14], m[15]);
+        }
+    }
+    // Wave-7 lane 1 (CTQ-06): register-resident permutation. The previous
+    // loop over MSG_PERMUTATION forced a runtime-indexed memory round-trip of
+    // all 16 message vectors every round; these literal-index copies let LLVM
+    // SROA the whole message array into the NEON register file (zero
+    // instructions for the permute itself).
+    #[inline(always)]
+    unsafe fn permute4(m: &mut [uint32x4_t; 16]) {
+        let p = *m;
+        m[0] = p[2];
+        m[1] = p[6];
+        m[2] = p[3];
+        m[3] = p[10];
+        m[4] = p[7];
+        m[5] = p[0];
+        m[6] = p[4];
+        m[7] = p[13];
+        m[8] = p[1];
+        m[9] = p[11];
+        m[10] = p[12];
+        m[11] = p[5];
+        m[12] = p[9];
+        m[13] = p[14];
+        m[14] = p[15];
+        m[15] = p[8];
+    }
+
+
+
+    unsafe {
+        let mut nb = [0usize; 4];
+        let mut max_nb = 1usize;
+        for l in 0..4 {
+            let len = payloads[l].len();
+            nb[l] = if len == 0 { 1 } else { len.div_ceil(64) };
+            if nb[l] > max_nb {
+                max_nb = nb[l];
+            }
+        }
+
+        // Chained CV held COLUMN-major across lanes: cv_cols[i] =
+        // {cv0[i], cv1[i], cv2[i], cv3[i]}, starting as IV per lane.
+        let mut cv_cols: [uint32x4_t; 8] = {
+            let mut c = [vdupq_n_u32(0); 8];
+            let mut i = 0;
+            while i < 8 {
+                c[i] = vdupq_n_u32(crate::IV[i]);
+                i += 1;
+            }
+            c
+        };
+        let mut out_words = [[0u32; 8]; 4];
+        // Bit-per-lane finished mask: a finished lane's CV is frozen and its
+        // words are excluded from all later blocks.
+        let mut done = vdupq_n_u32(0);
+
+        for b in 0..max_nb {
+
+            // Message schedule: lane-transposed, zero-padded past each
+            // lane's block end (partial final block and finished lanes read 0).
+            let mut m = [vdupq_n_u32(0); 16];
+            for k in 0..4 {
+                let mut bufs = [[0u8; 16]; 4];
+                for l in 0..4 {
+                    let o = b * 64 + k * 16;
+                    let end = (o + 16).min(payloads[l].len());
+                    if o < end {
+                        bufs[l][..end - o].copy_from_slice(&payloads[l][o..end]);
+                    }
+                }
+
+                let r0: uint32x4_t = vreinterpretq_u32_u8(vld1q_u8(bufs[0].as_ptr()));
+                let r1: uint32x4_t = vreinterpretq_u32_u8(vld1q_u8(bufs[1].as_ptr()));
+                let r2: uint32x4_t = vreinterpretq_u32_u8(vld1q_u8(bufs[2].as_ptr()));
+                let r3: uint32x4_t = vreinterpretq_u32_u8(vld1q_u8(bufs[3].as_ptr()));
+                let t01 = vtrnq_u32(r0, r1);
+                let t23 = vtrnq_u32(r2, r3);
+                m[k * 4] = vcombine_u32(vget_low_u32(t01.0), vget_low_u32(t23.0));
+                m[k * 4 + 1] = vcombine_u32(vget_low_u32(t01.1), vget_low_u32(t23.1));
+                m[k * 4 + 2] = vcombine_u32(vget_high_u32(t01.0), vget_high_u32(t23.0));
+                m[k * 4 + 3] = vcombine_u32(vget_high_u32(t01.1), vget_high_u32(t23.1));
+            }
+
+            // Per-lane block_len and flags; finished lanes read 0 (masked out).
+            let mut bl = [0u32; 4];
+            let mut fl = [0u32; 4];
+            let mut end_arr = [0u32; 4];
+            for l in 0..4 {
+                if b < nb[l] {
+                    bl[l] = (payloads[l].len() - b * 64).min(64) as u32;
+                    fl[l] = if b == 0 { crate::CHUNK_START } else { 0 }
+                        | if b + 1 == nb[l] {
+                            crate::CHUNK_END | crate::ROOT
+                        } else {
+                            0
+                        };
+                }
+                if b + 1 == nb[l] {
+                    end_arr[l] = u32::MAX;
+                }
+            }
+            let end_mask = vld1q_u32(end_arr.as_ptr());
+            let new_done = vorrq_u32(done, end_mask);
+
+            let mut s = [
+                cv_cols[0],
+                cv_cols[1],
+                cv_cols[2],
+                cv_cols[3],
+                cv_cols[4],
+                cv_cols[5],
+                cv_cols[6],
+                cv_cols[7],
+                vdupq_n_u32(crate::IV[0]),
+                vdupq_n_u32(crate::IV[1]),
+                vdupq_n_u32(crate::IV[2]),
+                vdupq_n_u32(crate::IV[3]),
+                vdupq_n_u32(0), // counter lo: 0 for every lane
+                vdupq_n_u32(0), // counter hi: 0 for every lane
+                vld1q_u32(bl.as_ptr()),
+                vld1q_u32(fl.as_ptr()),
+            ];
+
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+            permute4(&mut m);
+            round4(&mut s, &m);
+
+            // Finalize per column i: xor = s[i] ^ s[i+8]. Finished lanes keep
+            // their frozen CV; digest words are captured only on a lane's
+            // final block (digest = words 0..8 of the root output, i.e. the
+            // pre-cv-xor s[i]^s[i+8] terms).
+            let any_end = end_arr != [0u32; 4];
+            let mut xor_buf = [0u32; 4];
+            for i in 0..8 {
+                let xor = veorq_u32(s[i], s[i + 8]);
+                cv_cols[i] = vbslq_u32(new_done, cv_cols[i], xor);
+                if any_end {
+                    vst1q_u32(xor_buf.as_mut_ptr(), xor);
+                    for l in 0..4 {
+                        if end_arr[l] != 0 {
+                            out_words[l][i] = xor_buf[l];
+                        }
+                    }
+                }
+            }
+            done = new_done;
+        }
+
+        let mut out = [[0u8; 32]; 4];
+        for l in 0..4 {
+            for i in 0..8 {
+                out[l][i * 4..(i + 1) * 4].copy_from_slice(&out_words[l][i].to_le_bytes());
+            }
+        }
+        out
+    }
+}
+
 /// Interleaved 8-chunk variant (wave-5 lane 2, order (b)): two independent
 /// 4-way groups with their NEON round chains overlapped for ILP. The true
 /// 8-v128-lane form is register-infeasible; this form runs two 16-vector

@@ -32,6 +32,9 @@ cgap-core = { path = "../cgap-core", version = "26.11.3", default-features = fal
 cgap-storage = { path = "../cgap-storage", version = "26.11.3", default-features = false, optional = true }
 
 [dev-dependencies]
+# ZP-18 GAP-CLOSE lane: profile_guard fence collaborator for the two SP11
+# self_play benches (harness=false Instant timing legs). Test/bench-only.
+cgap-aoq = { path = "../cgap-aoq" }
 # SP8 lane (DISCLOSED MINIMAL UNBLOCK, lane lease was tests/self_play_
 # concurrency_spill.rs): the spill-gate race court drives cgap_ffi's
 # sovereign surface; cgap-ffi is rlib+cdylib so a path dev-dep is the only

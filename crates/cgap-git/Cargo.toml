@@ -39,6 +39,12 @@ cgap-parquet = { path = "../cgap-parquet" }
 
 cgap-bn3 = { path = "../cgap-bn3" }
 
+# ZP-18 timing fence: tests/ingress_ring_court.rs, tests/ladder_timing_stress.rs,
+# tests/perf_baseline.rs and tests/retract_court.rs compose
+# cgap_aoq::profile_guard (assert_release loud-skip + black_box fence).
+# Dev-dep only: the published kernel [dependencies] stays empty/no_std.
+cgap-aoq = { path = "../cgap-aoq" }
+
 [package.metadata.docs.rs]
 all-features = true
 rustc-args = ["--cfg", "docsrs"]

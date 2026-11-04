@@ -29,6 +29,9 @@ cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 decaps-only = []
 
 [dev-dependencies]
+# ZP-18: timing fences for benches/tests (dev-only edge; the lib surface
+# stays zero-dep no_std).
+cgap-aoq = { path = "../cgap-aoq" }
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }

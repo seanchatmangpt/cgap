@@ -212,6 +212,13 @@ fn run_batch(statements: usize, iters: usize) -> Oid {
 }
 
 fn main() {
+    // ZP-18 timing fence: the bench measures deriv/commit latency with two
+    // Instant timers per iteration; under a dev profile it loud-SKIPs
+    // instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_self_play_datalog_git: {v}");
+        return;
+    }
     let sizes: [(usize, usize); 3] = [(1_000, 30), (10_000, 10), (64_000, 3)];
     let mut first_oid: Option<Oid> = None;
     for (statements, iters) in sizes {

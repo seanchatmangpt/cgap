@@ -34,6 +34,9 @@
 //! documented at pack.rs:11-16). Promotion is a one-line coordinator
 //! `pub mod pack_demux;`.
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): pack_demux_court / pack_demux_poison_court / posh_wire_court / posh_alloc_sentry_court / posh_refusal_matrix_court / breach_regression_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 use core::fmt;
 
 /// Ring-window size the caller feeds per `feed` call.

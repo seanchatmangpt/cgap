@@ -35,6 +35,9 @@
 //! byte-unchanged after the refused update (real state assert, not a
 //! call-count).
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): admission_gate_court / e2e_wire_substrate_court / posh_refusal_matrix_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 #![deny(unsafe_code)]
 
 // std test builds resolve alloc explicitly; no_std host builds get it via

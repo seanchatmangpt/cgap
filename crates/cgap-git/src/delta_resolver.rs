@@ -19,6 +19,9 @@
 //! call-stack invariant. Zero heap: the module never references `alloc`
 //! or `std` (court-enforced below).
 
+// court-consumed surface (CEN2 ALLOW-WITH-REASON): delta_resolver_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
+#![allow(dead_code)]
+
 /// Scratch capacity: 11.6 KiB (11.6 * 1024 = 11_878.4, floored).
 pub const SCRATCH_LEN: usize = 11_878;
 /// Maximum delta chain depth; deeper chains are refused, never descended into.
