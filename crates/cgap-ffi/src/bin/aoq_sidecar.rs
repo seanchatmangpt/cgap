@@ -55,8 +55,7 @@ mod imp {
         self as sess, KemSeam, Session, SessionError, CT_BYTES, EK_BYTES, SS_BYTES,
     };
     use cgap_arrow::ipc::{
-        self, window_len, MetaHeader, AOQ1_MAGIC, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE,
-        PREFIX_SIZE,
+        self, window_len, MetaHeader, AOQ1_MAGIC, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE,
     };
     use cgap_arrow::stream_writer::{StreamError, StreamWriter, VectoredSink};
     use cgap_crypto::fips202::Shake256;
@@ -129,11 +128,6 @@ mod imp {
     const MAX_BODY: usize = 1 << 20;
     /// Metadata span for alignment-64 AOQ1 windows (`meta_span_for(64)`).
     const META_SPAN: usize = 120;
-    /// Window pad law region: body_len u32 LE at `AOQ1_TAG_AT - 4`, the tag
-    /// at `AOQ1_TAG_AT..+AOQ1_TAG_BYTES` (window-absolute offsets 72..92 for
-    /// align-64 AOQ1 windows).
-    const PAD_LO: usize = AOQ1_TAG_AT - 4;
-    const PAD_HI: usize = AOQ1_TAG_AT + AOQ1_TAG_BYTES;
 
     // ---------------------------------------------------------------------------
     // Request leg: read one AOQ1 window (typed read faults)
@@ -314,7 +308,7 @@ mod imp {
                 // cgap-aoq codec AoqHeader (FNV-1a32 at 60) plus the
                 // body_len/tag pad. Everything outside [8,128) is verbatim.
                 let (plo, phi) = (PREFIX_SIZE, PREFIX_SIZE + 120usize);
-                let mut pieces = if abs_hi <= plo || abs_lo >= phi {
+                let pieces = if abs_hi <= plo || abs_lo >= phi {
                     vec![IoSlice::new(seg)]
                 } else {
                     let lo = plo.max(abs_lo);
@@ -329,7 +323,7 @@ mod imp {
                     }
                     v
                 };
-                let n = self.stream.write_vectored(&mut pieces)?;
+                let n = self.stream.write_vectored(&pieces)?;
                 self.sent += n;
                 written += n;
                 if n < seg.len() {
@@ -473,7 +467,7 @@ mod imp {
         let ipc_meta = MetaHeader {
             magic: AOQ1_MAGIC,
             version: 2,
-            flags: u16::from(EPOCH),
+            flags: EPOCH,
             schema_digest: [0; 32],
             body_len: blen,
             alignment: 64,
