@@ -85,3 +85,54 @@ after this seal lands its two files.
   freestanding C header compile PASS).
 - `git rev-parse HEAD origin/main` → equal (`b6d68517…`), after
   `git fetch`.
+
+## Addendum: post-seal landings (2026-11-04, authored at c9430086)
+
+The seal above recorded `git rev-parse HEAD origin/main` equal at seal
+time (subject SHA **cfdd58ab**). Four commits landed after the seal was
+written; none re-grade the seal's claims.
+
+### Post-seal landing list
+
+- `7459848b` — zd-103: fix-forward cgap-ffi aoq_sidecar warnings
+  (zd-102 follow-up).
+- `c7bfdde4` — land zd-8 receipt (dod-006 quiet-machine close, 3x GREEN
+  261 MB/s).
+- `4bd598d8` — zd-113: ladder plan refresh — Stage-1 license blocker
+  FALSIFIED (never fired 20/20), census pinned 21, Stage 2
+  COMPLETE-VERIFIED, Stage 3 admission gate restated.
+- `c9430086` — zd-119: registry preflight (token present, zero 26.11.3
+  collisions, cgap-aoq first-publish; census 20 publish=true manifests).
+
+### Manifest-class verification
+
+`git diff --stat cfdd58ab..HEAD` (run at c9430086):
+
+```
+ crates/cgap-ffi/src/bin/aoq_sidecar.rs             | 14 +---
+ docs/jira/v26.11.3/plans/crates-io-ladder-plan.md  | 94 +++++++++++++++-------
+ docs/jira/v26.11.3/receipts/zd-103-ffi-warnings.md | 41 ++++++++++
+ .../v26.11.3/receipts/zd-119-cgap-preflight.md     | 80 ++++++++++++++++++
+ docs/jira/v26.11.3/receipts/zd-8-dod006-quiet.md   | 81 +++++++++++++++++++
+ 5 files changed, 270 insertions(+), 40 deletions(-)
+```
+
+Four of five changed paths are docs/plans/receipts. One path is source
+(`crates/cgap-ffi/src/bin/aoq_sidecar.rs`, commit 7459848b): disclosed
+as warning-fix only — dead `PAD_LO`/`PAD_HI` consts + orphaned
+`AOQ1_TAG_AT` import removed, `&mut pieces` → `&pieces`,
+`u16::from(EPOCH)` → `EPOCH`. No behavior change (receipt zd-103:
+cargo check 0 warnings in the file, clippy clean). Classified
+manifest-class with that disclosure; not a pure docs-only window.
+
+### Receipt count (re-read at addendum time)
+
+`ls docs/jira/v26.11.3/receipts | wc -l` → **83** at c9430086 working
+tree (includes zd-113/zd-116 receipt files present but uncommitted at
+authoring time; seal-time count was 80).
+
+### Falsifier note
+
+Seal claims remain anchored at **cfdd58ab**. This addendum extends the
+closure record; it does not re-grade any seal claim. The "origin/main =
+HEAD" seal verification is as-of-cfdd58ab only.
