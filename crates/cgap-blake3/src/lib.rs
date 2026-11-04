@@ -215,6 +215,16 @@ pub fn hash(data: &[u8]) -> [u8; 32] {
         return hash_many_simd(data);
     }
 
+    // BR-3 throughput-cliff fix (v26.11.4): above the small-batch window the
+    // sequential scalar loop ran at ~0.4 GB/s while the NEON kernels sat at
+    // ~0.9-2 GB/s — a 4.4x cliff at the 256 KiB bench point. Route everything
+    // larger through [`hash_many_simd`] (the dual-group x2 NEON leaf kernel
+    // with the identical zero-alloc stack Merkle merge — byte-identical, parity
+    // asserted by the vector courts and the intra-crate tests below).
+    if len > 64 * 1024 {
+        return hash_many_simd(data);
+    }
+
     // Zero-heap stack for parent Merkle reduction: max depth 54 covers 2^64 bytes.
     let mut stack = [[0u32; 8]; 54];
     let mut stack_len = 0usize;
