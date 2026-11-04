@@ -38,17 +38,28 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   concurrent with lever lanes (`docs/jira/v26.11.2/OVERNIGHT-LOOP.md:146-149`).
 - Registry slide (index reject or timeout): back off 1 hour. No retry
   storms.
-- `publish = false` (explicit, on disk, re-derived 2026-11-02): bench
+- Registry census (zd-119 live census, 2026-11-04, 23 crates probed):
+  cgap-aoq is NAME-FREE (first-publish candidate); wasm-footprint's
+  registry max is 26.11.1 (it skipped 26.11.2); every other censused
+  publish=true crate sits at 26.11.2; 26.11.3 is free everywhere —
+  zero registry collisions (receipt:
+  `docs/jira/v26.11.3/receipts/zd-119-cgap-preflight.md`). Historical
+  2026-11-02 re-derivation table: `docs/jira/v26.11.2/
+  01-release-gates.md:325ff` (prior "19/22 published" was UNVERIFIED
+  registry state).
+- `publish = false` (explicit, on disk, re-derived 2026-11-04): bench
   (registry name collision), beam, court (structural
-  [[test]]-only); `cgap-verification`/`csct`/`cli` are on disk but NOT
-  root members. gate/p28/crypto/branchless carry `publish = true`
-  explicitly (branchless flipped to true by lane DOD-02, 2026-11-02:
-  first-publish candidate, `lanes/lane-dod-02-branchless-pub.md`).
-  23/23 members declare an explicit flag (20 true, 3 false) as of
-  2026-11-02 (01-release-gates.md refreshed table; audit/
-  pub-02-flag-table-rederivation.md). Prior "19/22 published" was
-  UNVERIFIED registry state — guarded table at
-  `docs/jira/v26.11.2/01-release-gates.md:325ff`.
+  [[test]]-only), wire-shm (YD-3, 2026-11-04). gate/p28/crypto/
+  branchless carry `publish = true` explicitly (branchless flipped to
+  true by lane DOD-02, 2026-11-02: first-publish candidate,
+  `lanes/lane-dod-02-branchless-pub.md`).
+  25/25 members declare an explicit flag (21 true, 4 false) as of
+  2026-11-04 (`cargo metadata --no-deps` + per-manifest grep; prior
+  23/23 = 20 true / 3 false as of 2026-11-02, superseded by cgap-aoq
+  and the two ontology packs joining the true set and wire-shm joining
+  the false set). `cgap-mcp` (YD-3)/
+  `cgap-ocel2`/`cgap-fleet-ops`/`cgap-verification`/`csct`/`cli`
+  are on disk but NOT root members.
 
 ## CLI (ggen six-pack generated)
 
