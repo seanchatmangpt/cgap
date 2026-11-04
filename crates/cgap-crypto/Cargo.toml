@@ -23,6 +23,11 @@ license-file = "../../LICENSE.md"
 # external-vector test says so loudly); the keyed mode lives here.
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 
+[features]
+# decaps-only: soft gate (keygen/encaps dead_code-allowed) for the
+# rekey-verifier compile surface.
+decaps-only = []
+
 [dev-dependencies]
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).

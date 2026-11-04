@@ -6,11 +6,15 @@ content_hash = "blake3:99adbf4c8aedb2cd360f494f61a2e718f02255e086078b4abbb5ee044
 
 [packs.cgap-pack]
 source = "path:../ggen-marketplace/packs/cgap-pack"
-content_hash = "blake3:3a0c2e2dad360093b8c27a95d8c13d87b97f1c2aa88e3c3e89a43c0864973b72"
+content_hash = "blake3:99e05b757dde8f9532146ed10ee249b8d18782062d350124b39dcf97fce40f0d"
 
 [packs.cscb-pack]
 source = "path:../ggen-marketplace/packs/cscb-pack"
 content_hash = "blake3:cebe0a0a8609e55845d3873bf1131cdd1ff334056325c762568d4a278d2319cd"
+
+[packs.dod-pack]
+source = "path:packs/dod-pack"
+content_hash = "blake3:baa6ebd6300aacb79106b84ef6408d9df3ed16d5ab85f8be6110b6b50756624e"
 
 [packs.tort-pack]
 source = "path:../ggen-marketplace/packs/tort-pack"

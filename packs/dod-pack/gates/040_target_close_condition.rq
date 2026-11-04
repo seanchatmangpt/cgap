@@ -1,0 +1,11 @@
+# MESSAGE: every DoDTarget must carry a named close condition and a standing.
+PREFIX dod: <urn:cgap:dod:>
+SELECT ?target WHERE {
+  ?target a dod:DoDTarget .
+  FILTER (
+    NOT EXISTS { ?target dod:targetId ?tid } ||
+    NOT EXISTS { ?target dod:description ?d } ||
+    NOT EXISTS { ?target dod:closeCondition ?cc } ||
+    NOT EXISTS { ?target dod:standing ?s }
+  )
+} ORDER BY ?target

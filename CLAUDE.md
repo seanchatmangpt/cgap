@@ -1,7 +1,7 @@
 # cgap
 
-Sovereign `#![no_std]` columnar/deductive substrate; 23-crate root
-workspace at 26.11.1, 19 of 20 publish-intended member crates exist on
+Sovereign `#![no_std]` columnar/deductive substrate; 22-crate root
+workspace at 26.11.3, 19 of 20 publish-intended member crates exist on
 crates.io (`bench` there is a name
 collision, not ours; `cgap-beam`/`cgap-integration`/`cgap-court`/
 `cgap-branchless`/`cgap-verification` are registry-absent or

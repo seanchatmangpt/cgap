@@ -1,0 +1,7 @@
+# MESSAGE: gateId values are unique across all DoDGate individuals.
+PREFIX dod: <urn:cgap:dod:>
+SELECT ?gid WHERE {
+  ?g1 a dod:DoDGate ; dod:gateId ?gid .
+  ?g2 a dod:DoDGate ; dod:gateId ?gid .
+  FILTER (?g1 != ?g2)
+} ORDER BY ?gid

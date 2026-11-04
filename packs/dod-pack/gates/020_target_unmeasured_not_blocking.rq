@@ -1,0 +1,7 @@
+# MESSAGE: no DoDGate with standing TARGET-UNMEASURED may be publish-blocking.
+PREFIX dod: <urn:cgap:dod:>
+SELECT ?gate WHERE {
+  ?gate a dod:DoDGate ;
+        dod:standing "TARGET-UNMEASURED" ;
+        dod:publishBlocking true .
+} ORDER BY ?gate

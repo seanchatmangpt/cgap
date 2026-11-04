@@ -1,0 +1,23 @@
+[pack]
+name = "dod-pack"
+version = "0.1.0"
+description = """cgap definition-of-done pack: one canonical RDF graph of the
+v26.11.3 DoD surface (one DoDGate individual per gate: checkCommand,
+evidenceReceipt, standing MEASURED/TARGET-UNMEASURED/UNSUPPORTED — never
+rounded up; DoDTarget individuals for aspirational rows with named close
+conditions), projected into the rendered DoD checklist and open-targets list
+by ggen sync, and closure gates at sync time: required-fields closure (every
+DoDGate carries gateId/description/checkCommand/evidenceReceipt/standing),
+TARGET-UNMEASURED non-blocking closure (no TARGET-UNMEASURED gate is
+publish-blocking), gate-id uniqueness, and target close-condition closure."""
+
+[capabilities]
+provides = ["urn:ggen:pack:dod-pack"]
+
+[validation]
+gates = [
+  "gates/010_required_fields.rq",
+  "gates/020_target_unmeasured_not_blocking.rq",
+  "gates/030_gate_id_uniqueness.rq",
+  "gates/040_target_close_condition.rq",
+]

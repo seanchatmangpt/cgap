@@ -1,0 +1,12 @@
+# MESSAGE: every DoDGate must carry gateId, description, checkCommand, evidenceReceipt, standing.
+PREFIX dod: <urn:cgap:dod:>
+SELECT ?gate WHERE {
+  ?gate a dod:DoDGate .
+  FILTER (
+    NOT EXISTS { ?gate dod:gateId ?gid } ||
+    NOT EXISTS { ?gate dod:description ?d } ||
+    NOT EXISTS { ?gate dod:checkCommand ?c } ||
+    NOT EXISTS { ?gate dod:evidenceReceipt ?r } ||
+    NOT EXISTS { ?gate dod:standing ?s }
+  )
+} ORDER BY ?gate

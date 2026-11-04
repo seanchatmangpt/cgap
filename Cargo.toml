@@ -35,10 +35,6 @@ members = [
     "crates/cgap-branchless",
     # v26.11.3 AoQ Wave-1 lane AB-1: AOQ1 wire-law header kernel.
     "crates/cgap-aoq",
-    # v26.11.3 AoQ Wave-1 W1-5a (lane AB-6): AOQ1 wire-law header kernel.
-    # Minimal unblock: AB-1 (crate skeleton owner) was absent; AB-6 added
-    # the member line per fanout SLA-disclosure law.
-    "crates/cgap-aoq",
     "ontology-packs/fibo",
     "ontology-packs/cloud",
 ]

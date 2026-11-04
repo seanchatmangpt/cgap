@@ -10,6 +10,10 @@ source = "ontology/cgap.ttl"
 
 [packs]
 cgap-pack = { path = "../ggen-marketplace/packs/cgap-pack" }
+# GD-1 DoD pack: v26.11.3 definition-of-done graph (gates + targets), rendered
+# checklist dod-checklist.md / dod-targets-open.md, 4 sync-time closure gates.
+# Gate files under packs/dod-pack/gates/ are the runner truth (ar-1 protocol).
+dod-pack = { path = "packs/dod-pack" }
 aoq-pack = { path = "../ggen-marketplace/packs/aoq-pack" }
 cscb-pack = { path = "../ggen-marketplace/packs/cscb-pack" }
 tort-pack = { path = "../ggen-marketplace/packs/tort-pack" }

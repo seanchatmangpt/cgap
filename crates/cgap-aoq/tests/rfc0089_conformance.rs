@@ -120,7 +120,6 @@ const I5_KILLS: usize = 200;
 /// Shared lane law.
 const EPOCH: u16 = 1;
 const KEY_ID: u64 = 0x005E_C1D;
-const INSTRUMENTS: usize = 10_000;
 /// Largest body the suite builds (I1 ragged cap).
 const BODY_CAP: usize = 4_096;
 /// Window prefix + metadata span (body starts at 128; EOS after pad).
@@ -210,6 +209,7 @@ impl Xorshift {
         x ^= x >> 12;
         x ^= x << 25;
         x ^= x >> 27;
+        self.0 = x; // advance state (output is the splitmix finalizer)
         x.wrapping_mul(0x2545_F491_4F6C_DD1D)
     }
 }
@@ -276,35 +276,6 @@ fn expected_tag(win: &[u8], bl: usize, scratch: &mut [u8; 60 + BODY_CAP]) -> [u8
     scratch[..60].copy_from_slice(&win[8..68]);
     scratch[60..60 + bl].copy_from_slice(&win[BODY_AT..BODY_AT + bl]);
     blake3::hash(&scratch[..60 + bl])[..TAG_BYTES].try_into().expect("blake3 32B")
-}
-
-/// Per-frame risk gate (the AF-26 gate shape: key-id law + u64 wrapping
-/// margin ledger, fixed 10k slots, zero-alloc).
-struct Gate {
-    ledger: Box<[u64; INSTRUMENTS]>,
-}
-
-impl Gate {
-    fn new() -> Self {
-        Self { ledger: Box::new([1_000u64; INSTRUMENTS]) }
-    }
-    /// Ok(()) = admit; Err(code) = typed refusal class.
-    fn admit(&mut self, h: &AoqHeader, body: &[u8]) -> Result<(), u16> {
-        if h.key_id != KEY_ID {
-            return Err(0x10_02);
-        }
-        let instrument = (h.seq % INSTRUMENTS as u32) as usize;
-        let mut nb = [0u8; 8];
-        nb.copy_from_slice(&body[..8]);
-        let notional = u64::from_le_bytes(nb);
-        let slot = &mut self.ledger[instrument];
-        let new = slot.wrapping_add(notional);
-        if new < *slot {
-            return Err(0x10_01);
-        }
-        *slot = new;
-        Ok(())
-    }
 }
 
 /// Real cgap-arrow blake3 as the chain digest seam (ab-12 substrate).
@@ -570,10 +541,10 @@ fn churn_cycle(
             *b = rng.next() as u8;
         }
         body[..8].copy_from_slice(&(rng.next() % 1_000).to_le_bytes());
-        let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
-        // Wire-law round trip within the cycle window: verify the just-
-        // written window at the writer's pre-commit cursor.
+        // Wire-law round trip: capture the PRE-commit cursor (build_frame
+        // advances it) — the frame is stamped (ord, seq), verified at same.
         let (ord, seq) = writer.cursor();
+        let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
         let bl = u32::from_le_bytes(
             out[BODY_LEN_AT..BODY_LEN_AT + 4].try_into().expect("4B"),
         ) as usize;
@@ -610,13 +581,15 @@ fn churn_lane(
     let mut respawn_ns_total: u128 = 0;
     let mut ki = 0usize;
     while from < I5_FRAMES_PER_LANE {
-        let kill_at = if ki < kill_points.len() && kill_points[ki] > from {
+        // Points are deduped+sorted by the caller; a kill point equal to the
+        // resumed cursor cannot occur (cursor advances TO the kill point, and
+        // dedup removed repeats), so the next point always fires.
+        let kill_at = if ki < kill_points.len() {
+            let p = kill_points[ki];
             ki += 1;
-            Some(kill_points[ki - 1])
+            debug_assert!(p > from, "kill point must exceed the resumed cursor");
+            Some(p)
         } else {
-            if ki < kill_points.len() && kill_points[ki] <= from {
-                ki += 1; // stale kill point (already-resumed cursor): skip
-            }
             None
         };
         let t0 = Instant::now();
@@ -779,11 +752,15 @@ fn rfc0089_conformance_suite() {
                 }
                 body[..8].copy_from_slice(&(rng.next() % 1_000).to_le_bytes());
                 let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
-                if rng.next() % 100 < I4_CORRUPT_PCT {
+                let corrupt = rng.next() % 100 < I4_CORRUPT_PCT;
+                if corrupt {
                     out[76] ^= 0x40; // tamper: flip one tag byte in the window
                     cc.fetch_add(1, Ordering::Relaxed);
                 }
                 tx.write_all(&out[..wl]).expect("I4 producer write");
+                if corrupt {
+                    out[76] ^= 0x40; // restore: the flip must not persist
+                }
             }
         });
         let mut admit: Vec<u32> = Vec::new();
@@ -841,13 +818,13 @@ fn rfc0089_conformance_suite() {
                 let frame = 1 + (rng.next() as usize) % (I5_FRAMES_PER_LANE - 1);
                 per_lane[lane].push(frame);
             }
-            per_lane.iter_mut().for_each(|v| v.sort_unstable());
+            per_lane.iter_mut().for_each(|v| {
+                v.sort_unstable();
+                v.dedup();
+            });
             per_lane
         };
-        let unique_kills: usize = kill_points
-            .iter()
-            .map(|v| v.len() - v.windows(2).filter(|w| w[0] == w[1]).count())
-            .sum();
+        let unique_kills: usize = kill_points.iter().map(|v| v.len()).sum();
         let delivered = Arc::new(Mutex::new(vec![false; I5_LANES * I5_FRAMES_PER_LANE]));
         let mut handles = Vec::new();
         for lane in 0..I5_LANES {
@@ -866,7 +843,7 @@ fn rfc0089_conformance_suite() {
         }
         let mut total_kills = 0usize;
         for h in handles {
-            let (kills, mean_cycle_ns, mut chain) = h.join().expect("I5 lane join");
+            let (kills, mean_cycle_ns, chain) = h.join().expect("I5 lane join");
             total_kills += kills;
             println!("  I5 lane: {kills} kills, mean cycle {mean_cycle_ns} ns");
             // Post-churn chain integrity: append-only survival across kills.
@@ -993,11 +970,15 @@ fn rfc0089_tamper_refusal_typing() {
             }
             body[..8].copy_from_slice(&(rng.next() % 1_000).to_le_bytes());
             let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
-            if rng.next() % 100 < I4_CORRUPT_PCT {
+            let corrupt = rng.next() % 100 < I4_CORRUPT_PCT;
+            if corrupt {
                 out[76] ^= 0x40; // tag-byte tamper
                 cc.fetch_add(1, Ordering::Relaxed);
             }
             tx.write_all(&out[..wl]).expect("typing producer write");
+            if corrupt {
+                out[76] ^= 0x40; // restore: the flip must not persist
+            }
         }
     });
     let mut win = [0u8; WIN_MAX];
@@ -1014,6 +995,7 @@ fn rfc0089_tamper_refusal_typing() {
     }
     producer.join().expect("typing producer");
     let corrupt = corrupt_count.load(Ordering::Relaxed);
+    println!("typing: corrupt={corrupt} admits={admits} rejects={rejects}");
     assert_eq!(admits + rejects, frames, "accounting");
     assert_eq!(rejects, corrupt, "every tampered frame refused");
     assert!(rejects > 0 && admits > 0, "both classes witnessed (non-vacuous)");

@@ -1,0 +1,149 @@
+@prefix dod: <urn:cgap:dod:> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+# cgap definition-of-done graph (v26.11.3). One individual per DoD gate.
+# Standing vocabulary: MEASURED (an exit record exists on disk in the cited
+# receipt), TARGET-UNMEASURED (in flight, no exit record — never rounded up),
+# UNSUPPORTED (no receipt found on disk). The graph is the single source of
+# truth for the DoD checklist; the rendered .md files are projections, never
+# a second source of truth (GGM-SRC-002).
+
+dod:DoDGate a rdfs:Class ;
+    rdfs:label "Definition-of-done gate" ;
+    rdfs:comment "One v26.11.3 DoD gate: a check command, the receipt whose exit record proves it, and a standing. A gate with standing TARGET-UNMEASURED is never publish-blocking." .
+
+dod:DoDTarget a rdfs:Class ;
+    rdfs:label "Aspirational DoD row" ;
+    rdfs:comment "A definition-of-done row with no exit record on disk yet; carries a named close condition. Never publish-blocking by construction." .
+
+# ---- properties ----
+
+dod:gateId a owl:DatatypeProperty ;
+    rdfs:domain dod:DoDGate ;
+    rdfs:comment "Unique id, dod-001..dod-NNN." .
+
+dod:targetId a owl:DatatypeProperty ;
+    rdfs:domain dod:DoDTarget ;
+    rdfs:comment "Unique id, dod-t-001..dod-t-NNN." .
+
+dod:description a owl:DatatypeProperty ;
+    rdfs:comment "What the gate proves." .
+
+dod:checkCommand a owl:DatatypeProperty ;
+    rdfs:domain dod:DoDGate ;
+    rdfs:comment "The actual shell command whose exit record is the gate." .
+
+dod:evidenceReceipt a owl:DatatypeProperty ;
+    rdfs:comment "Path to the receipt carrying the exit record (cgap-rooted unless the value is absolute)." .
+
+dod:standing a owl:DatatypeProperty ;
+    rdfs:comment "MEASURED | TARGET-UNMEASURED | UNSUPPORTED. Never round up." .
+
+dod:publishBlocking a owl:DatatypeProperty ;
+    rdfs:domain dod:DoDGate ;
+    rdfs:comment "true only for MEASURED gates that block publish." .
+
+dod:closeCondition a owl:DatatypeProperty ;
+    rdfs:domain dod:DoDTarget ;
+    rdfs:comment "Named close condition: the observation that flips this row to MEASURED." .
+
+# ---- individuals ----
+
+dod:g-001 a dod:DoDGate ; dod:gateId "dod-001" ;
+    dod:description "cargo test -p cgap-arrow: full arrow suite, 0 failures (220 passed at CG-1, 228 at SA-4)" ;
+    dod:checkCommand "cargo test -p cgap-arrow" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/cg-1.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-002 a dod:DoDGate ; dod:gateId "dod-002" ;
+    dod:description "cargo check -p cgap-aoq compiles clean" ;
+    dod:checkCommand "cargo check -p cgap-aoq" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ab-1.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-003 a dod:DoDGate ; dod:gateId "dod-003" ;
+    dod:description "cgap-crypto fips202 kernel landing: 10 passed / 0 failed" ;
+    dod:checkCommand "cargo test -p cgap-crypto --lib fips202" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ab-2-fips202.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-004 a dod:DoDGate ; dod:gateId "dod-004" ;
+    dod:description "cgap-crypto chacha20 kernel landing: RFC 8439 fixtures, 9 passed / 0 failed" ;
+    dod:checkCommand "cargo test -p cgap-crypto --lib chacha" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ab-3-chacha.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-005 a dod:DoDGate ; dod:gateId "dod-005" ;
+    dod:description "cgap-crypto poly1305 + AEAD landing: aead_courts + ct_scan_court green" ;
+    dod:checkCommand "cargo test -p cgap-crypto --test aead_courts --test ct_scan_court" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ab-4-aead.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-006 a dod:DoDGate ; dod:gateId "dod-006" ;
+    dod:description "AB-5 ML-KEM-768 round-trip (encaps/decaps shared-secret agreement) — IN FLIGHT: mlkem_sanity FAILS at HEAD, TestKem fallback still bound (AF1-KD-1)" ;
+    dod:checkCommand "cargo test -p cgap-crypto --test mlkem_sanity" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/af-1-corridor.md" ;
+    dod:standing "TARGET-UNMEASURED" ;
+    dod:publishBlocking false .
+
+dod:g-007 a dod:DoDGate ; dod:gateId "dod-007" ;
+    dod:description "no_std embedded check, cgap-arrow on riscv32imc-unknown-none-elf: exit 0" ;
+    dod:checkCommand "cargo check -p cgap-arrow --target riscv32imc-unknown-none-elf" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/cg-1.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-008 a dod:DoDGate ; dod:gateId "dod-008" ;
+    dod:description "embedded/wasm check, cgap-aoq on wasm32-unknown-unknown: exit 0" ;
+    dod:checkCommand "cargo check -p cgap-aoq --target wasm32-unknown-unknown" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ab-1.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-009 a dod:DoDGate ; dod:gateId "dod-009" ;
+    dod:description "CBMQS 8/8 release gate: cbmqs_gates suite green under the release profile" ;
+    dod:checkCommand "cargo test --release -p cgap-aoq --test cbmqs_gates" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/af-10-cbmqs.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-010 a dod:DoDGate ; dod:gateId "dod-010" ;
+    dod:description "corridor join court: real ArrowArray to ChaCha20-Poly1305 seal over real transport, 3 passed / 0 failed (100 iterations)" ;
+    dod:checkCommand "cargo test -p cgap-aoq --test corridor_join_court" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/af-1-corridor.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-011 a dod:DoDGate ; dod:gateId "dod-011" ;
+    dod:description "ggen sync determinism: two consecutive ggen sync run invocations, second reports written: []" ;
+    dod:checkCommand "ggen sync run && ggen sync run" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ga-5b-flipback.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+dod:g-012 a dod:DoDGate ; dod:gateId "dod-012" ;
+    dod:description "FM-LAW-015 class zero: ggen sync run exits 0 with zero FM-LAW-015 (EA admission) refusals" ;
+    dod:checkCommand "ggen sync run" ;
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ga-5b-flipback.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
+
+# ---- aspirational targets (no exit record on disk, 2026-11-03) ----
+
+dod:t-001 a dod:DoDTarget ; dod:targetId "dod-t-001" ;
+    dod:description "index 177/177 exit gate (full index pass, every row exit-recorded)" ;
+    dod:closeCondition "A wave-index exit record showing 177/177 (exit status 0 or N passed / 0 failed) is receipted on disk and cited here." ;
+    dod:standing "TARGET-UNMEASURED" .
+
+dod:t-002 a dod:DoDTarget ; dod:targetId "dod-t-002" ;
+    dod:description "gofmt/goldens green for arcus-plane references (arcus goldens verify including cgap-facing rows)" ;
+    dod:closeCondition "bash /Users/sac/arcus/tests/goldens/verify.sh exits 0 with the arcus-plane reference rows present, receipted in a cgap v26.11.3 receipt." ;
+    dod:standing "TARGET-UNMEASURED" .

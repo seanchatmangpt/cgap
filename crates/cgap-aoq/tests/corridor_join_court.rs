@@ -62,18 +62,16 @@ fn shake32(parts: &[&[u8]]) -> [u8; 32] {
 }
 
 // ---------------------------------------------------------------------------
-// KEM seam. FALLBACK DISCLOSED: cgap-crypto ML-KEM-768 (FIPS 203) round-trip
-// FAILS at HEAD (its own court `cargo test -p cgap-crypto --test
-// mlkem_sanity` fails: encaps/decaps shared-secret disagreement). Per the
-// AF-1 dependency contract the join runs over the compiling subset with a
-// deterministic test-KEM (dk IS ek; same construction as session.rs's
-// inline test KEM) for the key hop. Rebinding to the real ML-KEM is the
-// close condition for the BLOCKED row in the receipt.
+// KEM seam. REBOUND (AB-5 close for AF1-KD-1): cgap-crypto ML-KEM-768
+// (FIPS 203 final) is ALIVE and interop-verified against liboqs — the
+// previous TestKem fallback is retired. Deterministic cores are driven with
+// in-test seeds (no RNG in-crate by design).
 // ---------------------------------------------------------------------------
 
-struct TestKem;
+/// Real ML-KEM-768 adapter over cgap_crypto::kem (FIPS 203 final).
+struct MlkemKem;
 
-impl cgap_aoq::session::KemSeam for TestKem {
+impl cgap_aoq::session::KemSeam for MlkemKem {
     fn encapsulate(
         &self,
         ek: &[u8; cgap_aoq::session::EK_BYTES],
@@ -81,37 +79,31 @@ impl cgap_aoq::session::KemSeam for TestKem {
         ([u8; cgap_aoq::session::CT_BYTES], [u8; cgap_aoq::session::SS_BYTES]),
         cgap_aoq::session::SessionError,
     > {
-        let ss = shake32(&[b"af1/testkem/ss", ek]);
-        let mut ct = [0u8; cgap_aoq::session::CT_BYTES];
-        let mut chunk = shake32(&[b"af1/testkem/ct", ek]);
-        let mut i = 0;
-        while i < ct.len() {
-            ct[i] = chunk[i % 32];
-            if i % 32 == 31 {
-                chunk = shake32(&[b"af1/testkem/ct2", &chunk]);
-            }
-            i += 1;
-        }
+        // Deterministic encapsulation seed (no RNG in-crate by design).
+        let m = shake32(&[b"af1/mlkem/m", ek]);
+        let mut ct = [0u8; 1088];
+        let mut ss = [0u8; 32];
+        cgap_crypto::kem::encaps(ek, &m, &mut ct, &mut ss);
         Ok((ct, ss))
     }
 
     fn decapsulate(
         &self,
         dk: &[u8],
-        _ct: &[u8; cgap_aoq::session::CT_BYTES],
+        ct: &[u8; cgap_aoq::session::CT_BYTES],
     ) -> Result<[u8; cgap_aoq::session::SS_BYTES], cgap_aoq::session::SessionError> {
-        if dk.len() != cgap_aoq::session::EK_BYTES {
-            return Err(cgap_aoq::session::SessionError::KemRefused { op: 1 });
-        }
-        let mut ek = [0u8; cgap_aoq::session::EK_BYTES];
-        ek.copy_from_slice(dk);
-        Ok(shake32(&[b"af1/testkem/ss", &ek]))
+        let dk: &[u8; 2400] = dk
+            .try_into()
+            .map_err(|_| cgap_aoq::session::SessionError::KemRefused { op: 1 })?;
+        Ok(cgap_crypto::kem::decaps(dk, ct))
     }
 
     fn kdf(&self, parts: &[&[u8]]) -> [u8; 32] {
         shake32(parts)
     }
 }
+
+
 
 // ---------------------------------------------------------------------------
 // Shared corridor constants + helpers
@@ -274,12 +266,13 @@ fn wire_tag_for(body: &[u8]) -> [u8; 16] {
 
 #[test]
 fn j1_corridor_join_100_iterations() {
-    // KEY HOP. BLOCKED-row fallback: test-KEM (see header note); the real
-    // ML-KEM round-trip is broken at HEAD (pre-existing, AB-5-owned).
+    // KEY HOP: REAL ML-KEM-768 (AB-5 ALIVE; AF1-KD-1 closed by this court).
+    let d = shake32(&[b"af1/mlkem/d"]);
+    let z = shake32(&[b"af1/mlkem/z"]);
     let mut ek = [0u8; cgap_aoq::session::EK_BYTES];
-    ek[..32].copy_from_slice(&shake32(&[b"af1/testkem/ek"]));
-    let dk = ek; // test-KEM: dk IS ek
-    let seam = TestKem;
+    let mut dk = [0u8; 2400];
+    cgap_crypto::kem::keygen(&d, &z, &mut ek, &mut dk);
+    let seam = MlkemKem;
     let (_ct, ss_alice) = seam.encapsulate(&ek).expect("encapsulate");
     let ss_bob = seam.decapsulate(&dk, &_ct).expect("decapsulate");
     assert_eq!(ss_alice, ss_bob, "KEM shared secret agreement");
