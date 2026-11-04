@@ -68,16 +68,16 @@ pub fn adler32(data: &[u8]) -> u32 {
 
 // ------------------------------------------------------------ bit writer --
 
-struct BitWriter {
-    out: Vec<u8>,
+struct BitWriter<'a> {
+    out: &'a mut Vec<u8>,
     bitbuf: u32,
     bitcnt: u32,
 }
 
-impl BitWriter {
-    fn new() -> Self {
+impl<'a> BitWriter<'a> {
+    fn new(sink: &'a mut Vec<u8>) -> Self {
         BitWriter {
-            out: Vec::new(),
+            out: sink,
             bitbuf: 0,
             bitcnt: 0,
         }
@@ -240,16 +240,46 @@ enum Token {
     Match(u16, u16),
 }
 
-fn lz77_tokens(data: &[u8]) -> Vec<Token> {
-    let mut tokens = Vec::new();
+/// Typed refusal for a caller-borrowed LZ77 chain scratch smaller than the
+/// input (the chain index is a per-byte table; a short table cannot address
+/// every position). Loud budget-refusal law — never a silent short table
+/// (mis-indexed chains) or a panic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeflateScratchError {
+    /// `prev.len() < data.len()`: the LZ77 chain scratch cannot index every
+    /// input position.
+    ScratchTooSmall { needed: usize, got: usize },
+}
+
+/// [`lz77_tokens`] into a caller-owned token buffer with a caller-borrowed
+/// chain table: clears `tokens`, reuses `prev` across frames (per-frame
+/// alloc law — the `data.len()`-sized i32 table is the compressor's dominant
+/// per-frame allocation), and refuses typed
+/// [`DeflateScratchError::ScratchTooSmall`] when the scratch cannot index
+/// every input position. `head` (the 32Ki-entry hash table) stays a stack
+/// local, re-initialized per call.
+fn lz77_tokens_into(
+    data: &[u8],
+    tokens: &mut Vec<Token>,
+    prev: &mut [i32],
+) -> Result<(), DeflateScratchError> {
+    if prev.len() < data.len() {
+        return Err(DeflateScratchError::ScratchTooSmall {
+            needed: data.len(),
+            got: prev.len(),
+        });
+    }
+    tokens.clear();
     if data.len() < MIN_MATCH {
         for &b in data {
             tokens.push(Token::Lit(b));
         }
-        return tokens;
+        return Ok(());
     }
     let mut head = [-1i32; HASH_SIZE];
-    let mut prev = vec![-1i32; data.len()];
+    for slot in prev[..data.len()].iter_mut() {
+        *slot = -1;
+    }
     let mut i = 0usize;
     while i < data.len() {
         let mut best_len = 0usize;
@@ -296,17 +326,36 @@ fn lz77_tokens(data: &[u8]) -> Vec<Token> {
             i += 1;
         }
     }
-    tokens
+    Ok(())
 }
 
 // ------------------------------------------------------------ compressor --
 
 /// Raw DEFLATE stream (no zlib header/trailer), one fixed-Huffman block.
 pub fn deflate_fixed(data: &[u8]) -> Vec<u8> {
-    let mut w = BitWriter::new();
+    let mut out = Vec::new();
+    let mut prev = vec![-1i32; data.len()];
+    deflate_fixed_into(data, &mut prev, &mut out)
+        .expect("scratch sized to data.len() by this constructor");
+    out
+}
+
+/// [`deflate_fixed`] into a caller-owned sink with a caller-borrowed chain
+/// scratch: clears `out`, reuses `prev` across frames (per-frame alloc law),
+/// refuses typed [`DeflateScratchError::ScratchTooSmall`] when the scratch
+/// cannot index the input. Same wire bytes as [`deflate_fixed`].
+pub fn deflate_fixed_into(
+    data: &[u8],
+    prev: &mut [i32],
+    out: &mut Vec<u8>,
+) -> Result<(), DeflateScratchError> {
+    out.clear();
+    let mut w = BitWriter::new(out);
     w.put_bits(1, 1); // BFINAL
     w.put_bits(1, 2); // BTYPE=01 fixed Huffman
-    for tok in lz77_tokens(data) {
+    let mut tokens = Vec::new();
+    lz77_tokens_into(data, &mut tokens, prev)?;
+    for tok in tokens {
         match tok {
             Token::Lit(b) => {
                 let (code, bits) = fixed_lit_code(b as u16);
@@ -330,7 +379,7 @@ pub fn deflate_fixed(data: &[u8]) -> Vec<u8> {
     let (code, bits) = fixed_lit_code(256);
     w.put_huff(code, bits);
     w.flush_to_byte();
-    w.out
+    Ok(())
 }
 
 /// zlib stream (RFC 1950): 0x78 0x9C header, deflate body, big-endian
@@ -788,5 +837,31 @@ mod tests {
             zlib_compress(&rep).len() < rep.len(),
             "repetitive corpus must compress"
         );
+    }
+
+    /// Scratch-refusal court (oabi law): a chain scratch smaller than the
+    /// input refuses typed [`DeflateScratchError::ScratchTooSmall`] from both
+    /// `_into` entry points — mutant kill: replace the length gate with a
+    /// clamp and the chain table would silently mis-index past `prev.len()`.
+    #[test]
+    fn scratch_too_small_refuses_typed() {
+        let data = vec![7u8; 256];
+        let mut out = Vec::new();
+        let mut short = vec![-1i32; 128];
+        assert_eq!(
+            deflate_fixed_into(&data, &mut short, &mut out),
+            Err(DeflateScratchError::ScratchTooSmall {
+                needed: 256,
+                got: 128
+            })
+        );
+        // Exact-size scratch: byte-identical to the alloc form.
+        let mut exact = vec![-1i32; 256];
+        deflate_fixed_into(&data, &mut exact, &mut out).expect("exact scratch");
+        assert_eq!(out, deflate_fixed(&data));
+        let cap = out.capacity();
+        deflate_fixed_into(&data, &mut exact, &mut out).expect("frame 2");
+        assert_eq!(out.capacity(), cap, "sink reused");
+        assert_eq!(out, deflate_fixed(&data), "frame 2 byte-identical");
     }
 }

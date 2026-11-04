@@ -75,13 +75,35 @@ use alloc::vec::Vec;
 /// - Output length is exactly `ceil(values.len() / 64) * w` words; a partial
 ///   final group is zero-padded (missing tuples read as value 0).
 pub fn pack_vertical(values: &[u32], w: u8) -> Vec<u64> {
+    let mut out = Vec::new();
+    pack_vertical_into(values, w, &mut out).expect("pack_vertical: output size overflows usize");
+    out
+}
+
+/// [`pack_vertical`] into a caller-owned buffer: clears `out` and reuses its
+/// allocation across frames — the per-frame alloc law (oabi `_into`
+/// pattern). The output size `groups.checked_mul(wf)` is computed with
+/// checked arithmetic and an overflow refuses typed
+/// ([`PackError::OutputOverflow`]) instead of wrapping the reserve — the
+/// same gate class as `scan_range_vertical_counted`'s group-count assert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackError {
+    /// `ceil(values.len() / 64) * w` overflowed `usize`.
+    OutputOverflow { groups: u64, w: u8 },
+}
+
+pub fn pack_vertical_into(values: &[u32], w: u8, out: &mut Vec<u64>) -> Result<(), PackError> {
     assert!(
         (1..=32).contains(&w),
         "pack_vertical: bit width w={w} outside 1..=32"
     );
     let wf = w as usize;
     let groups = values.len().div_ceil(64);
-    let mut out = alloc::vec![0u64; groups * wf];
+    let total = groups
+        .checked_mul(wf)
+        .ok_or(PackError::OutputOverflow { groups: groups as u64, w })?;
+    out.clear();
+    out.resize(total, 0);
     for (g, chunk) in values.chunks(64).enumerate() {
         let base = g * wf;
         for (t, &v) in chunk.iter().enumerate() {
@@ -103,7 +125,7 @@ pub fn pack_vertical(values: &[u32], w: u8) -> Vec<u64> {
             }
         }
     }
-    out
+    Ok(())
 }
 
 /// Scan a vertically packed column (`[`pack_vertical`]` output) for

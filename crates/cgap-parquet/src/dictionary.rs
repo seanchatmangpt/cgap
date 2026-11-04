@@ -137,13 +137,16 @@ impl DictionaryBuilder {
     /// function); `BTreeMap`'s `Index` panics if it were ever violated —
     /// loud and unreachable, not input handling.
     pub fn finish(self) -> (Vec<u32>, Vec<u32>) {
-        let Self {
-            values,
-            index_of,
-            dict,
-        } = self;
-        let indices = values.iter().map(|v| index_of[v]).collect();
-        (dict, indices)
+        let mut this = self;
+        // Encode the index stream in place: the arrival-order value buffer IS
+        // the index buffer after the map gather — no second allocation (the
+        // per-frame alloc law; `index_of[v]` cannot miss, same invariant as
+        // documented above).
+        for v in this.values.iter_mut() {
+            *v = this.index_of[v];
+        }
+        let Self { values, dict, .. } = this;
+        (dict, values)
     }
 }
 

@@ -822,6 +822,22 @@ impl ParquetFile {
         pred: (u64, u64),
     ) -> Result<Vec<(usize, usize, u64)>, ScanError> {
         let mut hits = Vec::new();
+        self.scan_u64_pred_into(col, pred, &mut hits)?;
+        Ok(hits)
+    }
+
+    /// [`scan_u64_pred`] into a caller-owned hit buffer: clears `hits` and
+    /// reuses its allocation across frames — the per-frame alloc law (the
+    /// oabi `_into` pattern). The buffer only ever grows to the hit count;
+    /// repeated scans over the same column stop reallocating after the
+    /// first call.
+    pub fn scan_u64_pred_into(
+        &self,
+        col: usize,
+        pred: (u64, u64),
+        hits: &mut Vec<(usize, usize, u64)>,
+    ) -> Result<(), ScanError> {
+        hits.clear();
         for rg in 0..self.meta.row_groups.len() {
             if self.meta.row_groups[rg].rg_prunes(col, pred) {
                 continue; // whole row group skipped: no resolve, no page read
@@ -834,7 +850,7 @@ impl ParquetFile {
                 }
             }
         }
-        Ok(hits)
+        Ok(())
     }
 
     /// Zero-copy slice of column `col`'s payload in row group `rg`.
@@ -1493,5 +1509,61 @@ mod tests {
         out.extend_from_slice(&(fmd.len() as u32).to_le_bytes());
         out.extend_from_slice(b"PAR1");
         out
+    }
+}
+
+/// Per-frame alloc law courts for [`ParquetFile::scan_u64_pred_into`]: the
+/// reuse observable (stable capacity across frames) and alloc/alloc-form
+/// byte-identity.
+#[cfg(test)]
+mod scan_into_tests {
+    extern crate std;
+
+    use alloc::format;
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use crate::level_free::{write_file, LevelFreeColumn, LevelFreeType};
+    use crate::scan::ParquetFile;
+
+    fn fixture_u64_col(values: &[u64]) -> Vec<u8> {
+        let cols = [LevelFreeColumn {
+            name: b"v".to_vec(),
+            ty: LevelFreeType::U64,
+        }];
+        let payload: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
+        let payloads: Vec<&[u8]> = vec![payload.as_slice()];
+        let aligned_rows = values.len();
+        write_file(&cols, &payloads, aligned_rows).expect("fixture file")
+    }
+
+    fn open(bytes: &[u8]) -> ParquetFile {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "cgap_scan_into_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::write(&path, bytes).expect("fixture write");
+        ParquetFile::open(&path).expect("fixture open")
+    }
+
+    #[test]
+    fn scan_u64_pred_into_reuses_and_matches_alloc_form() {
+        let values: Vec<u64> = (0..64u64).collect();
+        let bytes = fixture_u64_col(&values);
+        let pf = open(&bytes);
+        let pred = (10u64, 19u64);
+
+        let alloc_form = pf.scan_u64_pred(0, pred).expect("alloc form");
+        let mut hits = Vec::new();
+        pf.scan_u64_pred_into(0, pred, &mut hits).expect("frame 1");
+        assert_eq!(hits, alloc_form);
+        let cap_after_first = hits.capacity();
+        pf.scan_u64_pred_into(0, pred, &mut hits).expect("frame 2");
+        assert_eq!(hits.capacity(), cap_after_first, "hit buffer must be reused");
+        assert_eq!(hits, alloc_form, "frame 2 identical to frame 1");
     }
 }

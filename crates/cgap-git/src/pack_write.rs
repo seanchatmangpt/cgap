@@ -266,23 +266,49 @@ pub const MAX_OBJECTS: usize = 65_536;
 /// field is the uncompressed length, per pack-format. Conformant for real
 /// `git fsck` / `verify-pack` / `cat-file`.
 pub fn write_pack_v2(blobs: &[&[u8]]) -> Result<alloc::vec::Vec<u8>, GitError> {
+    let mut out = alloc::vec::Vec::new();
+    write_pack_v2_into(blobs, &mut out)?;
+    Ok(out)
+}
+
+/// [`write_pack_v2`] into a caller-owned buffer: clears `out` and reuses its
+/// allocation across frames — the per-frame alloc law. The reserve is the
+/// checked sum of the fixed header (12) + per-blob worst-case
+/// (header varint ≤ 10 bytes + zlib body) so a huge blob-count × size product
+/// refuses typed [`GitError::SizeOverflow`] instead of wrapping the reserve —
+/// the same gate class as `parse_idx_v2`'s section-length law.
+pub fn write_pack_v2_into(blobs: &[&[u8]], out: &mut alloc::vec::Vec<u8>) -> Result<(), GitError> {
     if blobs.len() > MAX_OBJECTS {
         return Err(GitError::TooManyObjects(blobs.len()));
     }
-    let mut out = alloc::vec::Vec::new();
-    out.extend_from_slice(b"PACK");
-    out.extend_from_slice(&2u32.to_be_bytes());
-    out.extend_from_slice(&(blobs.len() as u32).to_be_bytes());
+    out.clear();
+    let mut reserve = 12usize;
     for blob in blobs {
         if blob.len() > u32::MAX as usize {
             return Err(GitError::SizeOverflow);
         }
+        // Worst case per blob: header varint (≤10 bytes) + zlib body (≤
+        // blob.len() + 64 for stored-block worst case). Checked adds — a
+        // hostile size product refuses typed, never wraps.
+        reserve = reserve
+            .checked_add(10usize)
+            .ok_or(GitError::SizeOverflow)?
+            .checked_add(blob.len())
+            .ok_or(GitError::SizeOverflow)?
+            .checked_add(64)
+            .ok_or(GitError::SizeOverflow)?;
+    }
+    out.reserve(reserve);
+    out.extend_from_slice(b"PACK");
+    out.extend_from_slice(&2u32.to_be_bytes());
+    out.extend_from_slice(&(blobs.len() as u32).to_be_bytes());
+    for blob in blobs {
         out.extend_from_slice(&encode_object_header(3, blob.len() as u64));
         out.extend_from_slice(&zlib_compress(blob));
     }
-    let sum = sha1(&out);
+    let sum = sha1(out);
     out.extend_from_slice(&sum);
-    Ok(out)
+    Ok(())
 }
 
 /// Serialize a v2 `.idx` over sorted `(oid, offset, crc)` records per spec
@@ -376,19 +402,45 @@ pub fn build_pack_and_idx(
 }
 
 /// `PackBuilder` mirrors the spec Section 4 append-then-regenerate flow.
+/// Blobs are held either owned ([`PackBuilder::push`], copies — original
+/// behavior) or borrowed ([`PackBuilder::push_borrowed`], zero-copy — the
+/// per-frame alloc law for caller-owned buffers).
 #[derive(Default)]
-pub struct PackBuilder {
-    blobs: alloc::vec::Vec<alloc::vec::Vec<u8>>,
+pub struct PackBuilder<'a> {
+    blobs: alloc::vec::Vec<BlobRef<'a>>,
 }
 
-impl PackBuilder {
+#[derive(Debug, Clone)]
+enum BlobRef<'a> {
+    Owned(alloc::vec::Vec<u8>),
+    Borrowed(&'a [u8]),
+}
+
+impl<'a> BlobRef<'a> {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            BlobRef::Owned(v) => v.as_slice(),
+            BlobRef::Borrowed(s) => s,
+        }
+    }
+}
+
+impl<'a> PackBuilder<'a> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Append one blob; growth is tail-only.
+    /// Append one blob (copies into the builder); growth is tail-only.
     pub fn push(&mut self, blob: &[u8]) {
-        self.blobs.push(blob.to_vec());
+        self.blobs.push(BlobRef::Owned(blob.to_vec()));
+    }
+
+    /// Append one blob zero-copy: the builder aliases the caller's buffer
+    /// for lifetime `'a` — no per-frame copy (per-frame alloc law). Byte
+    /// identity with [`PackBuilder::push`] at `finish` time is the court's
+    /// job (see the `push_borrowed` tests).
+    pub fn push_borrowed(&mut self, blob: &'a [u8]) {
+        self.blobs.push(BlobRef::Borrowed(blob));
     }
 
     pub fn len(&self) -> usize {
@@ -401,7 +453,7 @@ impl PackBuilder {
 
     /// Regenerate pack + idx from the full pending set.
     pub fn finish(&self) -> Result<(alloc::vec::Vec<u8>, alloc::vec::Vec<u8>), GitError> {
-        let refs: alloc::vec::Vec<&[u8]> = self.blobs.iter().map(|b| b.as_slice()).collect();
+        let refs: alloc::vec::Vec<&[u8]> = self.blobs.iter().map(BlobRef::as_slice).collect();
         let (pack, idx, _) = build_pack_and_idx(&refs)?;
         Ok((pack, idx))
     }
@@ -706,6 +758,52 @@ mod tests {
         let (p2, i2, _) = build_pack_and_idx(&refs).unwrap();
         assert_eq!(p1, p2);
         assert_eq!(i1, i2);
+    }
+
+    /// Zero-copy borrowed-append court (per-frame alloc law): `push_borrowed`
+    /// must produce a byte-identical pack+idx to owned `push` — no copy is
+    /// observable, only the bytes are (mutant kill: have push_borrowed store
+    /// a truncated slice and this court fails on the pack byte comparison).
+    #[test]
+    fn push_borrowed_byte_identical_to_owned() {
+        let blobs: Vec<Vec<u8>> = (0..5).map(|_| blob_bytes(100, 7)).collect();
+        let mut borrowed = PackBuilder::new();
+        for blob in &blobs {
+            borrowed.push_borrowed(blob);
+        }
+        let mut owned = PackBuilder::new();
+        for blob in &blobs {
+            owned.push(blob);
+        }
+        assert_eq!(borrowed.len(), owned.len());
+        let (pb, ib) = borrowed.finish().unwrap();
+        let (po, io) = owned.finish().unwrap();
+        assert_eq!(pb, po, "borrowed and owned packs must be byte-identical");
+        assert_eq!(ib, io, "borrowed and owned idx must be byte-identical");
+        // Mixed builder also round-trips through the independent parser.
+        let mut mixed = PackBuilder::new();
+        mixed.push(&blobs[0]);
+        mixed.push_borrowed(&blobs[1]);
+        let (pm, _) = mixed.finish().unwrap();
+        let parsed = parse_pack_v2(&pm).unwrap();
+        assert_eq!(parsed.len(), 2);
+    }
+
+    /// Checked-reserve court: `write_pack_v2_into` reuses the caller buffer
+    /// and is byte-identical to the alloc form; the reserve arithmetic
+    /// (12 + Σ(10 + blob.len() + 64)) never wraps for admissible inputs.
+    #[test]
+    fn write_pack_v2_into_reuses_and_matches_alloc_form() {
+        let blobs: Vec<Vec<u8>> = (0..4).map(|i| blob_bytes(256 * (i + 1), i as u8)).collect();
+        let refs: Vec<&[u8]> = blobs.iter().map(|b| b.as_slice()).collect();
+        let mut out = Vec::new();
+        write_pack_v2_into(&refs, &mut out).unwrap();
+        let cap = out.capacity();
+        write_pack_v2_into(&refs, &mut out).unwrap();
+        assert_eq!(out.capacity(), cap, "buffer reused across frames");
+        assert_eq!(out, write_pack_v2(&refs).unwrap(), "_into == alloc form");
+        // Round-trips through the independent parser: real bytes asserted.
+        assert_eq!(parse_pack_v2(&out).unwrap().len(), 4);
     }
 
     #[test]

@@ -86,12 +86,23 @@ pub fn write_varint(dst: &mut Vec<u8>, mut value: u64) {
 /// at bits=12) and the `to_le_bytes()[..vb]` slice panic for `bits >= 33`:
 /// same loud refusal, at the contract boundary instead of mid-loop.
 pub fn rle_encode(values: &[u32], bits: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    rle_encode_into(values, bits, &mut out);
+    out
+}
+
+/// [`rle_encode`] into a caller-owned buffer: clears `out` and reuses its
+/// allocation across frames — the per-frame alloc law (oabi `_into`
+/// pattern). Per-frame page emission stops reallocating the wire buffer
+/// after the first call. Same width contract and panic behavior as
+/// [`rle_encode`].
+pub fn rle_encode_into(values: &[u32], bits: u8, out: &mut Vec<u8>) {
     assert!(
         (1..=8).contains(&bits),
         "UnsupportedBitWidth({bits}): rle_encode packs one byte per lane; \
          the wire supports widths 1..=8 only (decoder kernel set {{1,2,4,8}})"
     );
-    let mut out = Vec::new();
+    out.clear();
     out.push(bits);
     let mut i = 0;
     while i < values.len() {
@@ -102,7 +113,7 @@ pub fn rle_encode(values: &[u32], bits: u8) -> Vec<u8> {
             run += 1;
         }
         if run >= 3 {
-            write_varint(&mut out, u64::from(run as u32) << 1);
+            write_varint(out, u64::from(run as u32) << 1);
             let vb = usize::from(bits).div_ceil(8);
             out.extend_from_slice(&v.to_le_bytes()[..vb]);
             i += run;
@@ -136,7 +147,7 @@ pub fn rle_encode(values: &[u32], bits: u8) -> Vec<u8> {
             }
             let count = j - start;
             let groups = count.div_ceil(8);
-            write_varint(&mut out, ((groups as u64) << 1) | 1);
+            write_varint(out, ((groups as u64) << 1) | 1);
             let mut lane = 0;
             while lane < groups * 8 {
                 let val = if start + lane < j {
@@ -158,7 +169,6 @@ pub fn rle_encode(values: &[u32], bits: u8) -> Vec<u8> {
             i = j;
         }
     }
-    out
 }
 
 /// Decode the hybrid codec into `out` (u32 lanes).

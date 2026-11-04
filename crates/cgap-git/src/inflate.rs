@@ -42,6 +42,16 @@ pub enum InflateError {
         /// Adler-32 computed over the produced bytes.
         actual: u32,
     },
+    /// The caller's output budget would have been exceeded: the stream was
+    /// about to produce its `would_be`-th byte against a `budget`-byte cap.
+    /// Loud budget-refusal law (oabi `_into` pattern): refuse typed, never
+    /// allocate past the caller's declared ceiling.
+    BudgetExceeded {
+        /// The caller's declared output ceiling in bytes.
+        budget: usize,
+        /// The total byte count the stream was about to reach.
+        would_be: usize,
+    },
 }
 
 impl fmt::Display for InflateError {
@@ -95,6 +105,12 @@ impl fmt::Display for InflateError {
                 f,
                 "zlib adler32 mismatch: trailer stores {expected:#010x} but the inflated bytes \
                  hash to {actual:#010x} — content changed after compression; re-read the object"
+            ),
+            InflateError::BudgetExceeded { budget, would_be } => write!(
+                f,
+                "inflate output budget exceeded: the stream would produce {would_be} bytes but the \
+                 caller capped output at {budget} bytes — a hostile or truncated stream trying to \
+                 expand past the declared object size; enforce the pack entry's declared size"
             ),
         }
     }
@@ -272,8 +288,30 @@ fn fixed_distance_tree() -> Huffman {
 
 /// Inflate a raw DEFLATE stream (RFC 1951). Returns the decompressed bytes.
 pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
+    let mut out = Vec::new();
+    inflate_into(data, &mut out)?;
+    Ok(out)
+}
+
+/// [`inflate`] into a caller-owned buffer: clears `out` and reuses its
+/// allocation across frames — the per-frame alloc law (oabi `_into`
+/// pattern). Unbudgeted (`usize::MAX` ceiling); see [`zlib_decode_into`]
+/// for the budgeted zlib form.
+pub fn inflate_into(data: &[u8], out: &mut Vec<u8>) -> Result<(), InflateError> {
+    inflate_into_bounded(data, out, usize::MAX)
+}
+
+/// The bounded `_into` core: clears `out`, inflates into it, and refuses
+/// typed [`InflateError::BudgetExceeded`] the moment the next byte would
+/// push `out.len()` past `budget`. Checked arithmetic on `would_be` —
+/// never a wrapping budget comparison on a hostile stream.
+pub fn inflate_into_bounded(
+    data: &[u8],
+    out: &mut Vec<u8>,
+    budget: usize,
+) -> Result<(), InflateError> {
     let mut br = BitReader::new(data);
-    let mut out: Vec<u8> = Vec::new();
+    out.clear();
     loop {
         let bfinal = br.read_bits(1)?;
         let btype = br.read_bits(2)?;
@@ -284,8 +322,10 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
                 if byte + 4 > data.len() {
                     return Err(InflateError::Truncated);
                 }
-                let len = u16::from_le_bytes([data[byte], data[byte + 1]]);
-                let nlen = u16::from_le_bytes([data[byte + 2], data[byte + 3]]);
+                let len = u16::from_le_bytes(data[byte..byte + 2].try_into().expect("2 bytes"));
+                let nlen = u16::from_le_bytes(
+                    data[byte + 2..byte + 4].try_into().expect("2 bytes"),
+                );
                 if len != !nlen {
                     return Err(InflateError::BadCodeLengths);
                 }
@@ -294,6 +334,7 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
                 if end > data.len() {
                     return Err(InflateError::Truncated);
                 }
+                ensure_budget(out.len(), len as usize, budget)?;
                 out.extend_from_slice(&data[start..end]);
                 br = BitReader::new(data);
                 br.byte = end;
@@ -301,11 +342,11 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
             1 => {
                 let lt = fixed_literal_tree();
                 let dt = fixed_distance_tree();
-                inflate_block(&mut br, &mut out, &lt, &dt)?;
+                inflate_block(&mut br, out, &lt, &dt, budget)?;
             }
             2 => {
                 let (lt, dt) = dynamic_trees(&mut br)?;
-                inflate_block(&mut br, &mut out, &lt, &dt)?;
+                inflate_block(&mut br, out, &lt, &dt, budget)?;
             }
             other => return Err(InflateError::BadBlockType(other as u8)),
         }
@@ -313,7 +354,7 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, InflateError> {
             break;
         }
     }
-    Ok(out)
+    Ok(())
 }
 
 fn dynamic_trees(br: &mut BitReader<'_>) -> Result<(Huffman, Huffman), InflateError> {
@@ -381,11 +422,15 @@ fn inflate_block(
     out: &mut Vec<u8>,
     lt: &Huffman,
     dt: &Huffman,
+    budget: usize,
 ) -> Result<(), InflateError> {
     loop {
         let sym = lt.decode(br)?;
         match sym {
-            0..=255 => out.push(sym as u8),
+            0..=255 => {
+                ensure_budget(out.len(), 1, budget)?;
+                out.push(sym as u8);
+            }
             256 => return Ok(()),
             257..=285 => {
                 let idx = sym as usize - 257;
@@ -405,8 +450,9 @@ fn inflate_block(
                 }
                 let start = out.len() - dist;
                 // Byte-at-a-time: overlap copies (dist < len) must see bytes
-                // this same copy wrote.
+                // this same copy wrote. Budget-checked per byte.
                 for k in 0..len {
+                    ensure_budget(out.len(), 1, budget)?;
                     let b = out[start + k];
                     out.push(b);
                 }
@@ -414,6 +460,20 @@ fn inflate_block(
             _ => return Err(InflateError::BadCodeLengths),
         }
     }
+}
+
+/// Budget-refusal gate: the next `add` bytes must fit under `budget`.
+/// Checked arithmetic on the projection — never a wrapping compare.
+#[inline]
+fn ensure_budget(have: usize, add: usize, budget: usize) -> Result<(), InflateError> {
+    let would_be = have.checked_add(add).ok_or(InflateError::BudgetExceeded {
+        budget,
+        would_be: usize::MAX,
+    })?;
+    if would_be > budget {
+        return Err(InflateError::BudgetExceeded { budget, would_be });
+    }
+    Ok(())
 }
 
 /// Adler-32 (RFC 1950 section 8).
@@ -437,6 +497,21 @@ pub fn adler32(data: &[u8]) -> u32 {
 /// Decode a zlib stream (RFC 1950): 2-byte header, DEFLATE body, adler32.
 /// Returns the decompressed bytes. Verifies the header check and adler32.
 pub fn zlib_decode(data: &[u8]) -> Result<Vec<u8>, InflateError> {
+    let mut out = Vec::new();
+    zlib_decode_into(data, &mut out, usize::MAX)?;
+    Ok(out)
+}
+
+/// [`zlib_decode`] into a caller-owned buffer with a hard output budget:
+/// clears `out`, reuses its allocation across frames (per-frame alloc law),
+/// and refuses typed [`InflateError::BudgetExceeded`] the moment the stream
+/// would produce byte `budget + 1`. Budget gate mirrors the checked pack
+/// arithmetic law; pass `usize::MAX` for the unbudgeted form.
+pub fn zlib_decode_into(
+    data: &[u8],
+    out: &mut Vec<u8>,
+    budget: usize,
+) -> Result<(), InflateError> {
     if data.len() < 6 {
         return Err(InflateError::Truncated);
     }
@@ -446,21 +521,21 @@ pub fn zlib_decode(data: &[u8]) -> Result<Vec<u8>, InflateError> {
         return Err(InflateError::BadZlibHeader);
     }
     let body = &data[2..data.len() - 4];
-    let out = inflate(body)?;
+    inflate_into_bounded(body, out, budget)?;
     let stored = u32::from_be_bytes([
         data[data.len() - 4],
         data[data.len() - 3],
         data[data.len() - 2],
         data[data.len() - 1],
     ]);
-    let actual = adler32(&out);
+    let actual = adler32(out);
     if stored != actual {
         return Err(InflateError::AdlerMismatch {
             expected: stored,
             actual,
         });
     }
-    Ok(out)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -583,6 +658,46 @@ mod tests {
     fn truncated_stream_typed_error() {
         assert_eq!(zlib_decode(&[0x78]), Err(InflateError::Truncated));
         assert_eq!(inflate(&[0x03]), Err(InflateError::Truncated));
+    }
+
+    /// Budget-refusal courts (oabi law): a stream that would exceed the
+    /// caller's declared output ceiling refuses typed
+    /// [`InflateError::BudgetExceeded`] at the exact byte it would have
+    /// produced — mutant kill: replace the budget gate with a post-hoc
+    /// length check and the stored-block arm still allocates past the cap.
+    #[cfg(feature = "std")]
+    #[test]
+    fn zlib_budget_refusal_typed_at_exact_byte() {
+        let data = b"repetition-literal corpus for the budget gate 1234";
+        let z = python_compress(data, 6).expect("python3 zlib");
+        let mut out = Vec::new();
+        // Budget exactly one byte short: refusal names the exact would-be size.
+        assert_eq!(
+            zlib_decode_into(&z, &mut out, data.len() - 1),
+            Err(InflateError::BudgetExceeded {
+                budget: data.len() - 1,
+                would_be: data.len()
+            })
+        );
+        // Exact budget passes; `_into` form is byte-identical to the alloc form.
+        zlib_decode_into(&z, &mut out, data.len()).expect("exact budget");
+        assert_eq!(out, data);
+        assert_eq!(zlib_decode(&z).unwrap(), out);
+        // Buffer reuse: second frame keeps its capacity (no regrowth).
+        let cap = out.capacity();
+        zlib_decode_into(&z, &mut out, data.len()).expect("frame 2");
+        assert_eq!(out.capacity(), cap);
+    }
+
+    /// Unbudgeted `inflate_into` parity court: raw DEFLATE through the
+    /// `_into` form equals the alloc form.
+    #[test]
+    fn inflate_into_matches_alloc_form() {
+        let data = [0x01, 0x02, 0x00, 0xFD, 0xFF, b'h', b'i'];
+        let mut out = Vec::new();
+        inflate_into(&data, &mut out).expect("inflate_into");
+        assert_eq!(out, b"hi");
+        assert_eq!(inflate(&data).unwrap(), out);
     }
 
     #[cfg(feature = "std")]

@@ -57,6 +57,10 @@ pub enum LevelFreeError {
     UndecodablePage,
     /// The parsed payload length does not equal `rows * width`.
     PayloadMismatch { expected: usize, actual: usize },
+    /// `rows * Σwidth` (or the page-size arithmetic on it) overflowed the
+    /// platform's `usize` — the requested row-group cannot exist on this
+    /// target; refuse typed, never wrap.
+    RowGroupOverflow { rows: usize, width: usize },
 }
 
 impl fmt::Display for LevelFreeError {
@@ -117,6 +121,12 @@ impl fmt::Display for LevelFreeError {
                 "page payload is {actual} bytes but rows*width declares {expected}: a PLAIN V2 \
                  payload must be exactly rows*sum(width) bytes — re-check the writer's row-count \
                  and column-width arithmetic"
+            ),
+            LevelFreeError::RowGroupOverflow { rows, width } => write!(
+                f,
+                "row-group arithmetic rows={rows} * Σwidth={width} overflows usize: the requested \
+                 row group cannot exist on this target — refuse typed, never wrap (checked reserve \
+                 arithmetic, per-frame alloc law)"
             ),
         }
     }
@@ -254,6 +264,19 @@ pub fn write_schema_list(dst: &mut Vec<u8>, cols: &[LevelFreeColumn]) {
 /// element surfaces the underlying [`ThriftError`].
 pub fn parse_schema_elements(src: &[u8]) -> Result<Vec<WireSchemaElement>, ThriftError> {
     let mut out = Vec::new();
+    parse_schema_elements_into(src, &mut out)?;
+    Ok(out)
+}
+
+/// [`parse_schema_elements`] into a caller-owned buffer: clears `out` and
+/// reuses its allocation across frames — the per-frame alloc law (oabi
+/// `_into` pattern). Per-element `name` vectors still allocate (wire-owned
+/// `Vec<u8>`); the element-vector reuse is the per-frame win.
+pub fn parse_schema_elements_into(
+    src: &[u8],
+    out: &mut Vec<WireSchemaElement>,
+) -> Result<(), ThriftError> {
+    out.clear();
     let mut pos = 0usize;
     while pos < src.len() {
         let mut field_type: Option<i32> = None;
@@ -288,7 +311,7 @@ pub fn parse_schema_elements(src: &[u8]) -> Result<Vec<WireSchemaElement>, Thrif
             num_children,
         });
     }
-    Ok(out)
+    Ok(())
 }
 
 /// Admission check (spec Hook 5): the schema is either exactly the admitted
@@ -303,6 +326,19 @@ pub fn admit_schema(
     elements: &[WireSchemaElement],
 ) -> Result<Vec<LevelFreeColumn>, LevelFreeError> {
     let mut cols = Vec::new();
+    admit_schema_into(elements, &mut cols)?;
+    Ok(cols)
+}
+
+/// [`admit_schema`] into a caller-owned buffer: clears `cols` and reuses its
+/// allocation across frames — the per-frame alloc law. Column names are
+/// cloned per frame (owned `Vec<u8>` on `LevelFreeColumn`); the column-vector
+/// reuse is the per-frame win.
+pub fn admit_schema_into(
+    elements: &[WireSchemaElement],
+    cols: &mut Vec<LevelFreeColumn>,
+) -> Result<(), LevelFreeError> {
+    cols.clear();
     for (i, e) in elements.iter().enumerate() {
         // Root/group shape: no physical type with children.
         // The schema root is entry 0 with neither a physical type nor a
@@ -358,7 +394,7 @@ pub fn admit_schema(
         };
         cols.push(LevelFreeColumn { name, ty });
     }
-    Ok(cols)
+    Ok(())
 }
 
 /// Round `rows` up so `rows * width` is a multiple of 256 (the cgap
@@ -454,30 +490,76 @@ pub fn write_row_group_page(
     payloads: &[&[u8]],
     num_rows: usize,
 ) -> Result<Vec<u8>, LevelFreeError> {
+    let mut out = Vec::new();
+    write_row_group_page_into(cols, payloads, num_rows, &mut out)?;
+    Ok(out)
+}
+
+/// [`write_row_group_page`] into a caller-owned buffer: clears `dst` and
+/// reuses its allocation across frames — the per-frame alloc law. The page
+/// body is written column-by-column directly into `dst` (no intermediate
+/// body `Vec`), with the reserve computed by checked arithmetic
+/// (`Σ num_rows.checked_mul(width)`) and an overflow refusing typed as
+/// [`LevelFreeError::RowGroupOverflow`] — never `saturating_mul`-then-misemit.
+pub fn write_row_group_page_into(
+    cols: &[LevelFreeColumn],
+    payloads: &[&[u8]],
+    num_rows: usize,
+    dst: &mut Vec<u8>,
+) -> Result<(), LevelFreeError> {
     if cols.len() != payloads.len() {
         return Err(LevelFreeError::PayloadMismatch {
             expected: cols.len(),
             actual: payloads.len(),
         });
     }
-    let mut body = Vec::new();
+    // Checked reserve arithmetic: rows * Σwidth, refusing typed on overflow
+    // (the previous saturating_mul would mis-emit a truncated expected width).
+    let mut body_len = 0usize;
+    for c in cols.iter() {
+        let col_bytes = num_rows
+            .checked_mul(c.ty.width())
+            .ok_or(LevelFreeError::RowGroupOverflow {
+                rows: num_rows,
+                width: c.ty.width(),
+            })?;
+        body_len = body_len
+            .checked_add(col_bytes)
+            .ok_or(LevelFreeError::RowGroupOverflow {
+                rows: num_rows,
+                width: body_len,
+            })?;
+    }
+    dst.clear();
+    dst.reserve(body_len + 64);
     for (c, p) in cols.iter().zip(payloads.iter()) {
-        let expected = num_rows.saturating_mul(c.ty.width());
+        let expected = num_rows
+            .checked_mul(c.ty.width())
+            .ok_or(LevelFreeError::RowGroupOverflow {
+                rows: num_rows,
+                width: c.ty.width(),
+            })?;
         if p.len() != expected {
             return Err(LevelFreeError::PayloadMismatch {
                 expected,
                 actual: p.len(),
             });
         }
-        body.extend_from_slice(p);
     }
     let ncols = cols.len();
     let header = PageHeader {
         page_type: page_type::DATA_PAGE_V2,
-        uncompressed_page_size: size_i32(body.len()),
-        compressed_page_size: size_i32(body.len()),
+        uncompressed_page_size: size_i32(body_len),
+        compressed_page_size: size_i32(body_len),
         data_page_header_v2: Some(DataPageHeaderV2 {
-            num_values: size_i32(num_rows.saturating_mul(ncols)),
+            num_values: size_i32(
+                num_rows
+                    .checked_mul(ncols)
+                    .ok_or(LevelFreeError::RowGroupOverflow {
+                        rows: num_rows,
+                        width: ncols,
+                    })?,
+            ),
             num_nulls: 0,
             num_rows: size_i32(num_rows),
             definition_levels_byte_length: 0,
@@ -486,10 +568,14 @@ pub fn write_row_group_page(
             encoding: encoding::PLAIN,
         }),
     };
-    let mut out = Vec::with_capacity(body.len() + 64);
-    write_page_header(&mut out, &header);
-    out.extend_from_slice(&body);
-    Ok(out)
+    // Header first (its length is header-independent — write_page_header
+    // only appends), then the column-major payloads behind it: one pass,
+    // no intermediate body Vec.
+    write_page_header(dst, &header);
+    for p in payloads.iter() {
+        dst.extend_from_slice(p);
+    }
+    Ok(())
 }
 
 /// Emit one `ColumnMetaData` struct (parquet.thrift field ids: 1 `type`,
@@ -811,5 +897,60 @@ mod tests {
         }
         // 100 u32 rows = 400 bytes -> padded to 512 -> 128 rows.
         assert_eq!(align_rows_256b(100, 4), 128);
+    }
+
+    /// Budget-refusal court (oabi law): `rows * Σwidth` overflow refuses
+    /// typed [`LevelFreeError::RowGroupOverflow`] and never attempts the
+    /// (impossibly large) reserve — mutant kill: swap the checked_mul for
+    /// saturating_mul and this refusal becomes a mis-emit with a truncated
+    /// `num_values` instead of a typed error.
+    #[test]
+    fn row_group_overflow_refuses_typed() {
+        let cols = [
+            LevelFreeColumn {
+                name: b"a".to_vec(),
+                ty: LevelFreeType::U64,
+            },
+            LevelFreeColumn {
+                name: b"b".to_vec(),
+                ty: LevelFreeType::U32,
+            },
+        ];
+        let payloads: Vec<&[u8]> = cols.iter().map(|_| &b""[..]).collect();
+        // rows = usize::MAX / 8: rows * 8 (u64 col) saturates the address
+        // space, so rows.checked_mul(width) is None for every admitted width.
+        let rows = usize::MAX / 8;
+        let mut dst = Vec::new();
+        // Refusal lands at the Σ accumulation: col 1 alone is rows*8 =
+        // usize::MAX-7 (fits), then + rows*4 (col 2) overflows. The typed
+        // error carries the accumulated Σwidth at the refusal point.
+        assert_eq!(
+            write_row_group_page_into(&cols, &payloads, rows, &mut dst),
+            Err(LevelFreeError::RowGroupOverflow {
+                rows,
+                width: usize::MAX - 7
+            })
+        );
+        // The refusal fired BEFORE the reserve: dst stays empty.
+        assert!(dst.is_empty());
+    }
+
+    /// Reuse court: the second `_into` call must not grow `dst` — the
+    /// per-frame alloc law's observable (same buffer, stable capacity).
+    #[test]
+    fn write_row_group_page_into_reuses_buffer() {
+        let cols = [LevelFreeColumn {
+            name: b"a".to_vec(),
+            ty: LevelFreeType::U64,
+        }];
+        let payload = vec![7u8; 8 * 4];
+        let payloads: Vec<&[u8]> = vec![&payload];
+        let mut dst = Vec::new();
+        write_row_group_page_into(&cols, &payloads, 4, &mut dst).expect("frame 1");
+        let cap_after_first = dst.capacity();
+        write_row_group_page_into(&cols, &payloads, 4, &mut dst).expect("frame 2");
+        assert_eq!(dst.capacity(), cap_after_first, "buffer must be reused");
+        let out = write_row_group_page(&cols, &payloads, 4).expect("alloc form");
+        assert_eq!(dst, out, "_into and alloc forms are byte-identical");
     }
 }

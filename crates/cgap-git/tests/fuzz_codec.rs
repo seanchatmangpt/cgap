@@ -213,6 +213,7 @@ fn inflate_bucket(e: &InflateError) -> &'static str {
         InflateError::OverlongBackreference { .. } => "OverlongBackreference",
         InflateError::BadDistanceCode => "BadDistanceCode",
         InflateError::AdlerMismatch { .. } => "AdlerMismatch",
+        InflateError::BudgetExceeded { .. } => "BudgetExceeded",
     }
 }
 
