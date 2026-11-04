@@ -119,3 +119,67 @@ Open (named owners):
 modulo one witnessed contention flake (passes isolated); ggen engine
 check green, pre-fix gate correctly BLOCKED (fail-closed) with the
 staleness registered as open drift item 1.
+
+## Addendum (late tail, 2026-11-04)
+
+Events after this receipt's fill. Every SHA below ancestry-verified
+this session via `git branch -r --contains` → `origin/main` unless
+noted. D-numbers are coordinator lane IDs, not cgap receipt files.
+
+| Event | SHA | Artifact (one line) | Ancestry |
+|---|---|---|---|
+| D91 settle | 601e0274 | fix(ocel2): roundtrip_court hex32 — dead helper deleted; lane-reported settle 1803 passed / 0 failed (+14 vs this receipt's F10 1789) | origin/main |
+| D77 pin re-mints | ef43dbee | chore(freeze): status_maps + cscb-targets blake3 pins re-minted for the v3 era | origin/main |
+| D50/D53/D56 ocel2/mcp hygiene | fa8f45b0 | chore(ocel2,mcp): dead exports removed; ocel2 README added | origin/main |
+| D50/D53/D56 v3 fixtures | 9f668ce2 | fix(ocel2): conformance fixtures to v3 wire law (1104B Finish + sealed AppData) | origin/main |
+| D27 crypto legs | b257a70f | test(crypto): verify_tag_var_aad negative legs + mldsa primitive property tests | origin/main |
+| D51 dma court | 7b21f537 | E-h finding 5: cgap-local drift courts for dma_ring + isomorphism | origin/main |
+| D52 de-pub | 16b20c91 | refactor(branchless): dead exports de-published (E-h audit) | origin/main |
+| D83 CLAUDE | b69ccabd | docs: publish-flag drift fixed in CLAUDE.md (E-y row) | origin/main |
+| D80-class artifact batch | f30e19f4 | chore: tracked build artifacts removed (wrapper_host.o, `__pycache__` .pyc) | origin/main |
+| E-o integrity | (court, no commit) | chain-is-integrity: session inline court + chain_courts c7/c9 tamper legs green (wire-law-v3-landing.md:78) | n/a |
+| E-t purity coherence | (court, no commit) | purity_gate source scan green across stress suites (wire-law-v3-landing.md:83) | n/a |
+
+### Standing re-derivation (supersedes the PARTIAL-ish posture above)
+
+The receipt's PARTIAL-ish fences have resolved: the lint fence was
+ggen-side, not cgap; D28's fence landed (note: the coordinator-cited
+SHA `a86d167` is NOT present in cgap's object store —
+`git cat-file -t a86d167` refuses, `--all` grep empty, even after
+`git fetch` — so that specific citation is UNVERIFIED; the fence
+closure itself is witnessed by the courts below, not by that SHA).
+
+Re-derived this session against HEAD 601e0274:
+
+- `cargo build --workspace` rc=0 (0.12s warm).
+- Full `cargo test --workspace --no-fail-fast` in the canonical
+  checkout: 145 binaries `ok`; the ONLY failures (2) are in the
+  UNTRACKED in-flight lane file
+  `crates/cgap-aoq/tests/alloc_density_census.rs:179` — not committed
+  code, lane-owned, untouched by this lane.
+- Committed-HEAD cross-check via `git archive HEAD` → /tmp scratch
+  (worktree-free): 280 binaries, **1821 passed / 1 failed / 12
+  ignored**. The 1 failure is
+  `court_zero_fixed_shared_write_tmp_dirs_in_tree`
+  (crates/cgap-court/tests/shared_fixtures_court.rs:74) — a METHOD
+  artifact, not a code defect: that court derives repo root as
+  `CARGO_MANIFEST_DIR.parent×3`, which only resolves correctly in the
+  canonical `~/cgap` layout; in scratch it reads `/tmp/crates` and
+  panics. It passes in the canonical checkout (first ladder above).
+- ancestry: all nine commit rows above contained by origin/main.
+
+Verdict: cgap's own fences are closed; standing promotes to **ALIVE**
+on the committed tree, with three residuals named honestly:
+
+1. `crates/cgap-aoq/tests/alloc_density_census.rs` — untracked
+   in-flight lane file, failing (2 tests); must land green or be
+   withdrawn by its owning lane before the tree is truly clean.
+2. `shared_fixtures_court` repo_root derivation is layout-fragile
+   (`manifest.parent×3` assumes the canonical checkout path) — a
+   latent fence defect for any non-canonical run; harmless at the
+   canonical root.
+3. cgap's own `fmt-clippy` CI job is explicitly NON-BLOCKING
+   (ci.yml:109) pending a dedicated fmt pass — the one cgap-side
+   quality fence still open. The rust-quality.yml timeout + Docker
+   31m items are lsp-max's, and the clippy wider-scope is ggen's;
+   neither is cgap-side.
