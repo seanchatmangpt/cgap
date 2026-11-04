@@ -1,5 +1,7 @@
 # L7 Push-State Sweep — v26.11.4
 
+Standing: ALIVE (T2 sweep 2026-11-04, ls-remote exit-code gated)
+
 ## Method
 
 Three passes: baseline T0 (2026-11-04T20:04Z), T1 (~+15 min,

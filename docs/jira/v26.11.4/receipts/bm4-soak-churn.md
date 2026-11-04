@@ -1,5 +1,7 @@
 # bm4 soak receipt (cgap) — v3 re-pin disclosure
 
+Standing: ALIVE (1M trips, 55,411 fps, exit 0; v3 re-pin disclosure)
+
 - Subject: cgap @ `23436067ab758dfeb034a2957406aa6906c56c63` + in-flight working tree (uncommitted: Cargo.lock, cgap-aoq `aead.rs`, `generated_aoq_header_layout.rs`, `session.rs`, `aoq1_codec_court.rs` — the M2a v3 Finish law churn).
 - Date: 2026-11-04, 12:59–13:02 PST.
 - Machine: Darwin 25.2.0, Apple M3 Max (16 cores), 48 GB, load avg 37.28/28.43/25.99 during run (stagger disclosed below).
