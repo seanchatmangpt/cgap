@@ -16,7 +16,7 @@ extern "C" {
 
 #define CGAP_AOQ1_HEADER_SIZE 64
 #define CGAP_AOQ1_MAGIC 0x414F5131u
-#define CGAP_AOQ1_VERSION 2
+#define CGAP_AOQ1_VERSION 3
 
 /* Field offset/size defines — one per aoq:HeaderField, ORDER BY aoq:offset. */
 #define CGAP_AOQ1_MAGIC_OFFSET 0
@@ -35,6 +35,18 @@ extern "C" {
 #define CGAP_AOQ1_RESERVED_SIZE 36 /* reserved-zero, C: reserved */
 #define CGAP_AOQ1_HEADER_DIGEST_OFFSET 60
 #define CGAP_AOQ1_HEADER_DIGEST_SIZE 4 /* fnv1a32, C: header_digest */
+
+/* AOQ1 frozen status band — gate 020/070 law. One define per
+ * aoq:StatusConstant individual, projected from the same individuals as
+ * status_maps.rs; the retired band 0x4347_000x is not named here. */
+#define CGAP_AOQ_STATUS_OK 0x4347A001u
+#define CGAP_AOQ_STATUS_PENDING 0x4347A002u
+#define CGAP_AOQ_STATUS_BUSY 0x4347A003u
+#define CGAP_AOQ_STATUS_INCOMPLETE_FRAME 0x4347A004u
+#define CGAP_AOQ_STATUS_DIGEST_MISMATCH 0x4347A005u
+#define CGAP_AOQ_STATUS_EPOCH_MISMATCH 0x4347A006u
+#define CGAP_AOQ_STATUS_KEY_UNKNOWN 0x4347A007u
+#define CGAP_AOQ_STATUS_EPOCH_RETIRED 0x4347A008u
 
 /*
  * Little-endian accessors, one per non-reserved field. The reserved-zero

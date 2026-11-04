@@ -53,6 +53,11 @@ tests:
   the RFC-0089 ≤25 µs/link target → **MEASURED-UNMET**, typed, never
   softened. Profile disclosure rides the claim (debug, min-of-3,
   different plane than leg A).
+  > ERRATA 2026-11-04: G7 leg B standing superseded by ZP-17's branch-(a)
+  > MEASURED-MET release re-measure (1.26394 µs/link, min-of-7, same plane) —
+  > see `cgap/docs/jira/v26.11.4/receipts/zp-17-gate10-settling.md` and the
+  > v4 corrected-claims ledger
+  > (`ggen/docs/jira/v26.11.4/receipts/v4-corrected-claims-ledger.md` row 5).
 - **Leg A (in-process, release)**: AF-21 method — AoqChain bound to
   sovereign `cgap_blake3::hash`, 50k links, min-of-3 append + full-chain
   verify green + tamper flip witnessed → **within target** (MET leg).

@@ -78,6 +78,16 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
   cgap-gate,cgap-crypto,cgap-p28}` — moonshot lane crates
 - `crates/{cgap-ffi,cgap-beam,cgap-gpu,audit,integration,cgap-court}` — membranes, court harness
 - `crates/cgap-verification` — on disk, NOT in the 25-member `cargo metadata` list
+- `crates/wire-shm` — root member, `publish = false` (YD-3),
+  ORPHANED-DATUM-FROZEN: no production-data-path consumer;
+  `cgap-mcp` consumes it as a runtime path dep (bridge surface),
+  `cgap-aoq` as a dev-dep (AB-11 court surface); arcus p02/p09 name
+  its bytes as compat datum (UNBUILT). Escalation ladder: parked
+  raise = cached `next_ordinal` + direct-slice write (cgap-mcp
+  `wire.rs` byte-identity court is the drift fence); sanctioned
+  bounded change = 3-line payload-offset shift iff arcus p09
+  selects the 64B header; delete-first applies only if cgap-mcp
+  retires AND no arcus build lands in one release cycle.
 - `crates/cli` — standalone ggen CLI (above); `ontology-packs/{fibo,cloud}` — O-ABI packs
 - `docs/jira/v26.11.1/{lanes,waves}/` — A01-A20 specs + 152 receipts
   (`docs/jira/v26.11.2/waves/v2-07-census.md:9`)

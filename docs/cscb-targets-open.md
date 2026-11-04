@@ -12,6 +12,9 @@ gate 020). Verdicts: a TARGET row may not be cited as validated anywhere.
 | AF-2 row | Claim (verbatim, UNSUPPORTED) | Standing | Named bench that would measure it |
 |---:|---|---|---|
 | 1 | 18.1 ns per-call receipt latency | TARGET-UNMEASURED | ab-12 court-1 per-call latency cell (64 B-1 KiB, release, min-of-3) |
+> ERRATA 2026-11-04: row 1 superseded — see the v4 corrected-claims ledger
+> (`ggen/docs/jira/v26.11.4/receipts/v4-corrected-claims-ledger.md` rows 1-2)
+> and `cgap/docs/jira/v26.11.4/receipts/zp-17-gate10-settling.md`.
 | 5 | 174.1 ns header inspection | TARGET-UNMEASURED | ab-6-method per-header inspection cell (release, min-of-7x100k, black_box-guarded sink) |
 | 13 | <10 ns per-frame gate latency (USL validated) | TARGET-UNMEASURED | per-frame gate-latency bench (release) against the 41 ns timer-resolution floor witness (cgap AX-5); a sub-41 ns result is a measurement defect, not a pass |
 | 14 | Cpk >= 3.48 / <0.001 DPMO | TARGET-UNMEASURED | committed DFLSS process-capability baseline study (dx/17 law: capability block present:false until a committed baseline exists) |

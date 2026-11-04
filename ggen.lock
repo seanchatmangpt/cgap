@@ -2,7 +2,7 @@
 
 [packs.aoq-pack]
 source = "path:../ggen-marketplace/packs/aoq-pack"
-content_hash = "blake3:72de096fc2a6e61f2c46b50f4b79f6337744a9a87435ec82c530a85dce25542c"
+content_hash = "blake3:490a9b2f1c1be51d0d154d0329192515315ae963df3fd87b0a9d93cda18d5264"
 
 [packs.cgap-pack]
 source = "path:../ggen-marketplace/packs/cgap-pack"

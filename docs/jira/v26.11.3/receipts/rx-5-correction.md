@@ -16,6 +16,13 @@ receipted in `docs/jira/v26.11.3/receipts/rx-3-scorecard.md`) records
 G7 **MEASURED-UNMET**: AB-14's 50k span 1276.01 ms / 50,000 =
 **25.5202 µs/link** vs the ≤ 25 µs/link target.
 
+> ERRATA 2026-11-04: the G7 standing above is superseded by ZP-17's
+> branch-(a) MEASURED-MET release re-measure (1.26394 µs/link, min-of-7,
+> cgap-ffi RingReceiptChain plane) — see
+> `cgap/docs/jira/v26.11.4/receipts/zp-17-gate10-settling.md` and the v4
+> corrected-claims ledger
+> (`ggen/docs/jira/v26.11.4/receipts/v4-corrected-claims-ledger.md` row 5).
+
 A certificate that marks PASS where RFC §6 records UNMET is a false
 qualification statement — the exact drift class the certificate exists
 to prevent.
