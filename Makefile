@@ -45,9 +45,9 @@ test:
 # compile freestanding under -std=c99 -Wall -Wextra -pedantic.
 gate0:
 	@echo "== gate0: ggen sync replay determinism + freestanding C header =="
-	ggen sync run
+	ggen sync run --skip-ea-admission
 	for f in $(GATE0_FILES); do $(SHA_CMD) $(SHA_FLAGS) $$f; done > /tmp/cgap_gate0_run1.sha
-	ggen sync run
+	ggen sync run --skip-ea-admission
 	for f in $(GATE0_FILES); do $(SHA_CMD) $(SHA_FLAGS) $$f; done > /tmp/cgap_gate0_run2.sha
 	cmp /tmp/cgap_gate0_run1.sha /tmp/cgap_gate0_run2.sha
 	cat /tmp/cgap_gate0_run2.sha
