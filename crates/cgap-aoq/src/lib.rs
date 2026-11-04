@@ -21,6 +21,9 @@ pub mod header;
 pub mod kem;
 // session.rs landed (AB-7, 21:58); registration restored by AB-1.
 pub mod session;
+// Q6 M2b (P-f scope): peer identity pin-table over the fp/2 fingerprint
+// image; TOFU / Pinned / typed fail-closed refusal, no new deps.
+pub mod pin_table;
 // RX-4: reusable release-profile detector + anti-DCE fence (AF-25 axis 2
 // loud-SKIP pattern + AF-10 G1b black_box, generalized).
 pub mod profile_guard;

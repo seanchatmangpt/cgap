@@ -35,7 +35,7 @@ struct Registered {
 
 /// Registered modules of the lib target (must match src/lib.rs `pub mod`,
 /// cfg'd or not — the file-walk counts on-disk sources regardless of cfg).
-const REGISTERED: [Registered; 13] = [
+const REGISTERED: [Registered; 14] = [
     Registered { name: "aead.rs", exempt: &[] },
     Registered { name: "chain.rs", exempt: &[] },
     Registered { name: "codec.rs", exempt: &[] },
@@ -79,6 +79,10 @@ const REGISTERED: [Registered; 13] = [
             ),
         ],
     },
+    // [Q6 M2b SLA sync 2026-11-04] pin_table.rs landed in src/ (registered
+    // in lib.rs by its lane); adding it to the scanned set (index 13; the
+    // flips-both-ways court pins cert at REGISTERED[12]).
+    Registered { name: "pin_table.rs", exempt: &[] },
 ];
 
 /// [FLIPPED 2026-11-03 by AB-7, disclosed in ab-7-chain-session.md] The
