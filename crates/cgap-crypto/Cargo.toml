@@ -28,7 +28,16 @@ cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 # rekey-verifier compile surface.
 decaps-only = []
 
+[[bench]]
+# BM-9: crypto primitives first bench (divan membrane, ZP-18 composed:
+# assert_release harness entry + per-op fence; census-clean, no allowlist).
+name = "primitives"
+harness = false
+
 [dev-dependencies]
+# BM-9: exact-at-authoring-time pin (same law as crates/bench: `cargo search
+# divan` 2026-11-01 -> 0.1.21; exact only, a caret pin drifts silently).
+divan = "=0.1.21"
 # ZP-18: timing fences for benches/tests (dev-only edge; the lib surface
 # stays zero-dep no_std).
 cgap-aoq = { path = "../cgap-aoq" }
