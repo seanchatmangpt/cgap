@@ -144,10 +144,10 @@ noted. D-numbers are coordinator lane IDs, not cgap receipt files.
 
 The receipt's PARTIAL-ish fences have resolved: the lint fence was
 ggen-side, not cgap; D28's fence landed (note: the coordinator-cited
-SHA `a86d167` is NOT present in cgap's object store —
-`git cat-file -t a86d167` refuses, `--all` grep empty, even after
-`git fetch` — so that specific citation is UNVERIFIED; the fence
-closure itself is witnessed by the courts below, not by that SHA).
+SHA `a86d167` is an lsp-max commit — D28's work was dual-landed;
+in cgap the CLAUDE-drift fence is `b69ccabd` (D83), verified in
+cgap's object store; the fence closure is witnessed by the courts
+below).
 
 Re-derived this session against HEAD 601e0274:
 
