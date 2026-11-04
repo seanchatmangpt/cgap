@@ -2,11 +2,13 @@
 
 Sovereign `#![no_std]` columnar/deductive substrate; 25-member root
 workspace at 26.11.3 by `cargo metadata` (23 `crates/` members + 2
-ontology packs), 19 of 20 publish-intended member crates exist on
-crates.io (`bench` there is a name
-collision, not ours; `cgap-beam`/`cgap-integration`/`cgap-court`/
-`cgap-branchless`/`cgap-verification` are registry-absent or
-`publish = false`). cgap-datafusion was removed
+ontology packs); registry census (zd-119, 2026-11-04): cgap-aoq is
+NAME-FREE (first-publish candidate), wasm-footprint max 26.11.1, all
+other censused publish=true crates at 26.11.2, 26.11.3 free everywhere
+(`bench` there is a name
+collision, not ours; `cgap-verification` is on disk, not a root member;
+`cgap-integration`/`cgap-court`/`cgap-beam` carry `publish = false`).
+cgap-datafusion was removed
 (`docs/jira/v26.11.1/waves/cgap-datafusion-removal.md:6`) — do not
 re-scaffold. Campaign: v26.11.2 starDF (`docs/jira/v26.11.2/
 00-ard-prd.md`; runbook `OVERNIGHT-LOOP.md`, wave plan `05-wave-plan.md`).
