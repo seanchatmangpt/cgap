@@ -28,6 +28,12 @@
 //!   `cgap_aoq_session_new(epoch, key_id, ordinal)` inputs become pinned
 //!   constants here; arcus W2-B/D will pass them on the wire in a later
 //!   lane).
+//! - **Per-connection I/O timeout (A4 RISK A).** `serve` sets
+//!   SO_RCVTIMEO/SO_SNDTIMEO (30s default, `CGAP_SIDECAR_IO_TIMEOUT_MS`
+//!   court override) on both legs; a stalled peer is dropped SILENTLY —
+//!   no status word (the frozen band is 8/8 allocated, KD-1) — and the
+//!   single-tenant accept loop resumes. The deadline refreshes per
+//!   read/write call: a slow-but-progressing peer is never dropped.
 //!
 //! # Named exits (panic=abort rationale, workspace [profile.release])
 //!
@@ -169,6 +175,44 @@ mod imp {
         BadFraming,
         /// `body_len` word exceeds [`MAX_BODY`].
         Oversize,
+        /// The peer stalled past the per-connection I/O timeout
+        /// ([`IO_TIMEOUT`]): the OS read timed out with bytes sent but the
+        /// window incomplete. Transport-layer fault; the connection is
+        /// dropped WITHOUT a status word (the frozen band is 8/8 allocated
+        /// — KD-1 — and a timeout is a transport fault, not a framing
+        /// verdict), and the single-tenant accept loop resumes.
+        ClientTimeout,
+    }
+
+    /// Per-connection I/O timeout applied to BOTH legs (read and write) of
+    /// every served connection (A4 RISK A fix: a stalled client must not
+    /// park the single-tenant serve loop in read(2) forever).
+    ///
+    /// N = 30s: generous against lawful handshake latency (the ML-KEM-768
+    /// Ek + Finish round trips are sub-millisecond on host hardware; the
+    /// budget exists for scheduling stalls, not for the crypto), yet it
+    /// bounds the wedge to 30s per stalled connection instead of forever.
+    ///
+    /// COURT SEAM (disclosed): `CGAP_SIDECAR_IO_TIMEOUT_MS` overrides the
+    /// default in milliseconds so the wedge-freedom court can drive the
+    /// REAL binary at a 1s timeout instead of waiting 30s. Production
+    /// leaves the env unset and gets the 30s law.
+    fn io_timeout() -> std::time::Duration {
+        let ms = env::var("CGAP_SIDECAR_IO_TIMEOUT_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(30_000);
+        std::time::Duration::from_millis(ms)
+    }
+
+    /// The error kind the OS reports for an expired SO_RCVTIMEO/SO_SNDTIMEO
+    /// (EAGAIN/EWOULDBLOCK on macOS/BSD, ETIMEDOUT on Linux) — both are the
+    /// one [`ReadFault::ClientTimeout`] law.
+    fn is_timeout(e: &io::Error) -> bool {
+        matches!(
+            e.kind(),
+            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+        )
     }
 
     /// Read exactly one AOQ1 window off the stream.
@@ -179,9 +223,13 @@ mod imp {
         let mut prefix = [0u8; PREFIX_SIZE];
         let mut got = 0usize;
         while got < prefix.len() {
-            let n = stream
-                .read(&mut prefix[got..])
-                .map_err(|_| ReadFault::Short)?;
+            let n = stream.read(&mut prefix[got..]).map_err(|e| {
+                if is_timeout(&e) {
+                    ReadFault::ClientTimeout
+                } else {
+                    ReadFault::Short
+                }
+            })?;
             if n == 0 {
                 if got == 0 {
                     return Err(ReadFault::CleanClose);
@@ -228,7 +276,13 @@ mod imp {
     fn read_full(stream: &mut UnixStream, buf: &mut [u8]) -> Result<usize, ReadFault> {
         let mut got = 0usize;
         while got < buf.len() {
-            let n = stream.read(&mut buf[got..]).map_err(|_| ReadFault::Short)?;
+            let n = stream.read(&mut buf[got..]).map_err(|e| {
+                if is_timeout(&e) {
+                    ReadFault::ClientTimeout
+                } else {
+                    ReadFault::Short
+                }
+            })?;
             if n == 0 {
                 return Err(ReadFault::Short);
             }
@@ -397,6 +451,21 @@ mod imp {
     /// (a zero-byte sink accept) maps to [`AOQ_STATUS_BUSY`], the pinned
     /// internal-fault word, via the StreamWriter error surface.
     fn serve(mut stream: UnixStream) {
+        // A4 RISK A: bound both legs. A stalled client (connects, sends a
+        // partial prefix, holds) must NOT park serve() in read(2) forever —
+        // the accept loop is single-tenant, so that wedge stalls every
+        // subsequent peer and the PL7 BUSY drain never runs. Both timeouts
+        // fire per read/write call, so the deadline refreshes on progress:
+        // a slow-but-progressing lawful peer is never dropped.
+        let t = io_timeout();
+        if let Err(e) = stream.set_read_timeout(Some(t)) {
+            eprintln!("set_read_timeout: {e}");
+            return;
+        }
+        if let Err(e) = stream.set_write_timeout(Some(t)) {
+            eprintln!("set_write_timeout: {e}");
+            return;
+        }
         let kem = SidecarKem;
         let mut session = Session::new(&kem, EPOCH, KEY_ID, ORDINAL0);
         // Per-connection reused buffers (alloc-elimination lane): allocated
@@ -412,6 +481,15 @@ mod imp {
             let window = match read_window(&mut stream) {
                 Ok(w) => w,
                 Err(ReadFault::CleanClose) => return,
+                Err(ReadFault::ClientTimeout) => {
+                    // Transport-layer fault: drop the stalled connection
+                    // SILENTLY (no status word — the frozen band is 8/8
+                    // allocated per KD-1) and return to the accept loop.
+                    // The sidecar is NOT killed; the wedge is bounded, the
+                    // serve loop resumes (wedge-freedom law).
+                    eprintln!("client timeout: stalled peer dropped (no status word)");
+                    return;
+                }
                 Err(e) => {
                     let word = match e {
                         ReadFault::CleanClose => unreachable!(),
@@ -744,6 +822,37 @@ mod imp {
             match read_window(&mut b) {
                 Err(ReadFault::Short) => {}
                 other => panic!("expected Short, got {other:?}"),
+            }
+        }
+
+        /// Partial prefix then a STALL (peer holds, never closes) ->
+        /// ClientTimeout, not Short, once the per-connection deadline
+        /// expires. The court drives the fault function directly with a
+        /// 200ms SO_RCVTIMEO on the server-side socket (the same OS
+        /// deadline serve() installs; a bounded poll, not a sleep — the
+        /// kernel owns the wait).
+        #[test]
+        fn fault_matrix_client_timeout() {
+            let (mut a, mut b) = socketpair();
+            b.set_read_timeout(Some(std::time::Duration::from_millis(200)))
+                .expect("set court read timeout");
+            a.write_all(&[0xFFu8; 4]).expect("partial prefix");
+            // Peer deliberately does NOT close and does NOT send more.
+            match read_window(&mut b) {
+                Err(ReadFault::ClientTimeout) => {}
+                Err(ReadFault::Short) => {
+                    panic!("deadline expired but fault read as Short (timeout not mapped)")
+                }
+                other => panic!("expected ClientTimeout, got {other:?}"),
+            }
+            // A FRESH read_window after the timeout sees the peer's later
+            // close at offset 0 of the new call: CleanClose. (The deadline
+            // refreshes per read call; the partial 4 bytes from the timed-
+            // out call were discarded with it.)
+            drop(a);
+            match read_window(&mut b) {
+                Err(ReadFault::CleanClose) => {}
+                other => panic!("expected CleanClose after peer close, got {other:?}"),
             }
         }
 
