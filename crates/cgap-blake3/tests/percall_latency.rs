@@ -16,7 +16,6 @@
 //! black_box-consumed and parity against a known-answer vector is asserted
 //! before any timing is trusted.
 
-use std::hint::black_box;
 use std::time::Instant;
 
 use cgap_blake3::hash;
@@ -38,11 +37,11 @@ fn fill(buf: &mut [u8]) {
 fn round(buf: &[u8]) -> Vec<f64> {
     let mut samples = Vec::with_capacity(CALLS);
     for _ in 0..CALLS {
-        let input = black_box(buf);
+        let input = cgap_aoq::profile_guard::fence(buf);
         let t0 = Instant::now();
         let d = hash(input);
         let dt = t0.elapsed();
-        black_box(d);
+        cgap_aoq::profile_guard::fence(d);
         samples.push(dt.as_nanos() as f64);
     }
     samples
@@ -56,6 +55,12 @@ fn pct(sorted: &mut [f64], p: f64) -> f64 {
 
 #[test]
 fn percall_latency_64b_1kib_64kib() {
+    // ZP-18 profile guard: latency numbers are only lawful on a release
+    // profile — loud-SKIP (never a fake number) on a dev build.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP percall_latency_64b_1kib_64kib: {v}");
+        return;
+    }
     // Parity gate before timing: known BLAKE3 vector for the empty string and
     // a 64 B input must match the official vectors' law (digest is a pure
     // function; assert determinism across a fresh call).
@@ -66,7 +71,7 @@ fn percall_latency_64b_1kib_64kib() {
     for size in [64usize, 1024, 64 * 1024] {
         let mut buf = vec![0u8; size];
         fill(&mut buf);
-        black_box(&buf);
+        cgap_aoq::profile_guard::fence(&buf);
 
         let mut round_medians = Vec::with_capacity(ROUNDS);
         let mut best: Option<(Vec<f64>, f64)> = None;

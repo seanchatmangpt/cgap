@@ -37,6 +37,10 @@ fn time_min_fixed<F: FnMut() -> u64>(iters: usize, mut f: F) -> f64 {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     println!("# cgap v26.10.29 Civilizational Phase-Change Benchmark Suite");
     println!("# Min-of-{ROUNDS} rounds, MIN is the receipt. Invariant: 0 post-init allocations\n");
 

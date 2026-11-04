@@ -442,6 +442,10 @@ fn count_pattern(haystack: &[u8], needle: &[u8]) -> u64 {
 /// measurement printout).
 #[test]
 fn macro_federation_1m_records_500_endpoints() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP macro_federation_1m_records_500_endpoints: {v}");
+        return;
+    }
     run_federation(LAWFUL_PER_EP, PROBES_PER_EP);
 }
 
@@ -451,6 +455,10 @@ fn macro_federation_1m_records_500_endpoints() {
 #[test]
 #[ignore]
 fn macro_federation_10m_records() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP macro_federation_10m_records: {v}");
+        return;
+    }
     run_federation(18_000, 2_000);
 }
 

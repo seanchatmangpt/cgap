@@ -107,7 +107,6 @@ fn empty_delta_reproduces_base() {
 fn chain_of_16_resolves_iteratively() {
     let base = b"0123456789".to_vec();
     // Each hop re-asserts the full target via copy-from-base; chain of 16.
-    let mut deltas: Vec<&[u8]> = Vec::new();
     let mut storage: Vec<Vec<u8>> = Vec::new();
     for hop in 1..=MAX_CHAIN_DEPTH {
         let body: Vec<u8> = vec![b'a' + (hop as u8 - 1); 10];
@@ -152,7 +151,6 @@ fn cyclical_chain_is_refused_typed() {
 
 #[test]
 fn depth_17_chain_is_refused_typed() {
-    let mut deltas: Vec<&[u8]> = Vec::new();
     let mut storage: Vec<Vec<u8>> = Vec::new();
     for hop in 0..(MAX_CHAIN_DEPTH + 1) {
         let mut ops = Vec::new();

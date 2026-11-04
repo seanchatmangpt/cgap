@@ -103,6 +103,10 @@ fn wide_reduce64(cvs: &[[u32; 8]; 64]) -> [u32; 8] {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     let rounds: usize = std::env::var("AF3_ROUNDS")
         .ok()
         .and_then(|v| v.parse().ok())

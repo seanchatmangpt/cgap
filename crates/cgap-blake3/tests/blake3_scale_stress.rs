@@ -32,7 +32,6 @@
 //!    mirrors `chatman.rs`'s own one-kernel-many-bindings law.
 
 use std::collections::HashSet;
-use std::hint::black_box;
 use std::time::Instant;
 
 use cgap_blake3::{
@@ -157,6 +156,12 @@ fn pattern_buf(len: usize) -> Vec<u8> {
 /// Court 1: throughput curve (min-of-3) + 16 MiB dispatch boundary law.
 #[test]
 fn throughput_curve_and_gpu_dispatch_boundary() {
+    // ZP-18 profile guard: throughput numbers are only lawful on a release
+    // profile — loud-SKIP (never a fake number) on a dev build.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP throughput_curve_and_gpu_dispatch_boundary: {v}");
+        return;
+    }
     // Predicate flips exactly at the boundary.
     assert!(!should_dispatch_gpu(GPU_CROSSOVER_BYTES - 1));
     assert!(should_dispatch_gpu(GPU_CROSSOVER_BYTES));
@@ -176,11 +181,11 @@ fn throughput_curve_and_gpu_dispatch_boundary() {
         let mut best_wide = f64::INFINITY;
         for _ in 0..3 {
             let t = Instant::now();
-            black_box(hash(black_box(&data)));
+            cgap_aoq::profile_guard::fence(hash(cgap_aoq::profile_guard::fence(&data)));
             let el = t.elapsed().as_secs_f64();
             best = best.min(size as f64 / (1u64 << 20) as f64 / el);
             let tw = Instant::now();
-            black_box(hash_wide_simd(black_box(&data)));
+            cgap_aoq::profile_guard::fence(hash_wide_simd(cgap_aoq::profile_guard::fence(&data)));
             best_wide =
                 best_wide.min(size as f64 / (1u64 << 20) as f64 / tw.elapsed().as_secs_f64());
         }

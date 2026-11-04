@@ -10,6 +10,10 @@ const ROUNDS: usize = 5;
 const LSL_GIB_S: f64 = 1.0;
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     let gate = std::env::args().any(|a| a == "--gate");
     let model = std::env::var("BLAKE3_BENCH_MACHINE").unwrap_or_else(|_| String::from("unknown"));
 

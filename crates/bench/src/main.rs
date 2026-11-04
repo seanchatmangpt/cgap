@@ -43,6 +43,10 @@ unsafe impl std::alloc::GlobalAlloc for CountingAlloc {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     // CTQ-5 non-vacuity probe: prove the allocator hook actually counts before
     // any "0 allocs" line is trusted. A deliberate allocation must bump COUNT;
     // if it does not, the global allocator is not wired up and every zero on a

@@ -22,6 +22,10 @@ std = []
 # reaches the real cgap-arrow layout — same crate-as-dev-dep pattern as
 # cgap-ffi. Workspace path dep; adds no external dependency.
 cgap-arrow = { path = "../cgap-arrow" }
+# ZP-18 timing fence: tests/accessor_perf_court.rs + tests/aligned_interop.rs
+# compose cgap_aoq::profile_guard (assert_release loud-skip + black_box fence).
+# Dev-dep only: the published kernel [dependencies] stays empty/no_std.
+cgap-aoq = { path = "../cgap-aoq" }
 
 [package.metadata.docs.rs]
 all-features = true

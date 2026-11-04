@@ -56,6 +56,10 @@ fn timed_rounds(kernel: &mut dyn FnMut(), best: &mut f64) {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     println!(
         "digest-bench: 3 slices x {WORDS} words x 8 B = 192 MiB/call \
          (2 read + 1 write), min-of-{ROUNDS}, same buffers both kernels"

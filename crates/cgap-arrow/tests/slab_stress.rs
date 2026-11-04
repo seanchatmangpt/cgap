@@ -443,6 +443,12 @@ fn alloc_census_refusal_paths_allocate_zero() {
 // --------------------------------------------------------------------------
 #[test]
 fn throughput_push_reset_pairs_min_of_3() {
+    // Profile guard (arrow-ZP18-D): wall-clock min-of-3 leg fences against
+    // a release-only floor assert; under a dev profile it loud-SKIPs.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP throughput_push_reset_pairs_min_of_3: {v}");
+        return;
+    }
     use std::hint::black_box;
     use std::time::Instant;
 

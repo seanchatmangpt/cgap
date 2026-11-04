@@ -82,6 +82,10 @@ fn consume_u32(o: &[u32]) {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     // ---- (a) bit-unpack: widths 1/2/4/8 over 64 MiB of u64 lanes ----
     // Full-width source (1M words covers width 8; narrower widths read a prefix).
     let src: Vec<u64> = (0..UNPACK_LANES / 8)

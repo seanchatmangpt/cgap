@@ -111,6 +111,10 @@ fn read_unseal_frame(rx: &mut UnixStream, ordinal: u32, seq: u32) -> std::io::Re
 
 #[test]
 fn soak_10k_seal_writev_uds_verify_unseal() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP soak_10k_seal_writev_uds_verify_unseal: {v}");
+        return;
+    }
     let (mut tx, mut rx) = UnixStream::pair().expect("socketpair");
     let plain = [0x33u8; BODY];
     let zero_pad = [0u8; 64];

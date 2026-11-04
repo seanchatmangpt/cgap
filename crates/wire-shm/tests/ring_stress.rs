@@ -9,7 +9,7 @@ use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use wire_shm::{crc32_ieee, WireError, WireRing, BOOK_LEN, MAX_PAYLOAD, SLOT_LEN};
+use wire_shm::{crc32_ieee, WireError, WireRing, MAX_PAYLOAD};
 
 /// Per-test temp segment path (unique per test name; deleted on drop via
 /// leak-tolerant pattern: tests own disjoint names, files live in
@@ -194,7 +194,7 @@ fn backpressure_typed_refusal_state_intact() {
     for ord in 0..cap {
         let err = ring.stamp_frame(&fill_payload(ord, 256), ord).unwrap_err();
         assert!(
-            matches!(err, WireError::StaleOrdinal { expected: cap, found } if found == ord),
+            matches!(err, WireError::StaleOrdinal { expected, found } if expected == cap && found == ord),
             "overflow write at {ord} must refuse typed, got {err:?}"
         );
     }
@@ -243,6 +243,12 @@ fn backpressure_typed_refusal_state_intact() {
 /// fast-but-corrupt result fails the court.
 #[test]
 fn throughput_frames_per_sec_min_of_3() {
+    // ZP-18 timing fence: min-of-3 frames/sec throughput court; under a dev
+    // profile this loud-SKIPs instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP throughput_frames_per_sec_min_of_3: {v}");
+        return;
+    }
     let sizes: [usize; 2] = [64, MAX_PAYLOAD];
     let mut report = String::from("AB-11 throughput (min of 3 fill+drain runs):\n");
     for &size in &sizes {

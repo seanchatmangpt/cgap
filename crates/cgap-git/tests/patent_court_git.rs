@@ -116,7 +116,7 @@ fn budget_12_admits_the_199_edge_chain() {
 #[test]
 fn budget_4_on_199_edges_refuses_101_class_and_leaves_ref_chain_unmodified() {
     let d = driver();
-    let mut ref_chain = vec![[0u8; 20]; 4];
+    let ref_chain = vec![[0u8; 20]; 4];
     let snapshot: Vec<[u8; 20]> = ref_chain.clone();
     let res = evaluate_commit(BudgetMetering::Enforced, STATUTORY_FIXPOINT_BUDGET, &d);
     match res {

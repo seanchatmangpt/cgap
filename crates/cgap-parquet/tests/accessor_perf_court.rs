@@ -59,6 +59,13 @@ fn corpus() -> Vec<u64> {
 
 #[test]
 fn accessor_scan_16mib_under_ceiling() {
+    // ZP-18 timing fence: this court times a real loop and asserts a
+    // wall-clock ceiling; on a dev profile that number is meaningless, so
+    // the measurement loud-SKIPs instead of gating on debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP accessor_scan_16mib_under_ceiling: {v}");
+        return;
+    }
     let data = corpus();
     let bytes: Vec<u8> = data.iter().flat_map(|x| x.to_le_bytes()).collect();
     let cols = vec![FixtureColumn {
@@ -90,6 +97,8 @@ fn accessor_scan_16mib_under_ceiling() {
         sink ^= pf.value_u64(0, 0, r).expect("row");
     }
     let dt = start.elapsed();
+    // ZP-18 anti-DCE fence: keep the hot-loop digest output observable.
+    cgap_aoq::profile_guard::fence(sink);
     assert_ne!(sink, u64::MAX, "keep the loop observable, not dead code");
 
     let gib = 16.0 / 1024.0;
@@ -114,6 +123,7 @@ fn accessor_scan_16mib_under_ceiling() {
     }
     let dt2 = start.elapsed();
     println!("second (warm-cache) scan: {:?}", dt2);
+    cgap_aoq::profile_guard::fence(sink2);
     assert_eq!(sink, sink2, "two scans of the same column agree");
     assert!(dt2.as_millis() < 500, "warm scan took {:?}", dt2);
 }

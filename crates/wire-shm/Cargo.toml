@@ -8,3 +8,9 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
+
+# ZP-18 GAP-CLOSE lane: profile_guard fence collaborator for the ring
+# stress throughput court (tests/ring_stress.rs). Dev-only; the runtime lib
+# stays zero-dependency.
+[dev-dependencies]
+cgap-aoq = { path = "../cgap-aoq" }

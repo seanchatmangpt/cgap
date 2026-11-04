@@ -55,6 +55,12 @@ fn mib_s(bytes: usize, secs: f64) -> f64 {
 #[test]
 #[ignore]
 fn perf_baseline_git_plane() {
+    // ZP-18 timing fence: informational throughput baselines are only
+    // meaningful on a release profile; under dev the baseline loud-SKIPs.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP perf_baseline_git_plane: {v}");
+        return;
+    }
     let blobs = corpus();
     let total: usize = blobs.iter().map(|b| b.len()).sum();
     println!("\n=== cgap-git perf baseline (64 MiB corpus, 256 x 256 KiB blobs) ===");
@@ -82,6 +88,9 @@ fn perf_baseline_git_plane() {
         );
         best = best.min(mibs);
         best_objs = best_objs.min(objs);
+        // ZP-18 anti-DCE fence on the pack/idx digest outputs.
+        cgap_aoq::profile_guard::fence(pack.len());
+        cgap_aoq::profile_guard::fence(idx.len());
     }
     println!(
         "PACK WRITE: best {:.1} MiB/s, {:.0} objects/s (min-of-3)",
@@ -130,6 +139,8 @@ fn perf_baseline_git_plane() {
         }
     }
     let dt_lookup = t0.elapsed().as_secs_f64();
+    // ZP-18 fence on the lookup-loop measured value.
+    cgap_aoq::profile_guard::fence(dt_lookup);
     let probes_after = cgap_git::ladder::debug_probes();
     std::hint::black_box(&miss);
     assert_eq!(

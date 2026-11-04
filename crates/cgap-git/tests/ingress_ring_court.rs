@@ -257,6 +257,12 @@ fn tiny_ring_wrap_court() {
 #[test]
 fn sieve_throughput_release_report() {
     use std::time::Instant;
+    // ZP-18 timing fence: the ns/frame report is release-only; under a dev
+    // profile it loud-SKIPs instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP sieve_throughput_release_report: {v}");
+        return;
+    }
     let mut ring = StdIngressRing::new();
     let frame = [0x41u8; 64];
     // Warm the ring path once.
@@ -277,6 +283,8 @@ fn sieve_throughput_release_report() {
     }
     let elapsed = t0.elapsed();
     let per_frame_ns = elapsed.as_nanos() / FRAMES as u128;
+    // ZP-18 anti-DCE fence on the measured verdict value.
+    cgap_aoq::profile_guard::fence(per_frame_ns);
     println!(
         "MEASURED [sieve-throughput] method=batch-amortized(Instant over {} sieved 64B pushes, drain-at-capacity included) per_frame_ns={} target_ns_per_frame=10 status={}",
         FRAMES,

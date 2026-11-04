@@ -161,6 +161,11 @@ fn json_opt(v: Option<f64>) -> String {
 }
 
 fn main() {
+    // ZP-18-C: release-profile fence — dev-profile runs loud-SKIP.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     // Anti-vacuity injection: env gate read once, logged loudly.
     let inject = std::env::var("CPK_INJECT_FAIL").is_ok();
     if inject {

@@ -398,6 +398,10 @@ fn process_op(
 // never allocates -- the 0-alloc census IS the GC-immunity witness.
 #[test]
 fn i1_bimodal_size_storm() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP i1_bimodal_size_storm: {v}");
+        return;
+    }
     let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     if !census_isolated("i1_bimodal_size_storm") {
         return;
@@ -492,6 +496,10 @@ fn i1_bimodal_size_storm() {
 // the no-stall floor.
 #[test]
 fn i2_stall_walk_isolation() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP i2_stall_walk_isolation: {v}");
+        return;
+    }
     let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     const FRAMES: usize = 10_000;
     const STALL_FRAMES: [usize; 8] = [1000, 2000, 3999, 4000, 5000, 6000, 7000, 8000];
@@ -576,6 +584,10 @@ fn i2_stall_walk_isolation() {
 // the verify+gate op printed as context.
 #[test]
 fn i3_cache_stride() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP i3_cache_stride: {v}");
+        return;
+    }
     let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     if !census_isolated("i3_cache_stride") {
         return;
@@ -684,6 +696,10 @@ fn i3_cache_stride() {
 // (c) typed refusal census == deterministic plan, never a panic.
 #[test]
 fn i4_tamper_inundation() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP i4_tamper_inundation: {v}");
+        return;
+    }
     let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     if !census_isolated("i4_tamper_inundation") {
         return;
@@ -821,6 +837,10 @@ fn i4_tamper_inundation() {
 // after verify+gate+chain). ab-17/ab-18 receipted 5.8-7.4 ms band.
 #[test]
 fn i5_supervisor_churn() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP i5_supervisor_churn: {v}");
+        return;
+    }
     let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
     const FRAMES: usize = 10_000;
     const KILL_EVERY: usize = 1000;

@@ -34,6 +34,12 @@ fn oid(seed: u8) -> [u8; REF_LEN] {
 /// measured SMP property.
 #[test]
 fn court_clean_20_agent_interleaved_ingress() {
+    // ZP-18 timing fence: reports CAS ops/s (Instant, sequential); under a
+    // dev profile this loud-SKIPs instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP court_clean_20_agent_interleaved_ingress: {v}");
+        return;
+    }
     let mut t = LeaseTable::new();
     let mut expected: [[u8; REF_LEN]; 20] = [[0u8; REF_LEN]; 20];
     for i in 0..20u64 {

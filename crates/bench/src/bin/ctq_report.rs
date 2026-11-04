@@ -107,6 +107,11 @@ fn trimmed_cv(samples: &mut Vec<f64>, frac: f64) -> f64 {
 }
 
 fn main() {
+    // ZP-18-C: release-profile fence — dev-profile runs loud-SKIP.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     let mut gates_failed: Vec<&'static str> = Vec::new();
 
     // ------------------------------------------------------- CTQ-03 -----

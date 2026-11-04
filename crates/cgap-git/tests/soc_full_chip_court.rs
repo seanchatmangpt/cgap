@@ -44,6 +44,7 @@ use object_store::{ObjectKind, ObjectStore};
 
 /// Exact SoC SRAM: 131,072 bytes, page-aligned.
 const SRAM_BYTES: usize = 131_072;
+#[allow(dead_code)] // reserved: SRAM page-granularity stage not wired in this court
 const SRAM_PAGE: usize = 4096;
 const FACTS_TOTAL: usize = 1_000_000;
 /// 1,365-fact window (pack_demux::FACT_WINDOW, coprime stride).
@@ -197,11 +198,10 @@ fn serialize_window(
     buf: &mut [u8],
 ) -> usize {
     assert!(facts <= u32::MAX as usize);
-    let mut pos = 0usize;
+    let mut pos = 12usize;
     buf[..4].copy_from_slice(b"PACK");
     buf[4..8].copy_from_slice(&2u32.to_be_bytes());
     buf[8..12].copy_from_slice(&(facts as u32).to_be_bytes());
-    pos = 12;
     for i in 0..facts {
         let class = fact_class(base_fact + i);
         let p = &payloads[class];
@@ -219,6 +219,7 @@ fn serialize_window(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
+#[allow(dead_code)] // payload fields are diagnostic context; courts match on variant only
 enum StageError {
     Ring(ingress_ring::IngressError),
     Demux(pack_demux::DemuxError),

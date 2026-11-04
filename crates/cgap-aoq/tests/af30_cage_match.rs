@@ -101,6 +101,10 @@ fn make_header(ordinal: u32) -> (AoqHeader, [u8; 64]) {
 
 #[test]
 fn af30_contender_a_frame_pipeline() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP af30_contender_a_frame_pipeline: {v}");
+        return;
+    }
     // Build a valid sealed wire header once; per-frame decode re-runs the
     // full codec law (magic/version/epoch/digest checks) on a fresh copy.
     let (h0, wire0) = make_header(0);

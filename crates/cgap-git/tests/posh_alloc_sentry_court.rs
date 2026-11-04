@@ -143,11 +143,10 @@ fn put_varint_header(out: &mut [u8], pos: &mut usize, ty: u8, size: u64) {
 
 fn serialize_window(payloads: &[[u8; 32]; FACT_CLASSES], buf: &mut [u8]) -> usize {
     assert!(WINDOW <= u32::MAX as usize);
-    let mut pos = 0usize;
+    let mut pos = 12usize;
     buf[..4].copy_from_slice(b"PACK");
     buf[4..8].copy_from_slice(&2u32.to_be_bytes());
     buf[8..12].copy_from_slice(&(WINDOW as u32).to_be_bytes());
-    pos = 12;
     for i in 0..WINDOW {
         let class = fact_class(i);
         let p = &payloads[class];

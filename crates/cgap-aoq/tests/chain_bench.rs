@@ -44,12 +44,14 @@ fn slab() -> &'static mut [AoqChainRecord] {
 fn bench_append(links: usize) -> f64 {
     let slab = slab();
     let mut c = AoqChain::new(Mix32, slab);
-    let payload = [0xa5u8; 32];
+    let payload = cgap_aoq::profile_guard::fence([0xa5u8; 32]);
     let t0 = Instant::now();
     for i in 0u64..links as u64 {
         c.append((i % 3) as u16, &payload).unwrap();
     }
-    let per_op_us = t0.elapsed().as_secs_f64() * 1e6 / links as f64;
+    let per_op_us = cgap_aoq::profile_guard::fence(
+        t0.elapsed().as_secs_f64() * 1e6 / links as f64,
+    );
     assert_eq!(c.len(), links);
     per_op_us
 }
@@ -57,19 +59,25 @@ fn bench_append(links: usize) -> f64 {
 fn bench_verify(links: usize) -> f64 {
     let slab = slab();
     let mut c = AoqChain::new(Mix32, slab);
-    let payload = [0xa5u8; 32];
+    let payload = cgap_aoq::profile_guard::fence([0xa5u8; 32]);
     for i in 0u64..links as u64 {
         c.append((i % 3) as u16, &payload).unwrap();
     }
     let t0 = Instant::now();
     assert_eq!(c.verify_all(), Ok(()));
-    let per_op_us = t0.elapsed().as_secs_f64() * 1e6 / links as f64;
+    let per_op_us = cgap_aoq::profile_guard::fence(
+        t0.elapsed().as_secs_f64() * 1e6 / links as f64,
+    );
     per_op_us
 }
 
 /// Min-of-N across 1k / 10k / 100k links.
 #[test]
 fn bench_append_and_verify_min_of_n() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_append_and_verify_min_of_n: {v}");
+        return;
+    }
     const N: usize = 5;
     let mut best_append = [f64::INFINITY; 3];
     let mut best_verify = [f64::INFINITY; 3];
@@ -86,9 +94,11 @@ fn bench_append_and_verify_min_of_n() {
         }
     }
     for (i, links) in [1_000usize, 10_000, 100_000].into_iter().enumerate() {
+        let fa = cgap_aoq::profile_guard::fence(best_append[i]);
+        let fv = cgap_aoq::profile_guard::fence(best_verify[i]);
         println!(
             "chain bench: {:>7} links  append {:>8.3} us/op  verify {:>8.3} us/op  (min of {N})",
-            links, best_append[i], best_verify[i]
+            links, fa, fv
         );
     }
     // Sanity floor (not a perf claim): the digest seam is deterministic

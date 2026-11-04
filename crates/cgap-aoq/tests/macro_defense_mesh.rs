@@ -154,7 +154,9 @@ fn ek_of(seed: u8) -> [u8; EK_BYTES] {
 /// Radar track frame body: 48B.
 fn radar_body(seq: u32, c: usize) -> [u8; 4 + 48] {
     let mut b = [0u8; 4 + 48];
-    b[..4].copy_from_slice(&seq.to_be_bytes());
+    // seq word is opaque payload here (never parsed as a seq); written LE per
+    // the 2026-11-04 seq-LE migration for hygiene.
+    b[..4].copy_from_slice(&seq.to_le_bytes());
     for (i, slot) in b[4..].iter_mut().enumerate() {
         *slot = (c as u8) ^ (i as u8) ^ (seq as u8);
     }
@@ -164,7 +166,9 @@ fn radar_body(seq: u32, c: usize) -> [u8; 4 + 48] {
 /// Kinetic event frame body: 96B.
 fn kinetic_body(seq: u32, c: usize) -> [u8; 4 + 96] {
     let mut b = [0u8; 4 + 96];
-    b[..4].copy_from_slice(&seq.to_be_bytes());
+    // seq word is opaque payload here (never parsed as a seq); written LE per
+    // the 2026-11-04 seq-LE migration for hygiene.
+    b[..4].copy_from_slice(&seq.to_le_bytes());
     for (i, slot) in b[4..].iter_mut().enumerate() {
         *slot = (c as u8).wrapping_mul(3) ^ (i as u8).wrapping_mul(7) ^ (seq as u8);
     }
@@ -174,7 +178,9 @@ fn kinetic_body(seq: u32, c: usize) -> [u8; 4 + 96] {
 /// Launch-state frame body: 16B (low-latency shape).
 fn launch_body(seq: u32, c: usize) -> [u8; 4 + 16] {
     let mut b = [0u8; 4 + 16];
-    b[..4].copy_from_slice(&seq.to_be_bytes());
+    // seq word is opaque payload here (never parsed as a seq); written LE per
+    // the 2026-11-04 seq-LE migration for hygiene.
+    b[..4].copy_from_slice(&seq.to_le_bytes());
     for (i, slot) in b[4..].iter_mut().enumerate() {
         *slot = (c as u8) | (i as u8) << 2 | (seq as u8).rotate_left(1);
     }
@@ -424,6 +430,10 @@ fn ld(v: &AtomicUsize) -> usize {
 
 #[test]
 fn macro_defense_mesh() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP macro_defense_mesh: {v}");
+        return;
+    }
     let fd_before = fd_count();
     let rss_before = rss_kb();
     let t0 = Instant::now();

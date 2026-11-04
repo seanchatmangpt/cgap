@@ -311,7 +311,9 @@ fn leg_g1b_slab_floor() -> Verdict {
             let image = slab.as_bytes();
             cgap_aoq::profile_guard::fence(&image);
             cgap_aoq::profile_guard::fence(slab.len());
-            drop(slab); // reset-to-new is the release primitive
+            // reset-to-new is the release primitive: the fresh
+            // ArrowRecordSlab::new() per cycle re-arms the slab (drop on a
+            // Copy type is a no-op, so the old drop call was removed).
         }
         let secs = start.elapsed().as_secs_f64();
         min_rate = min_rate.min((CYCLES * CAP) as f64 / secs);

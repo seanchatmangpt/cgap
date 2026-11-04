@@ -17,6 +17,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use cgap_aoq::profile_guard::assert_release;
+use cgap_aoq::profile_guard::fence;
 use cgap_arrow::layout::{Quad64, QUAD_SIZE};
 use cgap_blake3::hash;
 use cgap_git::pack_write::{encode_object_header, git_object_oid, parse_idx_v2, parse_pack_v2};
@@ -413,8 +415,19 @@ fn admission_e2e_roundtrip_and_receipt() {
 fn admission_e2e_timing_probe_min_of_100() {
     // Informational only — datapoint toward CTQ-05 (≤35 µs). Not a gate: no
     // assertion on the measured value.
+    // Profile guard (ZP-18): loud-SKIP under a dev profile — green-but-loud
+    // unmeasured, never a fake pass.
+    if let Err(v) = assert_release() {
+        eprintln!(
+            "LOUD-SKIP admission_e2e_timing_probe_min_of_100: non-release profile ({v})"
+        );
+        return;
+    }
     let quads = make_quads(256);
     let bytes = batch_bytes(&quads);
+    // Anti-DCE (ZP-18): fence the digest INPUT (batch bytes) so the loop
+    // cannot constant-fold the receipt stage away.
+    fence(&bytes);
 
     // Integration-side buffer reuse: columns are allocated once and
     // refilled per iteration (clear() keeps capacity — no per-iteration
@@ -464,6 +477,10 @@ fn admission_e2e_timing_probe_min_of_100() {
             best = stage;
         }
     }
+    // Anti-DCE: fence the measured OUTPUTS (min total + stage breakdown)
+    // before reporting.
+    fence(best_total);
+    fence(best);
     let us = |v: u128| v as f64 / 1_000.0;
     // Post wave-5 lane 3 (4-way NEON kernel routing for 4-64-chunk hashes)
     // the receipt stage no longer dominates at ~94%: report the share so the

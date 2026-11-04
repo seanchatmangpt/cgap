@@ -150,11 +150,11 @@ fn court_encode_control() {
     let mut out = [0u8; 64];
     assert_eq!(encode_pkt(b"", &mut out).expect("empty payload"), 4);
     assert_eq!(&out[..4], b"0004", "empty data pkt is 0004");
-    pkt_line::encode_flush(&mut out);
+    pkt_line::encode_flush(&mut out).expect("flush pkt encodes");
     assert_eq!(&out[..4], b"0000");
-    pkt_line::encode_delim(&mut out);
+    pkt_line::encode_delim(&mut out).expect("delim pkt encodes");
     assert_eq!(&out[..4], b"0001");
-    pkt_line::encode_response_end(&mut out);
+    pkt_line::encode_response_end(&mut out).expect("response-end pkt encodes");
     assert_eq!(&out[..4], b"0002");
 }
 

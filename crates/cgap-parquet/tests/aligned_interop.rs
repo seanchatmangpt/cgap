@@ -295,6 +295,13 @@ fn pyarrow_rejects_corrupted_page() {
 
 #[test]
 fn bench_aligned_vs_rle() {
+    // ZP-18 timing fence: the GiB/s report is only meaningful on a release
+    // profile; under dev the bench loud-SKIPs instead of printing a
+    // debug-code throughput number.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_aligned_vs_rle: {v}");
+        return;
+    }
     let n: usize = 8 * 1024 * 1024; // 8 MiB payload
     let values = pattern(n);
 
@@ -309,6 +316,8 @@ fn bench_aligned_vs_rle() {
         let t0 = std::time::Instant::now();
         for _ in 0..4 {
             black_box(aligned_decode(black_box(&page), &mut out)).expect("decode");
+            // ZP-18 anti-DCE fence on the hot-loop digest output lane.
+            cgap_aoq::profile_guard::fence(out[n - 1]);
         }
         let dt = t0.elapsed().as_secs_f64();
         best_aligned = best_aligned.min((n as f64) * 4.0 / dt / 1024.0 / 1024.0 / 1024.0);
@@ -325,11 +334,16 @@ fn bench_aligned_vs_rle() {
         let t0 = std::time::Instant::now();
         for _ in 0..4 {
             black_box(decode_page_into(black_box(&page_rle), &mut out32)).expect("decode");
+            // ZP-18 anti-DCE fence on the hot-loop digest output lane.
+            cgap_aoq::profile_guard::fence(out32[n - 1]);
         }
         let dt = t0.elapsed().as_secs_f64();
         best_rle = best_rle.min((n as f64) * 4.0 / dt / 1024.0 / 1024.0 / 1024.0);
     }
 
+    // ZP-18 fence the curve outputs before the verdict print.
+    cgap_aoq::profile_guard::fence(best_aligned);
+    cgap_aoq::profile_guard::fence(best_rle);
     println!(
         "BENCH aligned_decode: {:.2} GiB/s | decode_page_into(RLE, bits=8): {:.2} GiB/s | \
          ratio: {:.2}x | n={} values/iter x4, best-of-3",

@@ -162,6 +162,10 @@ fn replicate_hash_many(data: &[u8]) -> [u8; 32] {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     let rounds_default: usize = std::env::var("PROFILE_ROUNDS")
         .ok()
         .and_then(|v| v.parse().ok())

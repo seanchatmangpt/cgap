@@ -89,6 +89,12 @@ fn multi_chunk_all_zero_and_all_ff_blocks() {
 #[test]
 #[ignore]
 fn bench_throughput_256mib_min_of_5() {
+    // ZP-18 profile guard: throughput numbers are only lawful on a release
+    // profile — loud-SKIP (never a fake number) on a dev build.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_throughput_256mib_min_of_5: {v}");
+        return;
+    }
     let byt: usize = 256 * 1024 * 1024;
     let buf = pseudo_random_bytes(byt);
 
@@ -99,19 +105,19 @@ fn bench_throughput_256mib_min_of_5() {
         let t0 = std::time::Instant::now();
         let d = hash_many_simd(&buf);
         let dt = t0.elapsed().as_secs_f64();
-        std::hint::black_box(&d);
+        cgap_aoq::profile_guard::fence(&d);
         best_many = best_many.min(dt);
 
         let t0 = std::time::Instant::now();
         let d = hash_many_simd_x2(&buf);
         let dt = t0.elapsed().as_secs_f64();
-        std::hint::black_box(&d);
+        cgap_aoq::profile_guard::fence(&d);
         best_x2 = best_x2.min(dt);
 
         let t0 = std::time::Instant::now();
         let d = cgap_blake3::hash_wide_simd(&buf);
         let dt = t0.elapsed().as_secs_f64();
-        std::hint::black_box(&d);
+        cgap_aoq::profile_guard::fence(&d);
         best_wide = best_wide.min(dt);
         eprintln!(
             "round {}: many={:.3}s x2={:.3}s wide={:.3}s",

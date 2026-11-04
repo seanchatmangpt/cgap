@@ -263,7 +263,7 @@ fn genesis_header(frame_ordinal: u32) -> AoqHeader {
 /// The subject's hot-path op: one full encode+decode roundtrip of a real
 /// 64-byte AOQ1 envelope. Alloc-free by the codec's own law (bound 0).
 fn aoq_op(i: usize) {
-    let mut header = genesis_header(i as u32);
+    let header = genesis_header(i as u32);
     let mut wire = [0u8; 64];
     encode(&header, &mut wire).expect("self-test encode");
     let back = decode(&wire).expect("self-test decode");
@@ -317,6 +317,14 @@ fn percentile_p99(sorted: &[u32]) -> u32 {
 }
 
 fn gate_g2_self() -> GateResult {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        return GateResult::skip(
+            "G2",
+            "NON_RELEASE_PROFILE",
+            &v.to_string(),
+            "timing census unlawful on a dev profile (loud SKIP, exit 3 path)",
+        );
+    }
     const BUDGET_NS: u64 = 10_000;
     aoq_op(0); // warmup
     let mut per_op_ns: Vec<u32> = Vec::with_capacity(CENSUS_OPS);
@@ -468,10 +476,10 @@ fn gate_g5_self() -> GateResult {
     // Storm: partial-accept (truncated), oversized, bad magic, unknown
     // epoch, digest tamper — every frame must elicit a TYPED refusal,
     // never a panic, never a silent accept.
-    let mut good = genesis_header(1);
+    let good = genesis_header(1);
     let mut wire = [0u8; 64];
     encode(&good, &mut wire).expect("storm encode");
-    good.header_digest = u32::from_le_bytes([wire[60], wire[61], wire[62], wire[63]]);
+    // Wire carries the encoded digest (bytes 60..64); `good` is not read again.
 
     let mut cases: Vec<(String, Vec<u8>, &'static str)> = Vec::new();
     cases.push((
@@ -519,6 +527,9 @@ fn gate_g5_self() -> GateResult {
                 AoqError::SeqGap { .. } => "SeqGap",
                 AoqError::KemKernelNotAdmitted { .. } => "KemKernelNotAdmitted",
                 AoqError::AeadKernelNotAdmitted { .. } => "AeadKernelNotAdmitted",
+                AoqError::SlabFull { .. } => "SlabFull",
+                // P2 M1 SLA-disclosed minimal unblock (lane co-edit): new error variant.
+                AoqError::AeadMismatch => "AeadMismatch",
             }
             .to_string(),
         };
@@ -699,6 +710,14 @@ fn gate_g1_foreign(s: &mut Subject, alloc_bound: u64) -> GateResult {
 }
 
 fn gate_g2_foreign(s: &mut Subject, budget_ns: u64) -> GateResult {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        return GateResult::skip(
+            "G2",
+            "NON_RELEASE_PROFILE",
+            &v.to_string(),
+            "timing census unlawful on a dev profile (loud SKIP, exit 3 path)",
+        );
+    }
     const BATCHES: usize = 16;
     const OPS_PER_BATCH: usize = 64;
     let mut per_op_ns: Vec<u64> = Vec::new();

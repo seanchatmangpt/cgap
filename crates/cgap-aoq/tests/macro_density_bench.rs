@@ -24,6 +24,11 @@
 //! scheduling (bounded poll on a real observable, `ps` RSS of this pid);
 //! the load loop is bounded by a real deadline observable, not a sleep.
 
+// kB unit-suffix naming (sample_rss_kB / peak_kB / plateau_kB) is
+// intentional — the identifier carries the kilobyte unit; not a casing
+// error, so it is allowed rather than renamed.
+#![allow(non_snake_case)]
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -111,6 +116,10 @@ fn make_header(ordinal: u32) -> (AoqHeader, [u8; 64]) {
 
 #[test]
 fn af33_density_court() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP af33_density_court: {v}");
+        return;
+    }
     let window = Duration::from_secs(WINDOW_SECS);
 
     // Chain slab + pipeline buffers: allocated OUTSIDE the measured window

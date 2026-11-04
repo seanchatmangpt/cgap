@@ -10,17 +10,6 @@
 use cgap_aoq::codec::{decode, encode};
 use cgap_aoq::header::{AoqHeader, Epoch};
 
-struct Rng(u64);
-impl Rng {
-    fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0xA076_1D64_78BD_642F);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-}
-
 fn timed<F: FnMut()>(mut f: F) -> f64 {
     let start = std::time::Instant::now();
     f();
@@ -29,6 +18,10 @@ fn timed<F: FnMut()>(mut f: F) -> f64 {
 
 #[test]
 fn bench_encode_decode_ns_per_header() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP bench_encode_decode_ns_per_header: {v}");
+        return;
+    }
     const ROUNDS: usize = 7;
     const ITERS: usize = 100_000;
     let h = AoqHeader::new(Epoch::Genesis as u16, 0xDEAD_BEEF, 42, 7);

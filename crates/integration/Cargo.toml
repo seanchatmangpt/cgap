@@ -13,6 +13,11 @@ keywords = ['integration', 'roundtrip', 'cabi', 'wire-parity']
 # cgap-arrow is consumed ONLY by tests/ (dev-dep below); declaring it in
 # [dependencies] too tripped the unused_dependencies manifest warning (W15/W6-b7).
 [dev-dependencies]
+# ZP-18 timing-fence census (ffi-ZP18-D): cgap-aoq pulled in as a DEV-DEPENDENCY
+# ONLY (tests/profile_guard fence compose); never a runtime dep edge.
+# path+version dev-dep (cargo strips path on publish), same pattern as cgap-audit
+# below — cgap-aoq is not yet on crates.io (zd-119: name-free).
+cgap-aoq = { path = "../cgap-aoq", version = "26.11.3" }
 cgap-arrow = "26.11.2" # CALVER-BUMP-26.11.3: minimum-bound pin; ^26.11.2 already admits 26.11.3; registry-only dev-dep (no path), ^26.11.3 breaks offline root resolve until 26.11.3 publish lift
 # path+version dev-dep: cargo strips the path on publish (dev-deps are
 # resolved but never compiled by `cargo publish` verify); kept local because

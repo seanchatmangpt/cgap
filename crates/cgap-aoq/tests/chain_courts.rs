@@ -1,4 +1,4 @@
-//! Chain courts (PG-A5, AB-7): 7 fail-closed courts over the real chain.
+//! Chain courts (PG-A5, AB-7): 9 fail-closed courts over the real chain.
 //! Chicago discipline: real collaborators, assert final state; the only
 //! injected collaborator is the deterministic digest seam the crate itself
 //! mandates (no crypto ships in cgap-aoq, R-K1).
@@ -7,8 +7,7 @@
 //! run with no observed refusal is a VACUOUS GATE.
 
 use cgap_aoq::chain::{
-    record_digest, verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS,
-    RECORD_BYTES,
+    verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS,
 };
 
 /// Deterministic dual-FNV digest substrate (same construction as the
@@ -208,12 +207,12 @@ fn c5_append_only_no_mutation_on_refusal() {
         .collect();
 
     // Header-agnostic law: arbitrary-length payloads digest (never store);
-    // only slab exhaustion refuses. Slab full -> typed refusal, unchanged.
+    // only slab exhaustion refuses. Slab full -> typed SlabFull, unchanged.
     c.append(0, b"three").unwrap();
     c.append(0, b"four").unwrap();
     assert!(matches!(
         c.append(0, b"five"),
-        Err(cgap_aoq::error::AoqError::BufferTooShort { .. })
+        Err(cgap_aoq::error::AoqError::SlabFull { len: 4 })
     ));
 
     // Byte-identity: every record is exactly as it was before refusals.
@@ -345,4 +344,168 @@ fn c7_compose_emit_verified_law() {
     }
     assert_eq!(c.checkpoint(), head_before, "no mutation on refusal");
     assert_eq!(c.len(), 3);
+}
+
+/// COURT 8 — slab-full law (non-vacuity): a full 65,536-link slab refuses
+/// the 65,537th append with typed `SlabFull { len: 65_536 }`, head and
+/// records byte-identical across the refusal.
+#[test]
+fn c8_slab_full_typed_at_capacity() {
+    let mut c = chain(65_536);
+    for i in 0u64..65_536 {
+        c.append((i % 3) as u16, &[i as u8; 8]).unwrap();
+    }
+    assert_eq!(c.len(), 65_536);
+    assert_eq!(c.verify_all(), Ok(()));
+    let head_before = c.checkpoint();
+    match c.append(0, b"overflow") {
+        Err(cgap_aoq::error::AoqError::SlabFull { len }) => {
+            assert_eq!(len, 65_536, "typed refusal names the slab capacity");
+        }
+        other => panic!("expected typed SlabFull refusal, got {other:?}"),
+    }
+    assert_eq!(c.checkpoint(), head_before, "no mutation on refusal");
+    assert_eq!(c.len(), 65_536);
+}
+
+/// COURT 9 — fold law (anti-vacuity, two named mutations): (a) a
+/// payload_digest byte flip in a landed-record copy flips verify_records to
+/// a typed refusal; (b) a single tag-byte flip in an otherwise valid
+/// `append_verified` frame still refuses with DigestMismatch and leaves
+/// the chain unmutated. A green run under either mutation is VACUOUS.
+#[test]
+fn c9_fold_payload_flip_and_tag_flip_refuse() {
+    // (a) payload fold: mutate a copy of the landed links.
+    let mut c = chain(8);
+    for i in 0u64..4 {
+        c.append(0, &[i as u8; 8]).unwrap();
+    }
+    assert_eq!(c.verify_all(), Ok(()), "untouched chain verifies clean");
+    let mut folded: [AoqChainRecord; 4] = c.records().try_into().ok().unwrap();
+    folded[2].payload_digest[5] ^= 0x80;
+    assert!(
+        matches!(
+            verify_records(&Mix32, &folded),
+            Err(cgap_aoq::error::AoqError::DigestMismatch { .. })
+        ),
+        "VACUOUS COURT: payload_digest fold verified clean"
+    );
+
+    // (b) tag fold: one tag byte flip in a well-formed frame refuses and
+    // the chain is not mutated.
+    let body = b"fold-frame-body";
+    let digest = Mix32.digest(&[body]);
+    let mut frame = body.to_vec();
+    frame.extend_from_slice(&digest[0..4]);
+    let mut fresh = chain(8);
+    fresh.append_verified(&frame).unwrap();
+    assert_eq!(fresh.len(), 1);
+
+    let head_before = fresh.checkpoint();
+    let mut bad = frame.clone();
+    let tag_off = bad.len() - 4; // flip the FIRST tag byte only
+    bad[tag_off] ^= 0x01;
+    match fresh.append_verified(&bad) {
+        Err(cgap_aoq::error::AoqError::DigestMismatch { expected, got }) => {
+            assert_ne!(expected, got, "tag fold must classify typed");
+        }
+        other => panic!("expected typed tag refusal, got {other:?}"),
+    }
+    assert_eq!(fresh.len(), 1, "refused frame must not land");
+    assert_eq!(fresh.checkpoint(), head_before, "no mutation on refusal");
+}
+
+/// COURT 10 — batch == sequential: `append_batch_admitted` over a run of
+/// admitted digests must land records byte-identical (whole-slab compare)
+/// to N sequential `append`s of the same payloads with the same epochs.
+#[test]
+fn c10_batch_admitted_equals_sequential_appends() {
+    const N: usize = 9;
+    let payloads: Vec<Vec<u8>> = (0..N)
+        .map(|i| vec![(i * 7 + 3) as u8; 16 + i])
+        .collect();
+    let digests: Vec<[u8; 32]> = payloads
+        .iter()
+        .map(|p| Mix32.digest(&[p]))
+        .collect();
+    let epochs: Vec<u16> = (0..N).map(|i| (i % 3) as u16).collect();
+
+    let mut batched = chain(16);
+    batched.append_batch_admitted(&epochs, &digests).unwrap();
+
+    let mut seq = chain(16);
+    for i in 0..N {
+        seq.append(epochs[i], &payloads[i]).unwrap();
+    }
+    assert_eq!(batched.records(), seq.records(), "whole-slab compare");
+    assert_eq!(batched.len(), N);
+    assert_eq!(batched.checkpoint(), seq.checkpoint());
+    assert_eq!(batched.verify_all(), Ok(()));
+    assert_eq!(seq.verify_all(), Ok(()));
+}
+
+/// COURT 11 — all-or-nothing refusal: a batch larger than the remaining
+/// slab is refused with typed `SlabFull { len }` and ZERO mutation (len
+/// unchanged, every existing record byte-identical).
+#[test]
+fn c11_batch_refusal_is_all_or_nothing() {
+    let mut c = chain(8);
+    let seed: Vec<[u8; 32]> = (0..5).map(|i| Mix32.digest(&[&[i as u8; 8]])).collect();
+    let e5: Vec<u16> = vec![0; 5];
+    c.append_batch_admitted(&e5, &seed).unwrap();
+    let before = c.records().to_vec();
+    let head_before = c.checkpoint();
+
+    // 4 more need indices 5..9 > cap 8 -> must refuse whole.
+    let more: Vec<[u8; 32]> = (0..4).map(|i| Mix32.digest(&[&[(i + 9) as u8; 8]])).collect();
+    let e4: Vec<u16> = vec![1; 4];
+    match c.append_batch_admitted(&e4, &more) {
+        Err(cgap_aoq::error::AoqError::SlabFull { len }) => assert_eq!(len, 8),
+        other => panic!("expected SlabFull, got {other:?}"),
+    }
+    assert_eq!(c.len(), 5, "refusal must leave len unchanged");
+    assert_eq!(c.records(), before.as_slice(), "records byte-identical");
+    assert_eq!(c.checkpoint(), head_before, "head frozen on refusal");
+}
+
+/// COURT 12 — length-parity refusal: unequal epochs/digests counts refuse
+/// typed, zero mutation.
+#[test]
+fn c12_batch_length_parity_refusal() {
+    let mut c = chain(8);
+    let d: Vec<[u8; 32]> = vec![Mix32.digest(&[&[1u8; 8]]); 3];
+    let e: Vec<u16> = vec![0; 2];
+    match c.append_batch_admitted(&e, &d) {
+        Err(cgap_aoq::error::AoqError::SeqGap { expected, got }) => {
+            assert_eq!((expected, got), (2, 3));
+        }
+        other => panic!("expected SeqGap parity refusal, got {other:?}")
+    }
+    assert_eq!(c.len(), 0);
+}
+
+/// COURT 13 — batch mutation non-vacuity: a digest corrupted AFTER batch
+/// admission must flip verify to failure (typed DigestMismatch over an
+/// independent copy; the chain itself stays append-only).
+#[test]
+fn c13_batch_admitted_digest_mutation_flips_verify() {
+    let mut c = chain(16);
+    let payloads: Vec<Vec<u8>> = (0..4).map(|i| vec![i as u8; 20]).collect();
+    let digests: Vec<[u8; 32]> = payloads.iter().map(|p| Mix32.digest(&[p])).collect();
+    let epochs: Vec<u16> = vec![0; 4];
+    c.append_batch_admitted(&epochs, &digests).unwrap();
+    assert_eq!(c.verify_all(), Ok(()));
+
+    let mut corrupted = c.records().to_vec();
+    corrupted[2].payload_digest[5] ^= 0x80;
+    assert!(
+        verify_records(&Mix32, &corrupted).is_err(),
+        "mutated batch-admitted digest must flip verify"
+    );
+    let mut bad = corrupted;
+    bad[2].digest[0] ^= 0x01;
+    assert!(
+        verify_records(&Mix32, &bad).is_err(),
+        "mutated record digest must flip verify"
+    );
 }

@@ -189,6 +189,15 @@ fn encode(r: Option<(u32, u64)>, out: &mut Vec<u8>) {
 #[test]
 #[ignore]
 fn ladder_result_constancy_under_cpu_noise() {
+    // ZP-18 timing fence: the sweep wall-time table is a release-profile
+    // measurement; under dev the court loud-SKIPs (the RESULT-constancy
+    // gates are also covered by non-timing courts elsewhere, and running a
+    // 30-sweep CPU-saturation window on debug code is not a lawful
+    // measurement).
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP ladder_result_constancy_under_cpu_noise: {v}");
+        return;
+    }
     println!(
         "\n=== ladder timing-stress court: {} sweeps x {} lookups, {}-object idx ===",
         SWEEPS, LOOKUPS, N_OBJECTS
@@ -246,6 +255,8 @@ fn ladder_result_constancy_under_cpu_noise() {
             );
         }
         let dt = t0.elapsed().as_secs_f64();
+        // ZP-18 anti-DCE fence on the per-sweep timing value.
+        cgap_aoq::profile_guard::fence(dt);
         times_ms.push(dt * 1_000.0);
 
         // RESULT-constancy gate 1: byte-identical to the previous sweep
@@ -277,7 +288,8 @@ fn ladder_result_constancy_under_cpu_noise() {
 
         let mut h = Sha1::new();
         h.update(&got);
-        digests.push(hex_prefix(&h.finalize()));
+        // ZP-18 fence on the sweep digest output before it feeds the report.
+        digests.push(cgap_aoq::profile_guard::fence(hex_prefix(&h.finalize())));
         result_bytes.push(got);
     }
     drop(noise); // spin pool down before reporting

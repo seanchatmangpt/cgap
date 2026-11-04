@@ -4,8 +4,9 @@
 //! `[u32 magic 0x5749_5230 ("WIR0")] [u32 crc32(payload)] [u32 payload_len] [u32 frame_ordinal] [payload]`
 //!
 //! The segment is an offset-addressed file-backed segment (std::fs +
-//! `FileExt`), NOT mmap — mmap requires libc and the zero-dep law forbids
-//! it. Layout: slot 0 holds `[u64 next_ordinal][u32 capacity]` bookkeeping
+//! `FileExt`), NOT mmap. Zero-dep law = zero crates, not zero syscalls
+//! (decision-d2-zero-dep-reinterpretation.md, 2026-11-04): a bare
+//! `extern "C"` libc call is zero-dep lawful. Layout: slot 0 holds `[u64 next_ordinal][u32 capacity]` bookkeeping
 //! region (4096 bytes, page-aligned); slots follow at fixed stride.
 //!
 //! SLOT = 4096-byte stride: 16-byte header + up to 4080 payload bytes.

@@ -13,6 +13,8 @@ publish = false
 cgap-arrow = { path = "../cgap-arrow" }
 cgap-blake3 = { path = "../cgap-blake3" }
 cgap-parquet = { path = "../cgap-parquet", features = ["std"] }
+# ZP-18 Phase C: release-profile loud-SKIP guard for bench binaries.
+cgap-aoq = { path = "../cgap-aoq" }
 
 # R6-16: cgap-ffi/cgap-git/cgap-storage are used ONLY by [[bench]] targets
 # (mctq_consolidation, seal, chains-sovereign, challenger_git, dred_churn,

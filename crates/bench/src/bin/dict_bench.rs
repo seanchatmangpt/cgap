@@ -115,6 +115,10 @@ impl Lcg {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     // Non-vacuity probe: a deliberate allocation must bump COUNT before any
     // "0 allocs" line below is trusted (counted nothing != allocated nothing).
     COUNT.store(0, Ordering::Relaxed);

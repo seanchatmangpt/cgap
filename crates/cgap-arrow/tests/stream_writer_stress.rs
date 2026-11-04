@@ -190,6 +190,12 @@ fn body_len_for(frame: u64) -> usize {
 /// sleeps). Throughput recorded as a receipt, never fenced.
 #[test]
 fn soak_50k_frames_byte_identity_and_throughput() {
+    // Profile guard (arrow-ZP18-D): the soak leg records a wall-clock
+    // throughput receipt; under a dev profile it loud-SKIPs.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP soak_50k_frames_byte_identity_and_throughput: {v}");
+        return;
+    }
     const FRAMES: u64 = 50_000;
     let (_listener, mut stream, mut peer, path) = uds_pair("soak");
     let mut writer = StreamWriter::with_seq(

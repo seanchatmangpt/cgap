@@ -12,7 +12,7 @@
 use cgap_aoq::error::AoqError;
 use cgap_aoq::verify;
 use cgap_aoq::verify::{decrypt_in_place, verify_window};
-use cgap_aoq::writer::{AoqWriter, TAG_BYTES as W_TAG_BYTES};
+use cgap_aoq::writer::AoqWriter;
 use cgap_arrow::blake3;
 use cgap_arrow::ipc;
 
@@ -372,7 +372,7 @@ fn a10_write_refusal_zero_progress() {
 fn a11_commit_semantics_and_seq_wrap() {
     let plain = [0x22u8; 8];
     let mut w = AoqWriter::new();
-    let mut out = vec![0u8; 512];
+    let out = vec![0u8; 512];
     let tag = [0u8; 16];
     // Stage without commit: cursor frozen, segments valid.
     let total = {

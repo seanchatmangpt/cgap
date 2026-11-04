@@ -362,6 +362,13 @@ fn integrity_driver(fr: &Frame, suppress_one_cascade_step: bool) -> Result<Vec<u
 /// gated. Determinism: survivor count identical across all runs.
 #[test]
 fn court_throughput_measured_reported() {
+    // ZP-18 timing fence: the min/median facts/s throughput report is a
+    // release-profile measurement; under dev the court loud-SKIPs instead
+    // of reporting debug-code throughput.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP court_throughput_measured_reported: {v}");
+        return;
+    }
     let facts = 100_000usize;
     let fr = build_frame(facts, CORPUS_SEED ^ 0xBEEF);
     let words = fr.derived_deps.len();
@@ -421,6 +428,8 @@ fn court_throughput_measured_reported() {
         )
         .expect("cascade");
         let ns = t.elapsed().as_nanos();
+        // ZP-18 anti-DCE fence on the measured timing value.
+        cgap_aoq::profile_guard::fence(ns);
         assert_eq!(n, n0, "survivor count must be run-invariant");
         if ns < best {
             best = ns;

@@ -13,7 +13,7 @@
 //! so `cargo test --test certificate_gate_table_court` runs those
 //! assertions twice total across binaries — same law, no new risk.
 
-#[path = "rfc0089_certificate.rs"]
+#[path = "../src/rfc0089_certificate.rs"]
 mod cert;
 
 use cert::{g7_leg_b_from_receipt, issue, scorecard_table, Overall, Verdict, CERT_SPEC};

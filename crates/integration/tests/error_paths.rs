@@ -17,6 +17,7 @@
 
 #![forbid(unsafe_code)]
 
+use cgap_aoq::profile_guard::fence;
 use cgap_audit::alloc_counter::with_alloc_tracking;
 use cgap_git::deflate::zlib_compress;
 use cgap_git::deflate::zlib_decompress;
@@ -689,11 +690,13 @@ fn alloc_report_scopes_and_error_path() {
 
     // Nested scopes: the inner report excludes the outer's allocations.
     let ((_inner_v, inner), outer) = with_alloc_tracking(|| {
-        let _pad = std::hint::black_box(vec![0u8; 4096]);
-        // black_box: an 8-byte vec whose only use is `.len()` is subject to
+        // profile_guard::fence = anti-DCE barrier (ZP-18 fence; same
+        // black_box semantics, composed through the guard module).
+        let _pad = fence(vec![0u8; 4096]);
+        // fence: an 8-byte vec whose only use is `.len()` is subject to
         // LLVM malloc/free pair elision in release (debug keeps it), which
         // would make the inner report legitimately zero — not a tracker bug.
-        with_alloc_tracking(|| std::hint::black_box(vec![1u8; 8]))
+        with_alloc_tracking(|| fence(vec![1u8; 8]))
     });
     assert_eq!(_inner_v.len(), 8);
     assert!(inner.count >= 1, "inner scope lost its alloc: {inner:?}");

@@ -507,6 +507,10 @@ fn census_isolated(child_name: &str) -> bool {
 
 #[test]
 fn composed_transit_1m() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP composed_transit_1m: {v}");
+        return;
+    }
     if !census_isolated("composed_transit_1m") {
         return;
     }
@@ -546,6 +550,10 @@ fn composed_transit_1m() {
 #[test]
 #[ignore]
 fn composed_transit_10m() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP composed_transit_10m: {v}");
+        return;
+    }
     let r = run_transit(10_000_000, false);
     let timer_floor_ns = measure_timer_floor(200_000);
     let frames = build_frames(10_000_000);

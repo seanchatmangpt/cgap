@@ -3,23 +3,13 @@
 //! and must observe typed flips; byte-identity is asserted via
 //! `Session::fingerprint` (full canonical state, KDF-sealed).
 
-use cgap_aoq::chain::{AoqChain, AoqChainRecord, ChainDigest};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{
-    derive, parse_frame, transcript_tag, Frame, FrameKind, KemSeam, Session, SessionError,
-    SessionState, CTX_HANDSHAKE, CTX_REKEY, CT_BYTES, EK_BYTES, REKEY_BUDGET, SS_BYTES,
+    derive, parse_frame, transcript_tag, FrameKind, KemSeam, Session, SessionError,
+    SessionState, CTX_HANDSHAKE, CTX_REKEY, CTX_RECV, CTX_SEND, CT_BYTES, EK_BYTES,
+    REKEY_BUDGET, SS_BYTES,
 };
-
-/// Deterministic digest substrate (shared with the chain courts by
-/// construction: one mix, two seams).
-#[derive(Clone, Copy)]
-struct Mix32;
-impl ChainDigest for Mix32 {
-    fn digest(&self, parts: &[&[u8]]) -> [u8; 32] {
-        mix32(parts)
-    }
-}
 
 fn mix32(parts: &[&[u8]]) -> [u8; 32] {
     let mut a: u64 = 0xcbf2_9ce4_8422_2325;
@@ -123,7 +113,7 @@ fn fin_frame(epoch: u16, key_id: u64, ordinal: u32, kem: &TestKem, ek: &[u8; EK_
 
 fn app_body(seq: u32, payload: &[u8]) -> Vec<u8> {
     let mut body = vec![0u8; 4 + payload.len()];
-    body[..4].copy_from_slice(&seq.to_be_bytes());
+    body[..4].copy_from_slice(&seq.to_le_bytes());
     body[4..].copy_from_slice(payload);
     body
 }
@@ -561,4 +551,109 @@ fn s8_tenk_soak_ordinal_wrap() {
     assert_eq!(accepted, 10_000);
     assert_eq!(rekeys, 2, "4096-frame budget rekeys twice in 10k frames");
     assert_eq!(s.state(), SessionState::Established);
+}
+
+// ----------------------------------------------------------------
+// P2 M1 courts — stored direction-split keys, rekey durability, and
+// the RandomnessSeam injection. Mutation witnesses (executed in a /tmp
+// sandbox copy of the workspace, sha256 fail-closed restore, lane
+// receipt): (M1) swap CTX_SEND/CTX_RECV at the handshake split site;
+// (M2) restore the rekey key-drop (`let keys = …` local, no store).
+// Both must flip the court below.
+// ----------------------------------------------------------------
+
+/// COURT S9 — handshake key derivation: keys are derived from the real
+/// handshake master (`derive(CTX_HANDSHAKE, ss, ek)`), direction-split
+/// via CTX_SEND/CTX_RECV, send != recv, deterministic; a second session
+/// walking the same handshake roundtrip derives the SAME keys (ss
+/// equality across sessions), and a different ek derives different keys.
+#[test]
+fn s9_direction_keys_derived_stored_and_send_ne_recv() {
+    let mut s = Session::new(&KEM, 0, 7, 0);
+    // Pre-handshake: keys are the zero value, loudly not Established.
+    assert_eq!(s.send_key(), [0u8; 32]);
+    assert_eq!(s.recv_key(), [0u8; 32]);
+
+    let ek1 = ek_of(1);
+    step(&mut s, &ek_frame(0, 7, 0, &ek1)).unwrap();
+    // Keys exist as soon as ss exists (HandshakeWait), before Established.
+    let (exp_ct, ss) = KEM.encapsulate(&ek1).unwrap();
+    let master = derive(&KEM, CTX_HANDSHAKE, &ss, &ek1);
+    let exp_send = KEM.kdf(&[CTX_SEND, &master]);
+    let exp_recv = KEM.kdf(&[CTX_RECV, &master]);
+    assert_eq!(s.send_key(), exp_send, "send_key = kdf(CTX_SEND, master)");
+    assert_eq!(s.recv_key(), exp_recv, "recv_key = kdf(CTX_RECV, master)");
+    assert_ne!(exp_send, exp_recv, "directions must separate");
+    let _ = exp_ct;
+
+    // ss roundtrip equality: an independent session over the same ek
+    // derives identical keys (the direction keys are a function of the
+    // handshake inputs, not of session identity).
+    let mut s2 = Session::new(&KEM, 0, 7, 0);
+    step(&mut s2, &ek_frame(0, 7, 0, &ek1)).unwrap();
+    assert_eq!(s2.send_key(), s.send_key(), "same ss => same keys");
+    assert_eq!(s2.recv_key(), s.recv_key(), "same ss => same keys");
+
+    // ek sensitivity: a different ek derives a different key set.
+    let mut s3 = Session::new(&KEM, 0, 7, 0);
+    step(&mut s3, &ek_frame(0, 7, 0, &ek_of(2))).unwrap();
+    assert_ne!(s3.send_key(), s.send_key(), "different ek => different keys");
+}
+
+/// COURT S10 — rekey durability: an accepted rekey ROTATES the direction
+/// keys to kdf(CTX_SEND/RECV, derive(CTX_REKEY, ss', ek')) — the stored
+/// keys are not dropped (mutation M2 restores the drop and must flip
+/// this court) — and the old keys never survive.
+#[test]
+fn s10_rekey_rotates_stored_keys_not_dropped() {
+    let mut s = Session::new(&KEM, 0, 7, 0);
+    let ek1 = ek_of(1);
+    step(&mut s, &ek_frame(0, 7, 0, &ek1)).unwrap();
+    step(&mut s, &fin_frame(0, 7, 1, &KEM, &ek1)).unwrap();
+    let old_send = s.send_key();
+    let old_recv = s.recv_key();
+    assert_ne!(old_send, [0u8; 32]);
+
+    let ek2 = ek_of(5);
+    step(&mut s, &rekey_frame(0, 2, &ek2)).unwrap();
+
+    let (_, ss2) = KEM.encapsulate(&ek2).unwrap();
+    let master2 = derive(&KEM, CTX_REKEY, &ss2, &ek2);
+    let want_send = KEM.kdf(&[CTX_SEND, &master2]);
+    let want_recv = KEM.kdf(&[CTX_RECV, &master2]);
+    assert_eq!(s.send_key(), want_send, "rekey send_key stored");
+    assert_eq!(s.recv_key(), want_recv, "rekey recv_key stored");
+    assert_ne!(s.send_key(), old_send, "rekey must rotate away the old keys");
+    assert_ne!(s.recv_key(), old_recv, "rekey must rotate away the old keys");
+    assert_ne!(s.send_key(), s.recv_key(), "directions separate after rekey");
+}
+
+/// COURT S11 — RandomnessSeam injection: the deterministic counter seam
+/// is bound at construction and reachable; the default `Session::new`
+/// binds the zero seam.
+#[test]
+fn s11_randomness_seam_injection() {
+    #[derive(Debug)]
+    struct Counter(u32);
+    impl cgap_aoq::session::RandomnessSeam for Counter {
+        fn fill32(&self) -> [u8; 32] {
+            let mut out = [0u8; 32];
+            for (i, cell) in out.iter_mut().enumerate() {
+                *cell = (self.0 as u8).wrapping_add(i as u8);
+            }
+ out
+        }
+    }
+    let c = Counter(7);
+    let s = Session::new_with_rng(&KEM, &c, 0, 7, 0);
+    let got = s.rng().fill32();
+    assert_eq!(got[0], 7);
+    assert_eq!(got[31], 7u8.wrapping_add(31));
+    // Default constructor: zero seam.
+    let s0 = Session::new(&KEM, 0, 7, 0);
+    assert_eq!(s0.rng().fill32(), [0u8; 32], "default seam is the zero seam");
+    // Different injected seam yields different entropy (seam is live).
+    let c2 = Counter(9);
+    let s2 = Session::new_with_rng(&KEM, &c2, 0, 7, 0);
+    assert_ne!(s.rng().fill32(), s2.rng().fill32());
 }

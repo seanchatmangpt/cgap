@@ -65,7 +65,7 @@ fn ten_k_valid_header_mutations_each_typed() {
     let base = valid_wire();
     let mut rng = Rng(0x5EED_C0DE_BEEF);
     let mut seen = std::collections::HashSet::new();
-    for i in 0..10_000 {
+    for _i in 0..10_000 {
         let mut wire = base;
         let pos = (rng.next() % 64) as usize;
         let newval = (rng.next() & 0xFF) as u8;

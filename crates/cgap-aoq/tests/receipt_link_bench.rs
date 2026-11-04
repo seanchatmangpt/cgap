@@ -47,15 +47,11 @@ fn slab(cap: usize) -> &'static mut [AoqChainRecord] {
     Box::leak(vec![AoqChainRecord::zeroed(); cap].into_boxed_slice())
 }
 
-fn black_box<T>(x: T) -> T {
-    std::hint::black_box(x)
-}
-
 /// (a) min-of-1000 individually-timed appends, microseconds per link.
 fn bench_append_per_link() -> (f64, f64) {
     let s = slab(2_048);
     let mut c = AoqChain::new(Blake3Digest, s);
-    let payload = black_box([0xa5u8; 32]);
+    let payload = cgap_aoq::profile_guard::fence([0xa5u8; 32]);
     // Warm-up: 64 appends so first-touch effects don't set the floor.
     for i in 0u64..64 {
         c.append((i % 3) as u16, &payload).unwrap();
@@ -67,7 +63,7 @@ fn bench_append_per_link() -> (f64, f64) {
         let t0 = Instant::now();
         let r = c.append(e, &payload);
         let dt = t0.elapsed();
-        black_box(r.unwrap());
+        cgap_aoq::profile_guard::fence(r.unwrap());
         idx += 1;
         samples.push(dt.as_secs_f64() * 1e6);
     }
@@ -87,7 +83,7 @@ fn bench_append_leg(links: usize) -> f64 {
     for _ in 0..LEGS {
         let t0 = Instant::now();
         for i in 0u64..links as u64 {
-            black_box(c.append((i % 3) as u16, &payload).unwrap());
+            cgap_aoq::profile_guard::fence(c.append((i % 3) as u16, &payload).unwrap());
         }
         let per = t0.elapsed().as_secs_f64() * 1e6 / links as f64;
         if per < best {
@@ -100,14 +96,14 @@ fn bench_append_leg(links: usize) -> f64 {
 /// (b) 64B digest per-call latency: n=1000 individually-timed calls,
 /// min of 3 reps. Returns (min_ns, mean_ns).
 fn bench_hash64_per_call() -> (f64, f64) {
-    let input = black_box([0x5au8; 64]);
+    let input = cgap_aoq::profile_guard::fence([0x5au8; 64]);
     let mut global_min = f64::INFINITY;
     let mut last_mean = 0.0;
     for _ in 0..3 {
         let mut samples = [0f64; 1_000];
         for s in samples.iter_mut() {
             let t0 = Instant::now();
-            black_box(cgap_blake3::hash(&input));
+            cgap_aoq::profile_guard::fence(cgap_blake3::hash(&input));
             *s = t0.elapsed().as_nanos() as f64;
         }
         global_min = global_min.min(samples.iter().cloned().fold(f64::INFINITY, f64::min));
@@ -127,7 +123,7 @@ fn bench_verify(links: usize) -> f64 {
     let mut best = f64::INFINITY;
     for _ in 0..5 {
         let t0 = Instant::now();
-        black_box(c.verify_all().unwrap());
+        cgap_aoq::profile_guard::fence(c.verify_all().unwrap());
         let per = t0.elapsed().as_secs_f64() * 1e6 / links as f64;
         if per < best {
             best = per;
@@ -138,6 +134,10 @@ fn bench_verify(links: usize) -> f64 {
 
 #[test]
 fn g7_receipt_link_bench() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP g7_receipt_link_bench: {v}");
+        return;
+    }
     // Non-vacuity: prove the BLAKE3 substrate is real before timing it.
     let mut slab0 = [AoqChainRecord::zeroed(); 2];
     let mut c0 = AoqChain::new(Blake3Digest, &mut slab0);

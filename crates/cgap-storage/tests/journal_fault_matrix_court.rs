@@ -356,7 +356,7 @@ fn harness_stdio() {
     let spec = std::fs::read_to_string(&spec_path).expect("spec file");
     let mut out = String::new();
     let mut open: Option<(String, u64, Vec<[u8; RECORD_SIZE]>)> = None;
-    let mut finish = |open: &mut Option<(String, u64, Vec<[u8; RECORD_SIZE]>)>,
+    let finish = |open: &mut Option<(String, u64, Vec<[u8; RECORD_SIZE]>)>,
                       out: &mut String| {
         if let Some((name, dag, slots)) = open.take() {
             let mut s = [[0u8; RECORD_SIZE]; SLOT_COUNT];

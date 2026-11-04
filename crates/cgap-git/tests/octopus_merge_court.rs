@@ -144,6 +144,12 @@ fn run_merge(heads: &[HeadInput<'_>]) -> (usize, Vec<u64>, Vec<u64>, Vec<u64>) {
 
 #[test]
 fn twenty_way_clean_merge_materializes() {
+    // ZP-18 timing fence: min-of-3 closure-time micros REPORT; under a dev
+    // profile this loud-SKIPs instead of printing debug-code timing.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP twenty_way_clean_merge_materializes: {v}");
+        return;
+    }
     let _g = TEST_SERIAL.lock().unwrap();
     let heads_data = build_corpus(N_HEADS, N_ROWS_PER_HEAD * 4);
     let planes_per: Vec<_> = heads_data.iter().map(|h| planes(h)).collect();

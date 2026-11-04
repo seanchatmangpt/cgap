@@ -84,6 +84,12 @@ fn cycle(w: &mut [u8], m: &MetaHeader, body: &[u8], out: &mut [u8]) -> usize {
 /// 1000 cycles each, min-of-3 runs, wall-clock via Instant.
 #[test]
 fn t1_throughput_bench_body_size_sweep() {
+    // Profile guard (arrow-ZP18-D): the wall-clock leg below fences against
+    // a release-only measurement; under a dev profile it loud-SKIPs.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP t1_throughput_bench_body_size_sweep: {v}");
+        return;
+    }
     const ITERS: usize = 1000;
     println!(
         "{:>9} {:>14} {:>14} {:>14} {:>12}",

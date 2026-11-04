@@ -66,8 +66,10 @@ const SCALED_FRAMES: usize = 10_000_000;
 /// Full-scale mode frames (dossier target; `#[ignore]`).
 const FULL_FRAMES: usize = 1_000_000_000;
 /// Strict zero-alloc window (lane 0, wave 0, cycle 0, global seq
-/// [1024, 1024+STRICT_N)).
-const STRICT_N: usize = 4_096;
+/// [STRICT_START, STRICT_START+64): the designated strict cycle asserts a
+/// minimum length of 64 frames (`strict_start + 64`) and measures the
+/// alloc delta over whatever span fits.
+const STRICT_START: usize = 1_024;
 /// seq < WARMUP: storm/corrupt rules suppressed (clean traffic under
 /// the strict window).
 const WARMUP: usize = 8_192;
@@ -420,7 +422,7 @@ fn run_cycle(
     SEGMENTS_OPENED.fetch_add(1, Ordering::Relaxed);
     let mut done = 0usize;
     let (mut s0, mut b0): (u64, u64) = (0, 0);
-    let strict_start = 1024usize;
+    let strict_start = STRICT_START;
     if spec.strict {
         assert!(
             spec.count >= strict_start + 64,
@@ -464,7 +466,7 @@ fn run_cycle(
         }
         if spec.strict && i == spec.count - 1 {
             // Strict delta over [strict_start, count): clean traffic
-            // (seq < WARMUP), whether or not the full STRICT_N fit.
+            // (seq < WARMUP), whether or not the full 64-frame window fit.
             let (sa, sb) = alloc_delta();
             STRICT_ALLOCS.store(sa.saturating_sub(s0) as usize, Ordering::Relaxed);
             STRICT_BYTES.store(sb.saturating_sub(b0) as usize, Ordering::Relaxed);
@@ -827,6 +829,10 @@ fn run_soak(total_requested: usize) -> f64 {
 /// minutes). Override with CGAP_AF32_FRAMES.
 #[test]
 fn af32_saturation_soak_scaled() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP af32_saturation_soak_scaled: {v}");
+        return;
+    }
     let frames = std::env::var("CGAP_AF32_FRAMES")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -842,6 +848,10 @@ fn af32_saturation_soak_scaled() {
 #[test]
 #[ignore = "full-scale 1B soak; run explicitly with -- --ignored"]
 fn af32_saturation_soak_full_1b() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP af32_saturation_soak_full_1b: {v}");
+        return;
+    }
     let fps = run_soak(FULL_FRAMES);
     println!("af32 full mode: {fps:.0} frames/sec measured");
 }

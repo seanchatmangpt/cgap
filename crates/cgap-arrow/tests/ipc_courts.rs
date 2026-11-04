@@ -352,7 +352,7 @@ fn sealed_window_with(v: u16, f: u16, with_digest: bool) -> (Vec<u8>, Vec<u8>, [
     let slab = sealed_4row().unwrap();
     let body = slab.as_bytes();
     let digest = schema_digest_of(body);
-    let mut w = vec![0u8; window_len(body.len(), 64)];
+    let w = vec![0u8; window_len(body.len(), 64)];
     let meta = MetaHeader {
         magic: MAGIC,
         version: v,

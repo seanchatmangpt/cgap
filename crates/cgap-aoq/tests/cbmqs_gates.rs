@@ -254,7 +254,10 @@ fn gate_g1b_slab_rate() -> GateOutcome {
             let image = slab.as_bytes();
             cgap_aoq::profile_guard::fence(&image);
             cgap_aoq::profile_guard::fence(slab.len());
-            drop(slab); // reset-to-new is the release primitive
+            // reset-to-new is the release primitive: the fresh
+            // ArrowRecordSlab::new() at the top of each cycle re-arms the
+            // slab (drop on a Copy type is a no-op, so the old drop call
+            // carried no semantics and was removed).
         }
         let secs = start.elapsed().as_secs_f64();
         let pushes = (CYCLES * CAP) as f64;

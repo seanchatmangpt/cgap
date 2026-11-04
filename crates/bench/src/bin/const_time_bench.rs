@@ -651,6 +651,10 @@ fn bench_dict_decode_page() {
 }
 
 fn main() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        return;
+    }
     println!("cgap const-time data-independence instrument — bench v26.10.29, lane PCL8");
     println!(
         "rows={ROWS} (identical for every kernel x class x instance), \

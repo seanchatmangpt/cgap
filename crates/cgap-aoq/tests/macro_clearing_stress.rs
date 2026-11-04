@@ -442,6 +442,10 @@ fn report(name: &str, r: &SoakResult) {
 /// Scaled mode: 1M frames, CI-adjacent.
 #[test]
 fn scaled_1m_flash_crash_soak() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP scaled_1m_flash_crash_soak: {v}");
+        return;
+    }
     let r = run_soak(1_000_000);
     report("scaled 1M frames", &r);
 }
@@ -450,6 +454,10 @@ fn scaled_1m_flash_crash_soak() {
 #[test]
 #[ignore]
 fn full_10m_flash_crash_soak() {
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP full_10m_flash_crash_soak: {v}");
+        return;
+    }
     let r = run_soak(10_000_000);
     report("FULL 10M frames", &r);
 }

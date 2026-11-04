@@ -265,6 +265,12 @@ fn project(json: &str) -> Result<Projected, Refusal> {
 
 #[test]
 fn macro_manifest_walk() {
+    // Profile guard (arrow-ZP18-D): the walk leg carries a wall-clock
+    // throughput receipt; under a dev profile it loud-SKIPs.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
+        eprintln!("LOUD-SKIP macro_manifest_walk: {v}");
+        return;
+    }
     println!("=== AF-28 macro manifest walk ===");
     println!("rows_total   = {TOTAL_ROWS}");
     println!("batch_cap    = {BATCH_CAP} rows (declared; last batch carries the remainder)");

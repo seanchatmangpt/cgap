@@ -22,7 +22,6 @@
 
 #![cfg(test)]
 
-use cgap_git::ingress_ring::{IngressError, IngressRing};
 use cgap_git::pack_demux::{Demux, DemuxError};
 
 /// Wire chunk header, cache-line aligned, C-repr so the byte layout is the
