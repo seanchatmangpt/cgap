@@ -2,4 +2,4 @@
 
 [packs.cgap-pack]
 source = "path:../ggen-marketplace/packs/cgap-pack"
-content_hash = "blake3:91793c6d845b0edb64b97fdc61879bcba8db3f0a24dd0abf34d944020d418e8a"
+content_hash = "blake3:3a0c2e2dad360093b8c27a95d8c13d87b97f1c2aa88e3c3e89a43c0864973b72"
