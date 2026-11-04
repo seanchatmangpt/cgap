@@ -42,7 +42,8 @@ pub const PAYLOAD_WINDOW_MASK: u64 = 0x00FF_FFFF_FFFF_FFFF;
 /// fallback is the exact copy with this sha256-pinned source comment;
 /// the differential court below proves replica == shipped semantics.
 #[inline(always)]
-pub fn radix_bucket_12(key: u64) -> usize {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn radix_bucket_12(key: u64) -> usize {
     let y = key & PAYLOAD_WINDOW_MASK;
     ((y ^ (y >> 16)) & 0x0FFF) as usize
 }

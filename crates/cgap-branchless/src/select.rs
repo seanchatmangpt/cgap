@@ -41,7 +41,8 @@
 /// ISel lowers every 2-way select to a branch; recorded as a documented
 /// census residual, not a fix.
 #[inline]
-pub fn cmov_u64(cond: bool, true_val: u64, false_val: u64) -> u64 {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn cmov_u64(cond: bool, true_val: u64, false_val: u64) -> u64 {
     let mask = 0u64.wrapping_sub(cond as u64);
     (mask & true_val) | (!mask & false_val)
 }
@@ -56,7 +57,8 @@ pub fn cmov_u64(cond: bool, true_val: u64, false_val: u64) -> u64 {
 /// selection is NOT supported here by contract — it cannot be
 /// constant-time; use `checked_uniform_select` for the loud refusal.
 #[inline]
-pub fn select_slice<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> &'a [u64] {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn select_slice<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> &'a [u64] {
     // MASK-FORM TWIN: the arithmetic ptr/len masks below are the exact
     // shape of the blocked unsafe form; the reconstruction is the
     // fat-pointer select LLVM lowers to two `csel`.
@@ -77,7 +79,8 @@ pub fn select_slice<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> &'a [u64] 
 /// mixed-mask refusal, then the branchless hot select. Not branchless
 /// by design — this is where the refusal lives.
 #[inline(never)]
-pub fn checked_uniform_select<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> &'a [u64] {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn checked_uniform_select<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> &'a [u64] {
     assert_eq!(a.len(), b.len(), "select_slice: length mismatch");
     assert_eq!(cond.len(), a.len(), "select_slice: cond length mismatch");
 
@@ -93,7 +96,8 @@ pub fn checked_uniform_select<'a>(cond: &[bool], a: &'a [u64], b: &'a [u64]) -> 
 /// unconditional store of `counter + cond as usize` (no branch leaks).
 /// Returns the post-increment counter value.
 #[inline]
-pub fn pred_inc(counter: &mut usize, cond: bool) -> usize {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn pred_inc(counter: &mut usize, cond: bool) -> usize {
     *counter = (*counter).wrapping_add(cond as usize);
     *counter
 }

@@ -18,7 +18,8 @@
 /// borrow = ((!c & d) | ((!c | d) & diff)) >> 63, expanded to an
 /// all-ones mask by 0u64.wrapping_sub(borrow).
 #[inline]
-pub fn saturated_subs_p28(counter: u64, delta: u64) -> (u64, u64) {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn saturated_subs_p28(counter: u64, delta: u64) -> (u64, u64) {
     let diff = counter.wrapping_sub(delta);
     // Carry kill/propagate borrow-out, pure u64 (branchless everywhere).
     let borrow = (((!counter) & delta) | (((!counter) | delta) & diff)) >> 63;
@@ -36,7 +37,8 @@ pub fn saturated_subs_p28(counter: u64, delta: u64) -> (u64, u64) {
 /// instruction to make doc+code agree with the B1 doc, the XOR
 /// complement is dropped; the shift result is already the mask.
 #[inline]
-pub fn poison_mask(quota: u64) -> u64 {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn poison_mask(quota: u64) -> u64 {
     // B1 unblock fix (disclosed in both lanes' receipts): the previous
     // `((quota.wrapping_sub(1)) as i64 >> 63)` form fired on EVERY quota
     // with bit 63 set (any quota >= 2^63), not only quota == 0. The exact

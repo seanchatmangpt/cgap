@@ -40,7 +40,8 @@ pub const EYTZINGER_PAD: u64 = u64::MAX;
 /// `is_less == true` descends right (search convention: `element <=
 /// target`). Pure arithmetic; no branch on the predicate.
 #[inline(always)]
-pub fn eytzinger_next(curr: usize, is_less: bool) -> usize {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn eytzinger_next(curr: usize, is_less: bool) -> usize {
     2 * curr + (is_less as usize)
 }
 
@@ -52,7 +53,8 @@ pub fn eytzinger_next(curr: usize, is_less: bool) -> usize {
 /// of the first element strictly greater than the searched target, or
 /// `0` when every element is `<= target` (upper-bound "end" sentinel).
 #[inline(always)]
-pub fn eytzinger_restore(index: usize) -> usize {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn eytzinger_restore(index: usize) -> usize {
     index >> (index.trailing_ones() + 1)
 }
 /// Full reference search driver over a laid-out array `eyt` (as produced
@@ -68,7 +70,8 @@ pub fn eytzinger_restore(index: usize) -> usize {
 /// per-step primitives [`eytzinger_next`] + [`eytzinger_restore`]. The
 /// per-step primitives themselves are branchless; the loop/predicate here
 /// is the readable reference form, not the optimized kernel.
-pub fn eytzinger_search(eyt: &[u64], target: u64) -> Option<usize> {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn eytzinger_search(eyt: &[u64], target: u64) -> Option<usize> {
     assert!(
         !eyt.is_empty(),
         "eytzinger_search: empty layout (need sentinel slot 0)"
@@ -99,7 +102,8 @@ pub fn eytzinger_search(eyt: &[u64], target: u64) -> Option<usize> {
 ///
 /// Allocates (test/reference convenience, documented per lane contract);
 /// the search primitives never call this.
-pub fn to_eytzinger_layout(sorted: &[u64]) -> alloc::vec::Vec<u64> {
+#[allow(dead_code)] // E-h de-pub: no external consumers; retained for differential/census courts
+pub(crate) fn to_eytzinger_layout(sorted: &[u64]) -> alloc::vec::Vec<u64> {
     let n = sorted.len();
     let mut m = 1usize;
     while m < n + 1 {
