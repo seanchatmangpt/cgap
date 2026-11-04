@@ -44,15 +44,19 @@ fn dod10_p28_urn_cited_in_manifest_and_readme() {
 
 #[test]
 fn dod10_no_spdx_license_identifiers_anywhere() {
-    // DoD 10's letter: "no SPDX identifiers" — no Cargo `license` /
-    // `license-file` keys (the SPDX expression slots), no LicenseRef-* or
-    // SPDX token shapes, in either file, code or prose. The URN is the only
-    // lawful license instrument reference.
+    // DoD 10's letter: "no SPDX identifiers" — no SPDX `license =` expression
+    // key, no LicenseRef-* / SPDX token shapes, in either file, code or prose.
+    // The URN is the only lawful license instrument reference. The
+    // `license-file = "../../LICENSE.md"` path key is NOT an SPDX identifier
+    // and stays lawful: it is the DOD-05 FLAG fix (v26.11.2
+    // dod/dod-05-package-manifest.md finding 1; branchless pattern) and the
+    // publish.md house style, and its non-SPDX path pointer form was ruled
+    // lawful by lane-dod-01fix-cargo-manifests.md:66-69. (XA-2 zd-1 root
+    // cause: the previous blanket `license-file` substring ban tripped on
+    // that required key — court bug, fixed here.)
     for (name, text) in [("Cargo.toml", MANIFEST), ("README.md", README)] {
         for (i, line) in text.lines().enumerate() {
-            let spdx_shape = line.contains("LicenseRef-")
-                || line.contains("license =")
-                || line.contains("license-file");
+            let spdx_shape = line.contains("LicenseRef-") || line.contains("license =");
             assert!(
                 !spdx_shape,
                 "DoD 10: SPDX-shaped license reference in {name}:{}: {line}",
