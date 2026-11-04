@@ -534,3 +534,88 @@ fn throughput_min_of_n_floor() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// X-1 #3: verify_tag_var_aad negative legs — the verify-only receive surface
+// had zero direct refs (its seal-twin `mac_tag_var_aad` carries the mutation
+// court above; the asymmetric complement is the REJECT behavior).
+// ---------------------------------------------------------------------------
+
+/// Verify-only negative-leg court (`verify_tag_var_aad`, aead.rs:343):
+/// valid tag MUST verify Ok; a 1-bit tag corruption at each position class
+/// MUST return `Mismatch`; an AAD mismatch MUST return `Mismatch` (the
+/// asymmetric surface the seal-side flip court does not cover).
+/// Anti-vacuity: inherent in the corruption legs — a stubbed-to-true
+/// `verify_tag_var_aad` (constant `Ok(())`) fails the corruption legs
+/// immediately; a stubbed-to-false fails the positive leg.
+#[test]
+fn verify_tag_var_aad_negative_legs() {
+    let mut state: u64 = 0x1E51FAA_C000_0001 ^ 0x5EED_C000;
+    let key = key32(&mut state);
+    let nonce = nonce_from(&mut state);
+    let aad: std::vec::Vec<u8> = (0..24).map(|_| splitmix64(&mut state) as u8).collect();
+    let ct: std::vec::Vec<u8> = (0..96).map(|_| splitmix64(&mut state) as u8).collect();
+
+    // Positive leg: the honest tag verifies Ok, deterministically.
+    let tag = aead::mac_tag_var_aad(&aad, &ct, &key, &nonce);
+    assert_eq!(
+        aead::verify_tag_var_aad(&aad, &ct, &tag, &key, &nonce),
+        Ok(()),
+        "valid tag must verify Ok"
+    );
+    assert_eq!(
+        aead::verify_tag_var_aad(&aad, &ct, &tag, &key, &nonce),
+        Ok(()),
+        "replay must be deterministic"
+    );
+
+    // Negative leg 1: 1-bit tag corruption at each position class MUST
+    // reject. Covers first, middle, last byte and low/high bit within.
+    for i in [0usize, TAG_LEN / 2, TAG_LEN - 1] {
+        for bit in [0x01u8, 0x80] {
+            let mut bad = tag;
+            bad[i] ^= bit;
+            assert_eq!(
+                aead::verify_tag_var_aad(&aad, &ct, &bad, &key, &nonce),
+                Err(Mismatch),
+                "1-bit tag corruption (byte {i}, bit {bit:#04x}) must reject"
+            );
+        }
+    }
+
+    // Negative leg 2: AAD mismatch MUST reject — same tag over different
+    // AAD (receive-transition surface the seal court does not cover).
+    let mut aad2 = aad.clone();
+    aad2[0] ^= 0x01;
+    assert_eq!(
+        aead::verify_tag_var_aad(&aad2, &ct, &tag, &key, &nonce),
+        Err(Mismatch),
+        "AAD mismatch must reject even with an otherwise-valid tag"
+    );
+
+    // Negative leg 3: ciphertext mismatch MUST reject.
+    let mut ct2 = ct.clone();
+    let mid = ct2.len() / 2;
+    ct2[mid] ^= 0x01;
+    assert_eq!(
+        aead::verify_tag_var_aad(&aad, &ct2, &tag, &key, &nonce),
+        Err(Mismatch),
+        "ciphertext mismatch must reject even with an otherwise-valid tag"
+    );
+
+    // Key/nonce sensitivity: wrong key or nonce MUST reject (all four
+    // inputs flow into the tag; the doc comment's claim gets a witness).
+    let key2 = key32(&mut state);
+    let nonce2 = nonce_from(&mut state);
+    assert_ne!(key, key2, "fuzz keys must differ (court sanity)");
+    assert_ne!(
+        aead::verify_tag_var_aad(&aad, &ct, &tag, &key2, &nonce),
+        Ok(()),
+        "wrong key must reject"
+    );
+    assert_ne!(
+        aead::verify_tag_var_aad(&aad, &ct, &tag, &key, &nonce2),
+        Ok(()),
+        "wrong nonce must reject"
+    );
+}

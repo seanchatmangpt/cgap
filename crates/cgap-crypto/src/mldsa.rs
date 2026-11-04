@@ -432,3 +432,212 @@ pub fn use_hint(a: i32, h: i32) -> i32 {
     let bumped = (a1 + bump) & (M_BUCKETS - 1);
     ct_select_i32(h, bumped, a1)
 }
+
+// ---------------------------------------------------------------------------
+// X-1 #4: primitive property tests — focused, deterministic, no KATs (the
+// ntt courts cover the full pipeline). These pin the identities the
+// pipeline silently relies on.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod primitive_property_tests {
+    use super::*;
+    use alloc::vec::Vec;
+
+    /// Deterministic splitmix64 driver (same shape as the test-suite
+    /// drivers; no rand dev-dep).
+    fn splitmix64(state: &mut u64) -> u64 {
+        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_4A0D_A71B_D881);
+        z ^ (z >> 31)
+    }
+
+    /// Centered representative in (−q/2, q/2] for congruence checks.
+    fn centered(a: i64) -> i64 {
+        let mut r = a % Q as i64;
+        if r <= -Q as i64 / 2 {
+            r += Q as i64;
+        }
+        if r > Q as i64 / 2 {
+            r -= Q as i64;
+        }
+        r
+    }
+
+    /// Decompose composition: for every sampled `a` in [0, q),
+    /// HighBits·α + LowBits ≡ a (mod q) — including the collapse bucket.
+    /// Anti-vacuity: a stubbed highbits/lowbits (e.g. constant 0) breaks
+    /// the congruence on sampled inputs immediately.
+    #[test]
+    fn decompose_highbits_lowbits_composition() {
+        let mut state: u64 = 0x6DE_1EA_5EED_0004;
+        // Deterministic samples across the full [0, q) domain plus the
+        // known edge inputs: 0, q−1, bucket boundaries around α·k, and
+        // the collapse region near q.
+        let mut samples: Vec<i32> = (0..512).map(|_| (splitmix64(&mut state) % Q as u64) as i32).collect();
+        samples.extend([0i32, Q - 1, ALPHA, ALPHA * 15, ALPHA * 16 - 1, ALPHA * 16, Q - ALPHA]);
+        for &a in &samples {
+            let (a1, a0) = decompose(a);
+            assert_eq!(a1, highbits(a), "highbits({a}) must be decompose().0");
+            assert_eq!(a0, lowbits(a), "lowbits({a}) must be decompose().1");
+            assert_eq!(
+                centered(a1 as i64 * ALPHA as i64 + a0 as i64),
+                centered(a as i64),
+                "a1·α + a0 ≡ a (mod q) at a={a} (a1={a1}, a0={a0})"
+            );
+            assert!(a0 > -GAMMA2 && a0 <= GAMMA2, "LowBits range at a={a}: {a0}");
+            assert!(
+                (0..M_BUCKETS).contains(&a1),
+                "HighBits bucket range at a={a}: {a1}"
+            );
+        }
+    }
+
+    /// Montgomery identities on sample values:
+    /// (1) `montgomery_reduce(a·b) == mont_mul(a, b)` (definition-level
+    /// agreement);
+    /// (2) `mont_mul(a, MONT) == a mod q` (Montgomery roundtrip:
+    /// a·R·R⁻¹ = a);
+    /// (3) `mont_mul(a, MONT2) ≡ a·2^64 (mod q)` (to-Montgomery factor,
+    /// the poly_tomont law);
+    /// (4) bimultiplicativity: `mont_mul(mont_mul(a,b),c) ≡ a·b·c·R⁻¹
+    /// (mod q)`.
+    #[test]
+    fn montgomery_reduce_mont_mul_identities() {
+        let mut state: u64 = 0x70A1_7000_5EED_0004;
+        let check = |a: i32, b: i32| {
+            let mm = mont_mul(a, b);
+            assert_eq!(
+                mm,
+                montgomery_reduce(a as i64 * b as i64),
+                "mont_mul({a},{b}) must equal montgomery_reduce(a·b)"
+            );
+            // Every result is a lawful (-q, q) representative (the
+            // montgomery_reduce quotient can leave a negative
+            // representative; callers reduce32/cond_add_q afterward).
+            assert!(mm > -Q && mm < Q, "mont_mul result {mm} out of (-q,q)");
+            assert_eq!(
+                centered(mm as i64 * MONT as i64),
+                centered(a as i64 * b as i64),
+                "mont_mul({a},{b})·R ≡ a·b (mod q)"
+            );
+        };
+        for _ in 0..256 {
+            let a = (splitmix64(&mut state) % Q as u64) as i32;
+            let b = (splitmix64(&mut state) % Q as u64) as i32;
+            check(a, b);
+            check(a, MONT);
+            check(a, MONT2);
+        }
+        // Identity (2): Montgomery roundtrip a·R·R⁻¹ = a.
+        for &a in &[0i32, 1, 2, Q - 1, MONT, MONT2, 12345, Q - 12345] {
+            assert_eq!(
+                centered(mont_mul(a, MONT) as i64),
+                centered(a as i64),
+                "mont_mul(a, R) == a (mod q) at a={a}"
+            );
+        }
+        // Identity (3): to-Montgomery factor through MONT2 = 2^64 mod q.
+        for &a in &[1i32, MONT, 41978, 8380416] {
+            assert_eq!(
+                centered(mont_mul(a, MONT2) as i64 * MONT as i64),
+                centered(a as i64 * MONT2 as i64),
+                "mont_mul(a, R²)·R ≡ a·R² (mod q) at a={a}"
+            );
+        }
+        // Identity (4): associativity through the Montgomery domain.
+        for _ in 0..64 {
+            let a = (splitmix64(&mut state) % Q as u64) as i32;
+            let b = (splitmix64(&mut state) % Q as u64) as i32;
+            let c = (splitmix64(&mut state) % Q as u64) as i32;
+            let ab_c = mont_mul(mont_mul(a, b), c);
+            let a_bc = mont_mul(a, mont_mul(b, c));
+            assert_eq!(ab_c, a_bc, "mont_mul associative in Montgomery domain");
+            // ab_c ≡ abc·R⁻² (mod q); multiplying by R² recovers abc.
+            assert_eq!(
+                centered(ab_c as i64 * MONT2 as i64),
+                centered(a as i64 * b as i64 % Q as i64 * c as i64),
+                "triple product law at ({a},{b},{c})"
+            );
+        }
+    }
+
+    /// cond_add_q branch coverage both ways: negative centered reps come
+    /// back in [0, q) shifted by exactly q; non-negatives pass through
+    /// unchanged. Exhaustive over the meaningful domain.
+    #[test]
+    fn cond_add_q_branches_both_ways() {
+        // Negative branch: every negative i32 that is a centered rep
+        // (a > −q) maps to a + q.
+        for a in [-1, -(Q / 2), -(Q - 1)] {
+            assert_eq!(cond_add_q(a), a + Q, "negative branch at {a}");
+            assert!((0..Q).contains(&cond_add_q(a)), "range at {a}");
+        }
+        // Non-negative branch: pass-through, including 0 and q−1.
+        for a in [0, 1, Q / 2, Q - 1] {
+            assert_eq!(cond_add_q(a), a, "non-negative branch at {a}");
+        }
+        // Inverse law: cond_add_q is an involution between centered and
+        // [0,q) representatives.
+        for a in -Q + 1..0 {
+            let b = cond_add_q(a);
+            assert_eq!(cond_add_q(b - Q), b, "involution at {a}");
+        }
+    }
+
+    /// Ring arithmetic identities (poly_add / poly_sub, no reduction):
+    /// (a+b)−b = a; a+b = b+a; (a−b)+b = a; subgroup closure under the
+    /// sampled small-coefficient domain.
+    #[test]
+    fn poly_add_sub_ring_identities() {
+        let mut state: u64 = 0x90A1_7C00_5EED_0004;
+        let small = |state: &mut u64| (splitmix64(state) % 2001) as i32 - 1000;
+        let mk = |state: &mut u64| {
+            let mut p = [0i32; N];
+            for c in p.iter_mut() {
+                *c = small(state);
+            }
+            p
+        };
+        for _ in 0..16 {
+            let a = mk(&mut state);
+            let b = mk(&mut state);
+            let mut sum = [0i32; N];
+            poly_add(&mut sum, &a, &b);
+            let mut commuted = [0i32; N];
+            poly_add(&mut commuted, &b, &a);
+            assert_eq!(sum, commuted, "poly_add commutativity");
+            let mut back = [0i32; N];
+            poly_sub(&mut back, &sum, &b);
+            assert_eq!(back, a, "(a+b)−b = a elementwise");
+            let mut diff = [0i32; N];
+            poly_sub(&mut diff, &a, &b);
+            let mut back2 = [0i32; N];
+            poly_add(&mut back2, &diff, &b);
+            assert_eq!(back2, a, "(a−b)+b = a elementwise");
+            let mut zero = [0i32; N];
+            poly_sub(&mut zero, &a, &a);
+            assert!(zero.iter().all(|&c| c == 0), "a−a = 0");
+            // Pointwise-Montgomery linearity gate: the pipeline composes
+            // poly_add with pointwise_montgomery; pin bilinearity.
+            let mut pm = [0i32; N];
+            pointwise_montgomery(&mut pm, &sum, &sum);
+            let mut pm_ab1 = [0i32; N];
+            let mut pm_ab2 = [0i32; N];
+            pointwise_montgomery(&mut pm_ab1, &a, &sum);
+            pointwise_montgomery(&mut pm_ab2, &b, &sum);
+            let mut pm_total = [0i32; N];
+            poly_add(&mut pm_total, &pm_ab1, &pm_ab2);
+            assert_eq!(
+                centered_vec(&pm),
+                centered_vec(&pm_total),
+                "pointwise_montgomery((a+b), s) ≡ pointwise(a,s)+pointwise(b,s)"
+            );
+        }
+    }
+
+    fn centered_vec(p: &[i32; N]) -> Vec<i64> {
+        p.iter().map(|&c| centered(c as i64)).collect()
+    }
+}
