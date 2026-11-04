@@ -15,7 +15,7 @@
 #
 # cgap-storage is included even though the runbook list omits it: the umbrella
 # cgap crate carries it as an optional path+version dependency, so it must be
-# on the registry before `cargo publish -p cgap`.
+# on the registry before `cargo publish --locked -p cgap`.
 
 name: publish
 
@@ -26,6 +26,10 @@ on:
 permissions:
   contents: read
   id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -43,10 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-arrow --dry-run
+        run: cargo publish --locked -p cgap-arrow --dry-run
       - name: publish
-        run: cargo publish -p cgap-arrow
+        run: cargo publish --locked -p cgap-arrow
 
   blake3:
     name: publish cgap-blake3
@@ -55,10 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-blake3 --dry-run
+        run: cargo publish --locked -p cgap-blake3 --dry-run
       - name: publish
-        run: cargo publish -p cgap-blake3
+        run: cargo publish --locked -p cgap-blake3
 
   git:
     name: publish cgap-git
@@ -67,10 +73,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-git --dry-run
+        run: cargo publish --locked -p cgap-git --dry-run
       - name: publish
-        run: cargo publish -p cgap-git
+        run: cargo publish --locked -p cgap-git
 
   parquet:
     name: publish cgap-parquet
@@ -79,10 +86,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-parquet --dry-run
+        run: cargo publish --locked -p cgap-parquet --dry-run
       - name: publish
-        run: cargo publish -p cgap-parquet
+        run: cargo publish --locked -p cgap-parquet
 
   # ---------------------------------------------------------------------
   # Tier 1 — layer 2. Actual edges: crypto/bont/bn3/storage -> blake3;
@@ -97,10 +105,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-branchless --dry-run
+        run: cargo publish --locked -p cgap-branchless --dry-run
       - name: publish
-        run: cargo publish -p cgap-branchless
+        run: cargo publish --locked -p cgap-branchless
 
   gate:
     name: publish cgap-gate
@@ -109,10 +118,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-gate --dry-run
+        run: cargo publish --locked -p cgap-gate --dry-run
       - name: publish
-        run: cargo publish -p cgap-gate
+        run: cargo publish --locked -p cgap-gate
 
   core:
     name: publish cgap-core
@@ -121,10 +131,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-core --dry-run
+        run: cargo publish --locked -p cgap-core --dry-run
       - name: publish
-        run: cargo publish -p cgap-core
+        run: cargo publish --locked -p cgap-core
 
   aoq:
     name: publish cgap-aoq
@@ -133,10 +144,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-aoq --dry-run
+        run: cargo publish --locked -p cgap-aoq --dry-run
       - name: publish
-        run: cargo publish -p cgap-aoq
+        run: cargo publish --locked -p cgap-aoq
 
   crypto:
     needs: [blake3]
@@ -146,10 +158,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-crypto --dry-run
+        run: cargo publish --locked -p cgap-crypto --dry-run
       - name: publish
-        run: cargo publish -p cgap-crypto
+        run: cargo publish --locked -p cgap-crypto
 
   bont:
     needs: [blake3]
@@ -159,10 +172,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-bont --dry-run
+        run: cargo publish --locked -p cgap-bont --dry-run
       - name: publish
-        run: cargo publish -p cgap-bont
+        run: cargo publish --locked -p cgap-bont
 
   bn3:
     needs: [blake3]
@@ -172,10 +186,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-bn3 --dry-run
+        run: cargo publish --locked -p cgap-bn3 --dry-run
       - name: publish
-        run: cargo publish -p cgap-bn3
+        run: cargo publish --locked -p cgap-bn3
 
   storage:
     needs: [blake3]
@@ -185,10 +200,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-storage --dry-run
+        run: cargo publish --locked -p cgap-storage --dry-run
       - name: publish
-        run: cargo publish -p cgap-storage
+        run: cargo publish --locked -p cgap-storage
 
   p28:
     needs: [blake3, crypto]
@@ -198,10 +214,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-p28 --dry-run
+        run: cargo publish --locked -p cgap-p28 --dry-run
       - name: publish
-        run: cargo publish -p cgap-p28
+        run: cargo publish --locked -p cgap-p28
 
   # ---------------------------------------------------------------------
   # Tier 2 — membranes. Actual edges: ffi -> arrow,p28,aoq,crypto,core,
@@ -219,10 +236,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-ffi --dry-run
+        run: cargo publish --locked -p cgap-ffi --dry-run
       - name: publish
-        run: cargo publish -p cgap-ffi
+        run: cargo publish --locked -p cgap-ffi
 
   gpu:
     needs: [arrow]
@@ -232,10 +250,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-gpu --dry-run
+        run: cargo publish --locked -p cgap-gpu --dry-run
       - name: publish
-        run: cargo publish -p cgap-gpu
+        run: cargo publish --locked -p cgap-gpu
 
   audit:
     needs: [arrow, parquet]
@@ -245,10 +264,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap-audit --dry-run
+        run: cargo publish --locked -p cgap-audit --dry-run
       - name: publish
-        run: cargo publish -p cgap-audit
+        run: cargo publish --locked -p cgap-audit
 
   umbrella:
     needs: [arrow, blake3, git, parquet, branchless, gate, core, storage, p28, bn3]
@@ -258,10 +278,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: dry-run gate
-        run: cargo publish -p cgap --dry-run
+        run: cargo publish --locked -p cgap --dry-run
       - name: publish
-        run: cargo publish -p cgap
+        run: cargo publish --locked -p cgap
 
   wasm-footprint:
     needs: [arrow, parquet]
@@ -271,9 +292,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: install wasm32-wasip1 target
         run: rustup target add wasm32-wasip1
       - name: dry-run gate
-        run: cargo publish --manifest-path crates/wasm-footprint/Cargo.toml --dry-run
+        run: cargo publish --locked --manifest-path crates/wasm-footprint/Cargo.toml --dry-run
       - name: publish
-        run: cargo publish --manifest-path crates/wasm-footprint/Cargo.toml
+        run: cargo publish --locked --manifest-path crates/wasm-footprint/Cargo.toml
