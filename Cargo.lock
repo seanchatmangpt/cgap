@@ -223,6 +223,7 @@ dependencies = [
 name = "cgap-core"
 version = "26.11.3"
 dependencies = [
+ "cgap-audit",
  "cgap-blake3 26.11.3",
  "cgap-gate",
 ]
