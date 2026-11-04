@@ -12,6 +12,28 @@ Constraint honored: no git commands run.
 | 3 | `test-cgap-beam` FAIL: `beam_kill_stress_100_iterations` BEAM `{init,do_boot,3,[]}` init crash, finished 2.24s | Load-induced BEAM boot failure under fleet contention. | CONTENTION FLAKE — passes isolated (6.66s ok) |
 | 4 | `composed_transit_1m` (cgap-aoq `macro_transit_bench`) FAIL: `stage loop Blake3HashOnly allocated, left: 2 right: 0` | Global ALLOC_CALLS census captured 2 allocations not present in isolated runs (environmental noise during fleet load). Input is 128 B (`WIRE_BYTES=64+BODY_CAP`), so `cgap_blake3::hash` takes the stack-only single-chunk fast path; no allocation exists in the stage loop itself. | CONTENTION FLAKE — passes isolated (203.8s ok) |
 | 5 | `i2_stall_walk_isolation` (cgap-aoq `macro_p99_torture`) FAIL: isolation fence ratio exceeded | p99 latency fence exceeded under host load. AF-43 owns this file (edited 00:30 during wave). | CONTENTION FLAKE — passes isolated (24.3s ok) |
+| 6 | `test-cgap-arrow` FAIL: `mutation_kills` "could not execute process ... (never executed) No such file or directory" | Same artifact-clobber as #2 (co-tenant cargo run deleted the rebuilt binary between build and exec). | CONTENTION FLAKE — passes isolated (36/36 ok) |
+| 7 | `test-cgap-parquet` FAIL: `accessor_scan_16mib_under_ceiling` 984.8ms > ceiling | Perf court over ceiling under co-tenant load; passes on serial rerun (1.04s). | CONTENTION FLAKE — passes isolated |
+| 8 | `test-cgap-beam` FAIL (2nd full run): `{storm_failed,16,...}` at 2.8s | Storm worker crash under co-tenant load; fails ~3 of 6 runs while fleet load persists, passes serially. | CONTENTION FLAKE — intermittent under load, ok in isolation |
+
+## Second full verify run (post-fix), same session
+
+| Gate | Status |
+|---|---|
+| check-workspace | PASS |
+| test-cgap-arrow | FAIL → rerun serial: PASS (36/36) |
+| test-cgap-parquet | FAIL → rerun serial: PASS |
+| test-cgap-git | PASS |
+| test-cgap-blake3 | PASS |
+| test-integration | PASS |
+| test-cgap-beam | FAIL → rerun serial: PASS (intermittent under load) |
+| audit-branchless | PASS |
+| cli-verify | PASS (the fix; exit 0, 7 rows, 0 FAIL, typed skip FR-07) |
+| test-audit | PASS |
+
+Every gate that fails during fleet co-tenancy passes on a serial rerun against
+the same tree. The one deterministic main-CI failure (cli-verify, exit 101 on
+every run) is fixed at the script level. |
 
 ## Fix
 
