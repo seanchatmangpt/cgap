@@ -10,6 +10,10 @@
 # Final exit 0 only when no gate is FAIL.
 #
 # Usage: scripts/verify_v26.10.31.sh [--regen-baseline]
+# NOTE (2026-11-04, staleness): this file is named for v26.10.31 but remains
+# the gate-of-record for the current workspace (26.11.3); the gate battery
+# below has tracked forward. Renaming is a governance decision, not a lane
+# edit — see lane plan item (3).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -28,6 +32,28 @@ TABLE="$TMPDIR_V/table"
 NAMES="$TMPDIR_V/names"
 : > "$TABLE"; : > "$NAMES"
 FAIL_ANY=0
+
+# run_timeout <secs> <outfile> <cmd...> — portable timeout-guard (ZB-65).
+# GNU coreutils `timeout` is absent on stock macOS/BSD; perl is not. Both
+# paths preserve the contract the gates rely on: run cmd, tee output to
+# outfile, exit 124 on deadline, else propagate the command's own rc.
+run_timeout() {
+  local secs="$1" outfile="$2"; shift 2
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@" > "$outfile" 2>&1
+  else
+    perl -e '
+      my $s = shift; my $p;
+      $SIG{ALRM} = sub { kill "KILL", $p if $p; exit 124 };
+      alarm $s;
+      if (!defined($p = fork)) { exit 127 }
+      if ($p == 0) { exec @ARGV or exit 127 }
+      waitpid($p, 0) == $p or exit 124;
+      my $rc = $? >> 8; my $sig = $? & 127;
+      exit($sig ? 128 + $sig : $rc);
+    ' "$secs" "$@" > "$outfile" 2>&1
+  fi
+}
 
 # run_gate <name> <cmd...>
 run_gate() {
@@ -102,7 +128,7 @@ run_gate test-integration  cargo test -p cgap-integration
 # cgap-beam spawns a real BEAM VM; timeout-guard at 10 min, loud skip on
 # timeout so a hung BEAM never silently fails or silently passes.
 BEAM_RC=0
-timeout 600 cargo test -p cgap-beam > "$TMPDIR_V/beam.out" 2>&1 || BEAM_RC=$?
+run_timeout 600 "$TMPDIR_V/beam.out" cargo test -p cgap-beam || BEAM_RC=$?
 if [ "$BEAM_RC" -eq 0 ]; then
   printf '| `test-cgap-beam` | PASS | 0 |\n' >> "$TABLE"
   printf '%s\n' "test-cgap-beam" >> "$NAMES"
@@ -134,7 +160,7 @@ fi
 # depend on a stale prebuilt target/); timeout-guard at 5 min, loud skip on
 # timeout so a hung run never silently fails or silently passes.
 CLI_RC=0
-timeout 300 cargo run -q --manifest-path crates/cli/Cargo.toml --bin verify_v26 > "$TMPDIR_V/cli.out" 2>&1 || CLI_RC=$?
+run_timeout 300 "$TMPDIR_V/cli.out" cargo run -q --manifest-path crates/cli/Cargo.toml --bin verify_v26 || CLI_RC=$?
 if [ "$CLI_RC" -eq 0 ]; then
   printf '| `cli-verify` | PASS | 0 |\n' >> "$TABLE"
   printf '%s\n' "cli-verify" >> "$NAMES"
@@ -154,6 +180,11 @@ else
 fi
 
 run_gate test-audit cargo test -p cgap-audit
+
+# ZP-18: timing-fence census non-vacuity (poison HIT + clean pass). The full
+# tree census is scripts/profile_guard_census.py run bare; here we gate on the
+# self-check so a gate that can no longer flip cannot silently pass.
+run_gate profile-guard-census python3 scripts/profile_guard_census.py --self-check
 
 # ---------------------------------------------------------------------------
 # Emit verify-latest.md

@@ -22,29 +22,97 @@ const BANNED: [(&str, &str); 9] = [
     ("UnsafeCell", "interior mutability requires a named court"),
 ];
 
-/// Registered modules of the lib target (must match src/lib.rs `pub mod`).
-const REGISTERED: [&str; 12] = [
-    "aead.rs",
-    "chain.rs",
-    "codec.rs",
-    "error.rs",
-    "generated_aoq_header_layout.rs",
-    "header.rs",
-    "kem.rs",
-    "lib.rs",
-    "session.rs",
+/// One registered source. `exempt` lists gate-side, court-reviewed token
+/// exemptions scoped to THAT file only (same law as the in-file
+/// `SOURCE-SCAN-EXEMPT` markers, held in the gate's own data table so the
+/// scanned source stays untouched by the gate lane).
+struct Registered {
+    name: &'static str,
+    /// (banned token, justification >= 20 chars) pairs; an empty slice is
+    /// the strict default — no exemptions.
+    exempt: &'static [(&'static str, &'static str)],
+}
+
+/// Registered modules of the lib target (must match src/lib.rs `pub mod`,
+/// cfg'd or not — the file-walk counts on-disk sources regardless of cfg).
+const REGISTERED: [Registered; 13] = [
+    Registered { name: "aead.rs", exempt: &[] },
+    Registered { name: "chain.rs", exempt: &[] },
+    Registered { name: "codec.rs", exempt: &[] },
+    Registered { name: "error.rs", exempt: &[] },
+    Registered {
+        name: "generated_aoq_header_layout.rs",
+        exempt: &[],
+    },
+    Registered { name: "header.rs", exempt: &[] },
+    Registered { name: "kem.rs", exempt: &[] },
+    Registered { name: "lib.rs", exempt: &[] },
+    Registered { name: "session.rs", exempt: &[] },
     // [AF-43 SLA sync 2026-11-04] profile_guard.rs landed in src/ (registered
     // in lib.rs by its lane); adding it to the scanned set.
-    "profile_guard.rs",
+    Registered { name: "profile_guard.rs", exempt: &[] },
     // [AB-7 SLA sync 2026-11-03] AB-8 landed verify.rs/writer.rs mid-pass.
-    "verify.rs",
-    "writer.rs",
+    Registered { name: "verify.rs", exempt: &[] },
+    Registered { name: "writer.rs", exempt: &[] },
+    // [D1 SLA sync 2026-11-04] rfc0089_certificate.rs landed in src/,
+    // registered in lib.rs behind #[cfg(feature = "cert")]. The cert feature
+    // is alloc-using by design (extern crate alloc; String/Vec certificate
+    // types); the DEFAULT build stays core-only and zero-alloc because the
+    // whole module is cfg'd out without `cert` (witness: cert = [] no default
+    // deps in Cargo.toml). Its std::/vec! hits are #[cfg(test)] host-side
+    // scaffolding (receipt parsing, scorecard table), never in the shipped
+    // no_std surface.
+    Registered {
+        name: "rfc0089_certificate.rs",
+        exempt: &[
+            (
+                "alloc::",
+                "cert feature is alloc-using by design; default build remains zero-alloc",
+            ),
+            (
+                "vec!",
+                "cert feature is alloc-using by design; default build remains zero-alloc",
+            ),
+            (
+                "std::",
+                "cert feature is alloc-using by design; default build remains zero-alloc",
+            ),
+        ],
+    },
 ];
 
 /// [FLIPPED 2026-11-03 by AB-7, disclosed in ab-7-chain-session.md] The
 /// chain.rs collision ledger entry is closed: the header-agnostic rewrite
 /// landed and is registered in lib.rs. No known-unregistered sources.
 const KNOWN_UNREGISTERED: [&str; 0] = [];
+
+/// A registration entry is lawful only if every exempt token is a known
+/// banned token and every justification is at least 20 chars — the same
+/// validity law as the in-file SOURCE-SCAN-EXEMPT markers (fail-loud on
+/// an invalid registration, never a silent blanket pass).
+fn validate_registration(entries: &[Registered]) -> Vec<String> {
+    let mut bad = Vec::new();
+    for entry in entries {
+        if entry.exempt.is_empty() {
+            continue;
+        }
+        for (token, just) in entry.exempt {
+            if !BANNED.iter().any(|(t, _)| t == token) {
+                bad.push(format!(
+                    "{}: INVALID-REGISTRATION: exempt token {token:?} is not a banned token",
+                    entry.name
+                ));
+            }
+            if just.len() < 20 {
+                bad.push(format!(
+                    "{}: INVALID-REGISTRATION: justification under 20 chars: {just:?}",
+                    entry.name
+                ));
+            }
+        }
+    }
+    bad
+}
 
 /// Remove line/block comments keeping string/char literals intact (the
 /// cgap-core scanner's proven algorithm, verbatim in structure).
@@ -178,22 +246,13 @@ fn scan_file(path: &std::path::Path, text: &str) -> Vec<String> {
         .collect()
 }
 
-#[test]
-fn gate_exits_clean_on_registered_sources() {
-    let manifest = env!("CARGO_MANIFEST_DIR");
-    let src = std::path::Path::new(manifest).join("src");
-    let mut violations = Vec::new();
-    let mut scanned = 0usize;
-    for name in &REGISTERED {
-        let path = src.join(name);
-        let text = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("registered source under {name} missing: ({e})"));
-        violations.extend(scan_file_exempt(&text, name));
-        scanned += 1;
-    }
-    // Loud accounting: every .rs file under src/ must be either registered
-    // or on the known unregistered ledger — anything else REFUSES.
-    for entry in std::fs::read_dir(&src).expect("read src dir") {
+/// Loud accounting over a directory: every .rs file must be either
+/// registered or on the known-unregistered ledger — anything else is
+/// named as UNREGISTERED (fail-closed). Extracted so the D1 court can
+/// run the same law against a /tmp fixture without touching src/.
+fn unregistered_sources(dir: &std::path::Path) -> Vec<String> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(dir).expect("read scanned dir") {
         let path = entry.expect("dirent").path();
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
             continue;
@@ -202,18 +261,83 @@ fn gate_exits_clean_on_registered_sources() {
             .file_name()
             .and_then(|n| n.to_str())
             .expect("utf8 name");
-        assert!(
-            REGISTERED.contains(&name) || KNOWN_UNREGISTERED.contains(&name),
-            "UNREGISTERED SOURCE (fail-closed): {name} is under src/ but is \
-             neither a registered module nor on the collision ledger"
-        );
+        if !REGISTERED
+            .iter()
+            .any(|r| r.name == name)
+            && !KNOWN_UNREGISTERED.contains(&name)
+        {
+            found.push(name.to_string());
+        }
     }
+    found.sort();
+    found
+}
+
+#[test]
+fn gate_exits_clean_on_registered_sources() {
+    let manifest = env!("CARGO_MANIFEST_DIR");
+    let src = std::path::Path::new(manifest).join("src");
+    // The registration table itself is a court surface: an invalid
+    // exemption (unknown token / sub-20-char reason) REFUSES the gate.
+    let reg_bad = validate_registration(&REGISTERED);
+    assert!(
+        reg_bad.is_empty(),
+        "INVALID REGISTRATION TABLE:\n{}",
+        reg_bad.join("\n")
+    );
+    let mut violations = Vec::new();
+    let mut scanned = 0usize;
+    for entry in &REGISTERED {
+        let path = src.join(entry.name);
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!("registered source under {} missing: ({e})", entry.name)
+        });
+        violations.extend(gate_side_scan(&text, entry.name, entry.exempt));
+        scanned += 1;
+    }
+    // Loud accounting: every .rs file under src/ must be either registered
+    // or on the known unregistered ledger — anything else REFUSES.
+    let strays = unregistered_sources(&src);
+    assert!(
+        strays.is_empty(),
+        "UNREGISTERED SOURCE (fail-closed): {strays:?} is/are under src/ but \
+         neither registered modules nor on the collision ledger"
+    );
     assert_eq!(scanned, REGISTERED.len());
     assert!(
         violations.is_empty(),
         "SOURCE_SCAN_GATE_FAIL:\n{}",
         violations.join("\n")
     );
+}
+
+/// Scan one file honoring GATE-SIDE exemptions (the registration table's
+/// form) UNIONED with the in-file SOURCE-SCAN-EXEMPT marker form — both
+/// exemption channels are lawful; invalid in-file markers are reported,
+/// never silently accepted. Invalid table rows are rejected upstream by
+/// `validate_registration`.
+fn gate_side_scan(
+    text: &str,
+    name: &str,
+    exempt: &[(&'static str, &'static str)],
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut allowed: Vec<&'static str> = exempt.iter().map(|(t, _)| *t).collect();
+    for (tok, just, valid) in parse_exemptions(text) {
+        if valid {
+            allowed.push(tok);
+        } else {
+            violations.push(format!(
+                "{name}: INVALID-EXEMPTION: SOURCE-SCAN-EXEMPT: {tok} : {just}"
+            ));
+        }
+    }
+    for token in scan_text(text) {
+        if !allowed.contains(&token) {
+            violations.push(format!("{name}: banned token {token:?}"));
+        }
+    }
+    violations
 }
 
 #[test]
@@ -397,4 +521,69 @@ fn exemption_is_scoped_not_a_blanket_pass() {
         !hits.iter().any(|s| s.contains("alloc::")),
         "marked token must be exempted: {hits:?}"
     );
+}
+
+/// D1 non-vacuity (the exact red that opened this lane): a source using
+/// alloc that lands under src/ WITHOUT registration must be NAMED by the
+/// file-walk — the gate that stayed green while rfc0089_certificate.rs
+/// was unregistered must not exist again. Run against a /tmp fixture so
+/// the shared tree is untouched.
+#[test]
+fn d1_unregistered_alloc_source_is_named_fail_closed() {
+    let dir = std::env::temp_dir().join(format!("cgap-aoq-gate-d1-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    // A registered file, present in the fixture (walk must ignore it)…
+    std::fs::write(dir.join("lib.rs"), "pub mod inner;\n").expect("write registered");
+    // …and the D1 poison: an alloc-using source registered NOWHERE.
+    std::fs::write(
+        dir.join("stray_cert.rs"),
+        "extern crate alloc;\nuse alloc::vec::Vec;\npub fn g() -> Vec<u8> { vec![0u8; 1] }\n",
+    )
+    .expect("write stray");
+    let strays = unregistered_sources(&dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(strays, vec!["stray_cert.rs".to_string()], "D1 flip");
+}
+
+/// Mutation court for the registration-table exemption attribute: an
+/// alloc-using source registered with an EMPTY exempt list must FAIL the
+/// scan (poison); the same token set under rfc0089_certificate.rs's
+/// reviewed exemptions must pass (clean). A gate that accepts the former
+/// is vacuous; a table that fails the latter is not a registration.
+#[test]
+fn registration_exemption_attribute_flips_both_ways() {
+    let cert_like = concat!(
+        "extern crate alloc;\n",
+        "use alloc::{string::String, vec::Vec};\n",
+        "fn t() { let v = vec![0u8; 1]; let s = String::new(); std::fs::read_to_string(\"x\"); }\n",
+    );
+    // POISON: same text, no exemptions — every banned token must trip.
+    let poison = gate_side_scan(cert_like, "unflagged.rs", &[]);
+    assert!(
+        poison.iter().any(|v| v.contains("alloc::"))
+            && poison.iter().any(|v| v.contains("vec!"))
+            && poison.iter().any(|v| v.contains("std::")),
+        "alloc-using source without the flag must fail: {poison:?}"
+    );
+    // CLEAN: the exact exemption set the certificate registration carries.
+    let clean = gate_side_scan(cert_like, "rfc0089_certificate.rs", REGISTERED[12].exempt);
+    assert!(
+        clean.is_empty(),
+        "flagged registration must pass on the same token set: {clean:?}"
+    );
+    // The exempt list must be per-token: exempting only alloc:: must leave
+    // vec! and std:: loud.
+    let partial = gate_side_scan(
+        cert_like,
+        "partial.rs",
+        &[(
+            "alloc::",
+            "cert feature is alloc-using by design; default build remains zero-alloc",
+        )],
+    );
+    assert_eq!(partial.len(), 2, "unexempted tokens stay loud: {partial:?}");
+    // And the live registered file must itself pass under its own row.
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let text = std::fs::read_to_string(src.join("rfc0089_certificate.rs")).expect("read cert src");
+    assert!(gate_side_scan(&text, "rfc0089_certificate.rs", REGISTERED[12].exempt).is_empty());
 }

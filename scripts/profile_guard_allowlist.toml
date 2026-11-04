@@ -1,0 +1,83 @@
+# profile_guard_allowlist.toml — ZP-18 census allowlist (fail-closed gate).
+#
+# Every entry needs `path`, `ticket`, `reason`, `added`. The census script
+# (scripts/profile_guard_census.py) fails closed on: nonexistent paths,
+# missing fields, duplicate entries, and any allowlisted file that also
+# composes profile_guard (allowlist must stay minimal). Adding a file with
+# unfenced timing requires a fenced file or a ticketed entry here.
+
+[[allowlist]]
+path = "crates/bench/benches/kernels.rs"
+ticket = "ZP-18-C"
+reason = "divan-no-per-bench-skip"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-blake3/tests/zero_alloc.rs"
+ticket = "ZP-18-D"
+reason = "alloc-court-only: counts heap allocations via a GlobalAlloc wrapper; std::hint::black_box is DCE-prevention on inputs/outputs, never a timing fence"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-ffi/tests/fa9_commit_gating.rs"
+ticket = "ffi-ZP18-D-1"
+reason = "concurrency court, no timed entry: Instant::now is the bounded-poll DEADLINE in spin_until (no-sleep doctrine, wall-clock poll on an AtomicBool observable), never a duration measurement"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-ffi/tests/aoq_sidecar_court.rs"
+ticket = "ffi-ZP18-D-2"
+reason = "sidecar e2e court, no timed entry: every Instant::now is a bounded-poll deadline (socket-exists / connect-retry / child-exit observables, no-sleep doctrine), never a duration measurement"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-ffi/tests/aoq_sidecar_e2e_court.rs"
+ticket = "ffi-ZP18-D-3"
+reason = "sidecar e2e court, no timed entry: every Instant::now is a bounded-poll deadline (socket/connect/exit/unlink observables, no-sleep doctrine), never a duration measurement"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-ffi/tests/aoq_sidecar_busy_drain_court.rs"
+ticket = "ffi-ZP18-D-4"
+reason = "sidecar busy-drain court (green leg + drain-removal mutation leg), no timed entry: every Instant::now is a bounded-poll deadline (socket-bind / connect / BUSY-word / mutation-flip polls on socket observables, no-sleep doctrine), never a duration measurement"
+added = "2026-11-04"
+
+# --- ZP-18 GAP-CLOSE lane (2026-11-04): incidental-Instant / black_box
+# entries below carry ticket ZP18-D-residual-N. None of these files composes
+# profile_guard (the census minimality rule forbids double-registration).
+
+[[allowlist]]
+path = "crates/cgap-arrow/tests/mutation_kills.rs"
+ticket = "ZP18-D-residual-1"
+reason = "bounded-poll DEADLINE only: Instant::now sets a 5 s wall-clock deadline for a leak-counter poll with 1 ms sleep steps (no-sleep doctrine bounded poll); no duration is measured or reported"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-beam/tests/kill_stress.rs"
+ticket = "ZP18-D-residual-2"
+reason = "subprocess wall-time DIAGNOSTIC only: Instant::now measures the escript child's wall time, printed in the failure message and an eprintln summary; no timing gate or perf assertion"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-bn3/tests/edge_closure_courts.rs"
+ticket = "ZP18-D-residual-3"
+reason = "DCE prevention only: std::hint::black_box on a derived value so the edge-closure result is not optimized away; no Instant, no timing measurement"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-parquet/tests/offset_fuzz.rs"
+ticket = "ZP18-D-residual-4"
+reason = "corpus-run wall-time DIAGNOSTIC only: each corruption-sweep test measures whole-court elapsed time for println summaries; correctness (typed refusals, byte equality) is the gate, never the duration"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "crates/cgap-parquet/tests/robustness.rs"
+ticket = "ZP18-D-residual-5"
+reason = "corpus-run wall-time DIAGNOSTIC only: elapsed feeds the fail_closed_adversarial_corpus summary eprintln; violations are the gate, never the duration"
+added = "2026-11-04"
+
+[[allowlist]]
+path = "ontology-packs/fibo/tests/wave9_integration_courts.rs"
+ticket = "ZP18-D-residual-6"
+reason = "advisory elapsed PRINT only (file's own doc: 'CORRECTNESS court at 1M scale; elapsed time is printed as an advisory measurement ... never a gate'); conformance is the deliverable"
+added = "2026-11-04"
