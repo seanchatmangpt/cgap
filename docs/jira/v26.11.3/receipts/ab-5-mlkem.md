@@ -77,10 +77,22 @@ Standing: **ALIVE** (all gates ran this session, commands + exits below).
 
 ## Gates (this session)
 
-- cargo test -p cgap-crypto (full crate): 74 tests, 0 failed, exit 0
-  (pass 1, background run receipt). Pass 2 + decaps-only feature +
-  riscv32imc + wasm32 checks: running at receipt-write time; results to be
-  appended below when the background task completes.
+- cargo test -p cgap-crypto (full crate) x2: pass 1 = 74 tests 0 failed
+  exit 0; pass 2 = 76 tests 0 failed exit 0 (background receipts).
+- decaps-only feature: `cargo check -p cgap-crypto --features decaps-only`
+  exit 0 (feature re-added to Cargo.toml after a concurrent overwrite —
+  disclosed).
+- Cross targets: `cargo check -p cgap-crypto --target
+  riscv32imc-unknown-none-elf` exit 0; `--target wasm32-unknown-unknown`
+  exit 0.
+- Corridor join (AF-1, AF1-KD-1 closure): crates/cgap-aoq corridor_join_court
+  REBOUND to the real ML-KEM-768 seam (MlkemKem adapter over
+  cgap_crypto::kem; TestKem fallback retired); run 1: 3 tests 0 failed
+  75.7s incl. the 100-iteration J1 court on the real KEM hop; run 2: 3 tests 0 failed (exit 0).
+- Final state re-read from disk: fips203.rs + kem.rs compile under all four
+  surfaces (default, decaps-only, riscv32imc, wasm32); 11 court files on
+  disk under tests/; receipt on disk (this file). Court file edit disclosed here
+  as the AF-1 close condition named in af-1-corridor.md.
 - Bench (cargo test --release --test mlkem768_bench, aarch64 darwin,
   min-of-100): keygen 29.60 us/op, encaps 30.46 us/op, decaps 33.55 us/op
   (OQ-4 rekey-cost baseline; UNVERIFIED for other targets).

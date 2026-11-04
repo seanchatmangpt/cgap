@@ -98,6 +98,12 @@ fn verdict_of(measured: u32, ceiling: u32) -> Verdict {
 // Counting allocator (alloc census; court instrumentation)
 // ---------------------------------------------------------------------------
 
+/// The counting allocator (and every latency court's noise floor) is
+/// process-global: the five courts SERIALIZE on this mutex so a default
+/// parallel `cargo test` harness cannot cross-contaminate an alloc
+/// census or a latency distribution.
+static SERIAL: Mutex<()> = Mutex::new(());
+
 static ALLOC_CALLS: AtomicUsize = AtomicUsize::new(0);
 static ALLOC_BYTES: AtomicUsize = AtomicUsize::new(0);
 
@@ -174,6 +180,33 @@ fn alloc_delta((c0, b0): (usize, usize)) -> (usize, usize) {
         ALLOC_CALLS.load(Ordering::Relaxed) - c0,
         ALLOC_BYTES.load(Ordering::Relaxed) - b0,
     )
+}
+
+/// Cross-test allocator contamination guard.
+///
+/// The census allocator is process-global. With the default parallel
+/// harness every court's setup allocations (Box::leak slabs, latency Vecs)
+/// land inside every other court's census window, so a `(0, 0)` census is
+/// unobservable in-process. Fix: re-exec this court as its own process so
+/// the census window covers exactly one test. Returns true only in the
+/// isolated child (where the census is observable); the parent asserts on
+/// the child's real exit status and then returns without running a census
+/// it could not observe.
+fn census_isolated(child_name: &str) -> bool {
+    if std::env::var_os("AOQ_P99_ISOLATED").is_some() {
+        return true; // we are the isolated child: run the real census
+    }
+    let exe = std::env::current_exe().expect("current_exe");
+    let status = Command::new(exe)
+        .args(["--exact", child_name, "--test-threads=1", "--nocapture"])
+        .env("AOQ_P99_ISOLATED", "1")
+        .status()
+        .expect("spawn isolated rerun");
+    assert!(
+        status.success(),
+        "isolated census rerun of {child_name} failed: {status}"
+    );
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +390,10 @@ fn process_op(
 // never allocates -- the 0-alloc census IS the GC-immunity witness.
 #[test]
 fn i1_bimodal_size_storm() {
+    let _serial = SERIAL.lock().expect("serial gate");
+    if !census_isolated("i1_bimodal_size_storm") {
+        return;
+    }
     let frames = 20_000;
     let body_len = |i: usize| -> usize {
         if i % 2 == 0 {
@@ -429,6 +466,7 @@ fn i1_bimodal_size_storm() {
 // Court I2 -- stall-walk (head-of-line-blocking isolation test).
 #[test]
 fn i2_stall_walk_isolation() {
+    let _serial = SERIAL.lock().expect("serial gate");
     const FRAMES: usize = 10_000;
     const STALL_FRAMES: [usize; 8] = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
     const STALL_MS: u64 = 200;
@@ -488,6 +526,10 @@ fn i2_stall_walk_isolation() {
 // the verify+gate op printed as context.
 #[test]
 fn i3_cache_stride() {
+    let _serial = SERIAL.lock().expect("serial gate");
+    if !census_isolated("i3_cache_stride") {
+        return;
+    }
     const FRAMES: usize = 20_000;
     const SWEEP_BYTES: usize = 16 * 1024 * 1024;
     let mut rng = Xorshift(0xAF37_0033);
@@ -583,6 +625,10 @@ fn i3_cache_stride() {
 // (c) typed refusal census == deterministic plan, never a panic.
 #[test]
 fn i4_tamper_inundation() {
+    let _serial = SERIAL.lock().expect("serial gate");
+    if !census_isolated("i4_tamper_inundation") {
+        return;
+    }
     const FRAMES: usize = 20_000;
     // Plan: tamper iff i % 5 < 3 (60%); classes cycle by (i/5) % 4:
     // 0 header-bitflip -> DigestMismatch, 1 magic flip -> BadMagic,
@@ -704,6 +750,7 @@ fn i4_tamper_inundation() {
 // after verify+gate+chain). ab-17/ab-18 receipted 5.8-7.4 ms band.
 #[test]
 fn i5_supervisor_churn() {
+    let _serial = SERIAL.lock().expect("serial gate");
     const FRAMES: usize = 10_000;
     const KILL_EVERY: usize = 1000;
     let acks_v: Vec<AtomicBool> = (0..FRAMES).map(|_| AtomicBool::new(false)).collect();

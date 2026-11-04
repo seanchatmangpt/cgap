@@ -8,6 +8,69 @@ transcribed from the v26.10.29 receipt docs (`docs/RECEIPTS.md`,
 `docs/BENCH_FLOORS.json`); conflicts between receipt docs are listed in the
 release notes' Discrepancies section, not reconciled here.
 
+## [26.11.3] - 2026-11-03
+
+AoQ Wave-1 campaign release. Every number below is transcribed from the
+session's landed receipts (`docs/jira/v26.11.3/receipts/`); UNVERIFIED
+never rounds up and fail-honest gate results are recorded as measured,
+not relaxed.
+
+### Added
+
+- `crates/cgap-aoq` — AOQ1 wire-law kernel (64-byte `AoqHeader`,
+  `#[repr(C)]`, closed `Epoch` enum, compile-time layout court with
+  ontology drift court + mutation flip witness: ab-6; typed
+  `AoqError` codec decode: ab-6/ab-8; hash-chained receipt chain
+  `AoqChain` with 4-state session machine and `verify_records`
+  (BLAKE3 digest substrate, cgap-arrow): ab-7; wire-tier IPC/SHM
+  stress and 0-alloc counting-allocator courts: ab-9/ab-10/ab-11;
+  zero-dep writer stress: ab-10; slab rate floor 12.2M pushes/s:
+  ab-19; FFI stress: ab-15).
+- `crates/cgap-crypto` kernels — `fips202` KECCAK-p[1600,24] +
+  SHAKE-128/256 with OpenSSL-oracle KAT courts (two from-memory KAT
+  constants caught wrong and corrected: ab-2); ChaCha20 block
+  (RFC 8439) and Poly1305 (ab-3); AEAD with typed
+  `AeadKernelNotAdmitted` pre-admission seam (ab-4); ML-KEM/fips203
+  NTT court tables (ab-5, disclosed round-trip defect). Negative
+  mutation demonstration court `kat_flip_demo.rs`: 324/324 flips
+  detected, baselines against landed pub APIs, sandbox-only mutation
+  with byte-exact restore (af-12).
+- CBMQS qualification machinery — executable seven-gate evaluator
+  `cbmqs_gates.rs` (8 gate functions incl. G1b slab floor; G2 wire
+  timing recorded FAIL-honest at ~717 ns vs the 100 ns fence, fence
+  not relaxed; G6 typed SKIP: af-10); CBMQS-7G/1 bake-off runner
+  `cbmqs_runner.rs` (`harness = false`, exit-status verdict, BLAKE3-
+  sealed JSON report, `--court` non-vacuity mode, foreign-subject
+  subprocess mode, self-test verdict PASS: af-14); RFC-0089 §8.4
+  qualification certificate machinery, fail-closed on SKIP gates
+  (rx-5); scorecard (rx-3) and profile guard (rx-4).
+- Macro-benchmarks over real UDS transport (all in `cgap-aoq/tests/`,
+  no mocks): flash-crash clearinghouse, scaled 1M x2 green + full
+  10M-frame documented run, 128 B wire units, margin-ledger risk
+  gate, per-frame BLAKE3 receipt chain (af-26); defense telemetry
+  mesh, 64 session channels through the real 4-state session
+  machine, per-channel `AoqChain` verification, AEAD attempts
+  honestly census'd as typed refusals (af-27); healthcare records
+  federation, 500 UDS endpoints / 1000 threads, consent-preimage
+  law bound into the chain hash, real RFC 8439 detached AEAD seals,
+  adversarial probe census incl. canonically-encoded epoch-0 probe
+  (af-29); cage-match Contender A runner, 0.5630 µs/frame release,
+  0 allocs (af-30; full cage-match receipt in arcus); saturation and
+  density follow-ups (af-32, af-33).
+- Corridor join kernel (af-1) and per-link/per-call latency profiles
+  (af-21, af-22), transit bench (af-35), G2-convergence (af-25),
+  SIMD profile (af-3).
+- cgap-arrow wire-tier gates (CG-1): `BadVersion`/`BadFlags` ipc
+  gates in shared order, `parse_meta` seam (`ParsedMeta`,
+  `read_with_meta`), truncation classified `Truncated` (killing the
+  wrong-class `BodyDigestNoRoom`), seq wrap-safe successor law,
+  witness-tier doc section, 6 new G1 courts (145 lib tests green),
+  frame-ABI mirror court in cgap-gate, wire-shm zero-"blake3" scan
+  court (cg-1).
+- Publish-wave fixes: gofmt formatting, `bench_gates` bash
+  compatibility, workspace version drift, CHANGELOG (this section)
+  and threat-model/CLAUDE.md updates.
+
 ## [26.11.2] - 2026-11-02
 
 starDF campaign release. Every number below cites its registry row or

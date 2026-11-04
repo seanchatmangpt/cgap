@@ -8,35 +8,31 @@ set -u
 ROOT="/Users/sac/cgap"
 PACK="$ROOT/packs/dod-pack"
 cd "$ROOT" || exit 2
-declare -a GATES
 GATES=("010_required_fields.rq" "020_target_unmeasured_not_blocking.rq" "030_gate_id_uniqueness.rq" "040_target_close_condition.rq")
 SHIM='SELECT ?s WHERE { ?s ?p ?o } LIMIT 1'
 
-fails=0; broken=0
+fails=0
 # PASS witness: one real sync (runs all 4 gates against the union graph)
 rm -f "$ROOT/ggen.lock"
 if ! ggen sync run >/dev/null 2>/tmp/gd1-court-pass.err; then
-  echo "PASS-WITNESS: sync exit nonzero — court broken"; cat /tmp/gd1-court-pass.err | tail -3; exit 2
+  echo "PASS-WITNESS: sync exit nonzero — court broken"; tail -3 /tmp/gd1-court-pass.err; exit 2
 fi
 echo "PASS-WITNESS: sync exit 0 (all 4 gates evaluated green against the union graph)"
 
 for g in "${GATES[@]}"; do
   f="$PACK/gates/$g"
+  cp "$f" /tmp/gd1-orig.rq || exit 2
   before=$(shasum -a 256 "$f" | cut -d' ' -f1)
-  before_lock=$(shasum -a 256 "$ROOT/ggen.lock" 2>/dev/null | cut -d' ' -f1)
   printf '# MESSAGE: SHIM-COURT probe %s\n%s\n' "$g" "$SHIM" > "$f"
-  mv "$ROOT/ggen.lock" "$ROOT/ggen.lock.held" 2>/dev/null
+  [ -f "$ROOT/ggen.lock" ] && mv "$ROOT/ggen.lock" "$ROOT/ggen.lock.held"
   ggen sync run --dry-run >/dev/null 2>/tmp/gd1-court.err
   rc=$?
-  if [ -f "$ROOT/ggen.lock.held" ]; then mv "$ROOT/ggen.lock.held" "$ROOT/ggen.lock"; fi
-  # restore + verify byte-exact
-  printf '%s' "$before" > /tmp/gd1-expected.sha
-  shasum -a 256 -c /tmp/gd1-expected.sha >/dev/null 2>&1 || true
-  # (shasum -c needs the filename; verify manually)
+  [ -f "$ROOT/ggen.lock.held" ] && mv "$ROOT/ggen.lock.held" "$ROOT/ggen.lock"
+  mv /tmp/gd1-orig.rq "$f"
   after=$(shasum -a 256 "$f" | cut -d' ' -f1)
   [ "$before" = "$after" ] || { echo "RESTORE-FAIL $g"; exit 2; }
   if [ "$rc" -eq 0 ]; then
-    echo "$g: DID-NOT-FLIP (dry-run exit 0) — court FAIL, VACUOUS"
+    echo "$g: DID-NOT-FLIP (dry-run exit 0) — VACUOUS court"
     fails=$((fails+1))
   elif grep -q "FM-PACK-013" /tmp/gd1-court.err && grep -q "$g" /tmp/gd1-court.err; then
     echo "$g: FLIP-OK (FM-PACK-013 refusal naming the gate, exit $rc)"
@@ -46,7 +42,6 @@ for g in "${GATES[@]}"; do
   fi
 done
 
-if [ "$broken" -gt 0 ]; then exit 2; fi
 if [ "$fails" -gt 0 ]; then echo "COURT: VIOLATION ($fails gates did not flip)"; exit 1; fi
 echo "COURT: CONFORMANT (4/4 FLIP-OK, restore byte-exact)"
 exit 0
