@@ -34,7 +34,8 @@ SHA_FLAGS := $(if $(findstring shasum,$(notdir $(SHA_CMD))),-a 256,)
 GATE0_FILES := include/cgap_c_data.h \
                include/cgap_format_codes.h \
                crates/cgap-arrow/src/generated_layout.rs \
-               crates/cgap-arrow/src/generated_version.rs
+               crates/cgap-arrow/src/generated_version.rs \
+               include/cgap_aoq.h
 
 test:
 	cargo test --workspace

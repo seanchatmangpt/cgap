@@ -6,6 +6,7 @@ source = "ontology/cgap.ttl"
 
 [packs]
 cgap-pack = { path = "../ggen-marketplace/packs/cgap-pack" }
+aoq-pack = { path = "../ggen-marketplace/packs/aoq-pack" }
 
 [templates]
 dir = "gen-templates"

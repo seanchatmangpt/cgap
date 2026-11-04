@@ -350,6 +350,12 @@ pub mod xip_tables;
 /// taxonomy counters, quota state, receipt digest).
 pub mod stats;
 
+/// PG-A6 step 6 (lane GA-5): generated Aligned Offset Queue (AOQ) FFI
+/// surface — a `ggen sync run` projection of the aoq-pack graph
+/// (the canonical marketplace aoq-pack, flipped from the GA-5 staged fallback
+/// marketplace landing). Do not hand-edit; regenerate via the graph.
+pub mod aoq;
+
 /// XIP glue (lane doc §5): a `target_os = "none"` staticlib needs a panic
 /// handler and no `std`. Host targets use std's handler — this item does not
 /// exist there, so host builds are untouched (the slot-surface cfg gates
