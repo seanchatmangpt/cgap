@@ -103,6 +103,9 @@ const fn status_of(err: &SessionError) -> u32 {
         // Truncated / out-of-order frame law.
         SessionError::LengthMismatch { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
         // Frame-integrity law (magic/version/digest/kind tag/ct-echo bind).
+        // KD-1 (docs/jira/v26.11.4/KNOWN_DIVERGENCES.md): UnsupportedVersion
+        // collides onto the digest word because the frozen band has no
+        // version-specific status; closes at the next band bump.
         SessionError::Wire(AoqError::BadMagic { .. })
         | SessionError::Wire(AoqError::UnsupportedVersion { .. })
         | SessionError::Wire(AoqError::DigestMismatch { .. })

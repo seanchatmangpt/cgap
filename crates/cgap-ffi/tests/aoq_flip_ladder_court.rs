@@ -6,10 +6,12 @@
 //! (not a simulation):
 //!
 //! - L1 tampered byte (stale tag)           -> DIGEST_MISMATCH 0x4347A005
-//! - L2 version skew 3->2 (honest re-tag)   -> the frozen-band word the
-//!   sidecar actually maps UnsupportedVersion to (OBSERVED, expected
-//!   EPOCH_MISMATCH 0x4347A006 per aoq_sidecar.rs session_status mapping;
-//!   the observed word is recorded, not assumed).
+//! - L2 version skew 3->2 (honest re-tag)   -> DIGEST_MISMATCH 0x4347A005,
+//!   the REGISTERED frozen-band collision KD-1
+//!   (docs/jira/v26.11.4/KNOWN_DIVERGENCES.md): the band has no version
+//!   word, so UnsupportedVersion shares the digest word. Tampered vs
+//!   wrong-version are indistinguishable on the wire until the band is
+//!   extended at the next version bump.
 //! - L3 ordering: bad version + bad FNV header digest, honest re-tag ->
 //!   must die at the VERSION law (deeper law fires first), NOT at the
 //!   digest word. A digest-only contrast leg proves the digest law is
@@ -357,8 +359,10 @@ fn l1_tampered_byte_stale_tag_digest_mismatch() {
 
 // ---------------------------------------------------------------------------
 // LADDER L2 — version skew 3->2, honest re-tag -> dies at the VERSION law.
-// The observed frozen-band word is asserted to be EPOCH_MISMATCH per the
-// sidecar's session_status mapping (Wire(UnsupportedVersion)).
+// DOCUMENTS divergence KD-1 (docs/jira/v26.11.4/KNOWN_DIVERGENCES.md):
+// the frozen band has no version word, so Wire(UnsupportedVersion)
+// collides onto DIGEST_MISMATCH 0x4347A005. This leg pins the collision
+// as registered, not as correct behavior; closes at the next band bump.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -384,7 +388,7 @@ fn l2_version_skew_dies_at_version_law() {
     let (word, w) = roundtrip(car.stream.as_mut().expect("conn"), &win, false);
     assert_eq!(
         word, AOQ_STATUS_DIGEST_MISMATCH,
-        "L2: version-skewed frame must die at the version law (OBSERVED frozen-band collision: DIGEST_MISMATCH 0x4347A005), got {} ({:#010x})",
+        "L2 (KD-1): version-skewed frame dies at the version law, emitted word is the REGISTERED collision DIGEST_MISMATCH 0x4347A005 (band extension closes KD-1), got {} ({:#010x})",
         leg_name(word),
         word
     );
@@ -441,7 +445,7 @@ fn l3_ordering_version_beats_digest_and_length() {
     let (word, _w) = roundtrip(car.stream.as_mut().expect("conn"), &win, false);
     assert_eq!(
         word, AOQ_STATUS_DIGEST_MISMATCH,
-        "L3 ordering: version+length-bad frame must die at version (DIGEST_MISMATCH collision), not at the length law (INCOMPLETE_FRAME); got {} ({:#010x})",
+        "L3 ordering (KD-1): version+length-bad frame must die at version (registered collision word DIGEST_MISMATCH 0x4347A005), not at the length law (INCOMPLETE_FRAME); got {} ({:#010x})",
         leg_name(word),
         word
     );
@@ -460,7 +464,7 @@ fn l3_ordering_version_beats_digest_and_length() {
     let (word2, _w2) = roundtrip(car2.stream.as_mut().expect("conn"), &win2, false);
     assert_eq!(
         word2, AOQ_STATUS_DIGEST_MISMATCH,
-        "L3 contrast: digest-only corruption must fire DIGEST_MISMATCH, got {} ({:#010x})",
+        "L3 contrast: digest-only corruption must fire DIGEST_MISMATCH (its TRUE class, unlike the KD-1 version collision), got {} ({:#010x})",
         leg_name(word2),
         word2
     );
