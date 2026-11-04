@@ -123,6 +123,14 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
   does NOT invalidate cargo's fingerprint — the mutated binary
   survives (`docs/jira/v26.11.1/waves/a02-finish-receipt.md:170-184`);
   bump mtimes or `cargo clean` between mutation and restore.
+- KD register law: `docs/jira/v26.11.4/KNOWN_DIVERGENCES.md` is the
+  register of truth. A divergence closes only via its close condition;
+  a court that documents a row is not a fix. Repo-scoped refs are bare
+  `KD-n`; cross-repo references must qualify (`stardf KD-12`), never
+  cite a foreign register with a bare id. Fix sites carry the token
+  `// KD-COVERS: KD-n` so coverage tooling can find them. The flip
+  tool (`kd_flip.py`-class) is deferred until the register holds >= 5
+  open rows or the first flip event occurs.
 - cwd resets to repo root between Bash calls — absolute paths only.
 - No Process.sleep: bounded polls on observables; the runtime owns time.
 - llvm tools: `~/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/` (NOT toolchain `bin/`); that toolchain's `llc` lacks a riscv backend — `/opt/homebrew/opt/llvm/bin/` has one.

@@ -21,7 +21,7 @@ missing / 3 loud skip.
   confirms S-2 absent at its 45-min poll deadline. Cited as named-absent,
   never read; nothing in this spec rests on it.
 - `/Users/sac/stardf/docs/parity-inventory.md` — S-5 audit: 17 surfaces
-  RUNS-GREEN in a /tmp sandbox; upstream-parity (KD-12/KD-14) has zero
+  RUNS-GREEN in a /tmp sandbox; upstream-parity (stardf KD-12/KD-14) has zero
   courts; "zero of 10 vs 10 golden digests shared"; node --check exit 1
   on the full-parity workflow; blake3 single-identity gate exit 0.
 - `/Users/sac/stardf/arrow/docs/DIVERGENCES.md` KD-12/KD-14 — both
@@ -116,8 +116,8 @@ fail-closed restore) and the gate must exit 1. No witnessed flip = FAIL.
 ## (c) KD-12 / KD-14 differential parity courts vs pinned purrdf fixtures
 
 Current witnessed state (parity-inventory.md, S-5): parity WITH UPSTREAM
-purrdf is CLAIMED-not-PROVEN. KD-12 (digest identity vs purrdf-hash): no
-differential test exists — grep finds none. KD-14 (columnar
+purrdf is CLAIMED-not-PROVEN. KD-12 (stardf digest identity vs purrdf-hash): no
+differential test exists — grep finds none. KD-14 (stardf columnar
 digest-ordering parity): the upstream `golden_bytes.rs` pins
 (/Users/sac/purrdf/crates/columnar/tests/golden_bytes.rs) and the
 stardf-columnar PINNED set share ZERO digests — 10 vs 10, disjoint.
