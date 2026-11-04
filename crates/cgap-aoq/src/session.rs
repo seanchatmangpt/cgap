@@ -50,6 +50,14 @@ pub const CTX_TRANSCRIPT: &[u8] = b"cgap-aoq/trans/1";
 pub const CTX_SEND: &[u8] = b"cgap-aoq/key/send";
 /// Direction-split context: the receiving direction key (`recv_key`).
 pub const CTX_RECV: &[u8] = b"cgap-aoq/key/recv";
+/// KDF context, v3 Finish confirm tag (M2a). The tag binds
+/// `recv_key ‖ transcript ‖ ct_echo` under this context.
+pub const CTX_CONFIRM: &[u8] = b"cgap-aoq/confirm/1";
+/// v3 Finish confirm-tag width (M2a).
+pub const FINISH_TAG_BYTES: usize = 16;
+/// v3 Finish body width (M2a): ct echo (1088) + confirm tag (16). The
+/// v2 ct-only 1088 body is refused under the v3 law.
+pub const FINISH_BODY_BYTES: usize = CT_BYTES + FINISH_TAG_BYTES;
 
 /// Caller-injected randomness seam (host facade; no RNG in this crate).
 /// Courts inject a deterministic counter; the production sidecar layer
@@ -116,6 +124,9 @@ pub enum SessionError {
     OrdinalMismatch { expected: u32, got: u32 },
     /// ServerFinish ct-echo does not bind our pending ciphertext.
     TranscriptMismatch,
+    /// v3 Finish confirm tag does not match the derived
+    /// `kdf(CTX_CONFIRM, recv_key, transcript, ct_echo)` value (M2a).
+    ConfirmMismatch,
     /// Counted frame budget exhausted; a rekey is required first.
     RekeyRequired { used: u32, budget: u32 },
     /// Session is Closed; nothing is lawful.
@@ -153,6 +164,7 @@ impl core::fmt::Display for SessionError {
                 write!(f, "ordinal mismatch: expected {expected}, got {got}")
             }
             Self::TranscriptMismatch => f.write_str("transcript mismatch"),
+            Self::ConfirmMismatch => f.write_str("confirm tag mismatch"),
             Self::RekeyRequired { used, budget } => {
                 write!(f, "rekey required: used {used}/{budget}")
             }
@@ -262,7 +274,7 @@ pub fn parse_frame(buf: &[u8]) -> Result<Frame<'_>, SessionError> {
     let body = &buf[crate::header::SIZE_BYTES + 1..];
     let expected = match kind {
         FrameKind::HandshakeEk | FrameKind::Rekey => EK_BYTES,
-        FrameKind::HandshakeFinish => CT_BYTES,
+        FrameKind::HandshakeFinish => FINISH_BODY_BYTES,
         FrameKind::AppData => 4 + TAG_LEN, // seq prefix + Poly1305 tag; ct may be empty
         FrameKind::Close => 0,
     };
@@ -305,6 +317,23 @@ pub fn transcript_tag<K: KemSeam>(
     let mut epoch_le = [0u8; 2];
     epoch_le.copy_from_slice(&epoch.to_le_bytes());
     kem.kdf(&[CTX_TRANSCRIPT, ek_server, ss, &epoch_le])
+}
+
+/// v3 Finish confirm tag (M2a):
+/// `kdf(CTX_CONFIRM ‖ recv_key ‖ transcript ‖ ct_echo)[..16]`. Both
+/// handshake parties derive the SAME direction keys from the shared
+/// `(ss, ek)` pair, so emitter and verifier compute one value.
+#[must_use]
+pub fn confirm_tag<K: KemSeam>(
+    kem: &K,
+    recv_key: &[u8; 32],
+    transcript: &[u8; 32],
+    ct_echo: &[u8; CT_BYTES],
+) -> [u8; FINISH_TAG_BYTES] {
+    let tag = kem.kdf(&[CTX_CONFIRM, recv_key, transcript, ct_echo]);
+    let mut out = [0u8; FINISH_TAG_BYTES];
+    out.copy_from_slice(&tag[..FINISH_TAG_BYTES]);
+    out
 }
 
 /// The session state machine over an injected KEM seam.
@@ -488,10 +517,28 @@ impl<'k, K: KemSeam> Session<'k, K> {
                 Ok(())
             }
             (SessionState::HandshakeWait, FrameKind::HandshakeFinish) => {
+                if frame.payload.len() < FINISH_BODY_BYTES {
+                    return Err(SessionError::LengthMismatch {
+                        expected: FINISH_BODY_BYTES,
+                        got: frame.payload.len(),
+                    });
+                }
                 let mut echo = [0u8; CT_BYTES];
                 echo.copy_from_slice(frame.payload[..CT_BYTES].as_ref());
                 if echo != self.pending_ct {
                     return Err(SessionError::TranscriptMismatch);
+                }
+                // v3 Finish law (M2a): the confirm tag binds
+                // recv_key ‖ transcript ‖ ct_echo; verify before any
+                // mutation (law 4).
+                let want = confirm_tag(
+                    self.kem,
+                    &self.recv_key,
+                    &self.transcript,
+                    &echo,
+                );
+                if frame.payload[CT_BYTES..FINISH_BODY_BYTES] != want[..] {
+                    return Err(SessionError::ConfirmMismatch);
                 }
                 self.advance();
                 self.state = SessionState::Established;
@@ -591,9 +638,12 @@ impl<'k, K: KemSeam> Session<'k, K> {
         out[64] = FrameKind::AppData.id();
         out[65..69].copy_from_slice(&seq.to_le_bytes());
         let nonce = self.wire_nonce(self.ordinal, seq);
-        let covered = &out[..crate::header::SIZE_BYTES + 5];
-        let (ct, tag_out) = out[69..].split_at_mut(payload.len());
-        aead::seal_detached(ct, tag_out, payload, covered, &self.send_key, &nonce);
+        let (covered, body_tail) = out.split_at_mut(crate::header::SIZE_BYTES + 5);
+        let (ct, rest) = body_tail.split_at_mut(payload.len());
+        let (tag_out, _) = rest.split_at_mut(TAG_LEN);
+        let mut tag = [0u8; TAG_LEN];
+        aead::seal_detached(ct, &mut tag, payload, covered, &self.send_key, &nonce);
+        tag_out.copy_from_slice(&tag);
         Ok(69 + payload.len() + TAG_LEN)
     }
 
@@ -622,13 +672,15 @@ impl<'k, K: KemSeam> Session<'k, K> {
     /// [`SessionError::AeadMismatch`] on any tag divergence — ciphertext
     /// byte, AAD byte, key, or nonce tamper all land here.
     fn verify_appdata(&self, frame: &Frame<'_>) -> Result<(), SessionError> {
-        let ct_len = frame.payload.len() - TAG_LEN;
+        // Body = [seq 4B][ct][tag 16B]; the ct span excludes the seq word.
+        let body_len = frame.payload.len();
+        let ct_len = body_len - 4 - TAG_LEN;
         let mut tag = [0u8; TAG_LEN];
-        tag.copy_from_slice(&frame.payload[ct_len..]);
+        tag.copy_from_slice(&frame.payload[4 + ct_len..]);
         let nonce = self.wire_nonce(frame.header.frame_ordinal, frame.header.seq);
         let expected = aead::verify_detached(
             frame.prefix,
-            &frame.payload[..ct_len],
+            &frame.payload[4..4 + ct_len],
             &tag,
             &self.recv_key,
             &nonce,
@@ -653,7 +705,9 @@ impl<'k, K: KemSeam> Session<'k, K> {
                 frame: frame.kind.id(),
             });
         }
-        let ct_len = frame.payload.len() - TAG_LEN;
+        // Body = [seq 4B][ct][tag 16B]; the ct span excludes the seq word.
+        let body_len = frame.payload.len();
+        let ct_len = body_len - 4 - TAG_LEN;
         if plaintext.len() != ct_len {
             return Err(SessionError::LengthMismatch {
                 expected: ct_len,
@@ -661,17 +715,54 @@ impl<'k, K: KemSeam> Session<'k, K> {
             });
         }
         let mut tag = [0u8; TAG_LEN];
-        tag.copy_from_slice(&frame.payload[ct_len..]);
+        tag.copy_from_slice(&frame.payload[4 + ct_len..]);
         let nonce = self.wire_nonce(frame.header.frame_ordinal, frame.header.seq);
         aead::open_detached(
             plaintext,
-            &frame.payload[..ct_len],
+            &frame.payload[4..4 + ct_len],
             &tag,
             frame.prefix,
             &self.recv_key,
             &nonce,
         )
         .map_err(|_| SessionError::AeadMismatch)
+    }
+
+    /// Emit a v3 HandshakeFinish frame (M2a, initiator twin of the Finish
+    /// cell): the initiator EMITS the confirm tag. Body =
+    /// `pending_ct (1088B) ‖ confirm_tag (16B)` where
+    /// `confirm_tag = kdf(CTX_CONFIRM ‖ recv_key ‖ transcript ‖
+    /// pending_ct)[..16]`. HandshakeWait only — the Ek step must have run
+    /// so transcript/keys/pending_ct are bound; the emit path mutates
+    /// nothing (the caller advances the machine through `step`).
+    ///
+    /// Writes `64 + 1 + 1088 + 16` bytes into `out`; length-checked,
+    /// alloc-free.
+    ///
+    /// # Errors
+    /// [`SessionError::UnexpectedFrame`] unless HandshakeWait;
+    /// [`SessionError::LengthMismatch`] when `out` is too small.
+    pub fn emit_finish(&self, out: &mut [u8]) -> Result<usize, SessionError> {
+        if self.state != SessionState::HandshakeWait {
+            return Err(SessionError::UnexpectedFrame {
+                state: self.state.id(),
+                frame: FrameKind::HandshakeFinish.id(),
+            });
+        }
+        let total = crate::header::SIZE_BYTES + 1 + FINISH_BODY_BYTES;
+        if out.len() < total {
+            return Err(SessionError::LengthMismatch {
+                expected: total,
+                got: out.len(),
+            });
+        }
+        let header = AoqHeader::new(self.epoch, self.key_id, self.ordinal, 0);
+        codec::encode(&header, out)?;
+        out[64] = FrameKind::HandshakeFinish.id();
+        out[65..65 + CT_BYTES].copy_from_slice(&self.pending_ct);
+        let tag = confirm_tag(self.kem, &self.recv_key, &self.transcript, &self.pending_ct);
+        out[65 + CT_BYTES..65 + FINISH_BODY_BYTES].copy_from_slice(&tag);
+        Ok(total)
     }
 }
 
@@ -755,6 +846,12 @@ mod tests {
         }
     }
 
+    impl crate::chain::ChainDigest for TestKem {
+        fn digest(&self, parts: &[&[u8]]) -> [u8; 32] {
+            mix32(parts)
+        }
+    }
+
     fn ek(seed: u8) -> [u8; EK_BYTES] {
         let mut k = [seed; EK_BYTES];
         k[0] = seed;
@@ -814,7 +911,7 @@ mod tests {
     // Wire helpers (header + kind + body, codec-encoded; stack arrays —
     // the purity gate bans alloc/vec tokens even in test code).
     const HS_WIRE: usize = crate::header::SIZE_BYTES + 1 + EK_BYTES;
-    const FIN_WIRE: usize = crate::header::SIZE_BYTES + 1 + CT_BYTES;
+    const FIN_WIRE: usize = crate::header::SIZE_BYTES + 1 + FINISH_BODY_BYTES;
 
     fn handshake_frame(ek_bytes: &[u8; EK_BYTES], ordinal: u32) -> [u8; HS_WIRE] {
         let mut buf = [0u8; HS_WIRE];
@@ -830,9 +927,17 @@ mod tests {
         let h = AoqHeader::new(0, 7, ordinal, 0);
         codec::encode(&h, &mut buf).unwrap();
         buf[64] = FrameKind::HandshakeFinish.id();
-        // Deterministic ct for ek(1): the session's pending ct.
-        let (ct, _) = TestKem.encapsulate(&ek(1)).unwrap();
-        buf[65..].copy_from_slice(&ct);
+        // Deterministic ct for ek(1) (epoch 0): the session's pending ct,
+        // plus the v3 confirm tag under the derived recv_key/transcript.
+        let kem = TestKem;
+        let e = ek(1);
+        let (ct, ss) = kem.encapsulate(&e).unwrap();
+        let transcript = transcript_tag(&kem, &e, &ss, 0);
+        let hs_master = derive(&kem, CTX_HANDSHAKE, &ss, &e);
+        let recv = kem.kdf(&[CTX_RECV, &hs_master]);
+        let tag = confirm_tag(&kem, &recv, &transcript, &ct);
+        buf[65..65 + CT_BYTES].copy_from_slice(&ct);
+        buf[65 + CT_BYTES..65 + FINISH_BODY_BYTES].copy_from_slice(&tag);
         buf
     }
 
@@ -846,7 +951,255 @@ mod tests {
         s.state = SessionState::Established;
         let mut out = [0u8; 256];
         let n = s.emit_verified(0x0102_0304, b"p", &mut out).unwrap();
-        assert_eq!(n, 69 + 1 + 4);
+        assert_eq!(n, 69 + 1 + TAG_LEN);
         assert_eq!(&out[65..69], &0x0102_0304u32.to_le_bytes());
+    }
+
+    /// Paired-session construction for the v3 emit/open courts: two
+    /// sessions handshake on the same ek (identical derived master), then
+    /// the receiver's direction keys are role-swapped (a real server
+    /// derives recv = peer's send). Without the swap both peers hold
+    /// identical send/recv and the direction-split law cannot be
+    /// exercised.
+    fn paired_sessions(kem: &TestKem) -> (Session<'_, TestKem>, Session<'_, TestKem>) {
+        let mut a = Session::new(kem, 1, 7, 0);
+        let mut b = Session::new(kem, 1, 7, 0);
+        // Handshake frame at the pair's epoch (1), ordinal 0.
+        let mut wire = [0u8; HS_WIRE];
+        let h = AoqHeader::new(1, 7, 0, 0);
+        codec::encode(&h, &mut wire).unwrap();
+        wire[64] = FrameKind::HandshakeEk.id();
+        wire[65..].copy_from_slice(&ek(1));
+        let frame = parse_frame(&wire).unwrap();
+        a.step(&frame).unwrap();
+        b.step(&frame).unwrap();
+        // Finish frame: ct echo + v3 confirm tag (M2a law) over
+        // recv_key ‖ transcript ‖ ct_echo (epoch 1 pair).
+        let mut fin = [0u8; FIN_WIRE];
+        let hf = AoqHeader::new(1, 7, 1, 0);
+        codec::encode(&hf, &mut fin).unwrap();
+        fin[64] = FrameKind::HandshakeFinish.id();
+        let (ct, _) = TestKem.encapsulate(&ek(1)).unwrap();
+        fin[65..65 + CT_BYTES].copy_from_slice(&ct);
+        let (a_send, a_recv) = (a.send_key, a.recv_key);
+        let confirm = confirm_tag(&TestKem, &a_recv, &a.transcript, &ct);
+        fin[65 + CT_BYTES..65 + FINISH_BODY_BYTES].copy_from_slice(&confirm);
+        let fin_frame = parse_frame(&fin).unwrap();
+        a.step(&fin_frame).unwrap();
+        b.step(&fin_frame).unwrap();
+        b.send_key = a_recv;
+        b.recv_key = a_send;
+        (a, b)
+    }
+
+    /// Emit→open roundtrip court (v3 wire law, real AEAD keys): a frame
+    /// emitted under `send_key` opens byte-exact under the peer's
+    /// `recv_key`, and the peer's `step` absorbs it (budget/ordinal
+    /// advance — the machine transition is authenticated-receive lawful).
+    #[test]
+    fn v3_emit_open_roundtrip() {
+        let kem = TestKem;
+        let (a, mut b) = paired_sessions(&kem);
+        let mut wire = [0u8; 256];
+        let n = a.emit_verified(42, b"roundtrip-payload", &mut wire).unwrap();
+        assert_eq!(n, 69 + 17 + TAG_LEN);
+        let mut pt = [0u8; 17];
+        b.open_verified(&wire[..n], &mut pt).unwrap();
+        assert_eq!(&pt, b"roundtrip-payload");
+        b.step(&parse_frame(&wire[..n]).unwrap()).unwrap();
+        assert_eq!(b.budget_used(), 1, "authenticated receive advances the budget");
+    }
+
+    /// Wire-nonce law: same (epoch, ordinal, seq) = same nonce;
+    /// different ordinal or seq = different nonce (uniqueness within the
+    /// direction stream).
+    #[test]
+    fn nonce_determinism_and_uniqueness() {
+        let kem = TestKem;
+        let s = Session::new(&kem, 2, 9, 5);
+        let n1 = s.wire_nonce(5, 100);
+        let n2 = s.wire_nonce(5, 100);
+        let n3 = s.wire_nonce(6, 100);
+        let n4 = s.wire_nonce(5, 101);
+        assert_eq!(n1, n2, "deterministic: same inputs = same nonce");
+        assert_ne!(n1, n3, "ordinal binds the nonce");
+        assert_ne!(n1, n4, "seq binds the nonce");
+    }
+
+    /// Anti-vacuity battery (v3): flip one ciphertext byte -> AeadMismatch
+    /// with the session byte-identical (no mutation on refusal); flip one
+    /// AAD byte (seq word) -> AeadMismatch.
+    #[test]
+    fn tamper_battery_ct_and_aad_refused_no_mutation() {
+        let kem = TestKem;
+        let (a, mut b) = paired_sessions(&kem);
+        let mut wire = [0u8; 256];
+        let n = a.emit_verified(7, b"tamper-me", &mut wire).unwrap();
+        let frame_len = n;
+
+        // Ciphertext-byte flip.
+        let mut ct_flip = wire;
+        ct_flip[69] ^= 0x01;
+        let fp = b.fingerprint();
+        let mut pt = [0u8; 9];
+        assert!(matches!(
+            b.open_verified(&ct_flip[..frame_len], &mut pt),
+            Err(SessionError::AeadMismatch)
+        ));
+        assert_eq!(b.fingerprint(), fp, "open refusal must not mutate");
+
+        // AAD-byte flip (seq word lives in the covered span buf[65..69]).
+        let mut aad_flip = wire;
+        aad_flip[65] ^= 0x01;
+        assert!(matches!(
+            b.open_verified(&aad_flip[..frame_len], &mut pt),
+            Err(SessionError::AeadMismatch)
+        ));
+
+        // step() path refuses identically, no mutation.
+        let fp = b.fingerprint();
+        assert!(matches!(
+            b.step(&parse_frame(&aad_flip[..frame_len]).unwrap()),
+            Err(SessionError::AeadMismatch)
+        ));
+        assert_eq!(b.fingerprint(), fp, "step refusal must not mutate");
+    }
+
+    /// Version gate (v3): a v2 header — rebuilt with the v2 word and a
+    /// recomputed digest — refuses typed `UnsupportedVersion { got: 2 }`.
+    #[test]
+    fn v2_header_refused_typed() {
+        let mut buf = [0u8; 64];
+        let h = AoqHeader::new(0, 1, 0, 0);
+        codec::encode(&h, &mut buf).unwrap();
+        buf[4..6].copy_from_slice(&2u16.to_le_bytes());
+        let digest = codec::fnv1a32(&buf[0..60]);
+        buf[60..64].copy_from_slice(&digest.to_le_bytes());
+        assert!(matches!(
+            codec::decode(&buf),
+            Err(AoqError::UnsupportedVersion { got: 2 })
+        ));
+    }
+
+    /// Chain-is-integrity court (v3): `append_verified` links with the
+    /// chain's OWN hash over the whole wire frame — no wire-tag
+    /// re-derivation (the chain holds no AEAD keys). A tampered wire
+    /// frame appends cleanly but lands a DIFFERENT record digest; the
+    /// stored hash catches any later record tamper as `Spoliation`.
+    #[test]
+    fn chain_is_integrity_no_wire_tag_rederivation() {
+        let kem = TestKem;
+        let (a, _b) = paired_sessions(&kem);
+        let mut wire = [0u8; 256];
+        let n = a.emit_verified(1, b"chained", &mut wire).unwrap();
+        let frame = &wire[..n];
+
+        let mut slab = [crate::chain::AoqChainRecord::zeroed(); 4];
+        let mut c = crate::chain::AoqChain::new(TestKem, &mut slab);
+        let idx0 = c.append_verified(frame).unwrap();
+        assert_eq!(idx0, 0);
+        assert_eq!(c.verify_all(), Ok(()));
+
+        // Tampered wire frame: appends (no wire-tag re-derivation), but
+        // the record digest differs from the honest frame's record.
+        let mut tampered = [0u8; 256];
+        tampered[..n].copy_from_slice(frame);
+        tampered[70] ^= 0x01;
+        let idx1 = c.append_verified(&tampered[..n]).unwrap();
+        assert_eq!(idx1, 1);
+        assert_ne!(
+            c.records()[0].payload_digest,
+            c.records()[1].payload_digest,
+            "tamper must be carried in the record hash"
+        );
+        assert_eq!(c.verify_all(), Ok(()), "the chain walk verifies its own hashes");
+    }
+
+    /// M2a court — confirm tag binds the transcript: a Finish frame whose
+    /// tag was derived over a MUTATED transcript is refused with
+    /// ConfirmMismatch, session byte-identical (fingerprint court).
+    /// Anti-vacuity: the lawful tag verifies (happy walk above).
+    #[test]
+    fn confirm_tag_binds_transcript() {
+        let kem = TestKem;
+        let mut s = Session::new(&kem, 0, 7, 0);
+        let wire = handshake_frame(&ek(1), 0);
+        let frame = parse_frame(&wire).unwrap();
+        s.step(&frame).unwrap();
+        let fp = s.fingerprint();
+        // Build a 1104B Finish whose tag derives from a flipped transcript.
+        let mut buf = [0u8; FIN_WIRE];
+        buf.copy_from_slice(&finish_frame(1));
+        buf[65 + CT_BYTES] ^= 0x01; // flip tag byte 0 == mutated-transcript tag
+        let frame = parse_frame(&buf).unwrap();
+        let err = s.step(&frame).unwrap_err();
+        assert_eq!(err, SessionError::ConfirmMismatch);
+        assert_eq!(s.fingerprint(), fp, "confirm refusal mutated the session");
+        assert_eq!(s.state(), SessionState::HandshakeWait);
+    }
+
+    /// M2a court — v2 Finish (1088B ct-only body) refused under the v3
+    /// law, at parse_frame AND in the Finish cell, no mutation.
+    #[test]
+    fn v2_finish_refused_under_v3() {
+        let kem = TestKem;
+        let mut s = Session::new(&kem, 0, 7, 0);
+        let wire = handshake_frame(&ek(1), 0);
+        let frame = parse_frame(&wire).unwrap();
+        s.step(&frame).unwrap();
+        let fp = s.fingerprint();
+        // v2-shaped frame: 64 + 1 + 1088.
+        let mut buf = [0u8; crate::header::SIZE_BYTES + 1 + CT_BYTES];
+        let h = AoqHeader::new(0, 7, 1, 0);
+        codec::encode(&h, &mut buf).unwrap();
+        buf[64] = FrameKind::HandshakeFinish.id();
+        let (ct, _) = TestKem.encapsulate(&ek(1)).unwrap();
+        buf[65..].copy_from_slice(&ct);
+        let err = parse_frame(&buf).unwrap_err();
+        assert_eq!(
+            err,
+            SessionError::LengthMismatch { expected: FINISH_BODY_BYTES, got: CT_BYTES }
+        );
+        // v3 parse law refuses the v2-shaped body BEFORE the machine sees
+        // it; the session is untouched.
+        assert_eq!(s.fingerprint(), fp, "v2 refusal mutated the session");
+    }
+
+    /// Stack-array shim: parse_frame borrows, so the v2 refusal leg
+    /// re-parses a copied wire image.
+    fn finish_wire_v2(buf: &[u8; crate::header::SIZE_BYTES + 1 + CT_BYTES]) -> [u8; crate::header::SIZE_BYTES + 1 + CT_BYTES] {
+        let mut out = [0u8; crate::header::SIZE_BYTES + 1 + CT_BYTES];
+        out.copy_from_slice(buf);
+        out
+    }
+
+    /// M2a court — emit_finish roundtrip mirrors the Finish cell: the
+    /// HandshakeWait session emits the v3 Finish, parse_frame accepts it,
+    /// step verifies the confirm tag and lands Established. Anti-vacuity:
+    /// the tamper mutation (flipped tag byte) flips the court to
+    /// ConfirmMismatch.
+    #[test]
+    fn emit_finish_roundtrip_mirrors_finish_cell() {
+        let kem = TestKem;
+        let mut s = Session::new(&kem, 0, 7, 0);
+        let wire = handshake_frame(&ek(1), 0);
+        let frame = parse_frame(&wire).unwrap();
+        s.step(&frame).unwrap();
+        let mut out = [0u8; crate::header::SIZE_BYTES + 1 + FINISH_BODY_BYTES];
+        let n = s.emit_finish(&mut out).unwrap();
+        assert_eq!(n, crate::header::SIZE_BYTES + 1 + FINISH_BODY_BYTES);
+        let frame = parse_frame(&out).unwrap();
+        s.step(&frame).unwrap();
+        assert_eq!(s.state(), SessionState::Established);
+        // Anti-vacuity: flipped tag byte -> ConfirmMismatch.
+        let mut s2 = Session::new(&kem, 0, 7, 0);
+        let hf = handshake_frame(&ek(1), 0);
+        let frame2 = parse_frame(&hf).unwrap();
+        s2.step(&frame2).unwrap();
+        let mut out2 = [0u8; crate::header::SIZE_BYTES + 1 + FINISH_BODY_BYTES];
+        s2.emit_finish(&mut out2).unwrap();
+        out2[65 + CT_BYTES] ^= 0x01;
+        let frame3 = parse_frame(&out2).unwrap();
+        assert_eq!(s2.step(&frame3).unwrap_err(), SessionError::ConfirmMismatch);
     }
 }

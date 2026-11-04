@@ -145,13 +145,21 @@ fn kem_aead_seams_refuse_loudly() {
         cgap_aoq::kem::decapsulate(0xBEEF, &[0u8; 48]),
         Err(AoqError::KemKernelNotAdmitted { kernel_id: 0xBEEF })
     ));
+    // v3 promotion: the AEAD seam delegates to the real cgap-crypto
+    // var-AAD kernel — a roundtrip must succeed and any tag divergence
+    // must surface as the typed AeadMismatch (never a silent pass).
+    let key = [7u8; 32];
+    let nonce = cgap_aoq::aead::Nonce96::new(1, 42).expect("nonce");
+    let mut ct = [0u8; 2];
+    let mut tag = [0u8; cgap_aoq::aead::TAG_LEN];
+    cgap_aoq::aead::seal_detached(&mut ct, &mut tag, b"pt", b"aad", &key, &nonce);
+    cgap_aoq::aead::open_detached(&mut [0u8; 2], &ct, &tag, b"aad", &key, &nonce)
+        .expect("roundtrip");
+    let mut bad_tag = tag;
+    bad_tag[0] ^= 0x01;
     assert!(matches!(
-        cgap_aoq::aead::seal(0xCAFE, &[0u8; 32], b"pt"),
-        Err(AoqError::AeadKernelNotAdmitted { kernel_id: 0xCAFE })
-    ));
-    assert!(matches!(
-        cgap_aoq::aead::open(0xCAFE, &[0u8; 32], &[0u8; 16]),
-        Err(AoqError::AeadKernelNotAdmitted { kernel_id: 0xCAFE })
+        cgap_aoq::aead::verify_detached(b"aad", &ct, &bad_tag, &key, &nonce),
+        Err(AoqError::AeadMismatch)
     ));
 }
 

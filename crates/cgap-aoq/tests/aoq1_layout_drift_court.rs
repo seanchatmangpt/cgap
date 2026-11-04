@@ -47,9 +47,9 @@ fn digest_span_is_half_open_0_3c() {
 #[test]
 fn magic_and_version_pins() {
     assert_eq!(MAGIC, 0x414F_5131);
-    assert_eq!(VERSION, 2);
+    assert_eq!(VERSION, 3);
     assert_eq!(gen::AOQ1_MAGIC, 0x414F_5131);
-    assert_eq!(gen::AOQ1_VERSION, 2);
+    assert_eq!(gen::AOQ1_VERSION, 3);
 }
 
 // ------------------------------------------------------- drift court

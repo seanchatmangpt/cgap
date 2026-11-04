@@ -9,6 +9,8 @@
 use cgap_aoq::chain::{
     verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS,
 };
+use cgap_aoq::codec;
+use cgap_aoq::header::AoqHeader;
 
 /// Deterministic dual-FNV digest substrate (same construction as the
 /// session's test KDF — the compose law needs one shared substrate).
@@ -305,45 +307,53 @@ fn c7_compose_emit_verified_law() {
     hs[65..].copy_from_slice(&ek);
     let frame = parse_frame(&hs).unwrap();
     session.step(&frame).unwrap();
-    let mut fin = [0u8; 64 + 1 + CT_BYTES];
+    // v3 Finish law (M2a): ct echo + confirm tag over the session's
+    // recv_key/transcript (read post-ek-step, pre-finish).
+    let mut fin = [0u8; 64 + 1 + cgap_aoq::session::FINISH_BODY_BYTES];
     let h = AoqHeader::new(0, 1, 1, 0);
     codec::encode(&h, &mut fin).unwrap();
     fin[64] = FrameKind::HandshakeFinish.id();
     let (ct, _) = kem.encapsulate(&ek).unwrap();
-    fin[65..].copy_from_slice(&ct);
+    fin[65..65 + CT_BYTES].copy_from_slice(&ct);
+    let confirm = cgap_aoq::session::confirm_tag(&kem, &session.recv_key(), &session.transcript(), &ct);
+    fin[65 + CT_BYTES..].copy_from_slice(&confirm);
     let frame = parse_frame(&fin).unwrap();
     session.step(&frame).unwrap();
     assert_eq!(session.state(), SessionState::Established);
 
-    // emit_verified -> append_verified composition.
+    // emit_verified -> append_verified composition (CHAIN-IS-INTEGRITY,
+    // v3 wire law): the chain links the WHOLE wire frame under its own
+    // hash — no wire-tag re-derivation (it holds no AEAD keys).
     let mut c = chain(16);
     for seq in 0u32..3 {
-        let mut out = [0u8; 96];
+        let mut out = [0u8; 128];
         let n = session
             .emit_verified(seq, b"compose-payload", &mut out[..])
             .unwrap();
-        // Chain re-derives the tag with the same substrate.
         c.append_verified(&out[..n]).unwrap();
     }
     assert_eq!(c.len(), 3);
     assert_eq!(c.verify_all(), Ok(()));
 
-    // Tampered emission refuses BEFORE linking: byte at body start flips.
-    let mut out = [0u8; 96];
+    // Tampered emission APPENDS (no wire-tag re-derivation) but lands a
+    // DIFFERENT record digest — the tamper is carried in the chain hash,
+    // detectable by any later chain walk against the honest record.
+    let mut out = [0u8; 128];
     let n = session
         .emit_verified(9, b"compose-payload", &mut out[..])
         .unwrap();
     let mut bad = out[..n].to_vec();
     bad[65] ^= 0x01;
-    let head_before = c.checkpoint();
-    match c.append_verified(&bad) {
-        Err(cgap_aoq::error::AoqError::DigestMismatch { expected, got }) => {
-            assert_ne!(expected, got);
-        }
-        other => panic!("expected typed tag refusal, got {other:?}"),
-    }
-    assert_eq!(c.checkpoint(), head_before, "no mutation on refusal");
-    assert_eq!(c.len(), 3);
+    let honest_digest = c.records()[2].payload_digest;
+    let idx = c.append_verified(&bad).unwrap();
+    assert_eq!(idx, 3);
+    assert_eq!(c.verify_all(), Ok(()), "chain verifies its own hashes");
+    assert_ne!(
+        c.records()[3].payload_digest,
+        honest_digest,
+        "tampered wire frame must land a different record hash"
+    );
+    assert_eq!(c.len(), 4);
 }
 
 /// COURT 8 — slab-full law (non-vacuity): a full 65,536-link slab refuses
@@ -391,28 +401,35 @@ fn c9_fold_payload_flip_and_tag_flip_refuse() {
         "VACUOUS COURT: payload_digest fold verified clean"
     );
 
-    // (b) tag fold: one tag byte flip in a well-formed frame refuses and
-    // the chain is not mutated.
-    let body = b"fold-frame-body";
-    let digest = Mix32.digest(&[body]);
-    let mut frame = body.to_vec();
-    frame.extend_from_slice(&digest[0..4]);
+    // (b) chain-is-integrity (v3 wire law): a sub-v3 (too-short) frame
+    // refuses typed with NO mutation; a flipped byte in a well-formed
+    // wire frame APPENDS (no wire-tag re-derivation) landing a different
+    // record hash — tamper is carried, caught at the chain walk.
+    let mut frame = vec![0u8; 64 + 5 + 16];
+    let h = cgap_aoq::header::AoqHeader::new(0, 1, 0, 0);
+    cgap_aoq::codec::encode(&h, &mut frame[..64]).unwrap();
     let mut fresh = chain(8);
     fresh.append_verified(&frame).unwrap();
     assert_eq!(fresh.len(), 1);
 
     let head_before = fresh.checkpoint();
-    let mut bad = frame.clone();
-    let tag_off = bad.len() - 4; // flip the FIRST tag byte only
-    bad[tag_off] ^= 0x01;
-    match fresh.append_verified(&bad) {
-        Err(cgap_aoq::error::AoqError::DigestMismatch { expected, got }) => {
-            assert_ne!(expected, got, "tag fold must classify typed");
+    let mut short = vec![0u8; 4];
+    match fresh.append_verified(&short) {
+        Err(cgap_aoq::error::AoqError::HeaderTooShort { got }) => {
+            assert_eq!(got, 4, "short-frame fold must classify typed");
         }
-        other => panic!("expected typed tag refusal, got {other:?}"),
+        other => panic!("expected typed HeaderTooShort refusal, got {other:?}"),
     }
     assert_eq!(fresh.len(), 1, "refused frame must not land");
     assert_eq!(fresh.checkpoint(), head_before, "no mutation on refusal");
+
+    // Wire-byte flip lands a different record hash (tamper carried).
+    let mut flipped = frame.clone();
+    flipped[70] ^= 0x01;
+    let honest = fresh.records()[0].payload_digest;
+    fresh.append_verified(&flipped).unwrap();
+    assert_eq!(fresh.len(), 2);
+    assert_ne!(fresh.records()[1].payload_digest, honest);
 }
 
 /// COURT 10 — batch == sequential: `append_batch_admitted` over a run of

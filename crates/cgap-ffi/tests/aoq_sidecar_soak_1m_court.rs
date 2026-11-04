@@ -55,6 +55,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use cgap_aoq::aead::{self, Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
@@ -299,11 +300,11 @@ const AOQ_STATUS_BUSY_WORD: u32 = 0x4347A003;
 /// during the PREVIOUS connection's serve gets the frozen-band BUSY word
 /// on its first hop and a close. The observable is "handshake accepted";
 /// the retry is a bounded poll on it, never a sleep.
-fn connect_established(sock_path: &PathBuf) -> UnixStream {
+fn connect_established(sock_path: &PathBuf) -> (UnixStream, SessionKeys) {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         match try_connect_established(sock_path) {
-            Ok(s) => return s,
+            Ok(ks) => return ks,
             Err(e) => {
                 if Instant::now() > deadline {
                     panic!("connect_established never succeeded within 10s: {e}");
@@ -314,6 +315,14 @@ fn connect_established(sock_path: &PathBuf) -> UnixStream {
     }
 }
 
+/// Derived direction keys for one established connection (v3 wire law):
+/// the client seals outbound AppData under `recv_key` (the sidecar's
+/// receive direction) and opens the sidecar's echo under `send_key`.
+struct SessionKeys {
+    recv_key: [u8; 32],
+    send_key: [u8; 32],
+}
+
 /// One connect+handshake attempt; Err carries the fault (retryable).
 ///
 /// The FIRST HOP must not panic on transport faults: the PL7 BUSY-drain
@@ -321,7 +330,7 @@ fn connect_established(sock_path: &PathBuf) -> UnixStream {
 /// (witnessed BrokenPipe), so hop 1 does its own write/read and returns
 /// typed retryable faults. Once hop 1 is accepted (OK), the connection is
 /// being served and hop 2 onward is transport-stable.
-fn try_connect_established(sock_path: &PathBuf) -> Result<UnixStream, String> {
+fn try_connect_established(sock_path: &PathBuf) -> Result<(UnixStream, SessionKeys), String> {
     let mut stream = UnixStream::connect(sock_path).map_err(|e| e.to_string())?;
 
     let d = shake32(&[b"w2c/mlkem/d"]);
@@ -330,7 +339,7 @@ fn try_connect_established(sock_path: &PathBuf) -> Result<UnixStream, String> {
     let mut dk = [0u8; 2400];
     cgap_crypto::kem::keygen(&d, &z, &mut ek, &mut dk);
     let kem = CourtKem;
-    let (ct_c, _ss) = kem.encapsulate(&ek).expect("court encapsulate");
+    let (ct_c, ss) = kem.encapsulate(&ek).expect("court encapsulate");
 
     let ek_win = seal_window(&wire_frame(FrameKind::HandshakeEk, 0, 0, &ek), 0, 0);
     stream.write_all(&ek_win).map_err(|e| e.to_string())?;
@@ -343,10 +352,23 @@ fn try_connect_established(sock_path: &PathBuf) -> Result<UnixStream, String> {
             w => format!("HandshakeEk refused {w:#010x}"),
         });
     }
+    // v3 Finish law (M2a): body = ct echo (1088B) + confirm tag (16B)
+    // binding recv_key ‖ transcript ‖ ct_echo. Mirrors the migrated
+    // aoq_sidecar_court J1 client; the v2 ct-only 1088B body is refused
+    // INCOMPLETE_FRAME (0x4347A004) under the v3 law. (bm4 integration
+    // disclosure: this court's handshake re-pinned to the M2a v3 law after
+    // the v2 shape drew INCOMPLETE_FRAME on the release run above.)
+    let transcript = sess::transcript_tag(&kem, &ek, &ss, EPOCH);
+    let hs_master = sess::derive(&kem, sess::CTX_HANDSHAKE, &ss, &ek);
+    let recv_key = kem.kdf(&[sess::CTX_RECV, &hs_master]);
+    let confirm = sess::confirm_tag(&kem, &recv_key, &transcript, &ct_c);
+    let mut fin_body = [0u8; CT_BYTES + 16];
+    fin_body[..CT_BYTES].copy_from_slice(&ct_c);
+    fin_body[CT_BYTES..].copy_from_slice(&confirm);
     let (word, _) = roundtrip(
         &mut stream,
         &seal_window(
-            &wire_frame(FrameKind::HandshakeFinish, 1, 0, &ct_c),
+            &wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body),
             1,
             0,
         ),
@@ -355,15 +377,43 @@ fn try_connect_established(sock_path: &PathBuf) -> Result<UnixStream, String> {
     if word != AOQ_STATUS_OK {
         return Err(format!("HandshakeFinish refused {word:#010x}"));
     }
-    let _ = (dk, kem);
-    Ok(stream)
+    let hs_master = sess::derive(&kem, sess::CTX_HANDSHAKE, &ss, &ek);
+    let recv_key: [u8; 32] = kem
+        .kdf(&[sess::CTX_RECV, &hs_master]);
+    let send_key: [u8; 32] = kem.kdf(&[sess::CTX_SEND, &hs_master]);
+    Ok((
+        stream,
+        SessionKeys {
+            recv_key,
+            send_key,
+        },
+    ))
 }
 
-/// One AppData echo trip on an established connection at (ordinal, seq).
-fn echo_trip(stream: &mut UnixStream, ordinal: u32, seq: u32, payload: &[u8]) {
-    let mut app_body = Vec::with_capacity(4 + payload.len());
-    app_body.extend_from_slice(&seq.to_le_bytes());
-    app_body.extend_from_slice(payload);
+/// One AppData echo trip on an established connection at (ordinal, seq),
+/// under the v3 wire law: the client AEAD-seals the payload (detached
+/// Poly1305 tag appended after ct) under the connection's recv_key; the
+/// echo is opened under send_key (plaintext byte-identity assert).
+fn echo_trip(stream: &mut UnixStream, keys: &SessionKeys, ordinal: u32, seq: u32, payload: &[u8]) {
+    let mut prefix = [0u8; cgap_aoq::header::SIZE_BYTES + 5];
+    codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix).expect("encode");
+    prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
+        .copy_from_slice(&seq.to_le_bytes());
+    let mut app_body = vec![0u8; 4 + payload.len() + TAG_LEN];
+    app_body[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = Nonce96::new(u32::from(EPOCH), (u64::from(ordinal) << 32) | u64::from(seq))
+        .expect("nonce");
+    let mut aead_tag = [0u8; TAG_LEN];
+    aead::seal_detached(
+        &mut app_body[4..4 + payload.len()],
+        &mut aead_tag,
+        payload,
+        &prefix,
+        &keys.recv_key,
+        &nonce,
+    );
+    app_body[4 + payload.len()..].copy_from_slice(&aead_tag);
     let app = wire_frame(FrameKind::AppData, ordinal, seq, &app_body);
     let win = seal_window(&app, ordinal, seq);
     let (word, resp) = roundtrip(stream, &win, true);
@@ -383,11 +433,26 @@ fn echo_trip(stream: &mut UnixStream, ordinal: u32, seq: u32, payload: &[u8]) {
         frame.payload[3],
     ]);
     assert_eq!(rseq, seq, "echoed seq");
-    assert_eq!(
-        &frame.payload[4..frame.payload.len() - 4],
-        payload,
-        "echoed payload"
-    );
+    // v3 wire law: the echo body = [seq][ct][tag 16B]; the payload is
+    // AEAD-sealed under the sidecar's send_key — open_detached recovers
+    // the plaintext (AEAD round trip, byte-identity assert).
+    let ct_len = frame.payload.len() - 4 - TAG_LEN;
+    let mut plain = vec![0u8; ct_len];
+    let echo_tag: [u8; TAG_LEN] = frame.payload[4 + ct_len..].try_into().expect("tag");
+    aead::open_detached(
+        &mut plain,
+        &frame.payload[4..4 + ct_len],
+        &echo_tag,
+        &body[..cgap_aoq::header::SIZE_BYTES + 5],
+        &keys.send_key,
+        &Nonce96::new(
+            u32::from(EPOCH),
+            (u64::from(frame.header.frame_ordinal) << 32) | u64::from(rseq),
+        )
+        .expect("nonce"),
+    )
+    .expect("echo opens under derived send_key");
+    assert_eq!(&plain, payload, "echoed payload (AEAD open byte-identity)");
 }
 
 // ---------------------------------------------------------------------------
@@ -428,15 +493,10 @@ fn soak_1m_echo_trips_over_real_sidecar() {
         // tag gate + echo seq/payload identity).
         let mut phase_trips = 0usize;
         while phase_trips < TRIPS_PER_PHASE {
-            let mut stream = connect_established(&sock);
+            let (mut stream, keys) = connect_established(&sock);
             let mut on_conn = 0u32;
             while phase_trips < TRIPS_PER_PHASE && on_conn < TRIPS_PER_CONNECTION {
-                echo_trip(
-                    &mut stream,
-                    2 + on_conn,
-                    1 + on_conn,
-                    payload,
-                );
+                echo_trip(&mut stream, &keys, 2 + on_conn, 1 + on_conn, payload);
                 on_conn += 1;
                 phase_trips += 1;
                 trips += 1;
@@ -485,9 +545,9 @@ fn soak_flipped_tag_refuses_and_fresh_connection_recovers() {
     // Leg 1: establish, send 999 clean echo trips, then ONE frame with a
     // corrupted tag byte mid-stream. The gate must refuse the exact
     // DIGEST_MISMATCH word; the connection dies (refusal law).
-    let mut stream = connect_established(&sock);
+    let (mut stream, keys) = connect_established(&sock);
     for i in 0..999 {
-        echo_trip(&mut stream, 2 + i, 1 + i, b"flip-leg");
+        echo_trip(&mut stream, &keys, 2 + i, 1 + i, b"flip-leg");
     }
     let ordinal: u32 = 2 + 999;
     let seq: u32 = 1 + 999;
@@ -520,7 +580,7 @@ fn soak_flipped_tag_refuses_and_fresh_connection_recovers() {
 
     // Leg 2: fresh connection resumes clean — the refusal was
     // per-connection, the sidecar survives (sequential accept law).
-    let mut fresh = connect_established(&sock);
-    echo_trip(&mut fresh, 2, 1, b"post-flip-recovery");
+    let (mut fresh, fresh_keys) = connect_established(&sock);
+    echo_trip(&mut fresh, &fresh_keys, 2, 1, b"post-flip-recovery");
     drop(fresh);
 }

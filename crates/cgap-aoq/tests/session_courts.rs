@@ -10,6 +10,7 @@ use cgap_aoq::session::{
     SessionState, CTX_HANDSHAKE, CTX_REKEY, CTX_RECV, CTX_SEND, CT_BYTES, EK_BYTES,
     REKEY_BUDGET, SS_BYTES,
 };
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 
 fn mix32(parts: &[&[u8]]) -> [u8; 32] {
     let mut a: u64 = 0xcbf2_9ce4_8422_2325;
@@ -107,8 +108,19 @@ fn ek_frame(epoch: u16, key_id: u64, ordinal: u32, ek: &[u8; EK_BYTES]) -> Vec<u
 }
 
 fn fin_frame(epoch: u16, key_id: u64, ordinal: u32, kem: &TestKem, ek: &[u8; EK_BYTES]) -> Vec<u8> {
-    let (ct, _) = kem.encapsulate(ek).unwrap();
-    wire(epoch, key_id, ordinal, 0, FrameKind::HandshakeFinish, &ct)
+    // v3 Finish law (M2a): body = ct echo (1088B) + confirm tag (16B)
+    // under recv_key/transcript derived from the same (ss, ek) pair the
+    // session derives at the Ek step. The v2 ct-only 1088B shape is
+    // refused under the v3 law.
+    let (ct, ss) = kem.encapsulate(ek).unwrap();
+    let transcript = transcript_tag(kem, ek, &ss, epoch);
+    let hs_master = derive(kem, CTX_HANDSHAKE, &ss, ek);
+    let recv = kem.kdf(&[CTX_RECV, &hs_master]);
+    let tag = cgap_aoq::session::confirm_tag(kem, &recv, &transcript, &ct);
+    let mut body = [0u8; CT_BYTES + 16];
+    body[..CT_BYTES].copy_from_slice(&ct);
+    body[CT_BYTES..].copy_from_slice(&tag);
+    wire(epoch, key_id, ordinal, 0, FrameKind::HandshakeFinish, &body)
 }
 
 fn app_body(seq: u32, payload: &[u8]) -> Vec<u8> {
@@ -118,15 +130,51 @@ fn app_body(seq: u32, payload: &[u8]) -> Vec<u8> {
     body
 }
 
-fn app_frame(epoch: u16, ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
-    wire(
-        epoch,
-        7,
-        ordinal,
-        seq,
-        FrameKind::AppData,
-        &app_body(seq, payload),
-    )
+/// The recv_key a test session holds after the ek_of(1) handshake
+/// (deterministic KEM: the same (ss, ek) derivation the session runs),
+/// so the court can seal frames the machine actually accepts.
+fn test_recv_key() -> [u8; 32] {
+    let ek = ek_of(1);
+    let (_, ss) = KEM.encapsulate(&ek).unwrap();
+    let hs_master = derive(&KEM, CTX_HANDSHAKE, &ss, &ek);
+    KEM.kdf(&[CTX_RECV, &hs_master])
+}
+
+/// A REAL sealed AppData frame (v3 wire law): body = [seq 4B][ct][tag 16B],
+/// AEAD under the test session's send_key, AAD = the frame's own covered
+/// prefix (header + kind + seq), nonce = Nonce96(epoch, ordinal<<32|seq).
+fn sealed_app_frame(
+    key: &[u8; 32],
+    epoch: u16,
+    ordinal: u32,
+    seq: u32,
+    payload: &[u8],
+) -> Vec<u8> {
+    let mut prefix = [0u8; 69];
+    let h = AoqHeader::new(epoch, 7, ordinal, seq);
+    codec::encode(&h, &mut prefix).expect("encode prefix");
+    prefix[64] = FrameKind::AppData.id();
+    prefix[65..69].copy_from_slice(&seq.to_le_bytes());
+    let mut body = vec![0u8; 4 + payload.len() + TAG_LEN];
+    body[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = Nonce96::new(u32::from(epoch), ((u64::from(ordinal)) << 32) | u64::from(seq))
+        .expect("nonce");
+    let mut tag = [0u8; TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut body[4..4 + payload.len()],
+        &mut tag,
+        payload,
+        &prefix,
+        key,
+        &nonce,
+    );
+    body[4 + payload.len()..].copy_from_slice(&tag);
+    wire(epoch, 7, ordinal, seq, FrameKind::AppData, &body)
+}
+
+/// Sealed frame under the session's CURRENT recv_key (tracks rekeys).
+fn app_frame(s: &Session<'static, TestKem>, epoch: u16, ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
+    sealed_app_frame(&s.recv_key(), epoch, ordinal, seq, payload)
 }
 
 fn rekey_frame(epoch: u16, ordinal: u32, ek: &[u8; EK_BYTES]) -> Vec<u8> {
@@ -182,14 +230,13 @@ fn s1_exhaustive_transition_table() {
             let w: Vec<u8> = match kind {
                 FrameKind::HandshakeEk => ek_frame(0, 7, s.ordinal(), &ek_of(9)),
                 FrameKind::HandshakeFinish => {
-                    // Echo the session's OWN pending ct: state 1 is the
-                    // lawful cell and must accept; other states refuse
-                    // before the ct check.
-                    let want = s.ordinal();
-                    let (ct, _) = KEM.encapsulate(&ek_of(1)).unwrap();
-                    wire(0, 7, want, 0, FrameKind::HandshakeFinish, &ct)
+                    // v3 law (M2a): the full 1104B body (ct echo + confirm
+                    // tag) so the state cell — not the parse length law —
+                    // is what refuses in unlawful states; state 1 is the
+                    // lawful cell and must accept.
+                    fin_frame(0, 7, s.ordinal(), &KEM, &ek_of(1))
                 }
-                FrameKind::AppData => app_frame(0, s.ordinal(), 0, b"xy"),
+                FrameKind::AppData => app_frame(&s, 0, s.ordinal(), 0, b"xy"),
                 FrameKind::Rekey => rekey_frame(0, s.ordinal(), &ek_of(9)),
                 FrameKind::Close => close_frame(0, s.ordinal()),
             };
@@ -243,7 +290,8 @@ fn s2_no_mutation_on_refusal_byte_identity() {
                 // Exhaust the counted budget so AppData is a guaranteed
                 // refusal (RekeyRequired) in this court.
                 for i in 0u32..REKEY_BUDGET {
-                    step(&mut s, &app_frame(0, i + 2, i, b"")).unwrap();
+                    let w = app_frame(&s, 0, i + 2, i, b"");
+                    step(&mut s, &w).unwrap();
                 }
                 assert_eq!(s.budget_used(), REKEY_BUDGET);
             }
@@ -271,7 +319,7 @@ fn s2_no_mutation_on_refusal_byte_identity() {
                 &app_body(0, b""),
             ),
             // Wrong-state: AppData outside 2 (or budget-exhausted).
-            app_frame(0, s.ordinal(), 0, b""),
+            app_frame(&s, 0, s.ordinal(), 0, b""),
             // Finish outside 1 (refused before any ct check).
             wire(
                 0,
@@ -291,7 +339,7 @@ fn s2_no_mutation_on_refusal_byte_identity() {
             );
         }
         if state == 3 {
-            let w = app_frame(0, s.ordinal(), 0, b"");
+            let w = app_frame(&s, 0, s.ordinal(), 0, b"");
             assert!(
                 matches!(step(&mut s, &w), Err(SessionError::SessionClosed)),
                 "closed refuses after the battery"
@@ -315,14 +363,14 @@ fn s3_rekey_budget_counted_not_timed() {
     s.step(&f).unwrap();
 
     for i in 0u32..REKEY_BUDGET {
-        let w = app_frame(0, i + 2, i, b"");
+        let w = app_frame(&s, 0, i + 2, i, b"");
         let f = parse_frame(&w).unwrap();
         assert!(s.step(&f).is_ok(), "frame {i} of the budget must be lawful");
     }
     assert_eq!(s.budget_used(), REKEY_BUDGET);
     // Boundary: next AppData refuses; the session is unmuted.
     let before = s.fingerprint();
-    let w = app_frame(0, REKEY_BUDGET + 2, 0, b"");
+    let w = app_frame(&s, 0, REKEY_BUDGET + 2, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
@@ -340,7 +388,7 @@ fn s3_rekey_budget_counted_not_timed() {
     assert_eq!(s.budget_used(), 0);
     assert_eq!(s.state(), SessionState::Established);
     // Budget restarts counting.
-    let w = app_frame(0, REKEY_BUDGET + 3, 0, b"");
+    let w = app_frame(&s, 0, REKEY_BUDGET + 3, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_ok());
     assert_eq!(s.budget_used(), 1);
@@ -351,7 +399,7 @@ fn s3_rekey_budget_counted_not_timed() {
 /// truncation of a lawful frame.
 #[test]
 fn s4_parse_frame_length_law() {
-    let good = app_frame(0, 0, 0, b"payload");
+    let good = sealed_app_frame(&test_recv_key(), 0, 0, 0, b"payload");
     assert!(parse_frame(&good).is_ok());
 
     // Truncations: every prefix shorter than 65B, and every truncation of
@@ -373,14 +421,24 @@ fn s4_parse_frame_length_law() {
         other => panic!("short ek must refuse typed, got {other:?}"),
     }
 
-    // Short ct body.
+    // Short ct body (v3 law, M2a: Finish body is 1104 = CT_BYTES + 16).
     let short_ct = wire(0, 7, 0, 0, FrameKind::HandshakeFinish, &[1u8; CT_BYTES - 1]);
     match parse_frame(&short_ct) {
         Err(SessionError::LengthMismatch { expected, got }) => {
-            assert_eq!(expected, CT_BYTES);
+            assert_eq!(expected, cgap_aoq::session::FINISH_BODY_BYTES);
             assert_eq!(got, CT_BYTES - 1);
         }
         other => panic!("short ct must refuse typed, got {other:?}"),
+    }
+
+    // v2-shaped Finish (ct-only 1088B) refused under the v3 law (M2a).
+    let v2_fin = wire(0, 7, 0, 0, FrameKind::HandshakeFinish, &[1u8; CT_BYTES]);
+    match parse_frame(&v2_fin) {
+        Err(SessionError::LengthMismatch { expected, got }) => {
+            assert_eq!(expected, cgap_aoq::session::FINISH_BODY_BYTES);
+            assert_eq!(got, CT_BYTES);
+        }
+        other => panic!("v2 Finish must refuse under the v3 law, got {other:?}"),
     }
 
     // Close with a payload (expected 0).
@@ -459,7 +517,7 @@ fn s6_two_round_kdf() {
 fn s7_epoch_ordinal_wire_law() {
     let mut s = established(0, 0, 1); // ordinal now 2
                                       // RETIRED epoch (u16::MAX): refused even with the right ordinal.
-    let w = wire(65535, 7, 2, 0, FrameKind::AppData, &app_body(0, b""));
+    let w = sealed_app_frame(&s.recv_key(), 65535, 2, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
@@ -469,7 +527,7 @@ fn s7_epoch_ordinal_wire_law() {
         })
     ));
     // Wrong epoch (1) refused.
-    let w = wire(1, 7, 2, 0, FrameKind::AppData, &app_body(0, b""));
+    let w = sealed_app_frame(&s.recv_key(), 1, 2, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
@@ -479,7 +537,7 @@ fn s7_epoch_ordinal_wire_law() {
         })
     ));
     // Ordinal gap (+1) refused.
-    let w = app_frame(0, 4, 0, b"");
+    let w = app_frame(&s, 0, 4, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
@@ -489,7 +547,7 @@ fn s7_epoch_ordinal_wire_law() {
         })
     ));
     // Ordinal regression (rewind to 1) refused.
-    let w = app_frame(0, 1, 0, b"");
+    let w = app_frame(&s, 0, 1, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(matches!(
         s.step(&f),
@@ -499,10 +557,10 @@ fn s7_epoch_ordinal_wire_law() {
         })
     ));
     // Replay (same ordinal as last accepted) refused.
-    let w = app_frame(0, 2, 0, b"");
+    let w = app_frame(&s, 0, 2, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_ok(), "ordinal 2 IS the expected one"); // consumes
-    let w = app_frame(0, 2, 0, b"");
+    let w = app_frame(&s, 0, 2, 0, b"");
     let f = parse_frame(&w).unwrap();
     assert!(s.step(&f).is_err(), "replay of ordinal 2 must refuse");
 }
@@ -536,7 +594,7 @@ fn s8_tenk_soak_ordinal_wrap() {
             ordinal = ordinal.wrapping_add(1);
             assert_eq!(s.budget_used(), 0);
         }
-        let w = app_frame(0, ordinal, i, &[i as u8; 4]);
+        let w = app_frame(&s, 0, ordinal, i, &[i as u8; 4]);
         let f = parse_frame(&w).unwrap();
         s.step(&f).unwrap();
         accepted += 1;

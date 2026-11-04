@@ -18,8 +18,8 @@ pub const AOQ1_SIZE_BYTES: usize = 64;
 /// Wire magic constant, "AOQ1" (`aoq:hf-magic aoq:value "0x414F5131"`).
 pub const AOQ1_MAGIC: u32 = 0x414F_5131;
 
-/// Header version this projection speaks (`aoq:hf-version aoq:value 2`).
-pub const AOQ1_VERSION: u16 = 2;
+/// Header version this projection speaks (`aoq:hf-version aoq:value 3`).
+pub const AOQ1_VERSION: u16 = 3;
 
 /// Digest coverage is the half-open span `[AOQ1_DIGEST_SPAN_START,
 /// AOQ1_DIGEST_SPAN_END)` = `[0x00,0x3C)`; the digest itself lives at

@@ -468,9 +468,10 @@ fn parse_meta_aoq1(buf: &[u8], alignment: usize, body_at: usize) -> Result<Parse
     if fnv1a32(&hb[..60]) != stored {
         return Err(IpcError::HeaderDigestMismatch { got: stored });
     }
-    // Version gate (LE domain value 2).
+    // Version gate (LE domain value; v3 wire law, 2026-11-04: AOQ1
+    // header version promoted 2 -> 3 by the generated layout projection).
     let version = u16::from_le_bytes([hb[4], hb[5]]);
-    if version != 2 {
+    if version != 3 {
         return Err(IpcError::BadVersion { got: version });
     }
     // Flags-position gate: the closed epoch enum {0,1,2,65535}.

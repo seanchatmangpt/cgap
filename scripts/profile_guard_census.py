@@ -201,6 +201,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="ZP-18 timing-fence census (fail-closed)")
     ap.add_argument("--self-check", action="store_true",
                     help="poison/clean twin-fixture vacuity check; exits 0 only when poison HITs and clean passes")
+    ap.add_argument("--receipt-verbatim", action="store_true",
+                    help="LANE-1 composite: after the census passes, run the "
+                         "VERBATIM_MISMATCH verifier over every "
+                         "docs/jira/v*/receipts/*.md receipt (exit 1 on any "
+                         "byte-drift finding; exit 3 when all cited raw logs "
+                         "are loud-skipped as missing)")
     args = ap.parse_args()
 
     if args.self_check:
@@ -226,6 +232,26 @@ def main() -> int:
         for f in remaining:
             print(f"  - {f}")
         return EXIT_GATE_FAIL
+
+    # LANE-1 composite arm: verbatim receipt verification, opt-in so the
+    # default census exit ABI stays byte-identical (a vanished /tmp raw log
+    # must not turn the timing census red — it loud-skips under this flag).
+    if args.receipt_verbatim:
+        import glob
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import receipt_verbatim_verify as rvv
+        receipts = sorted(
+            glob.glob(os.path.join(ROOT, "docs", "jira", "v*", "receipts", "*.md"))
+        )
+        rc = rvv.scan(receipts, ROOT) if receipts else rvv.EXIT_OK
+        if not receipts:
+            print("FAIL: --receipt-verbatim found no receipts (fail-closed)")
+            return EXIT_GATE_FAIL
+        if rc == rvv.EXIT_GATE_FAIL:
+            return EXIT_GATE_FAIL
+        if rc == rvv.EXIT_LOUD_SKIP:
+            print("PASS(census) + LOUD-SKIP(verbatim): cited raw logs absent")
+            return EXIT_LOUD_SKIP
 
     if unguarded and not remaining:
         covered = [f for f in unguarded if f in allow_paths]

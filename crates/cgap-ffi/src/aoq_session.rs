@@ -121,7 +121,10 @@ const fn status_of(err: &SessionError) -> u32 {
         | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
         | SessionError::KemRefused { .. }
         // AEAD open refused: an authenticity failure (P2 M1 typed landing).
-        | SessionError::AeadMismatch => AOQ_STATUS_DIGEST_MISMATCH,
+        | SessionError::AeadMismatch
+        // Confirm-tag law (v3): a close-frame confirm tag that fails
+        // verification is an authenticity failure like any other.
+        | SessionError::ConfirmMismatch => AOQ_STATUS_DIGEST_MISMATCH,
         // Counted budget exhausted; a rekey is required first.
         SessionError::RekeyRequired { .. } => AOQ_STATUS_BUSY,
         // Terminal session; nothing is lawful (retired = read-only).

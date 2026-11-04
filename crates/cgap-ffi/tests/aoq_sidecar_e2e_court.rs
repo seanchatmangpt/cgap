@@ -120,7 +120,7 @@ fn spawn_sidecar(tag: &str) -> Sidecar {
         .arg(&sock_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .expect("spawn aoq_sidecar");
     let stop_signal = child.stdin.take().expect("sidecar stdin pipe");
@@ -289,23 +289,40 @@ fn next_connection(car: &mut Sidecar) {
 /// Full cgap-side handshake to Established on the given stream: real
 /// ML-KEM-768 keygen, court encapsulation of the sidecar's pending ct.
 /// Returns (dk, ct) for the caller's witnesses.
-fn handshake(kem: &CourtKem, stream: &mut UnixStream) -> ([u8; 2400], [u8; CT_BYTES]) {
+fn handshake(
+    kem: &CourtKem,
+    stream: &mut UnixStream,
+) -> ([u8; 2400], [u8; CT_BYTES], [u8; 32], [u8; 32]) {
     let d = shake32(&[b"w2c/mlkem/d"]);
     let z = shake32(&[b"w2c/mlkem/z"]);
     let mut ek = [0u8; EK_BYTES];
     let mut dk = [0u8; 2400];
     cgap_crypto::kem::keygen(&d, &z, &mut ek, &mut dk);
-    let (ct_c, _ss) = kem.encapsulate(&ek).expect("court encapsulate");
+    let (ct_c, ss) = kem.encapsulate(&ek).expect("court encapsulate");
     let ek_win = seal_window(&wire_frame(FrameKind::HandshakeEk, 0, 0, &ek), 0, 0);
     let (word, _w) = roundtrip(stream, &ek_win, false);
     assert_eq!(word, AOQ_STATUS_OK, "HandshakeEk accepted");
-    let fin_win = seal_window(&wire_frame(FrameKind::HandshakeFinish, 1, 0, &ct_c), 1, 0);
+    // v3 Finish law (M2a): body = ct echo (1088B) + confirm tag (16B)
+    // under recv_key/transcript derived from the same (ss, ek) pair the
+    // sidecar derives at the Ek step (deterministic CourtKem).
+    let transcript = sess::transcript_tag(kem, &ek, &ss, EPOCH);
+    let hs_master = sess::derive(kem, sess::CTX_HANDSHAKE, &ss, &ek);
+    let recv_key = kem.kdf(&[sess::CTX_RECV, &hs_master]);
+    let confirm = sess::confirm_tag(kem, &recv_key, &transcript, &ct_c);
+    let mut fin_body = [0u8; CT_BYTES + 16];
+    fin_body[..CT_BYTES].copy_from_slice(&ct_c);
+    fin_body[CT_BYTES..].copy_from_slice(&confirm);
+    let fin_win = seal_window(&wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body), 1, 0);
     let (word, _w) = roundtrip(stream, &fin_win, false);
     assert_eq!(
         word, AOQ_STATUS_OK,
         "HandshakeFinish accepted (Established)"
     );
-    (dk, ct_c)
+    // The court's send_key (= the sidecar's recv_key): seals AppData the
+    // sidecar verifies; the echo is sealed under the sidecar's send_key
+    // (= the court's recv_key) and opened with it.
+    let send_key = kem.kdf(&[sess::CTX_SEND, &hs_master]);
+    (dk, ct_c, recv_key, send_key)
 }
 
 // ---------------------------------------------------------------------------
@@ -316,13 +333,30 @@ fn handshake(kem: &CourtKem, stream: &mut UnixStream) -> ([u8; 2400], [u8; CT_BY
 fn e1_full_path_preseal_bytes_survive_to_echo() {
     let mut car = spawn_sidecar("e1");
     let kem = CourtKem;
-    let (dk, _ct) = handshake(&kem, car.stream.as_mut().expect("conn 1"));
+    let (dk, _ct, recv_key, send_key) = handshake(&kem, car.stream.as_mut().expect("conn 1"));
 
     // Pre-seal payload: the bytes the caller wants carried end to end.
     let preseal = b"rung-8 e2e witness: cgap-side sealed feed payload \x00\x01\xff";
-    let mut app_body = Vec::with_capacity(4 + preseal.len());
-    app_body.extend_from_slice(&7u32.to_le_bytes());
-    app_body.extend_from_slice(preseal);
+    // v3 wire law: body = [seq][ct][tag] under the court's send_key
+    // (AAD = the covered prefix, nonce = Nonce96(epoch, ordinal<<32|seq)).
+    let mut prefix = [0u8; cgap_aoq::header::SIZE_BYTES + 5];
+    codec::encode(&AoqHeader::new(EPOCH, KEY_ID, 2, 7), &mut prefix).expect("encode");
+    prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
+        .copy_from_slice(&7u32.to_le_bytes());
+    let mut app_body = vec![0u8; 4 + preseal.len() + cgap_aoq::aead::TAG_LEN];
+    app_body[..4].copy_from_slice(&7u32.to_le_bytes());
+    let nonce = cgap_aoq::aead::Nonce96::new(u32::from(EPOCH), (2u64 << 32) | 7).expect("nonce");
+    let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut app_body[4..4 + preseal.len()],
+        &mut aead_tag,
+        preseal,
+        &prefix,
+        &recv_key,
+        &nonce,
+    );
+    app_body[4 + preseal.len()..].copy_from_slice(&aead_tag);
     let app = wire_frame(FrameKind::AppData, 2, 7, &app_body);
     let app_win = seal_window(&app, 2, 7);
     let (word, win) = roundtrip(car.stream.as_mut().expect("conn 1"), &app_win, true);
@@ -345,24 +379,32 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
         frame.payload[3],
     ]);
     assert_eq!(rseq, 7, "echoed seq");
-    let covered = &body[..body.len() - 4];
-    let mut tag = [0u8; 4];
-    tag.copy_from_slice(&body[body.len() - 4..]);
-    assert_eq!(
-        kem.kdf(&[covered])[0..4],
-        tag,
-        "emit_verified kdf tag re-derives"
-    );
+    // v3 wire law: the echo body = [seq][ct][tag 16B] sealed under the
+    // sidecar's send_key (= the court's recv_key); open_detached with the
+    // court-derived key recovers the plaintext (AEAD round trip).
+    let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
+    let mut plain = vec![0u8; ct_len];
+    let aead_tag: [u8; cgap_aoq::aead::TAG_LEN] =
+        frame.payload[4 + ct_len..].try_into().expect("tag");
+    cgap_aoq::aead::open_detached(
+        &mut plain,
+        &frame.payload[4..4 + ct_len],
+        &aead_tag,
+        &body[..cgap_aoq::header::SIZE_BYTES + 5],
+        &send_key,
+        &cgap_aoq::aead::Nonce96::new(
+            u32::from(EPOCH),
+            (u64::from(frame.header.frame_ordinal) << 32) | u64::from(rseq),
+        )
+        .expect("nonce"),
+    )
+    .expect("echo opens under the court-derived send_key");
 
     // THE RUNG-8 WITNESS: the recovered payload equals the pre-seal bytes.
-    assert_eq!(
-        &frame.payload[4..frame.payload.len() - 4],
-        &preseal[..],
-        "decrypted (echoed) payload == pre-seal bytes"
-    );
+    assert_eq!(&plain, &preseal[..], "decrypted (echoed) payload == pre-seal bytes");
     // Transcript digests for the receipt (blake3, 32-byte).
     let d_pre = cgap_arrow::blake3::hash(preseal);
-    let d_post = cgap_arrow::blake3::hash(&frame.payload[4..frame.payload.len() - 4]);
+    let d_post = cgap_arrow::blake3::hash(&plain);
     eprintln!(
         "E1 transcript: preseal_len={} preseal_sha256ish_blake3={:02x?} echoed_blake3={:02x?} equal_digests={}",
         preseal.len(),
@@ -414,13 +456,14 @@ fn e2_flipped_byte_fires_tag_gate() {
 fn e3_process_reuse_then_stdin_eof_stop() {
     let mut car = spawn_sidecar("e3");
     let kem = CourtKem;
-    let (_dk, _ct) = handshake(&kem, car.stream.as_mut().expect("conn 1"));
+    let (_dk, _ct, _recv_key1, _send_key1) =
+        handshake(&kem, car.stream.as_mut().expect("conn 1"));
 
     // Connection 3 (the reuse witness): a ONE-CONNECTION sidecar (mutation
     // C': the pre-ZD-56 binary) cannot accept this connect — the bounded
     // poll would expire. This sidecar serves a FRESH full handshake.
     next_connection(&mut car);
-    let (_dk2, ct2) = handshake(&kem, car.stream.as_mut().expect("conn 3"));
+    let (_dk2, ct2, recv_key2, send_key2) = handshake(&kem, car.stream.as_mut().expect("conn 3"));
     // Fresh-session proof: the new handshake's pending ct is the same
     // deterministic value the sidecar recomputes for the new ek — accepted,
     // so the sidecar did not carry connection-1 session state in.
@@ -428,9 +471,25 @@ fn e3_process_reuse_then_stdin_eof_stop() {
 
     // Established AppData hop on connection 3 (same-process reuse end to end).
     let preseal = b"conn-3 reuse payload";
-    let mut app_body = Vec::with_capacity(4 + preseal.len());
-    app_body.extend_from_slice(&9u32.to_le_bytes());
-    app_body.extend_from_slice(preseal);
+    // v3 wire law: body = [seq][ct][tag] under the court's send-side key.
+    let mut prefix = [0u8; cgap_aoq::header::SIZE_BYTES + 5];
+    codec::encode(&AoqHeader::new(EPOCH, KEY_ID, 2, 9), &mut prefix).expect("encode");
+    prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
+        .copy_from_slice(&9u32.to_le_bytes());
+    let mut app_body = vec![0u8; 4 + preseal.len() + cgap_aoq::aead::TAG_LEN];
+    app_body[..4].copy_from_slice(&9u32.to_le_bytes());
+    let nonce = cgap_aoq::aead::Nonce96::new(u32::from(EPOCH), (2u64 << 32) | 9).expect("nonce");
+    let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut app_body[4..4 + preseal.len()],
+        &mut aead_tag,
+        preseal,
+        &prefix,
+        &recv_key2,
+        &nonce,
+    );
+    app_body[4 + preseal.len()..].copy_from_slice(&aead_tag);
     let app = wire_frame(FrameKind::AppData, 2, 9, &app_body);
     let app_win = seal_window(&app, 2, 9);
     let (word, win) = roundtrip(car.stream.as_mut().expect("conn 3"), &app_win, true);
@@ -440,11 +499,31 @@ fn e3_process_reuse_then_stdin_eof_stop() {
     let mut body = vec![0u8; blen];
     ipc::read_verified(&win, None, &mut body).expect("conn-3 tag gate");
     let frame = sess::parse_frame(&body).expect("conn-3 frame parses");
-    assert_eq!(
-        &frame.payload[4..frame.payload.len() - 4],
-        &preseal[..],
-        "conn-3 echo == pre-seal bytes"
-    );
+    // v3: open the echo under the court-derived send-side key.
+    let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
+    let mut plain3 = vec![0u8; ct_len];
+    let aead_tag3: [u8; cgap_aoq::aead::TAG_LEN] =
+        frame.payload[4 + ct_len..].try_into().expect("tag");
+    cgap_aoq::aead::open_detached(
+        &mut plain3,
+        &frame.payload[4..4 + ct_len],
+        &aead_tag3,
+        &body[..cgap_aoq::header::SIZE_BYTES + 5],
+        &send_key2,
+        &cgap_aoq::aead::Nonce96::new(
+            u32::from(EPOCH),
+            (u64::from(frame.header.frame_ordinal) << 32)
+                | u64::from(u32::from_le_bytes([
+                    frame.payload[0],
+                    frame.payload[1],
+                    frame.payload[2],
+                    frame.payload[3],
+                ])),
+        )
+        .expect("nonce"),
+    )
+    .expect("conn-3 echo opens");
+    assert_eq!(&plain3, &preseal[..], "conn-3 echo == pre-seal bytes");
 
     // STOP SIGNAL: drop the client, then stdin EOF -> exit 0 (bounded poll
     // on try_wait; the runtime owns time).

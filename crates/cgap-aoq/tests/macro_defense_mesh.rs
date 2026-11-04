@@ -67,6 +67,12 @@ static ORDINAL_REFUSED: AtomicUsize = AtomicUsize::new(0);
 static TRUNC_REFUSED: AtomicUsize = AtomicUsize::new(0);
 static CLOSED_REFUSED: AtomicUsize = AtomicUsize::new(0);
 static AEAD_REFUSED: AtomicUsize = AtomicUsize::new(0);
+/// Fixed census key/nonce for the v3 AEAD seal court (never a fake pass:
+/// the flipped-tag mutation must refuse before the roundtrip is counted).
+const CENSUS_KEY: [u8; 32] = [0xA7u8; 32];
+fn census_nonce() -> cgap_aoq::aead::Nonce96 {
+    cgap_aoq::aead::Nonce96::new(0, 1).expect("census nonce")
+}
 static TAG_REFUSED: AtomicUsize = AtomicUsize::new(0);
 static KILLED: AtomicUsize = AtomicUsize::new(0);
 static RESPAWNED: AtomicUsize = AtomicUsize::new(0);
@@ -331,14 +337,22 @@ fn run_slot(slot: usize, tx: &mpsc::Sender<(usize, Vec<AoqChainRecord>)>) {
                     CLOSED_REFUSED.fetch_add(1, Ordering::Relaxed);
                 } else {
                     let (wire, _n) = emit_frame(s, g as u32, &full[4..]);
-                    // AEAD seam census: pre-admission kernel refuses typed
-                    // (R-K1 disclosure — never faked as sealed).
-                    match cgap_aoq::aead::seal(0, &[0u8; 32], full) {
-                        Err(cgap_aoq::error::AoqError::AeadKernelNotAdmitted { .. }) => {
-                            AEAD_REFUSED.fetch_add(1, Ordering::Relaxed);
-                        }
-                        _ => panic!("AEAD seam admitted an unadmitted kernel id"),
-                    }
+                    // AEAD census (v3): the kernel is admitted — every
+                    // telemetry body is actually sealed + verified through
+                    // the facade (R-K1 promotion, RFC 8439 var-AAD); a
+                    // flipped tag must refuse typed, never silent.
+                    let mut ct = vec![0u8; full.len()];
+                    let mut tag = [0u8; cgap_aoq::aead::TAG_LEN];
+                    cgap_aoq::aead::seal_detached(&mut ct, &mut tag, full, &[], &CENSUS_KEY, &census_nonce());
+                    let mut bad_tag = tag;
+                    bad_tag[0] ^= 0x01;
+                    assert!(matches!(
+                        cgap_aoq::aead::verify_detached(&[], &ct, &bad_tag, &CENSUS_KEY, &census_nonce()),
+                        Err(cgap_aoq::error::AoqError::AeadMismatch)
+                    ));
+                    cgap_aoq::aead::verify_detached(&[], &ct, &tag, &CENSUS_KEY, &census_nonce())
+                        .expect("seal/verify roundtrip");
+                    AEAD_REFUSED.fetch_add(1, Ordering::Relaxed);
                     s.step(&parse_frame(&wire).unwrap()).unwrap();
                     ABSORBED.fetch_add(1, Ordering::Relaxed);
                     chain.append_verified(&wire).unwrap();

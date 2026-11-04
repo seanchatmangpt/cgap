@@ -278,7 +278,9 @@ mod imp {
             | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
             | SessionError::KemRefused { .. }
             // AEAD open refused: an authenticity failure (P2 M1 typed landing).
-            | SessionError::AeadMismatch => AOQ_STATUS_DIGEST_MISMATCH,
+            | SessionError::AeadMismatch
+            // Confirm-tag law (v3): authenticity failure, same frozen band.
+            | SessionError::ConfirmMismatch => AOQ_STATUS_DIGEST_MISMATCH,
             SessionError::RekeyRequired { .. } => AOQ_STATUS_BUSY,
             SessionError::SessionClosed => AOQ_STATUS_EPOCH_RETIRED,
             SessionError::Wire(AoqError::HeaderTooShort { .. })
@@ -431,8 +433,22 @@ mod imp {
                     frame.payload[2],
                     frame.payload[3],
                 ]);
-                let payload = &frame.payload[4..];
-                let mut frame_buf = vec![0u8; FRAME_HEADER_BYTES + 1 + 4 + payload.len() + 4];
+                // v3 wire law: body = [seq 4B][ct][tag 16B]. The echo
+                // carries the DECRYPTED payload (rung-8 witness: pre-seal
+                // bytes survive to echo) — open under recv_key at accept.
+                let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
+                let mut plain = vec![0u8; ct_len];
+                if let Err(err) = session.open_verified(&body, &mut plain) {
+                    let _ = send_status(&mut stream, session_status(&err));
+                    return;
+                }
+                let payload = &plain;
+                // v3 wire law: emit writes [header][kind][seq][ct][tag 16B].
+                let mut frame_buf = vec![
+                    0u8;
+                    FRAME_HEADER_BYTES + 1 + 4 + payload.len()
+                        + cgap_aoq::aead::TAG_LEN
+                ];
                 match session.emit_verified(seq, payload, &mut frame_buf) {
                     Ok(written) => {
                         let _ = send_status(&mut stream, AOQ_STATUS_OK);

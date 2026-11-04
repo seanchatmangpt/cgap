@@ -13,7 +13,12 @@
 
 use cgap_aoq::codec;
 use cgap_aoq::header::{AoqHeader, SIZE_BYTES};
-use cgap_aoq::session::{parse_frame, FrameKind, CT_BYTES, EK_BYTES};
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
+use cgap_aoq::session::{
+    derive, parse_frame, transcript_tag, FrameKind, KemSeam, CT_BYTES, CTX_HANDSHAKE, CTX_RECV,
+    CTX_SEND, EK_BYTES, SS_BYTES,
+};
+use cgap_aoq::session::SessionError;
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{
     aoq_status_name, AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
@@ -78,20 +83,108 @@ fn ek_frame(ordinal: u32, ek: &[u8; EK_BYTES]) -> Vec<u8> {
     buf
 }
 
-fn finish_frame(ordinal: u32, ct: &[u8; CT_BYTES]) -> Vec<u8> {
-    let mut buf = vec![0u8; SIZE_BYTES + 1 + CT_BYTES];
+/// Court-side mirror of the HostKem kdf law (shake32) so the court can
+/// derive the session's direction keys independently of the FFI surface.
+struct CourtSeam;
+
+impl KemSeam for CourtSeam {
+    fn encapsulate(
+        &self,
+        ek: &[u8; EK_BYTES],
+    ) -> Result<([u8; CT_BYTES], [u8; SS_BYTES]), SessionError> {
+        let m = shake32(&[b"w2a/mlkem/m", ek]);
+        let mut ct = [0u8; CT_BYTES];
+        let mut ss = [0u8; SS_BYTES];
+        cgap_crypto::kem::encaps(ek, &m, &mut ct, &mut ss);
+        Ok((ct, ss))
+    }
+
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], SessionError> {
+        let dk: &[u8; 2400] = dk
+            .try_into()
+            .map_err(|_| SessionError::KemRefused { op: 1 })?;
+        Ok(cgap_crypto::kem::decaps(dk, ct))
+    }
+
+    fn kdf(&self, parts: &[&[u8]]) -> [u8; 32] {
+        shake32(parts)
+    }
+}
+
+/// The session's recv_key law: kdf(CTX_RECV || handshake master) where the
+/// master derives from (ss, ek) via CTX_HANDSHAKE. `ss` comes from the
+/// court-held dk, so the derivation is independent of the FFI surface.
+fn court_recv_key(ek: &[u8; EK_BYTES], dk: &[u8], ct: &[u8; CT_BYTES]) -> [u8; 32] {
+    let kem = CourtSeam;
+    let ss = kem.decapsulate(dk, ct).expect("decapsulate");
+    let hs_master = derive(&kem, CTX_HANDSHAKE, &ss, ek);
+    kem.kdf(&[CTX_RECV, &hs_master])
+}
+
+/// The session's send_key law (emit direction, same handshake master).
+fn court_send_key(ek: &[u8; EK_BYTES], _dk: &[u8]) -> [u8; 32] {
+    let kem = CourtSeam;
+    let ss = {
+        let m = shake32(&[b"w2a/mlkem/m", ek]);
+        let mut ct = [0u8; CT_BYTES];
+        let mut ss = [0u8; SS_BYTES];
+        cgap_crypto::kem::encaps(ek, &m, &mut ct, &mut ss);
+        ss
+    };
+    let hs_master = derive(&kem, CTX_HANDSHAKE, &ss, ek);
+    kem.kdf(&[CTX_SEND, &hs_master])
+}
+
+fn finish_frame(
+    ordinal: u32,
+    ct: &[u8; CT_BYTES],
+    ek: &[u8; EK_BYTES],
+    dk: &[u8],
+) -> Vec<u8> {
+    // v3 Finish law (M2a): body = ct echo + confirm tag over the session's
+    // recv_key/transcript, both derived by the court from the held dk.
+    let kem = CourtSeam;
+    let ss = kem.decapsulate(dk, ct).expect("decapsulate");
+    let transcript = transcript_tag(&kem, ek, &ss, EPOCH);
+    let hs_master = derive(&kem, CTX_HANDSHAKE, &ss, ek);
+    let recv = kem.kdf(&[CTX_RECV, &hs_master]);
+    let tag = cgap_aoq::session::confirm_tag(&kem, &recv, &transcript, ct);
+    let mut buf = vec![0u8; SIZE_BYTES + 1 + CT_BYTES + 16];
     codec::encode(&header(ordinal, 0), &mut buf).expect("header encode");
     buf[SIZE_BYTES] = FrameKind::HandshakeFinish.id();
-    buf[SIZE_BYTES + 1..].copy_from_slice(ct);
+    buf[SIZE_BYTES + 1..SIZE_BYTES + 1 + CT_BYTES].copy_from_slice(ct);
+    buf[SIZE_BYTES + 1 + CT_BYTES..].copy_from_slice(&tag);
     buf
 }
 
-fn app_frame(ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
-    let mut buf = vec![0u8; SIZE_BYTES + 1 + 4 + payload.len()];
+fn app_frame(key: &[u8; 32], ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
+    // v3 wire law: body = [seq 4B][ct][tag 16B] AEAD-sealed, AAD = the
+    // frame's own covered prefix, nonce = Nonce96(epoch, ordinal<<32|seq).
+    let mut prefix = [0u8; SIZE_BYTES + 5];
+    codec::encode(&header(ordinal, seq), &mut prefix).expect("header encode");
+    prefix[SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&seq.to_le_bytes());
+    let mut body = vec![0u8; 4 + payload.len() + TAG_LEN];
+    body[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = Nonce96::new(
+        u32::from(EPOCH),
+        (u64::from(ordinal) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
+    let mut tag = [0u8; TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut body[4..4 + payload.len()],
+        &mut tag,
+        payload,
+        &prefix,
+        key,
+        &nonce,
+    );
+    body[4 + payload.len()..].copy_from_slice(&tag);
+    let mut buf = vec![0u8; SIZE_BYTES + 1 + body.len()];
     codec::encode(&header(ordinal, seq), &mut buf).expect("header encode");
     buf[SIZE_BYTES] = FrameKind::AppData.id();
-    buf[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&seq.to_le_bytes());
-    buf[SIZE_BYTES + 5..].copy_from_slice(payload);
+    buf[SIZE_BYTES + 1..].copy_from_slice(&body);
     buf
 }
 
@@ -116,7 +209,7 @@ fn assert_in_band(w: u32) {
 
 /// Drive the session to Established with the REAL ML-KEM handshake.
 fn establish() -> u64 {
-    let (ek, _dk) = peer_keypair();
+    let (ek, dk) = peer_keypair();
     let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     assert_ne!(h, 0, "session_new returned 0");
     let ek_wire = ek_frame(0, &ek);
@@ -124,7 +217,7 @@ fn establish() -> u64 {
         unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, ek_wire.as_ptr(), ek_wire.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "ek step refused: {st:#x}");
     let ct = expected_pending_ct(&ek);
-    let fin = finish_frame(1, &ct);
+    let fin = finish_frame(1, &ct, &ek, &dk);
     let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "finish step refused: {st:#x}");
     h
@@ -144,7 +237,7 @@ fn fingerprint(h: u64) -> [u8; 32] {
 
 #[test]
 fn court1_happy_path_handshake_and_emit_round_trip() {
-    let (ek, _dk) = peer_keypair();
+    let (ek, dk) = peer_keypair();
     let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     assert_ne!(h, 0, "session_new returned 0");
 
@@ -156,14 +249,15 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
 
     // HandshakeWait -> Established on the ct-echo finish frame.
     let ct = expected_pending_ct(&ek);
-    let fin = finish_frame(1, &ct);
+    let fin = finish_frame(1, &ct, &ek, &dk);
     let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
     assert_eq!(st, AOQ_STATUS_OK, "finish step refused: {st:#x}");
 
-    // Verified emit: [header 64B][kind 2][seq BE 4B][payload][tag 4B].
+    // Verified emit (v3): [header 64B][kind][seq LE 4B][ct][tag 16B], the
+    // payload AEAD-sealed under the session's send_key.
     let payload: [u8; 16] = core::array::from_fn(|i| (i as u8) ^ 0x5a);
     let seq: u32 = 42;
-    let mut out = [0u8; SIZE_BYTES + 1 + 4 + 16 + 4];
+    let mut out = [0u8; SIZE_BYTES + 1 + 4 + 16 + TAG_LEN];
     let mut written = 0usize;
     let st = unsafe {
         cgap_ffi::aoq_session::cgap_aoq_session_emit_verified(
@@ -190,17 +284,31 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
     );
     assert_eq!(frame.header.seq, seq);
     assert_eq!(frame.payload[..4], seq.to_le_bytes(), "seq prefix");
-    assert_eq!(
+    // The body carries AEAD ciphertext, not plaintext (no overclaiming:
+    // ct must NOT equal the payload).
+    assert_ne!(
         &frame.payload[4..4 + payload.len()],
         &payload,
-        "payload identity"
+        "payload must be encrypted"
     );
 
-    // Tag law: kdf(header||kind||seq||payload)[0..4] over the WHOLE wire
-    // frame minus the trailing 4 tag bytes.
-    let covered = &out[..written - 4];
-    let tag = shake32(&[covered]);
-    assert_eq!(&out[written - 4..written], &tag[0..4], "emit tag law");
+    // v3 AEAD law: open_detached under the court-derived send_key recovers
+    // the plaintext (nonce = Nonce96(epoch, ordinal<<32|seq), AAD = the
+    // covered prefix buf[..69]).
+    let send_key = court_send_key(&ek, &dk);
+    let nonce =
+        Nonce96::new(u32::from(EPOCH), (u64::from(2u32) << 32) | u64::from(seq)).expect("nonce");
+    let mut plain = [0u8; 16];
+    cgap_aoq::aead::open_detached(
+        &mut plain,
+        &frame.payload[4..4 + payload.len()],
+        frame.payload[4 + payload.len()..].try_into().expect("tag"),
+        &out[..written][..SIZE_BYTES + 5],
+        &send_key,
+        &nonce,
+    )
+    .expect("emitted frame must open under the derived send_key");
+    assert_eq!(&plain, &payload, "AEAD round trip");
 
     // Close, then free; free of a live handle is OK exactly once.
     let cl = close_frame(2);
@@ -218,7 +326,7 @@ fn court1_happy_path_handshake_and_emit_round_trip() {
 
 #[test]
 fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
-    let (ek, _dk) = peer_keypair();
+    let (ek, dk) = peer_keypair();
     let h = cgap_ffi::aoq_session::cgap_aoq_session_new(EPOCH, KEY_ID, 0);
     let ek_wire = ek_frame(0, &ek);
     let st =
@@ -229,7 +337,7 @@ fn court2_ct_echo_flip_refused_fingerprint_unchanged() {
     // Mutation A: the real pending ct with one byte flipped.
     let mut ct = expected_pending_ct(&ek);
     ct[7] ^= 0x01;
-    let fin = finish_frame(1, &ct);
+    let fin = finish_frame(1, &ct, &ek, &dk);
     let st = unsafe { cgap_ffi::aoq_session::cgap_aoq_session_step(h, fin.as_ptr(), fin.len()) };
     assert_eq!(
         st, AOQ_STATUS_DIGEST_MISMATCH,
@@ -269,7 +377,9 @@ fn court3_fingerprint_identity_after_every_refused_step() {
     // (e) garbage bytes (bad magic).
     let garbage = vec![0xa5u8; 512];
     // (f) AppData in HandshakeInit (unexpected (state, frame) cell).
-    let app_too_early = app_frame(0, 1, b"nope");
+    // Refusal wire: body is parse-lawful (>= 20B); the (state, kind) cell
+    // refuses before the AEAD law, so a zero-key seal is fine here.
+    let app_too_early = app_frame(&[0u8; 32], 0, 1, b"nope");
 
     for (name, frame) in [
         ("wrong-epoch", &bad),
