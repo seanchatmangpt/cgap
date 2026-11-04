@@ -132,15 +132,26 @@ const KDF_LABEL: &[u8] = b"cgap-ffi/aoq-bridge/kdf/v1";
 /// `expect` is the fail-closed surface for that impossible class (a silent
 /// deterministic fallback would launder the failure).
 fn bridge_kdf(key: &[u8; 32], parts: &[&[u8]]) -> [u8; 32] {
-    // HOST-SURFACE: alloc is lawful in this host-gated module.
-    let cap = KDF_LABEL.len() + parts.iter().map(|p| 8 + p.len()).sum::<usize>();
-    let mut buf = Vec::with_capacity(cap);
-    buf.extend_from_slice(KDF_LABEL);
+    /// Stack bound: label + up to 8 parts x (8-byte length prefix + 32-byte
+    /// part). Largest lawful caller surface is 2x32-byte parts; the bound
+    /// leaves headroom for the court's 4-part corpus.
+    const KDF_BUF_MAX: usize = KDF_LABEL.len() + 8 * (8 + 32);
+    let mut buf = [0u8; KDF_BUF_MAX];
+    buf[..KDF_LABEL.len()].copy_from_slice(KDF_LABEL);
+    let mut n = KDF_LABEL.len();
     for p in parts {
-        buf.extend_from_slice(&(p.len() as u64).to_le_bytes());
-        buf.extend_from_slice(p);
+        // Fail-closed bound: loud panic in every profile (stronger than the
+        // debug_assert floor) -- never silent truncation.
+        assert!(
+            n + 8 + p.len() <= KDF_BUF_MAX,
+            "bridge_kdf input exceeds stack bound ({KDF_BUF_MAX}); refusing loudly"
+        );
+        buf[n..n + 8].copy_from_slice(&(p.len() as u64).to_le_bytes());
+        n += 8;
+        buf[n..n + p.len()].copy_from_slice(p);
+        n += p.len();
     }
-    keyed_digest(key, &buf)
+    keyed_digest(key, &buf[..n])
         .expect("keyed_digest length-overflow refusal is impossible for bounded host input")
 }
 
