@@ -34,21 +34,35 @@ fn bench_encode_decode_ns_per_header() {
     for _ in 0..ROUNDS {
         let enc = timed(|| {
             for _ in 0..ITERS {
+                // Loop-carried dependency: this iteration's sink feeds the
+                // next iteration's encode INPUT (key_id), and each sink
+                // update routes through the house anti-DCE fence — LLVM
+                // cannot constant-fold across iterations (BR-5 fix).
+                let mut hi = h;
+                hi.key_id = h.key_id ^ sink;
                 let mut w = [0u8; 64];
-                encode(&h, &mut w).ok();
-                sink = sink.wrapping_add(w[0] as u64);
-            }
+                encode(&hi, &mut w).ok();
+                // w[60] is the low byte of header_digest — the digest covers
+                // bytes [0,0x3C) including the sink-chained key_id, so the
+                // FULL encode work (digest loop included) is required to
+                // produce it. Fencing a digest-independent byte (w[0] magic,
+                // w[8] key_id) lets DSE kill the digest as a dead store.
+                sink = sink.wrapping_add(cgap_aoq::profile_guard::fence(w[60] as u64));            }
         }) / ITERS as f64;
         let dec = timed(|| {
             for _ in 0..ITERS {
-                // decode a fresh copy so the cache state matches encode's
+                // decode a fresh copy so the cache state matches encode's;
+                // byte 61 is chained from the previous iteration's sink so
+                // the decode INPUT is loop-carried (not hoistable).
                 let mut w = wire;
-                w[61] = (sink & 0xFF) as u8; // keep buffer live
+                w[61] = (sink & 0xFF) as u8;
                 let r = decode(&w).ok();
-                sink = sink.wrapping_add(r.map(|_| 1).unwrap_or(0));
-                // restore for next iteration
-                w[61] = wire[61];
-                let _ = std::hint::black_box(&w);
+                // House fence on the folded result keeps sink opaque to the
+                // optimizer — a constant success-bit cannot collapse the
+                // chain into a closed form.
+                sink = sink.wrapping_add(cgap_aoq::profile_guard::fence(
+                    r.map(|hdr| (hdr.header_digest as u64) & 1).unwrap_or(0),
+                ));
             }
         }) / ITERS as f64;
         min_enc = min_enc.min(enc);
