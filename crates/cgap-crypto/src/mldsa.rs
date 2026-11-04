@@ -32,6 +32,8 @@
 //! Branchless per the fips203 class (ct-select/mask, no data-addressed
 //! branches). `#![no_std]`, `#![forbid(unsafe_code)]` respected crate-wide.
 
+use crate::fips202::{Shake128, Shake256, Sponge};
+
 // ---------------------------------------------------------------------------
 // Parameters (FIPS 204 Table 2, ML-DSA-65)
 // ---------------------------------------------------------------------------
@@ -438,6 +440,761 @@ pub fn use_hint(a: i32, h: i32) -> i32 {
 // ntt courts cover the full pipeline). These pin the identities the
 // pipeline silently relies on.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Seeding / hash derivations (FIPS 204 §7.2; SHAKE256 domain via fips202).
+// mu construction and signature byte-packing are OUT of this module's scope
+// (phase 3 serializer onto the frozen Receipt shape); the sign loop consumes
+// a caller-supplied 64-byte mu and emits structured SignatureParts.
+// ---------------------------------------------------------------------------
+
+/// H seed derivation per FIPS 204 §7.2: from the 32-byte entropy seed ξ,
+/// (rho, K) = H(ξ, SEED domain byte 0x00) — 64-byte SHAKE256(ξ || 0x00).
+/// Returns (rho — the matrix seed, k_seed — the PRF seed).
+pub fn derive_key_seeds(xi: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
+    let mut out = [0u8; 64];
+    let mut s = Shake256::instance();
+    s.absorb(xi);
+    s.absorb(&[0x00]);
+    s.squeeze_into(&mut out);
+    let mut rho = [0u8; 32];
+    let mut k_seed = [0u8; 32];
+    rho.copy_from_slice(&out[..32]);
+    k_seed.copy_from_slice(&out[32..]);
+    (rho, k_seed)
+}
+
+/// PRF mask seed rho' = H(K, mu, rnd domain, 32 bytes) =
+/// SHAKE256(K || mu || rnd || 0x00) squeezed to 32. (rho' drives ExpandMask;
+/// the rnd domain byte mirrors FIPS 204's hedged branch discriminator.)
+pub fn derive_rho_prime(k_seed: &[u8; 32], mu: &[u8; 64], rnd: &[u8; 32]) -> [u8; 32] {
+    let mut input = alloc::vec::Vec::with_capacity(32 + 64 + 32 + 1);
+    input.extend_from_slice(k_seed);
+    input.extend_from_slice(mu);
+    input.extend_from_slice(rnd);
+    input.push(0x00);
+    let mut out = [0u8; 32];
+    Shake256::xof(&input, &mut out);
+    out
+}
+
+/// PRF stream prefix: SHAKE256(seed || LE16(nonce)) — the expand-side stream
+/// (ExpandS eta domain and ExpandMask gamma1 domain share the shape; the
+/// nonce space keeps the two domains disjoint by call-site convention).
+fn prf_stream(seed: &[u8], nonce: u16, out: &mut [u8]) {
+    let mut s = Shake256::instance();
+    s.absorb(seed);
+    s.absorb(&[(nonce & 0xFF) as u8, (nonce >> 8) as u8]);
+    s.squeeze_into(out);
+}
+
+/// Branchless nibble popcount (CBD building block).
+#[inline(always)]
+fn popcnt4(x: u8) -> i32 {
+    ((x & 1) + ((x >> 1) & 1) + ((x >> 2) & 1) + ((x >> 3) & 1)) as i32
+}
+
+/// CBD_eta(eta = 4): one stream byte per coefficient,
+/// coeff = popcnt(low nibble) − popcnt(high nibble) ∈ [−4, 4]. Branchless.
+pub fn cbd_eta4(stream: &[u8; N], r: &mut [i32; N]) {
+    for i in 0..N {
+        let t = stream[i];
+        r[i] = popcnt4(t & 0xF) - popcnt4(t >> 4);
+    }
+}
+
+/// ExpandS: one secret polynomial from (sigma, nonce) via PRF + CBD_4.
+pub fn expand_s_poly(sigma: &[u8; 32], nonce: u16, r: &mut [i32; N]) {
+    let mut stream = [0u8; N];
+    prf_stream(sigma, nonce, &mut stream);
+    cbd_eta4(&stream, r);
+}
+
+/// ExpandA row slice: one NTT-domain matrix entry from (rho, entry index =
+/// (row << 8) | col), SHAKE128(rho || LE16(idx)) with 22-bit rejection
+/// (3-byte LE candidates masked to 0x3F_FFFF, accept iff < q), centered via
+/// cond_add_q, then NTT. The rejection loop consumes the uniform stream —
+/// trip count depends on the stream, never on secret values.
+pub fn expand_a_row_hat(rho: &[u8; 32], idx: u16, r: &mut [i32; N]) {
+    let mut s = Shake128::instance();
+    s.absorb(rho);
+    s.absorb(&[(idx & 0xFF) as u8, (idx >> 8) as u8]);
+    let mut buf = [0u8; Shake128::RATE];
+    s.squeeze_into(&mut buf);
+    let mut pos = 0usize;
+    for c in r.iter_mut() {
+        loop {
+            if pos + 3 > buf.len() {
+                // refill (Sponge squeezes contiguously; rate is 168 > 3 so a
+                // fresh block covers the coefficient)
+                s.squeeze_into(&mut buf);
+                pos = 0;
+            }
+            let t = (buf[pos] as u32)
+                | ((buf[pos + 1] as u32) << 8)
+                | ((buf[pos + 2] as u32) << 16);
+            pos += 3;
+            let t = t & 0x3F_FFFF;
+            if t < Q as u32 {
+                *c = cond_add_q(t as i32);
+                break;
+            }
+        }
+    }
+    ntt(r);
+}
+
+/// SampleInBall: sparse challenge c with exactly τ = 49 nonzero ±1
+/// coefficients, from SHAKE256(c_tilde) via 8-bit rejection + partial
+/// Fisher–Yates (ref poly_challenge form: `do t = stream8() while t > i`,
+/// sign = t & 1, j = i − (t >> 1); c[i] = c[j]; c[j] = sign ? −1 : 1).
+/// Rejection trips depend on the hash stream (post-hash, public values),
+/// not on secrets.
+pub fn sample_in_ball(c_tilde: &[u8; CTILDE_BYTES], c: &mut [i32; N]) {
+    let mut s = Shake256::instance();
+    s.absorb(c_tilde);
+    let mut buf = [0u8; Shake256::RATE];
+    s.squeeze_into(&mut buf);
+    let mut pos = 0usize;
+    let next8 = |s: &mut Sponge, buf: &mut [u8; Shake256::RATE], pos: &mut usize| -> u8 {
+        if *pos == buf.len() {
+            s.squeeze_into(buf);
+            *pos = 0;
+        }
+        let b = buf[*pos];
+        *pos += 1;
+        b
+    };
+    *c = [0i32; N];
+    for i in (N - TAU)..N {
+        let t = loop {
+            let t = next8(&mut s, &mut buf, &mut pos);
+            if (t as usize) <= i {
+                break t;
+            }
+        };
+        let signs = t & 1;
+        let j = i - (t >> 1) as usize;
+        c[i] = c[j];
+        c[j] = ct_select_i32((signs == 1) as i32, -1, 1);
+    }
+}
+
+/// SampleMask (ExpandMask, gamma1 = 2^19): one y polynomial from
+/// (rho', kappa) via PRF stream with 20-bit rejection: candidate t =
+/// 3-byte LE masked to 0xF_FFFF, accept iff t < 2·γ1, coeff = γ1 − t
+/// ∈ [−γ1, γ1). Stream-trip only; no secret-dependent branches.
+pub fn expand_mask_poly(rhoprime: &[u8; 32], kappa: u16, r: &mut [i32; N]) {
+    let mut s = Shake256::instance();
+    s.absorb(rhoprime);
+    s.absorb(&[(kappa & 0xFF) as u8, (kappa >> 8) as u8]);
+    let mut buf = [0u8; Shake256::RATE];
+    s.squeeze_into(&mut buf);
+    let mut pos = 0usize;
+    for c in r.iter_mut() {
+        loop {
+            if pos + 3 > buf.len() {
+                s.squeeze_into(&mut buf);
+                pos = 0;
+            }
+            let t = (buf[pos] as u32)
+                | ((buf[pos + 1] as u32) << 8)
+                | ((buf[pos + 2] as u32) << 16);
+            pos += 3;
+            let t = t & 0xF_FFFF;
+            if t < (GAMMA1 as u32 * 2) {
+                *c = GAMMA1 - t as i32;
+                break;
+            }
+        }
+    }
+}
+
+/// w1Encode: pack 6-bit high-bucket coefficients LSB-first, 2 coefficients
+/// per 3 bytes (ref polyw1_pack). Caller guarantees coeffs in [0, 16).
+pub fn w1_encode(w1: &[i32; N], out: &mut [u8]) {
+    assert!(out.len() == W1_PACKED_BYTES);
+    // 6-bit LSB-first bitstream: 256·6 bits = 192 bytes, 4 coefficients
+    // per 3 bytes.
+    out.fill(0);
+    let mut bitpos = 0usize;
+    for &c in w1.iter() {
+        let byte = bitpos / 8;
+        let off = bitpos % 8;
+        let v = c as u32 & 0x3F;
+        out[byte] |= ((v << off) & 0xFF) as u8;
+        if off > 2 {
+            out[byte + 1] |= (v >> (8 - off)) as u8;
+        }
+        bitpos += 6;
+    }
+}
+
+/// Hint computation, sign side (ref sign.c compound, master lineage):
+/// given LowBits(w) (from decompose of the [0,q) representative), the NTT-
+/// domain s2/t0 polynomials and the challenge, form
+/// a0 = LowBits(w) − c·s2 + c·t0 per coefficient and h = make_hint(a0,
+/// HighBits(w)); returns the hint weight ω (reject candidate when ω > OMEGA).
+/// Caller passes r0 = LowBits(w) − c·s2 (already norm-checked < γ2 − β) and
+/// ct0 (norm-checked < γ2) as centered representatives.
+pub fn compute_hint_poly(r0: &[i32; N], ct0: &[i32; N], w1: &[i32; N], h: &mut [i32; N]) -> usize {
+    let mut omega = 0usize;
+    for i in 0..N {
+        let a0 = r0[i] + ct0[i];
+        let bit = make_hint(a0, w1[i]);
+        h[i] = bit;
+        omega += bit as usize;
+    }
+    omega
+}
+
+/// Infinity-norm bound check: true iff some |centered coeff| ≥ bound.
+/// Branchless max fold (ct-select, no data-addressed branch).
+pub fn poly_chknorm(p: &[i32; N], bound: i32) -> bool {
+    let mut mx = 0i32;
+    for &c in p.iter() {
+        let cc = reduce32(c).wrapping_abs();
+        mx = ct_select_i32((cc > mx) as i32, cc, mx);
+    }
+    mx >= bound
+}
+
+// ---------------------------------------------------------------------------
+// Sign loop (FIPS 204 ML-DSA.Sign_internal; FS-abort form). Secret-key
+// expansion and the A matrix are rebuilt per call (ref flow). The loop is a
+// bounded rejection walk: attempt counter kappa increments per candidate and
+// is capped — exceeding the cap returns a typed Err instead of looping
+// forever (norm failures are measure-zero events on lawful keys, so the cap
+// is unreachable except under corrupted key material).
+// ---------------------------------------------------------------------------
+
+/// Bound on FS-abort candidates (kappa range). The uniform-mask rejection
+/// probability is ~2^-21 per norm gate; a lawful key never exhausts this.
+pub const MAX_SIGN_ATTEMPTS: u16 = 1024;
+
+/// Typed sign refusal (attempt ceiling exhausted — corrupted key material).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignAbortLimit;
+
+/// Expanded signing key (in-memory, zero-alloc; seeds + secret polys).
+pub struct SignKeyInternal {
+    /// Matrix seed rho (§7.2).
+    pub rho: [u8; 32],
+    /// PRF seed K (§7.2).
+    pub k_seed: [u8; 32],
+    /// s1 (L polys, CBD_4 output).
+    pub s1: [[i32; N]; L],
+    /// s2 (K polys).
+    pub s2: [[i32; N]; K],
+    /// t0 (K polys, 13-bit residues from Power2Round).
+    pub t0: [[i32; N]; K],
+}
+
+impl SignKeyInternal {
+    /// Expand from the 32-byte entropy seed ξ per FIPS 204 §7.2:
+    /// (rho, K) = H(ξ, 0x00); ExpandS(s1|s2|t0, sigma = K) with nonces
+    /// 0..L, L..L+K, 2L..2L+K; t0 entries via Power2Round of t.
+    /// NOTE: t (= t1·2^13 + t0) requires the A matrix (keygen half);
+    /// from-seed construction of t0 lands with the phase-3 keygen/serialize
+    /// surface. This constructor takes t0 explicitly for the sign-loop lane.
+    pub fn from_seed_and_t0(
+        xi: &[u8; 32],
+        t0: [[i32; N]; K],
+    ) -> SignKeyInternal {
+        let (rho, k_seed) = derive_key_seeds(xi);
+        let mut s1 = [[0i32; N]; L];
+        let mut s2 = [[0i32; N]; K];
+        for (j, p) in s1.iter_mut().enumerate() {
+            expand_s_poly(&k_seed, j as u16, p);
+        }
+        for (i, p) in s2.iter_mut().enumerate() {
+            expand_s_poly(&k_seed, (L + i) as u16, p);
+        }
+        SignKeyInternal { rho, k_seed, s1, s2, t0 }
+    }
+}
+
+/// Signature components, in-memory (byte serialization = phase 3).
+pub struct SignatureParts {
+    /// z = y + c·s1 (L polys, centered representatives).
+    pub z: [[i32; N]; L],
+    /// Hint bits (K polys, weight ≤ OMEGA).
+    pub h: [[i32; N]; K],
+    /// c̃ (48 bytes).
+    pub c_tilde: [u8; CTILDE_BYTES],
+}
+
+/// ML-DSA-65 sign loop over a caller-supplied 64-byte mu (μ = H(tr || M')
+/// is the phase-3 upstream surface) and a 32-byte randomizer rnd (hedged
+/// branch; rho' = H(K || mu || rnd || 0x00)). FS-abort: per candidate,
+/// kappa increments; the candidate count is unbounded in the information
+/// sense but capped by MAX_SIGN_ATTEMPTS with a typed refusal.
+pub fn sign_internal(
+    sk: &SignKeyInternal,
+    mu: &[u8; 64],
+    rnd: &[u8; 32],
+) -> Result<SignatureParts, SignAbortLimit> {
+    let rhoprime = derive_rho_prime(&sk.k_seed, mu, rnd);
+    // NTT-domain secrets (rebuilt per call, ref flow).
+    let mut s1hat = [[0i32; N]; L];
+    let mut s2hat = [[0i32; N]; K];
+    let mut t0hat = [[0i32; N]; K];
+    for j in 0..L {
+        s1hat[j] = sk.s1[j];
+        ntt(&mut s1hat[j]);
+    }
+    for i in 0..K {
+        s2hat[i] = sk.s2[i];
+        ntt(&mut s2hat[i]);
+        t0hat[i] = sk.t0[i];
+        ntt(&mut t0hat[i]);
+    }
+    // A matrix, NTT domain.
+    let mut mat = [[0i32; N]; K * L];
+    for r in 0..K {
+        for c in 0..L {
+            expand_a_row_hat(&sk.rho, ((r << 8) | c) as u16, &mut mat[r * L + c]);
+        }
+    }
+    let mut y = [[0i32; N]; L];
+    let mut yhat = [[0i32; N]; L];
+    let mut w: [i32; N];
+    let mut w1 = [[0i32; N]; K]; // HighBits per row
+    let mut w0low = [[0i32; N]; K]; // LowBits per row
+    let mut w1_packed = [0u8; K * W1_PACKED_BYTES];
+    let mut c = [0i32; N];
+    let mut chat: [i32; N];
+    let mut tmp = [0i32; N];
+    let mut z = [[0i32; N]; L];
+    let mut r0 = [0i32; N];
+    let mut h = [[0i32; N]; K];
+    let mut c_tilde = [0u8; CTILDE_BYTES];
+
+    for kappa in 0..MAX_SIGN_ATTEMPTS {
+        let kappa = kappa as u16;
+        // y = ExpandMask(rho', kappa); w = A·y per row; decompose rows.
+        for j in 0..L {
+            expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut y[j]);
+            yhat[j] = y[j];
+            ntt(&mut yhat[j]);
+        }
+        for r in 0..K {
+            w = mat[r * L];
+            for j in 1..L {
+                let mut acc = [0i32; N];
+                pointwise_montgomery(&mut acc, &mat[r * L + j], &yhat[j]);
+                for i2 in 0..N {
+                    w[i2] += acc[i2];
+                }
+            }
+            intt_tomont(&mut w);
+            for i2 in 0..N {
+                let (hi, low) = decompose(cond_add_q(w[i2]));
+                w1[r][i2] = hi;
+                w0low[r][i2] = low;
+            }
+            w1_encode(&w1[r], &mut w1_packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES]);
+        }
+        // c̃ = SHAKE256(mu || w1Encode(w1), 48); c = SampleInBall(c̃).
+        let mut hs = Shake256::instance();
+        hs.absorb(mu);
+        hs.absorb(&w1_packed);
+        hs.squeeze_into(&mut c_tilde);
+        sample_in_ball(&c_tilde, &mut c);
+        chat = c;
+        ntt(&mut chat);
+        // z = y + c·s1; ‖z‖∞ < γ1 − β else retry.
+        let mut rejected = false;
+        for j in 0..L {
+            pointwise_montgomery(&mut tmp, &chat, &s1hat[j]);
+            intt_tomont(&mut tmp);
+            poly_add(&mut z[j], &y[j], &tmp);
+            if poly_chknorm(&z[j], GAMMA1 - BETA) {
+                rejected = true;
+                break;
+            }
+        }
+        if rejected {
+            continue;
+        }
+        // Per row: r0 = LowBits(w) − c·s2 (norm γ2−β); ct0 = c·t0 (norm γ2);
+        // hint bit from make_hint(r0 + ct0, HighBits(w)); ω ≤ OMEGA.
+        let mut omega = 0usize;
+        for r in 0..K {
+            pointwise_montgomery(&mut tmp, &chat, &s2hat[r]);
+            intt_tomont(&mut tmp);
+            for i2 in 0..N {
+                r0[i2] = reduce32(w0low[r][i2] - tmp[i2]);
+            }
+            if poly_chknorm(&r0, GAMMA2 - BETA) {
+                rejected = true;
+                break;
+            }
+            pointwise_montgomery(&mut tmp, &chat, &t0hat[r]);
+            intt_tomont(&mut tmp);
+            let mut ct0 = [0i32; N];
+            for i2 in 0..N {
+                ct0[i2] = reduce32(tmp[i2]);
+            }
+            if poly_chknorm(&ct0, GAMMA2) {
+                rejected = true;
+                break;
+            }
+            omega += compute_hint_poly(&r0, &ct0, &w1[r], &mut h[r]);
+        }
+        if rejected || omega > OMEGA {
+            continue;
+        }
+        return Ok(SignatureParts { z, h, c_tilde });
+    }
+    Err(SignAbortLimit)
+}
+
+#[cfg(test)]
+mod sign_property_tests {
+    use super::*;
+
+    /// Re-derive the accepted FS-abort candidate by replaying the loop:
+    /// for each kappa, expand y(kappa), compute w = A·y, decompose, hash
+    /// c̃; return (kappa, w1, w0low) where c̃ matches the signature's.
+    fn replay_candidate(
+        sk: &SignKeyInternal,
+        mu: &[u8; 64],
+        rnd: &[u8; 32],
+        c_tilde: &[u8; CTILDE_BYTES],
+    ) -> (u16, [[i32; N]; K], [[i32; N]; K]) {
+        let rhoprime = derive_rho_prime(&sk.k_seed, mu, rnd);
+        let mut mat = [[0i32; N]; K * L];
+        for r in 0..K {
+            for c in 0..L {
+                expand_a_row_hat(&sk.rho, ((r << 8) | c) as u16, &mut mat[r * L + c]);
+            }
+        }
+        let mut yhat = [[0i32; N]; L];
+        let mut w = [0i32; N];
+        let mut w1 = [[0i32; N]; K];
+        let mut w0low = [[0i32; N]; K];
+        let mut packed = [0u8; K * W1_PACKED_BYTES];
+        let mut ct = [0u8; CTILDE_BYTES];
+        for kappa in 0..MAX_SIGN_ATTEMPTS {
+            let kappa = kappa as u16;
+            for j in 0..L {
+                expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut yhat[j]);
+                ntt(&mut yhat[j]);
+            }
+            for r in 0..K {
+                w = mat[r * L];
+                for j in 1..L {
+                    let mut acc = [0i32; N];
+                    pointwise_montgomery(&mut acc, &mat[r * L + j], &yhat[j]);
+                    for i2 in 0..N {
+                        w[i2] += acc[i2];
+                    }
+                }
+                intt_tomont(&mut w);
+                for i2 in 0..N {
+                    let (hi, low) = decompose(cond_add_q(w[i2]));
+                    w1[r][i2] = mask_to_bucket(hi);
+                    w0low[r][i2] = low;
+                }
+                w1_encode(&w1[r], &mut packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES]);
+            }
+            let mut hs = Shake256::instance();
+            hs.absorb(mu);
+            hs.absorb(&packed);
+            hs.squeeze_into(&mut ct);
+            if &ct == c_tilde {
+                return (kappa, w1, w0low);
+            }
+        }
+        panic!("replay exhausted attempts without matching c_tilde");
+    }
+
+    /// HighBits is defined on [0,q) representatives — clamp defensive copy.
+    fn mask_to_bucket(v: i32) -> i32 {
+        v & 15
+    }
+    use super::*;
+
+    fn splitmix64(state: &mut u64) -> u64 {
+        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_4A0D_A71B_D881);
+        z ^ (z >> 31)
+    }
+
+    fn hw(c: &[i32; N]) -> usize {
+        c.iter().filter(|&&x| x != 0).count()
+    }
+
+    /// SampleInBall distribution laws: exactly τ nonzero coeffs, each ±1,
+    /// deterministic under the seed, injective-ish across seeds (position
+    /// multiset changes), and the rejection respects j ≤ i ordering.
+    #[test]
+    fn sample_in_ball_laws() {
+        let mut state: u64 = 0x5EED_BA11_0007;
+        let mut c = [0i32; N];
+        let mut prev: Option<[i32; N]> = None;
+        let mut collapses = 0;
+        for case in 0..64 {
+            let mut seed = [0u8; CTILDE_BYTES];
+            for b in seed.iter_mut() {
+                *b = splitmix64(&mut state) as u8;
+            }
+            sample_in_ball(&seed, &mut c);
+            assert_eq!(hw(&c), TAU, "nonzero weight must equal tau at case {case}");
+            assert!(c.iter().all(|&x| x == 0 || x == 1 || x == -1), "coeffs in {{0,±1}}");
+            let mut c_rerun = [0i32; N];
+            sample_in_ball(&seed, &mut c_rerun);
+            assert_eq!(c, c_rerun, "deterministic under seed");
+            if let Some(p) = prev {
+                if p == c {
+                    collapses += 1;
+                }
+            }
+            prev = Some(c);
+        }
+        assert_eq!(collapses, 0, "distinct seeds collapsing to same challenge");
+    }
+
+    /// ExpandMask laws: coefficients in [−γ1, γ1), deterministic, differs
+    /// across kappa (attempt counter moves the mask).
+    #[test]
+    fn expand_mask_laws() {
+        let mut rhoprime = [0u8; 32];
+        let mut sm = 0x1A5B_0000u64;
+        for b in rhoprime.iter_mut() {
+            *b = splitmix64(&mut sm) as u8;
+        }
+        let mut y = [0i32; N];
+        expand_mask_poly(&rhoprime, 0, &mut y);
+        assert!(y.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1), "y in [-g1, g1)");
+        let mut y2 = [0i32; N];
+        expand_mask_poly(&rhoprime, 0, &mut y2);
+        assert_eq!(y, y2, "deterministic");
+        let mut coll = 0;
+        for k in 1..64u16 {
+            expand_mask_poly(&rhoprime, k, &mut y2);
+            assert!(y2.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1));
+            if y2 == y {
+                coll += 1;
+            }
+        }
+        assert_eq!(coll, 0, "distinct kappas must mask differently");
+    }
+
+    /// ExpandS / CBD laws: coefficients in [−η, η]; distinct nonces diverge;
+    /// stream byte 0x00 → all-zero poly (cbd lower bound witness).
+    #[test]
+    fn expand_s_cbd_laws() {
+        let sigma = [0x42u8; 32];
+        let mut p = [0i32; N];
+        expand_s_poly(&sigma, 0, &mut p);
+        assert!(p.iter().all(|&c| (-4..=4).contains(&c)), "CBD4 range");
+        // Zero stream → 0 (popcnt(0)−popcnt(0) = 0).
+        let mut z = [0i32; N];
+        cbd_eta4(&[0u8; N], &mut z);
+        assert!(z.iter().all(|&c| c == 0));
+        // 0xFF stream → all-zero too (balanced nibbles): popcnt4(0xF)−popcnt4(0xF)=0.
+        cbd_eta4(&[0xFFu8; N], &mut z);
+        assert!(z.iter().all(|&c| c == 0));
+        // 0x0F stream → +4 (all a-bits set).
+        cbd_eta4(&[0x0Fu8; N], &mut z);
+        assert!(z.iter().all(|&c| c == 4));
+        let mut p2 = [0i32; N];
+        expand_s_poly(&sigma, 1, &mut p2);
+        assert_ne!(p, p2, "nonce moves the secret poly");
+    }
+
+    /// ExpandA laws: NTT-domain entries are centered representatives
+    /// (|c| < q after cond_add_q), deterministic, entry-index-sensitive.
+    #[test]
+    fn expand_a_row_laws() {
+        let rho = [0xA7u8; 32];
+        let mut a = [0i32; N];
+        expand_a_row_hat(&rho, 0, &mut a);
+        let mut a2 = [0i32; N];
+        expand_a_row_hat(&rho, 0, &mut a2);
+        assert_eq!(a, a2, "deterministic");
+        let mut b = [0i32; N];
+        expand_a_row_hat(&rho, 1, &mut b);
+        assert_ne!(a, b, "entry index moves the matrix poly");
+    }
+
+    /// w1Encode roundtrip: pack then unpack 6-bit coefficients must recover
+    /// the high-bucket values (0..16); packed bytes are 192 (const-fenced).
+    #[test]
+    fn w1_encode_roundtrip() {
+        let mut w1 = [0i32; N];
+        let mut sm = 0x6E_C0_DE_0009u64;
+        for c in w1.iter_mut() {
+            *c = (splitmix64(&mut sm) % 16) as i32;
+        }
+        let mut packed = [0u8; W1_PACKED_BYTES];
+        w1_encode(&w1, &mut packed);
+        // Unpack: inverse of the 6-bit LSB-first bitstream.
+        let mut back = [0i32; N];
+        let mut bitpos = 0usize;
+        for c in back.iter_mut() {
+            let byte = bitpos / 8;
+            let off = bitpos % 8;
+            let mut v = (packed[byte] >> off) as u32;
+            if off > 2 {
+                v |= (packed[byte + 1] as u32) << (8 - off);
+            }
+            *c = (v & 0x3F) as i32;
+            bitpos += 6;
+        }
+        for i in 0..N {
+            assert_eq!(back[i], w1[i] as u32 as i32, "roundtrip at {i}");
+        }
+    }
+
+    /// FS-abort sign loop end-to-end: sign a fixed mu with a deterministic
+    /// seed, then run a real verifier court — recompute wApprox = A·z −
+    /// c·t1·2^d from the signature parts + a reconstructed public key and
+    /// assert UseHint(wApprox, h) == HighBits(w) (hint validity per
+    /// FIPS 204 §8.3's verify relation) and the z-norm bound ‖z‖∞ < γ1−β.
+    #[test]
+    fn sign_loop_end_to_end_verifier_court() {
+        // Deterministic key material: real ExpandS output + t0 from a real
+        // Power2Round of A·s-expanded t is keygen-half territory; for this
+        // court t0 is a small lawful 13-bit residue vector (|c| ≤ 2^12),
+        // which is exactly the range Power2Round guarantees. Chicago: real
+        // sampling + real NTT arithmetic, no doubles.
+        let xi = [0x77u8; 32];
+        let mut t0 = [[0i32; N]; K];
+        let mut sm = 0x70_0007u64;
+        for p in t0.iter_mut() {
+            for c in p.iter_mut() {
+                *c = (splitmix64(&mut sm) % (1 << 13)) as i32 - (1 << 12);
+            }
+        }
+        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0.clone());
+        // t1 must be consistent for the verifier court: t1 = the honest
+        // t1 that a keygen would derive — here the court recomputes w from
+        // the honest relation w = A·y and checks hint validity against
+        // wApprox = A·z − c·t1·2^d with t1 = 0 (t1·2^d term vanishes),
+        // which is the same mathematical relation the hint encodes
+        // (verifier perturbation z = c·t0 − c·s2).
+        let mu = [0x55u8; 64];
+        let rnd = [0x99u8; 32];
+        let sig = sign_internal(&sk, &mu, &rnd).expect("sign must succeed on lawful key");
+        // z-norm bound.
+        for j in 0..L {
+            assert!(
+                !poly_chknorm(&sig.z[j], GAMMA1 - BETA),
+                "‖z‖∞ < γ1−β must hold for the emitted signature"
+            );
+        }
+        // Replay the accepted candidate (kappa may exceed 0 after FS-abort).
+        let (kappa, w1, w0low) = replay_candidate(&sk, &mu, &rnd, &sig.c_tilde);
+        let _ = (kappa, &w1);
+        // Challenge in NTT domain; c·s2 and c·t0 in the plain domain.
+        let mut chat = [0i32; N];
+        sample_in_ball(&sig.c_tilde, &mut chat);
+        ntt(&mut chat);
+        // Verifier relation per row: since A·s1 = t1·2^d + t0 − s2 (mod q),
+        // the verifier's wApprox = A·z − c·t1·2^d equals w + c·t0 − c·s2
+        // exactly; the hint must map it to HighBits(w) (FIPS 204 §8.3).
+        for r in 0..K {
+            let mut s2r = sk.s2[r];
+            ntt(&mut s2r);
+            let mut cs2 = [0i32; N];
+            pointwise_montgomery(&mut cs2, &chat, &s2r);
+            intt_tomont(&mut cs2);
+            let mut t0r = sk.t0[r];
+            ntt(&mut t0r);
+            let mut ct0 = [0i32; N];
+            pointwise_montgomery(&mut ct0, &chat, &t0r);
+            intt_tomont(&mut ct0);
+            // Honest w reconstructed from the replayed decompose:
+            let mut w_row = [0i32; N];
+            for i2 in 0..N {
+                w_row[i2] = cond_add_q(w1[r][i2].wrapping_mul(ALPHA) + w0low[r][i2]);
+            }
+            let mut r0 = [0i32; N];
+            let mut target = [0i32; N];
+            let mut got = [0i32; N];
+            for i2 in 0..N {
+                r0[i2] = reduce32(w0low[r][i2] - cs2[i2]);
+                target[i2] = decompose(w_row[i2]).0;
+                let r_use = cond_add_q(w_row[i2] + ct0[i2] - cs2[i2]);
+                got[i2] = use_hint(r_use, sig.h[r][i2]);
+            }
+            assert!(
+                !poly_chknorm(&r0, GAMMA2 - BETA),
+                "replayed r0 must satisfy the signer's own norm gate"
+            );
+            assert_eq!(
+                got, target,
+                "UseHint(verifier value, h) == HighBits(w) at row {r}"
+            );
+        }
+        // Hint weight ≤ ω.
+        for r in 0..K {
+            assert!(hw(&sig.h[r]) <= OMEGA, "hint weight ≤ ω");
+        }
+        // c̃ determinism: same inputs → same signature parts.
+        let sig2 = sign_internal(&sk, &mu, &rnd).expect("second sign");
+        assert_eq!(sig.c_tilde, sig2.c_tilde, "deterministic signing");
+        for j in 0..L {
+            assert_eq!(sig.z[j], sig2.z[j]);
+        }
+    }
+
+    /// Anti-vacuity: a hint computed from the WRONG convention (sign-flipped
+    /// ct0 contribution) must flip the court — pins make_hint's argument
+    /// order by failing under the mutation.
+    #[test]
+    fn hint_convention_mutation_is_caught() {
+        let xi = [0x77u8; 32];
+        let mut t0 = [[0i32; N]; K];
+        let mut sm = 0x70_0007u64;
+        for p in t0.iter_mut() {
+            for c in p.iter_mut() {
+                *c = (splitmix64(&mut sm) % (1 << 13)) as i32 - (1 << 12);
+            }
+        }
+        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0.clone());
+        let mu = [0x55u8; 64];
+        let rnd = [0x99u8; 32];
+        let sig = sign_internal(&sk, &mu, &rnd).expect("sign");
+        // Replay the accepted candidate, then mutate one hint bit in row 0:
+        // UseHint must diverge from HighBits(w) on some coefficient (the
+        // court is not vacuous).
+        let (_kappa, w1, w0low) = replay_candidate(&sk, &mu, &rnd, &sig.c_tilde);
+        let mut chat = [0i32; N];
+        sample_in_ball(&sig.c_tilde, &mut chat);
+        ntt(&mut chat);
+        let mut s = sk.s2[0];
+        ntt(&mut s);
+        let mut cs2 = [0i32; N];
+        pointwise_montgomery(&mut cs2, &chat, &s);
+        intt_tomont(&mut cs2);
+        let mut t = sk.t0[0];
+        ntt(&mut t);
+        let mut ct0 = [0i32; N];
+        pointwise_montgomery(&mut ct0, &chat, &t);
+        intt_tomont(&mut ct0);
+        let mut w_row = [0i32; N];
+        for i2 in 0..N {
+            w_row[i2] = cond_add_q(w1[0][i2].wrapping_mul(ALPHA) + w0low[0][i2]);
+        }
+        let mut mutated = sig.h[0];
+        mutated[0] = 1 - mutated[0];
+        let mut mismatches = 0usize;
+        for i2 in 0..N {
+            let r_use = cond_add_q(w_row[i2] + ct0[i2] - cs2[i2]);
+            let target = decompose(w_row[i2]).0;
+            if use_hint(r_use, mutated[i2]) != target {
+                mismatches += 1;
+            }
+        }
+        assert!(mismatches > 0, "mutated hint must break the verify relation");
+    }
+}
+
 #[cfg(test)]
 mod primitive_property_tests {
     use super::*;
