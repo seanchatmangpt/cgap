@@ -15,6 +15,7 @@ use crate::header::{AoqHeader, Epoch, UnknownEpoch, MAGIC, SIZE_BYTES, VERSION};
 /// (`aoq:hf-header-digest`, WireKind::Fnv1a32); cryptographic digest
 /// bodies remain cgap-crypto/cgap-blake3 territory (R-K1).
 #[must_use]
+#[inline]
 pub const fn fnv1a32(data: &[u8]) -> u32 {
     let mut hash: u32 = 0x811C_9DC5;
     let mut i = 0;
@@ -33,6 +34,7 @@ pub const fn fnv1a32(data: &[u8]) -> u32 {
 ///
 /// # Errors
 /// [`AoqError::BufferTooShort`] when `out` is shorter than the envelope.
+#[inline]
 pub fn encode(header: &AoqHeader, out: &mut [u8]) -> Result<(), AoqError> {
     if out.len() < SIZE_BYTES {
         return Err(AoqError::BufferTooShort {
@@ -58,6 +60,7 @@ pub fn encode(header: &AoqHeader, out: &mut [u8]) -> Result<(), AoqError> {
 ///
 /// # Errors
 /// Typed [`AoqError`] refusals, integer fields only.
+#[inline]
 pub fn decode(buf: &[u8]) -> Result<AoqHeader, AoqError> {
     if buf.len() < SIZE_BYTES {
         return Err(AoqError::HeaderTooShort {

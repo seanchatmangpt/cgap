@@ -151,6 +151,7 @@ pub fn verify_records<H: ChainDigest>(h: &H, records: &[AoqChainRecord]) -> Resu
     Ok(())
 }
 
+#[inline]
 fn four(bytes: &[u8; 32]) -> [u8; 4] {
     [bytes[0], bytes[1], bytes[2], bytes[3]]
 }
@@ -192,7 +193,8 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
 
     /// Current head digest (GENESIS when empty).
     #[must_use]
-    pub fn checkpoint(&self) -> [u8; 32] {
+    #[inline]
+pub fn checkpoint(&self) -> [u8; 32] {
         if self.len == 0 {
             GENESIS
         } else {
