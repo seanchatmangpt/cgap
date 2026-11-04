@@ -59,26 +59,49 @@ const MAX_WINDOW_BYTES: usize = 12 + WINDOW * 34 + 20; // 46,442 < 64 KiB
 // ---------------------------------------------------------------------------
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AOrd};
+use std::cell::Cell;
 
-static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-static WINDOW_OPEN: AtomicBool = AtomicBool::new(false);
+// The window is PER-THREAD (const-init TLS Cell, the same pattern as
+// crates/audit/src/alloc_counter.rs): a process-wide AtomicBool window
+// counted allocations from other concurrently-running test threads that
+// happened to overlap the window (intermittent, load-dependent — the
+// ZB-4 ~50% flake). Per-thread scoping means only allocations made on
+// the thread that opened the window are counted.
+#[derive(Clone, Copy)]
+struct WindowState {
+    open: bool,
+    count: usize,
+}
+
+thread_local! {
+    static ALLOC_WINDOW: Cell<WindowState> = const {
+        Cell::new(WindowState { open: false, count: 0 })
+    };
+}
 
 struct CountingAlloc;
 unsafe impl GlobalAlloc for CountingAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if WINDOW_OPEN.load(AOrd::Relaxed) {
-            ALLOC_COUNT.fetch_add(1, AOrd::Relaxed);
-        }
+        ALLOC_WINDOW.with(|w| {
+            let mut s = w.get();
+            if s.open {
+                s.count += 1;
+                w.set(s);
+            }
+        });
         unsafe { System.alloc(layout) }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         unsafe { System.dealloc(ptr, layout) }
     }
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new: usize) -> *mut u8 {
-        if WINDOW_OPEN.load(AOrd::Relaxed) {
-            ALLOC_COUNT.fetch_add(1, AOrd::Relaxed);
-        }
+        ALLOC_WINDOW.with(|w| {
+            let mut s = w.get();
+            if s.open {
+                s.count += 1;
+                w.set(s);
+            }
+        });
         unsafe { System.realloc(ptr, layout, new) }
     }
 }
@@ -87,12 +110,14 @@ unsafe impl GlobalAlloc for CountingAlloc {
 static GLOBAL: CountingAlloc = CountingAlloc;
 
 fn open_window() {
-    ALLOC_COUNT.store(0, AOrd::Relaxed);
-    WINDOW_OPEN.store(true, AOrd::Relaxed);
+    ALLOC_WINDOW.with(|w| w.set(WindowState { open: true, count: 0 }));
 }
 fn close_window() -> usize {
-    WINDOW_OPEN.store(false, AOrd::Relaxed);
-    ALLOC_COUNT.load(AOrd::Relaxed)
+    ALLOC_WINDOW.with(|w| {
+        let s = w.get();
+        w.set(WindowState { open: false, count: s.count });
+        s.count
+    })
 }
 fn positive_control() -> usize {
     open_window();

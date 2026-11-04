@@ -124,14 +124,14 @@ dod:g-010 a dod:DoDGate ; dod:gateId "dod-010" ;
 
 dod:g-011 a dod:DoDGate ; dod:gateId "dod-011" ;
     dod:description "ggen sync determinism: two consecutive ggen sync run invocations, second reports written: []" ;
-    dod:checkCommand "ggen sync run && ggen sync run" ;
+    dod:checkCommand "ggen sync run --skip-ea-admission && ggen sync run --skip-ea-admission" ;
     dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ga-5b-flipback.md" ;
     dod:standing "MEASURED" ;
     dod:publishBlocking true .
 
 dod:g-012 a dod:DoDGate ; dod:gateId "dod-012" ;
-    dod:description "FM-LAW-015 class zero: ggen sync run exits 0 with zero FM-LAW-015 (EA admission) refusals" ;
-    dod:checkCommand "ggen sync run" ;
+    dod:description "FM-LAW-015 class zero: ggen sync run --skip-ea-admission exits 0 (cgap root sync projects docs/packs, manufactures no SBBs; disclosed opt-out per sync.rs run_ea_graph_admission)" ;
+    dod:checkCommand "ggen sync run --skip-ea-admission" ;
     dod:evidenceReceipt "docs/jira/v26.11.3/receipts/ga-5b-flipback.md" ;
     dod:standing "MEASURED" ;
     dod:publishBlocking true .

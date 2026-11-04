@@ -12,13 +12,16 @@ reconstruction against the in-session report.
 
 ## Assets (5)
 
-| # | Asset | Grounding |
-|---|---|---|
-| A1 | Frame confidentiality: AEAD-protected payload under a per-epoch key | ab-4-aead, ab-3-chacha |
-| A2 | Frame authenticity/integrity: Poly1305 tag + AoqChain digest chain | ab-3, ab-7-chain-session |
-| A3 | Epoch key material: ML-KEM-768 capsules and epoch keys; decaps infallible-by-type | ab-5-mlkem |
-| A4 | Sequence/order state: wrap-safe successor law, SeqGap typed refusal | cg-1, ab-6-header |
-| A5 | Refusal fidelity: typed refusal classes downstream policy reads; forgery would misroute lawful traffic | ab-6-header, af-10 |
+- **A1** — Frame confidentiality: AEAD-protected payload under a per-epoch
+  key (ab-4-aead, ab-3-chacha).
+- **A2** — Frame authenticity/integrity: Poly1305 tag + AoqChain digest
+  chain (ab-3, ab-7-chain-session).
+- **A3** — Epoch key material: ML-KEM-768 capsules and epoch keys; decaps
+  infallible-by-type (ab-5-mlkem).
+- **A4** — Sequence/order state: wrap-safe successor law, SeqGap typed
+  refusal (cg-1, ab-6-header).
+- **A5** — Refusal fidelity: typed refusal classes downstream policy
+  reads; forgery would misroute lawful traffic (ab-6-header, af-10).
 
 ## Blind-routing premise
 
@@ -33,12 +36,17 @@ depend on the AEAD tag and the digest chain, which the header cannot forge.
 
 ## Adversaries (4)
 
-| # | Adversary | Capability | Held by design |
-|---|---|---|---|
-| W1 | Passive eavesdropper | Reads all wire bytes | A1 holds; header is plaintext BY DESIGN (see premise) |
-| W2 | Active tamperer (Dolev-Yao on the wire) | Reads, drops, reorders, mutates in flight | A2/A4 hold; tamper lands in typed refusals (aoq1_stress_court full mutation coverage) |
-| W3 | Frame-injection adversary | Crafts frames from the public header law | Holds only if it forges the AEAD tag or chain digest; I4 census: 12,000 tampered frames, per-class census exact |
-| W4 | Harvest-now-decrypt-later | Records today, decrypts after a quantum break of classical transport keys | ML-KEM-768 epoch capsules (A3) close the HNDL channel for payloads; Gap-1 qualifies this |
+- **W1 passive eavesdropper** — reads all wire bytes. A1 holds; the
+  header is plaintext BY DESIGN (see premise).
+- **W2 active tamperer** (Dolev-Yao on the wire) — reads, drops,
+  reorders, mutates in flight. A2/A4 hold; tamper lands in typed
+  refusals (aoq1_stress_court full mutation coverage).
+- **W3 frame-injection adversary** — crafts frames from the public
+  header law. Holds only if it forges the AEAD tag or chain digest;
+  I4 census: 12,000 tampered frames, per-class census exact.
+- **W4 harvest-now-decrypt-later** — records today, decrypts after a
+  quantum break of classical transport keys. ML-KEM-768 epoch capsules
+  (A3) close the HNDL channel for payloads; Gap-1 qualifies this.
 
 ## Gap-1: KEM identity binding
 

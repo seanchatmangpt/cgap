@@ -3347,7 +3347,7 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
         std::fs::write(
             dir.join("Cargo.toml"),
             format!(
-                "[package]\nname = \"cgap-ffi\"\nversion = \"26.10.29\"\nedition = \"2021\"\npublish = false\n\n\
+                "[package]\nname = \"cgap-ffi\"\nversion = \"26.10.29\"\nedition = \"2021\"\npublish = false\nautobins = false\n\n\
                  [lib]\ncrate-type = [\"staticlib\", \"rlib\"]\n\n\
                  [[bin]]\nname = \"a19xip_elf\"\npath = \"src/main.rs\"\n\n\
                  [dependencies]\ncgap-arrow = {{ path = \"{}\" }}\n\n\

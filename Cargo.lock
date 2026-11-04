@@ -195,11 +195,13 @@ dependencies = [
 name = "cgap-ffi"
 version = "26.11.3"
 dependencies = [
+ "cgap-aoq",
  "cgap-arrow 26.11.3",
  "cgap-audit",
  "cgap-blake3 26.11.3",
  "cgap-bn3",
  "cgap-core",
+ "cgap-crypto",
  "cgap-gate",
  "cgap-p28",
  "cgap-parquet 26.11.3",

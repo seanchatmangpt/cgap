@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn nested_inner_scope_excludes_outer_allocations() {
         let ((_v, inner), outer) = with_alloc_tracking(|| {
-            let _pad = vec![0u8; 4096];
+            let _pad = std::hint::black_box(vec![0u8; 4096]);
             with_alloc_tracking(|| vec![1u8; 8])
         });
         assert_eq!(_v.len(), 8);

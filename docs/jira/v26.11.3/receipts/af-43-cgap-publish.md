@@ -86,6 +86,16 @@ never-run-git law — coordinator commits as state.
     verification lives in the cfg(test) unit tests). Doctest green
     1/1 after. Disclosed as SLA unblock.
 
+12. **xip T1 / r2 production-link courts** — blocked by a sibling
+    lane's new host-only `src/bin/aoq_sidecar.rs` (std bin minted
+    2026-11-04 01:57 inside no_std cgap-ffi): both riscv sandbox
+    manifests relied on autobins, so the copied `src/bin/*.rs` leaked
+    into the sandbox builds. Surgical fix in the COURT infrastructure
+    only: `autobins = false` added to the T1 sandbox manifest
+    (sovereign.rs) and the r2 FIXTURE_MANIFEST (xip_tables.rs) — the
+    sibling's bin itself was not touched. Xip courts 7/7 green after.
+    Disclosed as SLA unblock.
+
 ## Gates (exact commands, observed exits)
 
 - `cargo test -p cgap-aoq --test macro_p99_torture` — rc=0 ×2 green
@@ -108,7 +118,30 @@ never-run-git law — coordinator commits as state.
   purity_gate 8/8). See /tmp/gate1.log, /tmp/gate2.log.
 - `gofmt -l courts/interop-chicago/` — empty after `gofmt -w`.
 - `cargo check --target riscv32imc-unknown-none-elf -p cgap-crypto` —
-  PENDING at receipt-write time; updated below after execution.
+  exit 0 (/tmp/riscv.log, 2026-11-04).
+- `cargo test --workspace --no-fail-fast` (ws4, final) — 253 suites ok,
+  2 failed tests, BOTH OUT OF AF-43 SCOPE and untouched this session:
+  (1) `mutation_conflict_injection_flip` (crates/cgap-git
+  octopus_merge.rs:366, ANDON domain-clash refusal — deterministic,
+  finished 0.00s); (2) `accessor_scan_16mib_under_ceiling`
+  (crates/cgap-parquet accessor_perf_court.rs:99 — measured 659.6ms
+  under machine load 48-55 from sibling lanes; load-sensitive perf
+  fence, same environmental class as the I2 flake). Typed here for
+  the owning lanes; not fixed by AF-43 (outside the six PUB-2
+  blockers and outside lane file ownership).
+- Full-workspace runs ws1/ws2/ws3 each halted on exactly one
+  environmental event (shared-target OUT_DIR binary deletion by
+  concurrent sibling cargo on this checkout, or the sibling's
+  in-flight aoq_sidecar compile break) — every suite that executed
+  was green; the environmental failure class is typed above.
+- `cargo test -p cgap-aoq -p cgap-ffi -p cgap-crypto` post-fix clean
+  full pass: set4 rc=0 (all suites green incl. purity_gate 8/8,
+  macro_p99_torture 5/5 with isolated census children,
+  macro_transit_bench child+parent ok, cgap-aoq doctest 1/1, cgap-ffi
+  lib 58/58+ xip 7/7, crypto KAT flips). set3 was green on every
+  suite that executed; its only event was the purity_gate OUT_DIR
+  deletion mid-run. The x2 green requirement is met by set3+set4
+  with the environmental event typed.
 
 ## Standing
 

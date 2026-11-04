@@ -27,6 +27,18 @@ cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
 # rv32imc staticlib size court and the rv32imc check gate are unaffected.
 [target.'cfg(not(target_os = "none"))'.dependencies]
 cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
+# W2-A (docs/jira/v26.11.3/receipts/zd-6-w2a-session-ffi.md) — DISCLOSED NEW
+# EDGE (manifest is coordinator-owned, disclosed here + in the lane receipt
+# per the A19 cgap-p28 precedent): the host-only session C-ABI surface
+# (src/aoq_session.rs) wraps cgap-aoq's Session state machine and maps its
+# typed refusals onto the frozen status band. HOST-SURFACE ONLY: the
+# `target_os = "none"` XIP build keeps the pre-existing dep set (no
+# allocator in the staticlib).
+cgap-aoq = { path = "../cgap-aoq", version = "26.11.3" }
+# W2-A host KemSeam: the real ML-KEM-768 adapter (AB-5, vendored from the
+# corridor join court's test-local MlkemKem) over cgap-crypto kem/fips202.
+# Host-gated for the same XIP allocator-free law.
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
 # GAP-1 (2026-11-01) — DISCLOSED UNAVOIDABLE CROSS-TOUCH (lane lease was
 # src/sovereign.rs + include/cgap.h; manifest is coordinator-owned, disclosed
 # here and in the lane receipt per the Wave-F2 cgap-p28 precedent above):

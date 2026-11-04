@@ -354,7 +354,9 @@ fn mutation_conflict_injection_flip() {
         std::process::exit(0);
     }
     let me = std::env::current_exe().unwrap();
-    let st = std::process::Command::new(me)
+    // Child stdout/stderr are captured (piped), never inherited: the
+    // child's FAILED summary must not leak into the shared harness stdout.
+    let out = std::process::Command::new(me)
         .args([
             "--exact",
             "mutation_conflict_injection_flip",
@@ -362,12 +364,21 @@ fn mutation_conflict_injection_flip() {
             "1",
         ])
         .env("GIT12_ANDON_CHILD", "1")
-        .status()
+        .output()
         .expect("re-exec self");
     assert_eq!(
-        st.code(),
+        out.status.code(),
         Some(101),
-        "Andon refusal exits 101-class, got {st:?}"
+        "Andon refusal exits 101-class, got {:?}",
+        out.status
+    );
+    // Andon semantics witness: the child must name the refusal class
+    // (libtest captures the panic text into its stdout).
+    let captured = String::from_utf8_lossy(&out.stdout).to_string()
+        + &String::from_utf8_lossy(&out.stderr);
+    assert!(
+        captured.contains("ANDON-REFUSAL"),
+        "child must have taken the Andon refusal path, captured: {captured}"
     );
 }
 

@@ -1,12 +1,99 @@
 # AoQ Wave-2 Membrane Plan (Ruling R-C1)
 
-**Status**: PLAN (UNVERIFIED — nothing on this page has run yet)
+**Status**: LANDED (lanes W2-A..W2-E) with rung states — see "Wave-2
+landing state" below. Rungs 1-5 witnessed ×2; rung 0 corridor leg
+witnessed this session, `cargo test -p cgap-crypto` leg standing from
+AB-5; rung 6 arcus side witnessed, cgap side not cited; rungs 7-8
+unwitnessed (rung 8 partial: law ladder + refusal chain per zd-42;
+full handshake echo per zd-56 — receipt ABSENT on disk, not landed).
 **Ruling**: R-C1 — membranes deferred from Wave 1; unblocked by (a) kernel
 landing, (b) AF-1 corridor join court green, with AF1-KD-1 (real
 ML-KEM-768 round-trip) closed — the precondition this plan assumes and
 whose re-verification is Gate 0 below.
 **Invariants**: cgap kernel stays zero-external-dep / `no_std`; arcus
 stays Go stdlib-only, zero cgo.
+
+## Wave-2 landing state (2026-11-04 closeout, zd-63)
+
+Per-lane standing, re-read from each receipt at closeout time:
+
+| Lane | Receipt | Standing |
+|---|---|---|
+| W2-A | cgap `receipts/zd-6-w2a-session-ffi.md` | ALIVE |
+| W2-B | arcus `receipts/zd-29-w2b-twin.md` | ALIVE |
+| W2-C | cgap `receipts/zd-13-w2c-sidecar.md` | ALIVE |
+| W2-D | arcus `receipts/zd-42-w2d-admission.md` | ALIVE |
+| W2-E | rode with lanes (courts landed per-lane: `aoq_session_ffi_court.rs`, `aoq_sidecar_court.rs`, `aoq_ipc_test.go`, `aoq_boundary_test.go`, `admit_test.go`) | courts green per lane receipts |
+| ZD-56 E2E | receipt ABSENT on disk (grep both receipt dirs → no match; disclosed absent by the zd-57 index pass) | NOT LANDED |
+
+Verification-ladder witness state (plan §4 rungs 0-8; standing words
+re-read from receipts, never rounded up):
+
+- **Rung 0** — PARTIAL. `cargo test -p cgap-aoq --test
+  corridor_join_court`: 3 passed / 0 failed, exit 0 this session
+  (zd-13 ladder). `cargo test -p cgap-crypto`: NOT re-run by any Wave-2
+  receipt; AF1-KD-1 standing rests on AB-5 (ALIVE, earlier pass) —
+  uncited this session, so not re-claimed here.
+- **Rung 1** — WITNESSED ×2. `cargo test -p cgap-ffi` exit 0: 14
+  suites, lib 60/60 (58 pre-existing + 2 new in-module), session court
+  6/6 (zd-6 rows 1-2 pre-sidecar; rows 3-4 post-W2-C ×2; zd-13 full
+  suite exit 0).
+- **Rung 2** — WITNESSED ×2. `cargo test -p cgap-ffi --test
+  aoq_sidecar_court`: 3 passed / 0 failed twice (zd-13), J1/J2/J3
+  (J2/J3 are the anti-vacuity mutation courts).
+- **Rung 3** — WITNESSED. corridor_join_court 3 passed / 0 failed,
+  exit 0 (zd-13, unregressed with the bin target landed).
+- **Rung 4** — WITNESSED. `go test ./...` arcus exit 0, drift courts
+  included (zd-29, first run green); re-run `-count=1` ×2 exit 0 with
+  `admit_test.go` (zd-42; flight package 24 PASS / 0 FAIL ×2).
+- **Rung 5** — WITNESSED. `go build ./...` + `go vet ./...` exit 0;
+  `go list -deps ./... | grep -c runtime/cgo` = 0 (zd-29) — zero-cgo
+  invariant holds.
+- **Rung 6** — PARTIAL. Arcus side witnessed: `ggen sync run` ×2 final
+  → `written: []`, twin offsets byte-match `include/cgap_aoq.h` at
+  test time (zd-29 drift court). Cgap-side sync determinism (`written:
+  []` ×2) not cited by any Wave-2 receipt.
+- **Rung 7** — UNWITNESSED. `make gate0` byte-stable replay not run by
+  any Wave-2 receipt.
+- **Rung 8** — PARTIAL (rung-8 evidence exactly as disclosed). Law
+  ladder + refusal chain against the REAL sidecar binary witnessed by
+  zd-42 courts 6/7: valid real blake3 tag → EPOCH_MISMATCH (tag gate
+  passed, state law fired deeper); flipped byte + stale tag →
+  DIGEST_MISMATCH at the tag gate; full admission chain vs real binary
+  → typed in-band EPOCH_MISMATCH 0x4347A006. Happy-path echo over real
+  UDS witnessed against an in-process peer speaking the sidecar wire
+  law with the real tag gate (zd-42 court 5: decrypted == pre-seal
+  bytes) — NOT against the real binary, because the ML-KEM-768
+  handshake is out of Go-stdlib reach (zd-42 disclosure 3). The full
+  real-binary decrypted==pre-seal handshake echo is ZD-56's leg;
+  its receipt is ABSENT on disk → rung 8 NOT fully witnessed.
+
+Falsifier sweep (plan §3; spot-checked 3, none fired unaddressed):
+
+- **W2-A** (fingerprint change on refusal / stale-handle success /
+  panic across `extern "C"`): addressed by zd-6 courts 2, 3, 4, 5 —
+  court 2 flips a ct-echo byte → DIGEST_MISMATCH with byte-identical
+  fingerprint; court 3 asserts fingerprint identity after every refused
+  step with an accepted-step-moves-fingerprint anti-vacuity leg; court
+  4 refuses stale/never-existed/double-free handles identically
+  (KEY_UNKNOWN, monotone ids); court 5 hostile inputs never panic.
+  Also: the W2-B drift-court falsifier (Go twin offset ≠ cgap_aoq.h
+  define) is addressed by zd-29's TestAoqHeaderDriftCourt parsing the
+  header at test time.
+- **W2-C** (tag disagreement → refuse never echo; zero-byte accept →
+  refuse): addressed by zd-13 J2 (stale-tag window → DIGEST_MISMATCH,
+  no echo, EOF on next read; fresh sidecar accepts the intact window —
+  the gate is the difference) and J3 (true zero-byte close → clean
+  exit 0; short prefix+EOF → typed INCOMPLETE_FRAME, never accepted).
+- **W2-D** (feed admitted with op absent from flightOpTable; Go
+  re-implementing admit): addressed by zd-42 court 4
+  (TestAdmitUnknownOpTypedRefusal — typed *FlightRefusal, never
+  nil,nil) and the admit chain delegating Seal/Unseal to RequireBoundary
+  (no re-implementation; `flight_boundary.go:9` law holds).
+- Whole-plan falsifiers: cgo import — none (`grep -c runtime/cgo` = 0,
+  zd-29); external dep added to cgap-aoq/cgap-arrow — none disclosed
+  by zd-6/zd-13 (zd-6 ran `cargo check -p cgap-aoq` exit 0; sidecar is
+  path-dep only).
 
 ## 0. Seam reconciliation (the load-bearing design decision)
 
@@ -23,14 +110,20 @@ zero-cgo consumer) but the existing transport already resolves it:
   (`internal/arcus/adapter/bitmaps_ipc.go:343-345`, ontology primitive
   `StreamWriter` "writev/sendmsg vectored emission to a Unix domain
   socket").
-- **AOQ1 rides the same framing.** `crates/cgap-arrow/src/ipc.rs:418`
-  (`if raw.magic == AOQ1_MAGIC`) already forks the parse: BE header,
-  version 2, FNV-1a32 over `[0x00,0x3C)`, `body_len` u32 LE + 16-byte
-  blake3 tag at `AOQ1_TAG_AT = PREFIX_SIZE + 64 + 4`.
-  `emit_verified`/`read_verified` raise body integrity into the framing
-  layer. The Go side already holds the IPC1 twin (`OabiHeader` in
-  `bitmaps_ipc.go`) — Wave-2 adds the AOQ1 twin as a sibling primitive
-  in the same ontology projection, never hand-written Go.
+- **AOQ1 rides its own framing (corrected by ZD-13, 2026-11-04).**
+  `crates/cgap-arrow/src/ipc.rs:418` forks the AOQ1 parse, but the
+  **lawful AOQ1 wire law is the sidecar's, not ipc::emit's**: request =
+  AOQ1 window with codec-sealed AoqHeader metadata (FNV at byte 60 —
+  NOT cgap-arrow's IPC MetaHeader layout, whose FNV sits at 0x38;
+  `ipc::emit` cannot produce lawful AOQ1 headers), body_len LE at
+  72..76, blake3 tag at 76..92, ipc::pad_to(body_len, 64) pad, EOS;
+  response = 4-byte LE frozen-band status word, then on accepted
+  AppData one AOQ1 window (`emit_verified` echo). See
+  `crates/cgap-ffi/src/bin/aoq_sidecar.rs` (zd-13-w2c-sidecar.md) as
+  the wire authority. The Go twin (W2-B) mirrors THIS layout, and the
+  StreamWriter response scatter uses a PatchSink VectoredSink impl
+  substituting the 120-byte metadata block by absolute window offset
+  (scatter mechanics are the crate's; header/pad law is not).
 - **Therefore arcus needs no cgo and no linked libcgap.** The membrane
   is: arcus `flight.Boundary` (interface, `flight_boundary.go:87-92`)
   implemented by a **kernel sidecar process** that speaks AOQ1/IPC

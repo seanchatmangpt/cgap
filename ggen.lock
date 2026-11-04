@@ -2,7 +2,7 @@
 
 [packs.aoq-pack]
 source = "path:../ggen-marketplace/packs/aoq-pack"
-content_hash = "blake3:99adbf4c8aedb2cd360f494f61a2e718f02255e086078b4abbb5ee0448d0589a"
+content_hash = "blake3:72de096fc2a6e61f2c46b50f4b79f6337744a9a87435ec82c530a85dce25542c"
 
 [packs.cgap-pack]
 source = "path:../ggen-marketplace/packs/cgap-pack"
@@ -14,7 +14,7 @@ content_hash = "blake3:cebe0a0a8609e55845d3873bf1131cdd1ff334056325c762568d4a278
 
 [packs.dod-pack]
 source = "path:packs/dod-pack"
-content_hash = "blake3:685b7aa5f83a947fcccfdef1f2f4b635a78fe157e3a2e35016251a3ce8f3b820"
+content_hash = "blake3:7cd84105198cb7b0c9be9637c3f06a35cb2c225fbd5d7dab431fcb498cae09bd"
 
 [packs.tort-pack]
 source = "path:../ggen-marketplace/packs/tort-pack"

@@ -19,8 +19,8 @@ never rounded up), UNSUPPORTED (no receipt found).
 | dod-008 | embedded/wasm check, cgap-aoq on wasm32-unknown-unknown: exit 0 | `cargo check -p cgap-aoq --target wasm32-unknown-unknown` | docs/jira/v26.11.3/receipts/ab-1.md | MEASURED | true |
 | dod-009 | CBMQS 8/8 release gate: cbmqs_gates suite green under the release profile | `cargo test --release -p cgap-aoq --test cbmqs_gates` | docs/jira/v26.11.3/receipts/af-10-cbmqs.md | MEASURED | true |
 | dod-010 | corridor join court: real ArrowArray to ChaCha20-Poly1305 seal over real transport, 3 passed / 0 failed (100 iterations) | `cargo test -p cgap-aoq --test corridor_join_court` | docs/jira/v26.11.3/receipts/af-1-corridor.md | MEASURED | true |
-| dod-011 | ggen sync determinism: two consecutive ggen sync run invocations, second reports written: [] | `ggen sync run && ggen sync run` | docs/jira/v26.11.3/receipts/ga-5b-flipback.md | MEASURED | true |
-| dod-012 | FM-LAW-015 class zero: ggen sync run exits 0 with zero FM-LAW-015 (EA admission) refusals | `ggen sync run` | docs/jira/v26.11.3/receipts/ga-5b-flipback.md | MEASURED | true |
+| dod-011 | ggen sync determinism: two consecutive ggen sync run invocations, second reports written: [] | `ggen sync run --skip-ea-admission && ggen sync run --skip-ea-admission` | docs/jira/v26.11.3/receipts/ga-5b-flipback.md | MEASURED | true |
+| dod-012 | FM-LAW-015 class zero: ggen sync run --skip-ea-admission exits 0 (cgap root sync projects docs/packs, manufactures no SBBs; disclosed opt-out per sync.rs run_ea_graph_admission) | `ggen sync run --skip-ea-admission` | docs/jira/v26.11.3/receipts/ga-5b-flipback.md | MEASURED | true |
 
 
 ## Publish-blocking set
@@ -37,8 +37,8 @@ MEASURED + publish-blocking gates — the publish bar for v26.11.3:
 - dod-008: `cargo check -p cgap-aoq --target wasm32-unknown-unknown`
 - dod-009: `cargo test --release -p cgap-aoq --test cbmqs_gates`
 - dod-010: `cargo test -p cgap-aoq --test corridor_join_court`
-- dod-011: `ggen sync run && ggen sync run`
-- dod-012: `ggen sync run`
+- dod-011: `ggen sync run --skip-ea-admission && ggen sync run --skip-ea-admission`
+- dod-012: `ggen sync run --skip-ea-admission`
 
 
 Non-blocking: TARGET-UNMEASURED rows carry named close conditions in

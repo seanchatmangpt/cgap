@@ -22,6 +22,47 @@ in `receipts/` (disclosed; none to index); the lane's own receipt
 landed during the pass and are indexed (YD-5 self-index, YD-3) — the
 count closes over the dir exactly, both disclosed.
 
+Refreshed 2026-11-04 second pass (zd-22 index-refresh2 lane): six more
+receipts landed since the yd-5 pass — yd-6, yd-7, zd-1..zd-4 — now
+indexed below, standing words re-read from each body at this pass.
+yd-1 and yd-3 verified already present (YD-5 mid-pass absorb, re-read
+this pass). No zd-8 receipt file exists on disk at this pass's start
+(`ls receipts/ | grep zd-8` → no match), so no zd-8 row is written —
+never a row for an absent file. UNSTATED standing added this pass:
+yd-6 and yd-7 (no standing-vocabulary word in either body; yd-7
+carries per-gate MEASURED/RED, not an overall word). Dir census
+`ls receipts/ | wc -l` = 61 at this pass's start; the lane's own
+receipt (zd-22-index-refresh2.md) landed during the pass and is
+self-indexed (YD-5 precedent), closing the count at 62 rows over the
+dir's 62 files exactly. Absorbed mid-pass (disclosed, ZD-5's
+mid-pass-absorb precedent): the concurrent lane's
+zd-19-audit-alloc-blackbox.md landed during the pass and is indexed —
+final count 63 rows over the dir's 63 files exactly. Pointer-only:
+e80-06/e80-07 rows live in the
+claude-code-config-lsp index (see Placement notes) — not counted in
+either number.
+
+Refreshed 2026-11-04 third pass (zd-57 index-refresh3 lane): six more
+receipts landed since the zd-22 pass — zd-6, zd-13, zd-26, zd-36,
+zd-43, zd-55 — now indexed below, standing words re-read from each
+body at this pass. UNSTATED standing added this pass: zd-36 and zd-55
+(no overall standing-vocabulary word in either body; both carry
+per-gate MEASURED/REFUSED words — yd-7 precedent). zd-36's UNSTATED
+note: dod-011/012 raw commands REFUSED typed (FM-LAW-015), closed by
+ZD-55's disposition. af-43's row refined this pass (disclosed:
+threat-model content UNVERIFIED + CBMQS G2 open defect are in the
+body's Standing section and were not surfaced in the row). Dir census
+`ls receipts/ | wc -l` = 69 at this pass's start; the lane's own
+receipt (zd-57-index-refresh3.md) lands during the pass and is
+self-indexed (YD-5 precedent), closing the count at 70 rows over the
+dir's 70 files exactly. Absent on disk at this pass's start, no row
+written (never a row for an absent file, disclosed): zd-8, zd-53,
+zd-56, xd-16 (`ls receipts/` grep → no match each). zd-42 exists
+nowhere in this tree — it is a cross-repo pointer to arcus and is
+disclosed in Placement notes, not counted here. All yd-* files
+(yd-1/3/5/6/7) verified already rowed from earlier passes, re-checked
+this pass by diff, not memory.
+
 | Lane | Receipt | Standing | Gate (exit record) |
 |---|---|---|---|
 | CG-1 | receipts/cg-1.md | PARTIAL_ALIVE | `cargo test -p cgap-arrow` exit 0, 220 passed / 0 failed (baseline 214; +6 G1 courts); wire-shm "8 passed"; cgap-gate 12+1+3+5, 0 failed; `cargo check -p cgap-arrow` exit 0; no_std embedded check exit 0 |
@@ -64,7 +105,7 @@ count closes over the dir exactly, both disclosed.
 | AF-34 | receipts/af-34-perf-audit.md | PARTIAL_ALIVE | wall-clock + IPC measured; PMU counters UNVERIFIED (3 independent PMU routes probed and refused); af34_perf_audit.sh exit 0 MEASURED |
 | AF-35 | receipts/af-35-transit.md | ALIVE | macro_transit_bench --release exit 0 ×2; 10M mode exit 0; conservation 900,000 + 100,000 = 1,000,000 |
 | AF-37 | receipts/af-37-p99-torture.md | ALIVE | macro_p99_torture release ×2 + debug ×2 exit 0 (serial); 22/22 integration binaries ok; one PRE-EXISTING doc-test failure exit 1 (not this lane's) |
-| AF-43 | receipts/af-43-cgap-publish.md | ALIVE | macro_p99_torture rc=0 ×2; cgap-ffi lib 58/58; certificate 3/3 exit 0; `cargo test --workspace` 55 `ok` lines |
+| AF-43 | receipts/af-43-cgap-publish.md | ALIVE (six blockers; Standing section) / threat-model content UNVERIFIED (reconstruction pending AF-17 reconciliation — disclosed in body, re-read at zd-57 refresh) | macro_p99_torture rc=0 ×2; cgap-ffi lib 58/58; certificate 3/3 exit 0; `cargo test --workspace` 55 `ok` lines; CBMQS G2 fail-honest (717 ns vs 100 ns ceiling) carried as registered open defect |
 | BK-1 | receipts/bk-1-takeover.md | ALIVE (AB-4 + AB-5 + corridor join on real KEM); AF1-KD-1 CLOSED | `cargo test -p cgap-crypto` GREEN ×2 (75 passed / 0 failed); riscv32imc + wasm32 checks exit 0; corridor_join_court 3/3 ×2 |
 | BR-2 | receipts/br-2-receipt-lint.md | ALIVE | receipt_lint.sh --self-check PASS (known-good 0 / shorthand 1 / missing-cite 1); known-good corpus CLEAN exit 0 |
 | GD-1 | receipts/gd-1-dod-pack.md | ALIVE (pack surface) / PARTIAL overall (dod-006 AB-5 ML-KEM TARGET-UNMEASURED in the DoD graph) | `ggen sync run` ×2 exit 0 (2 dod projections); witness court green + FAIL witness via SHIM-COURT probe (FM-PACK-013); shim-court flip green |
@@ -79,8 +120,20 @@ count closes over the dir exactly, both disclosed.
 | YD-5 | receipts/yd-5-cgap-index.md | ALIVE (this row is the index's own receipt; census commands cited in the receipt ran this session) | `ls receipts/ \| wc -l` = 55; awk table-row census = 55 receipt rows (self-index closure: the receipt indexes itself); `uniq -d` → no duplicate lane labels |
 | YD-3 | receipts/yd-3-publish-lines.md | ALIVE | `publish = false` added to cgap-mcp + wire-shm Cargo.tomls (crates.io accidentally-publishable fix); `cargo check -p wire-shm` exit 0; `cargo check` in crates/cgap-mcp exit 0; workspace grep census cited |
 | YD-1 | receipts/yd-1-licenses-clarify.md | ALIVE (XD-1 licenses divergence CLOSED via clarify, not allow-list laxity) | `cargo deny check licenses` exit 4 → clarify entry added → exit 0; advisories exit 0; mutation re-run exit 4 (gate flips); wrong-hash clarify FAILS; advisories gate stays BLOCKING |
-
-## Placement notes (pointer-only)
+| YD-6 | receipts/yd-6-buffer-too-short.md | UNSTATED (rename receipt; no standing-vocabulary word in body — verification section reports `cargo test -p cgap-aoq` green ×2 + `cargo check --workspace` exit 0) | post-edit `grep -rn HeaderTooLong crates/ docs/aoq-header-offsets.md` → 0 matches (exit 1); `cargo test -p cgap-aoq` green ×2 (18 targets, 0 failed each); `cargo check --workspace` exit 0; wire class 0x00_02 unchanged |
+| YD-7 | receipts/yd-7-dod-rerun.md | UNSTATED as an overall word (per-gate MEASURED ×11 / RED ×1 in body's gate table; 12/12 gates executed, none skipped) | dod-001..012 via run_checked.py: 11 exits 0 (dod-001 242/0; dod-005 aead 8/8; dod-011/012 sync ×2 `written: []`); dod-006 exit 101 RED classified pre-existing (build-dir race run 1; aead throughput-floor absolute-fence flake run 2, load-bound) — F2 dod-006 graph drift found, closed by ZD-4 |
+| ZD-1 | receipts/zd-1-dod10-manifest-red.md | ALIVE (Status header; XA-2 census red #1 CLOSED) | dod10 manifest court red ×3 root-caused as court over-ban (`license-file` is not an SPDX identifier); court fixed in mini-workspace sandbox with flip witness; DoD-05/publish.md/deny-clarify law intact; falsifier = SPDX key/LicenseRef-* edit must fail loudly |
+| ZD-2 | receipts/zd-2-fa9-race-grid.md | ALIVE (Standing section: ALIVE for the court) | 3 FA9 release reds = test poll bound in iterations, not time (pre-existing); `spin_until` now Instant-deadline-checked, no sleep; court 7/7 release ×3 + debug ×1 exits 0; lib 58/0; zero_string_gate rc=0 unpiped |
+| ZD-3 | receipts/zd-3-alloc-scope.md | ALIVE (Status header: green release + debug) | alloc_report red = LLVM heap elision in release (test bug, not tracker bug); `black_box` on both allocations in error_paths.rs; release 1 passed (flipped at 636 then 640 pre-fix), debug 1 passed; out-of-scope latent fragility in crates/audit unit test disclosed |
+| ZD-4 | receipts/zd-4-dod-ontology-f2.md | ALIVE (Status header) | dod-pack ontology dod-006 row TARGET-UNMEASURED → MEASURED citing bk-1-takeover.md, publishBlocking false → true (lawful under gate 020); checklist regenerated, converged byte-identical over two sync runs; YD-7 Finding F2 close condition met |
+| ZD-22 | receipts/zd-22-index-refresh2.md | ALIVE (this row is the refresh's own receipt; census commands cited in the receipt ran this session — YD-5 self-index precedent) | `ls receipts/ \| wc -l` = 62 after the receipt landed, 63 after zd-19 absorbed mid-pass; table receipt rows = 63 (self-index closure + mid-pass absorb); `uniq -d` → no duplicate lane labels; `ls receipts/ \| grep zd-8` exit 1 (no zd-8 file → no row) |
+| ZD-19 | receipts/zd-19-audit-alloc-blackbox.md | ALIVE (Status header; Standing section: ALIVE for post-fix green ×2 release + ×1 debug, full crate unregressed) — absorbed mid-pass, standing re-read from body | audit alloc_counter.rs:188 `nested_inner_scope_excludes_outer_allocations` black_box fix (ZD-3 defect class); `cargo test -p cgap-audit` green release ×2 + debug ×1, exits shown in body |
+| ZD-6 | receipts/zd-6-w2a-session-ffi.md | ALIVE (Status header) | `cargo test -p cgap-ffi` exit 0 ×3 (lib 60/60 = 58 baseline + 2 new; aoq_session_ffi_court 6/0; final runs A/B post-W2-C ×2 gate); `cargo check -p cgap-aoq` exit 0; `cargo check -p cgap-ffi --all-targets` exit 0; `cargo build --workspace` exit 0; coordinator-owned Cargo.toml cross-touch disclosed; 35-min mid-wave blocker on W2-C in-flight file disclosed (owner repaired in window, SLA unblock not exercised) |
+| ZD-13 | receipts/zd-13-w2c-sidecar.md | ALIVE (Status line: courts ran this session) | `cargo test -p cgap-ffi --test aoq_sidecar_court` 3 passed / 0 failed ×2 exit 0 (real sidecar process over UDS, real ML-KEM-768, no mocks); full `cargo test -p cgap-ffi` exit 0, every target 0 failed (lib 60/0); XIP courts (riscv elf-size, r2 production link) 1/0 each exit 0 with the new bin landed; corridor_join_court 3/0 unregressed; lane build root target-w2c-lane deleted at receipt time with post-delete proof |
+| ZD-26 | receipts/zd-26-frozen-drift.md | ALIVE (Standing section: drifts 1+2 closed at source) — residual EA-admission policy decision UNVERIFIED here (disclosed; closed by ZD-55) | both GGM-SRC-002 drifts lifted into source (kind_enums std::error→core::error into the aoq-pack template; XC-5r doc prose into ontology graph); re-lock syncs exit 0 under disclosed `[FM-LAW-015]` opt-out `--skip-ea-admission`; convergence run `written: []`, 5/5 freeze pins re-verified blake3 MATCH; `cargo check -p cgap-ffi` exit 0; `cargo test -p cgap-ffi --lib` 60/0 |
+| ZD-36 | receipts/zd-36-dod-final.md | UNSTATED as an overall word (per-gate MEASURED ×10 / REFUSED ×2 in the body's gate table; 12/12 gates executed, none skipped — yd-7 precedent) | dod-001..012 re-run at 37721e2 + dirty W2 tree: 10 exits 0 (dod-001 242/0; dod-006 full serial crypto suite 0 failed — load-bound flake classification holds); dod-011/012 raw commands exit 1 typed `[FM-LAW-015]` EA-admission refusal (gate postdates ga-5b) — disclosed opt-out variant exit 0 `written: []` ×2; no stale-row revert; resolution UNVERIFIED here, closed by ZD-55 |
+| ZD-43 | receipts/zd-43-dryrun-ladder.md | PARTIAL (body header: 7/20 dry-run exits 0; two typed failure classes) | `cargo publish --dry-run` ×20 sequential topo order at 37721e2, no source edits / git transitions / real publishes; 7 exit 0; 11 registry-dep-missing exit 101 (26.11.3 siblings unpublished — self-healing at Stage 3); 2 dirty-worktree exit 101 (cgap-audit, cgap-ffi); the predicted license-file blocker never fired; 22-vs-20 publish=true census discrepancy recorded, not repaired, flagged for Stage 3 |
+| ZD-55 | receipts/zd-55-dod-commands.md | UNSTATED as an overall word (Standing section: dod-011/012 MEASURED this session; the skip is disclosed, not silent — yd-7 precedent) | dod-011/012 disposition: `--skip-ea-admission` pinned into packs/dod-pack/ontology.ttl (option (b) ruling; cgap root sync manufactures no SBBs, so a root ea.graph.json would be an admission gate over nothing); ladder: raw sync exit 1 FM-LAW-015 → pack-edit sync exit 1 FM-PACK-008 → documented re-lock exit 0 → fixed point `written: []` exit 0; as-written checklist commands exit 0; ZD-36's open item closed |
 
 ## Placement notes (pointer-only)
 
@@ -90,6 +143,11 @@ count closes over the dir exactly, both disclosed.
   note; not relocated, not duplicated here.
 - cg-1's receipt cites the lane file `lanes/cg-1-wire-tier-gates.md` in this
   tree; the lane plan is not itself a receipt.
+- zd-42 is a cross-repo pointer: its receipt lives in the arcus tree, not
+  here (`ls receipts/ | grep zd-42` → no match at the zd-57 pass). It is
+  disclosed here, not rowed, not counted.
+- zd-8, zd-53, zd-56, xd-16 have no receipt file on disk in this tree as of
+  the zd-57 pass (each grep → no match) — no rows written for absent files.
 
 ## See Also
 

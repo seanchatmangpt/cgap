@@ -356,6 +356,14 @@ pub mod stats;
 /// marketplace landing). Do not hand-edit; regenerate via the graph.
 pub mod aoq;
 
+/// W2-A (wave-2-membrane-plan §1): host-only C-ABI session surface over
+/// `cgap_aoq::session` — handle table, closed-set status words, real
+/// ML-KEM host seam. Compiled out on `target_os = "none"` (the XIP
+/// staticlib stays allocator-free; the `cgap-aoq`/`cgap-crypto` deps are
+/// host-gated in the manifest).
+#[cfg(not(target_os = "none"))]
+pub mod aoq_session;
+
 /// XIP glue (lane doc §5): a `target_os = "none"` staticlib needs a panic
 /// handler and no `std`. Host targets use std's handler — this item does not
 /// exist there, so host builds are untouched (the slot-surface cfg gates

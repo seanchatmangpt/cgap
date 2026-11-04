@@ -443,6 +443,7 @@ name = "cgap-ffi"
 version = "26.10.29"
 edition = "2021"
 publish = false
+autobins = false
 
 [lib]
 crate-type = ["staticlib", "rlib"]
