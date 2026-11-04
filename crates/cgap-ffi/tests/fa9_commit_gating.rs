@@ -72,14 +72,24 @@ fn commit(path: &CString, n: usize) -> u32 {
     unsafe { cgap_commit_parquet(lanes.as_ptr(), lanes.len(), path.as_ptr()) }
 }
 
-/// Bounded spin on a real observable (no sleep): deadline by iterations.
+/// Bounded poll on a real observable (no sleep): deadline by WALL CLOCK,
+/// not iterations. History (XA-2, v26.11.3): the original bound was
+/// iteration-count (50M loads), which is machine- AND profile-dependent —
+/// release compiles the spin ~1000x faster than debug, collapsing the
+/// fence to ~15-20ms while the owner's real time-to-ready (grant +
+/// ~309 commits + rotation drain incl. fsync) measures ~14.7ms in
+/// release, so 3 grid legs expired deterministically. An iteration bound
+/// fences the wrong variable: it shrinks exactly when the code speeds up,
+/// while the owner's latency is IO-bound (fsync) and does not. Time
+/// deadline, same observable, loud expiry.
 fn spin_until(flag: &AtomicBool) {
-    for _ in 0..50_000_000 {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while std::time::Instant::now() < deadline {
         if flag.load(Ordering::SeqCst) {
             return;
         }
     }
-    panic!("bounded spin deadline expired — owner never signalled ready");
+    panic!("bounded poll deadline expired — owner never signalled ready");
 }
 
 #[test]
