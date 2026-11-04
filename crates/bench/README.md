@@ -41,7 +41,8 @@ chain costs stage by stage; receipts under
   `CGAP_ERR_LEASE_EXHAUSTED` (0x43470004).
 - **chains-bn3**: unify join is 81.2% of the chain at N=65,536 rising to
   **99.9%** at N=1,048,576 (1.472 s of 1.473 s); scan runs at 12.5 GB/s in
-  chain, 80.3 GB/s isolated.
+  chain, 80.3 GB/s isolated. (as-of v26.11.1 wave, pre-chain-fold zp-17
+  ERRATA-2, pre-v3 wire law)
 - **chains-seal**: no 80% stage — a three-way split: asc450 metering ~45%,
   chatman seal+verify ~35%, p28 §5 validate ~19%. Per-row cost is flat
   (2.378 vs 2.373 µs/row across 1024→65536, ≤0.3% drift).

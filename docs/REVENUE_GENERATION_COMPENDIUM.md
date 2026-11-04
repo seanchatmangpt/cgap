@@ -50,7 +50,7 @@ Rather than relying on sales representatives chasing procurement departments or 
 flowchart TD
     subgraph Wedge ["1. Developer & Performance Wedge"]
         Dev["cargo add cgap / cgap-parquet / cgap-arrow"]
-        Perf["4.06x BitSlice Scan | 82.2 GB/s BN3 (quiet-host) | 0-Alloc RLE"]
+        Perf["4.06x BitSlice Scan | 82.2 GB/s BN3 (quiet-host, not chain) | 0-Alloc RLE"]
         SafeHarbor["Universal Safe Harbor (U_exempt: $0 Royalty)"]
     end
 
@@ -115,7 +115,10 @@ CGAP enforces a strict **AM $\to$ FM (Frequency/Phase Modulation) Diode**:
 1. **Unmatched Performance Density:** Operating purely on fixed-width 64-bit `SlotId`s, 24-byte `Bn3Statement`s, and 64-byte `Quad64`s allows CGAP to run at **82.24 GB/s** in-register speeds (quiet-host divan,
 v26.11.1 F2-13 receipt; byte-counter figure — no row in the v26.11.2
 claims register: UNVERIFIED-WITHOUT-METHOD there, and NOT a facts/s
-multiple per §7 unit law).
+multiple per §7 unit law). CHALLENGER scope banner: 82.24 GB/s is
+BN3-internal isolated-scan (80.32), not end-to-end chain (12.3 GB/s,
+`bench-chains-bn3.md:37`); receipted quiet-host only
+(`bench-bn3-receipt.md:45,69`).
 2. **Vendor Lock-In via O-ABI Coordinate Space:** Once an enterprise maps its financial instruments (`cgap-fibo`) or cloud infrastructure (`cgap-cloud`) into CGAP's collision-checked `.oabi` `SlotId` coordinate space, CGAP becomes the canonical, high-speed binary ABI of the enterprise's entire data plane.
 
 ---
@@ -261,7 +264,8 @@ Sold as the **CGAP Neuro-Symbolic & Deductive Reasoning Engine SKU**:
 | Crate | Path | Technical Capability | Commercial Role |
 |---|---|---|---|
 | **`cgap-bn3`** | [`crates/cgap-bn3`](file:///Users/sac/cgap/crates/cgap-bn3/src/lib.rs) | Binary N3 deductive reasoner: 24-byte cache-aligned `Bn3Statement` `arena` (**82.24 GB/s** isolated-scan, quiet-host divan — BN3-internal
-only, not chain throughput; UNVERIFIED-WITHOUT-METHOD for v26.11.2,
+only, not chain throughput — 80.32 GB/s isolated / 12.3 GB/s chain,
+`bench-chains-bn3.md:37`; UNVERIFIED-WITHOUT-METHOD for v26.11.2,
 receipted `docs/jira/v26.11.1/waves/bench-bn3-receipt.md:45,69`; see
 §6 scope banner), SIMD 2-atom join `unify` (**6.50 ns/pair**), branchless register `builtins` (**3.12 ns/eval**, 0 indirect jumps `blr`/`br`), and fixpoint `project`. | Replaces slow RDF/SPARQL/OWL/Prolog engines with line-rate deterministic reasoning for AI guardrails and policy enforcement. |
 | **`cgap-bont`** | [`crates/cgap-bont`](file:///Users/sac/cgap/crates/cgap-bont/src/lib.rs) | Binary Ontology (`.oabi` v1) container loader, collision-checked 64-bit `SlotId` BLAKE3 generator (`primitives.rs`), and closed-world SHACL-to-bitmask compiler (`shacl_compiler.rs`) validating shape constraints via single-instruction bitwise masks (`validate_presence`). | Compiles enterprise governance schemas and RDF ontologies into sub-nanosecond bitmask instructions. |
@@ -431,7 +435,8 @@ Target Personas: **Chief Architect, VP of Data Engineering, Head of Quantitative
     quiet-host divan, BN3-internal
     isolated scan — receipted `docs/jira/v26.11.1/waves/bench-bn3-receipt.md:45,69`;
     no v26.11.2 register row, UNVERIFIED-WITHOUT-METHOD for that register; not
-    end-to-end chain throughput per `bench-chains-bn3.md:37`) and **1,000,000 process
+    end-to-end chain throughput per `bench-chains-bn3.md:37` (80.32 GB/s
+    isolated / 12.3 GB/s chain)) and **1,000,000 process
     conformance events verified in < 1.7 seconds** in `cgap-audit`.
 - **Step 3 — The Solution (Sovereign Drop-In):**
   Via `cgap-ffi` (`include/cgap.h`), `cgap-arrow::c_abi` (Arrow C Data Interface parity proven against PyArrow), and `cgap-beam` (Erlang/Elixir NIF shared-memory ring), the customer can drop CGAP into their existing Python, C++, Rust, or Elixir pipeline in an afternoon without rewriting their application tier.

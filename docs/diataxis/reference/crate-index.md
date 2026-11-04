@@ -7,6 +7,8 @@ crates.io versions verified live 2026-11-01 via
 | Directory | Package name | crates.io version | Status | Receipt pointer |
 |---|---|---|---|---|
 | crates/audit | cgap-audit | 26.11.1 | published | `docs/jira/v26.11.1/waves/` (campaign ledger) |
+
+(Published v26.11.1; v26.11.4 moved cgap-aoq/cgap-arrow APIs — `wire-law-v3-landing.md`.)
 | crates/bench | bench | — (name collision: crates.io `bench` 1.1.0 is an unrelated crate) | local-only | `docs/jira/v26.11.1/waves/bench-chains-*.md` |
 | crates/cli | cgap-cli | not published | standalone ggen CLI | `docs/jira/v26.11.1/waves/doc-6-bench-cli.md` |
 | crates/cgap | cgap | 26.11.1 | published (umbrella) | `docs/jira/v26.11.1/waves/v26111-campaign-ledger.md` |

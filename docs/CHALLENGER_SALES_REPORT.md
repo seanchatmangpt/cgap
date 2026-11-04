@@ -25,8 +25,8 @@ register row 29, `docs/jira/v26.11.2/11-measured-claims.md`).
 - **Cryptographic Wire-Speed Integrity:** Branch-free ladder searches
   (mechanism descriptor — "constant-time" is UNSUPPORTED, register row 29,
   `docs/jira/v26.11.2/11-measured-claims.md`) and wide-SIMD BLAKE3 tree
-  hashing deliver integrity verification at memory-bus speeds (>10 GB/s —
-  UNSOURCED: no row in `11-measured-claims.md`; nearest receipted figure is
+  hashing deliver integrity verification at 2.0 GB/s post-cliff-fix
+  (`docs/jira/v26.11.4/receipts/br3-blake3-cliff-fix.md`; pre-fix
   `challenger_crypto` 461.8 MB/s tree digest, compendium §11).
 
 ---

@@ -88,7 +88,9 @@ useful as a prefilter at every step:
 
 - BLAKE3 ~84 GB/s SIMD throughput is CITED-CONTEXT from the BLAKE3 paper
   (O'Connor, Aumasson, Neves, Wilcox-O'Hearn, 2020) and the blake3 crate
-  README — not measured in this repo; cgap currently pulls zero external
+  README — not measured in this repo; in-repo cgap-blake3 measures
+  2.0 GB/s post-cliff-fix (`docs/jira/v26.11.4/receipts/br3-blake3-cliff-fix.md`);
+  cgap currently pulls zero external
   crates and the zero-dependency law holds (`crates/cgap-arrow/src/
   lib.rs`: `no_std` + `alloc` only).
 - Arrow C Data Interface struct/layout claims (ArrowArray/ArrowSchema
