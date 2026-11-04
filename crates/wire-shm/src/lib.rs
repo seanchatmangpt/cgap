@@ -26,6 +26,7 @@ pub const MAX_PAYLOAD: usize = SLOT_LEN - HEADER_LEN;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WireError {
     FrameTooLarge { len: usize, max: usize },
+    BudgetTooSmall { need: usize, have: usize },
     CrcMismatch { expected: u32, found: u32 },
     StaleOrdinal { expected: u32, found: u32 },
     BadMagic { found: u32 },
@@ -37,6 +38,9 @@ impl std::fmt::Display for WireError {
         match self {
             WireError::FrameTooLarge { len, max } => {
                 write!(f, "frame too large: {len} > max {max}")
+            }
+            WireError::BudgetTooSmall { need, have } => {
+                write!(f, "output budget too small: need {need}, have {have}")
             }
             WireError::CrcMismatch { expected, found } => {
                 write!(

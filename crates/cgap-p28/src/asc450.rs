@@ -373,12 +373,17 @@ impl LeaseEpochSealer {
 
     /// The 64-B epoch binding over a byte string: two domain-separated keyed
     /// BLAKE3 digests. Shared by all four trait methods.
-    fn epoch_binding(&self, domain: &[u8; 20], signed: &[u8]) -> [u8; 64] {
+    fn epoch_binding<const N: usize>(&self, domain: &[u8; 20], signed: &[u8; N]) -> [u8; 64] {
+        // Structural guard (S13): the span is a compile-time constant, so the
+        // 256 B buffer bound is proven at monomorphization, not assumed.
+        const {
+            assert!(N <= 256, "signed span exceeds the 256 B epoch-binding buffer");
+        }
         let key = *self.lease.issued_root();
         let mut buf = [0u8; 20 + 256];
         buf[0..20].copy_from_slice(domain);
-        buf[20..20 + signed.len()].copy_from_slice(signed);
-        let input = &buf[..20 + signed.len()];
+        buf[20..20 + N].copy_from_slice(signed);
+        let input = &buf[..20 + N];
         let d1 = cgap_crypto::chatman::keyed_digest(&key, input)
             .expect("domain||span <= 276 B: single-chunk keyed bound (1024) cannot trip");
         let mut meta = [0u8; 20 + 32];

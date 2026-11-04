@@ -699,7 +699,10 @@ impl Parser {
                     }
                 }
                 Some(Tok::Iri(_)) | Some(Tok::PName(_, _)) => {
-                    let subj = self.expand_tok(self.peek().expect("checked"))?;
+                    let tok = self
+                        .peek()
+                        .ok_or_else(|| self.err("unexpected EOF: expected triples"))?;
+                    let subj = self.expand_tok(tok)?;
                     self.bump();
                     let mut pairs = Vec::new();
                     self.parse_pred_obj_list(&mut pairs)?;
@@ -1282,16 +1285,28 @@ pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError
         }
 
         // (5) BitmaskLayout: sorted by property IRI ascending (doc section 5
-        // step 3), one bit per accepted property.
-        let mut sorted: Vec<&PropertyShapeIr> = shape.props.iter().collect();
-        sorted.sort_by(|a, b| a.path.as_deref().unwrap().cmp(b.path.as_deref().unwrap()));
+        // step 3), one bit per accepted property. Paths are threaded
+        // structurally with ok_or: a None path here is a typed
+        // ShaclParseError, not a control-flow-guarded unwrap — the
+        // blocking-guard invariant (every accepted shape has all paths) is
+        // re-proven at the point of use instead of assumed.
+        let mut sorted: Vec<(&PropertyShapeIr, &str)> = shape
+            .props
+            .iter()
+            .map(|p| p.path.as_deref().map(|path| (p, path)))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| ShaclParseError {
+                line: 0, // compile-stage: post-parse, no source line survives
+                message: format!("shape {} lost a sh:path between court and layout", shape.iri),
+            })?;
+        sorted.sort_by(|a, b| a.1.cmp(b.1));
         let n = sorted.len();
         let mut bits = Vec::with_capacity(n);
         let mut m_mandatory = 0u64;
         let mut m_group = 0u64;
-        for (idx, prop) in sorted.iter().enumerate() {
+        for (idx, (prop, path)) in sorted.iter().enumerate() {
             let bit = idx as u8;
-            bits.push((prop.path.clone().unwrap(), bit));
+            bits.push(((*path).to_string(), bit));
             if prop.min_count == 1 {
                 m_mandatory |= 1u64 << bit;
             }
@@ -1738,6 +1753,33 @@ ex:PersonShape a sh:NodeShape ;
         // reaching this test at all proves `cargo build -p cgap-bont` exit 0.
         assert_eq!(MASK_WIDTH_MAX, 64);
         assert_eq!(MAX_DECLARED_PROPERTIES, 64);
+    }
+
+    /// Corrupt-input court (negative leg) for the compile-stage path
+    /// threading: the surface behavior law is that a shape whose property
+    /// has NO `sh:path` never reaches the layout stage — it refuses as a
+    /// `MalformedShape` row (typed report, not a panic, not a silent
+    /// acceptance). The structural `ok_or` arm at the layout stage is the
+    /// fail-closed backstop for that invariant drifting; its mutation leg
+    /// is: delete the blocking guard and the same input flips from a
+    /// MalformedShape refusal row to this court's typed-error path.
+    #[test]
+    fn pathless_property_never_panics_and_refuses_typed() {
+        let ttl = r#"@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ex: <http://example.org/> .
+
+ex:Bad a sh:NodeShape ;
+    sh:closed true ;
+    sh:property [ sh:datatype ex:T ] ."#;
+        let report = compile_shapes(ttl).expect("parse succeeds");
+        assert!(
+            report.accepted.is_empty(),
+            "pathless property must never compile"
+        );
+        assert!(report
+            .refusals
+            .iter()
+            .any(|r| r.reason_code == ReasonCode::MalformedShape));
     }
 
     /// T2 constraint court (anti-vacuity core): mandatory presence via one

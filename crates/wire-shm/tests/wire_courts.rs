@@ -176,6 +176,62 @@ fn crc_tamper_typed() {
     cleanup(&path);
 }
 
+#[test]
+fn corrupt_plen_budget_refusal_typed() {
+    // Budget-refusal court (S12 zero-alloc law, oabi `_into` pattern):
+    // `plen` is wire input. A corrupt plen (still <= MAX_PAYLOAD, so it
+    // passes the FrameTooLarge gate) must refuse as typed BudgetTooSmall
+    // against an undersized caller buffer — never panic, never over-read
+    // into the caller's memory. ANTI-VACUITY: control (matching budget)
+    // must PASS, mutated plen against the same budget must FAIL typed.
+    let path = tmp_segment("plen-budget");
+    {
+        let mut ring = WireRing::create(&path, 2).expect("create");
+        ring.stamp_frame(b"plen budget court", 0).expect("stamp");
+    }
+    let raw = read_seg(&path);
+    let plen_off = 4096 + 8; // slot 0 header, payload_len bytes 8..12
+    assert_eq!(&raw[plen_off..plen_off + 4], &17u32.to_be_bytes());
+    let ring = WireRing::open(&path).expect("open");
+
+    // CONTROL: budget >= 16 + 17 -> read_frame_into succeeds.
+    let mut ctrl = [0u8; 64];
+    let n = ring
+        .read_frame_into(0, &mut ctrl)
+        .expect("control must pass with sufficient budget");
+    assert_eq!(n, 17);
+    assert_eq!(&ctrl[..n], b"plen budget court");
+
+    // MUTATION 1 (corrupt wire plen 17 -> 2000): same 64-byte budget now
+    // refuses typed BudgetTooSmall, payload bytes untouched.
+    let mut mutated = raw.clone();
+    mutated[plen_off..plen_off + 4].copy_from_slice(&2000u32.to_be_bytes());
+    std::fs::write(&path, &mutated).expect("write mutated");
+    let ring = WireRing::open(&path).expect("open mutated");
+    let err = ring
+        .read_frame_into(0, &mut ctrl)
+        .expect_err("mutated plen must refuse");
+    assert!(
+        matches!(err, WireError::BudgetTooSmall { need: 2016, have: 64 }),
+        "expected typed BudgetTooSmall {{need:2016, have:64}}, got {err}"
+    );
+
+    // MUTATION 2 (plen above MAX_PAYLOAD): typed FrameTooLarge, regardless
+    // of budget.
+    let mut huge = raw.clone();
+    huge[plen_off..plen_off + 4].copy_from_slice(&4081u32.to_be_bytes());
+    std::fs::write(&path, &huge).expect("write huge");
+    let ring = WireRing::open(&path).expect("open huge");
+    let err = ring
+        .read_frame_into(0, &mut ctrl)
+        .expect_err("over-max plen must refuse");
+    assert!(
+        matches!(err, WireError::FrameTooLarge { len: 4081, .. }),
+        "got {err}"
+    );
+    cleanup(&path);
+}
+
 // ===========================================================================
 // CG-1 additions (v26.11.3): G3 witness-tier anti-confusion courts.
 // ===========================================================================

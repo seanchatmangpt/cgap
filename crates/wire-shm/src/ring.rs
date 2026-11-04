@@ -75,19 +75,24 @@ impl WireRing {
         Ok(())
     }
 
-    fn read_book(&self, off: u64, n: usize) -> Result<Vec<u8>, WireError> {
-        let mut buf = vec![0u8; n];
-        self.file.read_exact_at(&mut buf, off)?;
-        Ok(buf)
+    fn read_book(&self, off: u64, buf: &mut [u8]) -> Result<(), WireError> {
+        self.file.read_exact_at(buf, off)?;
+        Ok(())
     }
 
     /// Current next ordinal (strictly increasing per writer).
+    ///
+    /// Zero-alloc law (S12): the 8 bookkeeping bytes land on the stack.
     pub fn next_ordinal(&self) -> Result<u64, WireError> {
-        let b = self.read_book(NEXT_ORD_OFF, 8)?;
-        Ok(u64::from_be_bytes(b.try_into().unwrap()) as u64)
+        let mut buf = [0u8; 8];
+        self.read_book(NEXT_ORD_OFF, &mut buf)?;
+        Ok(u64::from_be_bytes(buf))
     }
 
     /// Write header+payload at slot `ordinal % capacity`, advance next_ordinal.
+    ///
+    /// Zero-alloc law (S12): header and payload go to the slot via two
+    /// `write_all_at` calls — no assembled frame Vec.
     pub fn stamp_frame(&mut self, payload: &[u8], ordinal: u32) -> Result<(), WireError> {
         if payload.len() > MAX_PAYLOAD {
             return Err(WireError::FrameTooLarge {
@@ -95,7 +100,7 @@ impl WireRing {
                 max: MAX_PAYLOAD,
             });
         }
-        let next = self.next_ordinal()? as u64;
+        let next = self.next_ordinal()?;
         if (ordinal as u64) < next {
             return Err(WireError::StaleOrdinal {
                 expected: next as u32,
@@ -104,13 +109,13 @@ impl WireRing {
         }
         let idx = ordinal % self.capacity;
         let off = Self::slot_offset(idx);
-        let mut frame = Vec::with_capacity(HEADER_LEN + payload.len());
-        frame.extend_from_slice(&MAGIC.to_be_bytes());
-        frame.extend_from_slice(&crc32_ieee(payload).to_be_bytes());
-        frame.extend_from_slice(&(payload.len() as u32).to_be_bytes());
-        frame.extend_from_slice(&ordinal.to_be_bytes());
-        frame.extend_from_slice(payload);
-        self.file.write_all_at(&frame, off)?;
+        let mut header = [0u8; HEADER_LEN];
+        header[0..4].copy_from_slice(&MAGIC.to_be_bytes());
+        header[4..8].copy_from_slice(&crc32_ieee(payload).to_be_bytes());
+        header[8..12].copy_from_slice(&(payload.len() as u32).to_be_bytes());
+        header[12..16].copy_from_slice(&ordinal.to_be_bytes());
+        self.file.write_all_at(&header, off)?;
+        self.file.write_all_at(payload, off + HEADER_LEN as u64)?;
         // Persist highest_ordinal+1 AFTER the frame so recovery sees the frame.
         self.write_book(NEXT_ORD_OFF, &((ordinal as u64) + 1).to_be_bytes())?;
         Ok(())
@@ -119,19 +124,73 @@ impl WireRing {
     /// Read+validate the frame at `ordinal % capacity`: magic, ordinal match,
     /// payload_len, crc32.
     pub fn read_frame(&self, ordinal: u32) -> Result<Vec<u8>, WireError> {
-        let frame = self.read_raw_frame(ordinal)?;
-        let payload = frame[HEADER_LEN..].to_vec();
-        Ok(payload)
+        let mut buf = [0u8; SLOT_LEN];
+        let n = self.read_frame_into(ordinal, &mut buf)?;
+        Ok(buf[..n].to_vec())
     }
 
     /// Read and validate; returns (payload, crc) for tamper courts.
     pub fn read_frame_with_crc(&self, ordinal: u32) -> Result<(Vec<u8>, u32), WireError> {
-        let frame = self.read_raw_frame(ordinal)?;
-        let crc = u32::from_be_bytes(frame[4..8].try_into().unwrap());
-        Ok((frame[HEADER_LEN..].to_vec(), crc))
+        let off = Self::slot_offset(ordinal % self.capacity);
+        let header = self.read_validated_header(ordinal)?;
+        let plen = Self::header_payload_len(&header)?;
+        let mut payload = [0u8; MAX_PAYLOAD];
+        self.file
+            .read_exact_at(&mut payload[..plen], off + HEADER_LEN as u64)?;
+        let expect_crc = u32::from_be_bytes(header[4..8].try_into().unwrap());
+        let found_crc = crc32_ieee(&payload[..plen]);
+        if found_crc != expect_crc {
+            return Err(WireError::CrcMismatch {
+                expected: expect_crc,
+                found: found_crc,
+            });
+        }
+        Ok((payload[..plen].to_vec(), expect_crc))
     }
 
-    fn read_raw_frame(&self, ordinal: u32) -> Result<Vec<u8>, WireError> {
+    /// Read+validate the frame at `ordinal % capacity` into the caller's
+    /// buffer; returns the payload length.
+    ///
+    /// Zero-alloc law (S12): the only wire-sized memory is `out`, supplied
+    /// by the caller. `plen` is wire input, so the budget check is
+    /// `HEADER_LEN.checked_add(plen)` — overflow and undersized buffers are
+    /// typed refusals (`FrameTooLarge` / `BudgetTooSmall`), never panics.
+    pub fn read_frame_into(
+        &self,
+        ordinal: u32,
+        out: &mut [u8],
+    ) -> Result<usize, WireError> {
+        let off = Self::slot_offset(ordinal % self.capacity);
+        let header = self.read_validated_header(ordinal)?;
+        let plen = Self::header_payload_len(&header)?;
+        let total = HEADER_LEN
+            .checked_add(plen)
+            .ok_or(WireError::FrameTooLarge {
+                len: plen,
+                max: MAX_PAYLOAD,
+            })?;
+        if total > out.len() {
+            return Err(WireError::BudgetTooSmall {
+                need: total,
+                have: out.len(),
+            });
+        }
+        self.file
+            .read_exact_at(&mut out[..plen], off + HEADER_LEN as u64)?;
+        let expect_crc = u32::from_be_bytes(header[4..8].try_into().unwrap());
+        let found_crc = crc32_ieee(&out[..plen]);
+        if found_crc != expect_crc {
+            return Err(WireError::CrcMismatch {
+                expected: expect_crc,
+                found: found_crc,
+            });
+        }
+        Ok(plen)
+    }
+
+    /// Read the 16-byte header at `ordinal % capacity`, validating magic and
+    /// the stored ordinal. Stack-only; payload length is NOT yet checked.
+    fn read_validated_header(&self, ordinal: u32) -> Result<[u8; HEADER_LEN], WireError> {
         let off = Self::slot_offset(ordinal % self.capacity);
         let mut header = [0u8; HEADER_LEN];
         self.file.read_exact_at(&mut header, off)?;
@@ -146,6 +205,12 @@ impl WireRing {
                 found: stored_ord,
             });
         }
+        Ok(header)
+    }
+
+    /// Extract and bounds-check the payload length from a validated header.
+    /// `plen` is wire input: above `MAX_PAYLOAD` it is a typed refusal.
+    fn header_payload_len(header: &[u8; HEADER_LEN]) -> Result<usize, WireError> {
         let plen = u32::from_be_bytes(header[8..12].try_into().unwrap()) as usize;
         if plen > MAX_PAYLOAD {
             return Err(WireError::FrameTooLarge {
@@ -153,22 +218,17 @@ impl WireRing {
                 max: MAX_PAYLOAD,
             });
         }
-        let mut frame = vec![0u8; HEADER_LEN + plen];
-        self.file.read_exact_at(&mut frame, off)?;
-        let expect_crc = u32::from_be_bytes(header[4..8].try_into().unwrap());
-        let found_crc = crc32_ieee(&frame[HEADER_LEN..]);
-        if found_crc != expect_crc {
-            return Err(WireError::CrcMismatch {
-                expected: expect_crc,
-                found: found_crc,
-            });
-        }
-        Ok(frame)
+        Ok(plen)
     }
 
-    /// Verify magic + crc32 only (no ordinal check) at `ordinal % capacity`.
+    /// Verify magic + crc32 (header ordinal match is enforced too) at
+    /// `ordinal % capacity`.
+    ///
+    /// Thin wrapper over `read_frame_into` with a stack scratch buffer —
+    /// zero-alloc law (S12) keeps the read path Vec-free.
     pub fn verify_frame(&self, ordinal: u32) -> Result<(), WireError> {
-        self.read_raw_frame(ordinal)?;
+        let mut buf = [0u8; SLOT_LEN];
+        self.read_frame_into(ordinal, &mut buf)?;
         Ok(())
     }
 }
