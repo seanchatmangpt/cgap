@@ -1,0 +1,36 @@
+[package]
+name = "cbmqs-cli"
+description = "CBMQS std host tool: RFC-0089 §8.4 certificate emit/verify (CGAP P5 phases 1-2)"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+# std host tool: the embedded workspace crates stay zero-dep/no_std; THIS
+# crate is deliberately allowed host-tool dependencies.
+[dependencies]
+# RFC-0089 certificate kernel behind the `cert` feature (CG6 lane contract).
+cgap-aoq = { path = "../cgap-aoq", features = ["cert"] }
+# Sovereign BLAKE3 (seal_fn = hex(BLAKE3-256 over canonical JSON string)).
+cgap-blake3 = { path = "../cgap-blake3", features = ["std"] }
+# Plain clap (builder API) — this crate is a std host tool, not a ggen CLI.
+# Feature set pinned to the crates already in Cargo.lock (no derive/suggest).
+clap = { version = "4.5", default-features = false, features = [
+    "std",
+    "help",
+    "usage",
+    "error-context",
+    "color",
+    "wrap_help",
+] }
+
+# DOD4 tamper court: the reseal-forgery leg recomputes the real
+# BLAKE3-256 seal over attacker-patched bytes in-process.
+[dev-dependencies]
+cgap-blake3 = { path = "../cgap-blake3", features = ["std"] }
+
+[[bin]]
+name = "cbmqs-audit"
+path = "src/main.rs"

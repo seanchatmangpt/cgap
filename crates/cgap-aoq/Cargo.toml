@@ -6,8 +6,20 @@ license-file.workspace = true
 edition.workspace = true
 publish = true
 
-# Embedded surface: no dependencies, no alloc.
+# ZP-21: cert feature gates the alloc-using RFC-0089 §8.4 certificate
+# module (no new dependencies — digest substrate injected).
+[features]
+cert = []
+
+# Embedded surface: exactly ONE dependency — the R-K1 crypto body crate
+# (v3 wire law Stage 2, 2026-11-04: the AEAD facade in src/aead.rs
+# delegates to cgap-crypto's var-AAD detached seal/open; the prior
+# const-refusal stubs were the pre-admission seam). No alloc, no std in
+# the lib surface. `cert` feature (ZP-21) unchanged: alloc-using
+# RFC-0089 §8.4 certificate module, digest substrate still injected via
+# the `*_with` seam forms.
 [dependencies]
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
 
 [dev-dependencies]
 # AB-8 classification-identity sweep + UDS soak: the sweep pairs cgap-arrow

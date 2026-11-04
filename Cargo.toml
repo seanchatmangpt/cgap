@@ -35,6 +35,8 @@ members = [
     "crates/cgap-branchless",
     # v26.11.3 AoQ Wave-1 lane AB-1: AOQ1 wire-law header kernel.
     "crates/cgap-aoq",
+    # v26.11.3 P5 phases 1-2: CBMQS std host tool (certificate emit/verify).
+    "crates/cbmqs-cli",
     "ontology-packs/fibo",
     "ontology-packs/cloud",
 ]
@@ -55,6 +57,16 @@ rust-version = "1.85"
 repository = "https://github.com/seanchatmangpt/cgap"
 authors = ["Sean Chatman <info@chatmangpt.com>"]
 
+# PANIC=ABORT RATIONALE (PL7, do not flip to unwind): the AoQ kernel
+# sidecar (crates/cgap-ffi/src/bin/aoq_sidecar.rs) has exactly three named
+# exits, and abort is load-bearing for one of them. A panic escaping the
+# serve loop becomes SIGABRT, the arcus supervisor reaps the abnormal death
+# and respawns a fresh generation — the process-boundary twin of the
+# in-process catch_unwind -> BUSY surface in
+# crates/cgap-ffi/src/aoq_session.rs:202-401. With unwind, a poisoned serve
+# loop would keep serving; with abort, every poison lands on the supervisor
+# boundary where the respawn/derive law already governs. Twin profile
+# blocks (dev/audit) carry the same law.
 [profile.release]
 lto = "thin"
 codegen-units = 1
