@@ -50,6 +50,18 @@ pub enum AoqError {
     /// the typed landing for a not-yet-admitted kernel id, not a witnessed
     /// refusal path. AB-8 integration owns population.
     AeadKernelNotAdmitted { kernel_id: u32 },
+    /// Record slab exhausted: the chain holds `len` links and no more fit.
+    ///
+    /// Additive variant (P1 lane, 2026-11-04): replaces the silently-clamped
+    /// `BufferTooShort` returned by the chain slab-full check. Integer
+    /// field only — `Copy`, no heap, no strings.
+    SlabFull { len: usize },
+    /// Authenticated open refused under the session direction key (v3
+    /// wire law Stage 2, 2026-11-04 — wired: the session receive path
+    /// and the AEAD facade surface this variant on any tag divergence;
+    /// ciphertext-byte and AAD-byte tamper both land here). Integer
+    /// field only — `Copy`, no heap, no strings.
+    AeadMismatch,
 }
 
 impl AoqError {
@@ -68,6 +80,8 @@ impl AoqError {
             Self::SeqGap { .. } => 0x00_09,
             Self::KemKernelNotAdmitted { .. } => 0x00_0A,
             Self::AeadKernelNotAdmitted { .. } => 0x00_0B,
+            Self::SlabFull { .. } => 0x00_0C,
+            Self::AeadMismatch => 0x00_0D,
         }
     }
 }
@@ -102,6 +116,8 @@ impl fmt::Display for AoqError {
             Self::AeadKernelNotAdmitted { kernel_id } => {
                 write!(f, "AEAD kernel not admitted: id 0x{kernel_id:08X}")
             }
+            Self::SlabFull { len } => write!(f, "slab full: {len} links"),
+            Self::AeadMismatch => f.write_str("aead open mismatch"),
         }
     }
 }

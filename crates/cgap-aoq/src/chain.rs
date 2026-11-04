@@ -15,12 +15,15 @@
 //!    unit courts to prove tamper detection fires (non-vacuity).
 //! 4. Compose-with-`emit_verified`: frames emitted by
 //!    [`crate::session::Session::emit_verified`] append cleanly through
-//!    [`AoqChain::append_verified`]; tampered variants are refused with
-//!    `DigestMismatch`.
+//!    [`AoqChain::append_verified`]. CHAIN-IS-INTEGRITY (v3 wire law):
+//!    the chain does not re-derive the wire AEAD tag (it holds no
+//!    keys) — the record hashes the whole wire frame with the chain's
+//!    own substrate; tamper surfaces at the chain walk.
 //!
 //! `no_std`, alloc-free, no wall clock. Digest substrate is the
 //! caller-injected [`ChainDigest`] seam (R-K1: the crate ships no crypto).
 
+use crate::aead::TAG_LEN;
 use crate::error::AoqError;
 
 /// Digest seam: caller-injected hash substrate (32-byte digests).
@@ -136,8 +139,8 @@ pub fn verify_records<H: ChainDigest>(h: &H, records: &[AoqChainRecord]) -> Resu
                 got: u32::from_be_bytes(four(&rec.prev_hash)),
             });
         }
-        if record_digest(h, rec) != rec.digest {
-            let d = record_digest(h, rec);
+        let d = record_digest(h, rec);
+        if d != rec.digest {
             return Err(AoqError::DigestMismatch {
                 expected: u32::from_be_bytes(four(&d)),
                 got: u32::from_be_bytes(four(&rec.digest)),
@@ -211,14 +214,26 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
     /// payload_digest)`.
     ///
     /// Refusals are typed and leave the chain unmutated (slab full ->
-    /// `BufferTooShort`).
+    /// `SlabFull`).
     pub fn append(&mut self, epoch: u16, payload: &[u8]) -> Result<u64, AoqError> {
+        let payload_digest = self.h.digest(&[payload]);
+        self.link(epoch, payload_digest)
+    }
+
+    /// Write the next record for an already-computed `payload_digest`.
+    ///
+    /// Single slab-full check + single record-digest pass; [`AoqChain::append`]
+    /// and [`AoqChain::append_verified`] both land here so a verified link
+    /// costs one payload hash (the tag check), not two.
+    ///
+    /// Refusals are typed and leave the chain unmutated (slab full ->
+    /// `SlabFull`).
+    fn link(&mut self, epoch: u16, payload_digest: [u8; 32]) -> Result<u64, AoqError> {
         if self.len == self.slab.len() {
-            return Err(AoqError::BufferTooShort {
-                got: (self.len + 1).min(u16::MAX as usize) as u16,
+            return Err(AoqError::SlabFull {
+                len: self.slab.len(),
             });
         }
-        let payload_digest = self.h.digest(&[payload]);
         let index = self.len as u64;
         let prev = self.checkpoint();
         let mut epoch_le = [0u8; 2];
@@ -240,30 +255,63 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
         Ok(index)
     }
 
-    /// Verified append of an `emit_verified` wire frame
-    /// (`[body][4-byte tag]`, `tag == H(body)[0..4]`).
+    /// Batch-append a run of already-computed payload digests
+    /// (`payload_digests[i]` lands with `epochs[i]` at the next `epochs.len()`
+    /// indices). The admitted-digest entry: callers who already paid for the
+    /// payload hash (e.g. a SIMD independent batch) skip the per-frame
+    /// re-hash; [`AoqChain::append`] still re-hashes per call.
     ///
-    /// The tag is checked BEFORE the link is written: a mismatch is
-    /// `DigestMismatch` and the chain is not mutated (law: no mutation
-    /// on refusal).
+    /// All-or-nothing refusal law: capacity is checked FIRST, so a batch that
+    /// does not fit is refused with [`AoqError::SlabFull`] `{ len: slab.len() }`
+    /// and ZERO mutation — the chain never lands a partial batch (stronger
+    /// than the "unmutated past that index" floor).
+    ///
+    /// Length-parity refusal: unequal `epochs`/`payload_digests` counts are
+    /// refused typed (`SeqGap` reused as the length-parity carrier:
+    /// `expected` = epochs count, `got` = digest count) — never a partial
+    /// batch, never a panic.
+    pub fn append_batch_admitted(
+        &mut self,
+        epochs: &[u16],
+        payload_digests: &[[u8; 32]],
+    ) -> Result<(), AoqError> {
+        if epochs.len() != payload_digests.len() {
+            return Err(AoqError::SeqGap {
+                expected: epochs.len() as u32,
+                got: payload_digests.len() as u32,
+            });
+        }
+        if self.len + epochs.len() > self.slab.len() {
+            return Err(AoqError::SlabFull {
+                len: self.slab.len(),
+            });
+        }
+        for (i, &d) in payload_digests.iter().enumerate() {
+            // Cannot refuse post-pre-check; propagated for honesty, not for
+            // a reachable path.
+            self.link(epochs[i], d)?;
+        }
+        Ok(())
+    }
+
+    /// Append a v3 wire frame (`emit_verified` output) as the next
+    /// record. CHAIN-IS-INTEGRITY (v3 wire law Stage 2, 2026-11-04): the
+    /// wire frame's authentication is the 16-byte AEAD tag, whose keys
+    /// the chain does not hold — the chain re-derives NOTHING from the
+    /// wire. The record's `payload_digest` is the chain's OWN hash over
+    /// the whole wire frame; tamper detection is the chain walk
+    /// ([`Self::verify_all`]/[`Self::verify_span`]) against that stored
+    /// hash, not a wire-tag re-derivation.
+    ///
+    /// Refusals are typed and leave the chain unmutated (short frame ->
+    /// `HeaderTooShort`, slab full -> `SlabFull`).
     pub fn append_verified(&mut self, frame: &[u8]) -> Result<u64, AoqError> {
-        if frame.len() < PARENT_PREFIX_BYTES + 1 {
+        if frame.len() < crate::header::SIZE_BYTES + 5 + TAG_LEN {
             return Err(AoqError::HeaderTooShort {
                 got: frame.len() as u16,
             });
         }
-        let (body, tag) = frame.split_at(frame.len() - PARENT_PREFIX_BYTES);
-        let mut want = [0u8; PARENT_PREFIX_BYTES];
-        want.copy_from_slice(tag);
-        let got_digest = self.h.digest(&[body]);
-        let got = &got_digest[0..PARENT_PREFIX_BYTES];
-        if got != want {
-            return Err(AoqError::DigestMismatch {
-                expected: u32::from_be_bytes(want),
-                got: u32::from_be_bytes(four(&got_digest)),
-            });
-        }
-        self.append(0, body)
+        self.link(0, self.h.digest(&[frame]))
     }
 
     /// Verify the whole chain (GENESIS parent law + per-record digests).

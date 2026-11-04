@@ -27,3 +27,10 @@ pub mod profile_guard;
 // AB-8 (PG-A2 wire seam): window verification + 5-segment scatter writer.
 pub mod verify;
 pub mod writer;
+// ZP-21 (RFC-0089 §8.4): CBMQS qualification certificate types +
+// canonical JSON emitters + issue/verify law, behind the `cert`
+// feature. Zero dependencies; the BLAKE3 substrate is injected
+// (`*_with` seam forms). alloc-using under the feature; the default
+// embedded surface stays no-dep / no-alloc.
+#[cfg(feature = "cert")]
+pub mod rfc0089_certificate;
