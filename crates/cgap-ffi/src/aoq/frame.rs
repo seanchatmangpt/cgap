@@ -12,7 +12,7 @@ pub const AOQ1_SIZE_BYTES: usize = 64;
 pub const AOQ1_MAGIC: u32 = 0x414F_5131;
 
 /// Header version this accessor set speaks.
-pub const AOQ1_VERSION: u16 = 2;
+pub const AOQ1_VERSION: u16 = 3;
 
 // Field offset constants — one per aoq:HeaderField, ORDER BY aoq:offset.
 pub const AOQ1_MAGIC_OFFSET: usize = 0; // u32 (4B, C: magic, Go: Magic)
@@ -36,7 +36,8 @@ pub fn aoq1_magic(header: &[u8]) -> Option<u32> {
     }
     let mut raw = [0u8; 4];
     raw.copy_from_slice(&header[AOQ1_MAGIC_OFFSET..AOQ1_MAGIC_OFFSET + 4]);
-    Some(u32::from_le_bytes(raw))
+    Some(u32::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_version(header: &[u8]) -> Option<u16> {
@@ -45,7 +46,8 @@ pub fn aoq1_version(header: &[u8]) -> Option<u16> {
     }
     let mut raw = [0u8; 2];
     raw.copy_from_slice(&header[AOQ1_VERSION_OFFSET..AOQ1_VERSION_OFFSET + 2]);
-    Some(u16::from_le_bytes(raw))
+    Some(u16::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_epoch(header: &[u8]) -> Option<u16> {
@@ -54,7 +56,8 @@ pub fn aoq1_epoch(header: &[u8]) -> Option<u16> {
     }
     let mut raw = [0u8; 2];
     raw.copy_from_slice(&header[AOQ1_EPOCH_OFFSET..AOQ1_EPOCH_OFFSET + 2]);
-    Some(u16::from_le_bytes(raw))
+    Some(u16::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_key_id(header: &[u8]) -> Option<u64> {
@@ -63,7 +66,8 @@ pub fn aoq1_key_id(header: &[u8]) -> Option<u64> {
     }
     let mut raw = [0u8; 8];
     raw.copy_from_slice(&header[AOQ1_KEY_ID_OFFSET..AOQ1_KEY_ID_OFFSET + 8]);
-    Some(u64::from_le_bytes(raw))
+    Some(u64::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_frame_ordinal(header: &[u8]) -> Option<u32> {
@@ -72,7 +76,8 @@ pub fn aoq1_frame_ordinal(header: &[u8]) -> Option<u32> {
     }
     let mut raw = [0u8; 4];
     raw.copy_from_slice(&header[AOQ1_FRAME_ORDINAL_OFFSET..AOQ1_FRAME_ORDINAL_OFFSET + 4]);
-    Some(u32::from_le_bytes(raw))
+    Some(u32::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_seq(header: &[u8]) -> Option<u32> {
@@ -81,7 +86,8 @@ pub fn aoq1_seq(header: &[u8]) -> Option<u32> {
     }
     let mut raw = [0u8; 4];
     raw.copy_from_slice(&header[AOQ1_SEQ_OFFSET..AOQ1_SEQ_OFFSET + 4]);
-    Some(u32::from_le_bytes(raw))
+    Some(u32::from_le_bytes(raw),
+    )
 }
 #[inline]
 pub fn aoq1_header_digest(header: &[u8]) -> Option<u32> {
@@ -90,7 +96,8 @@ pub fn aoq1_header_digest(header: &[u8]) -> Option<u32> {
     }
     let mut raw = [0u8; 4];
     raw.copy_from_slice(&header[AOQ1_HEADER_DIGEST_OFFSET..AOQ1_HEADER_DIGEST_OFFSET + 4]);
-    Some(u32::from_le_bytes(raw))
+    Some(u32::from_le_bytes(raw),
+    )
 }
 
 #[cfg(test)]
@@ -101,8 +108,7 @@ mod tests {
     fn header_buf() -> [u8; AOQ1_SIZE_BYTES] {
         let mut b = [0u8; AOQ1_SIZE_BYTES];
         b[AOQ1_MAGIC_OFFSET..AOQ1_MAGIC_OFFSET + 4].copy_from_slice(&AOQ1_MAGIC.to_le_bytes());
-        b[AOQ1_VERSION_OFFSET..AOQ1_VERSION_OFFSET + 2]
-            .copy_from_slice(&AOQ1_VERSION.to_le_bytes());
+        b[AOQ1_VERSION_OFFSET..AOQ1_VERSION_OFFSET + 2].copy_from_slice(&AOQ1_VERSION.to_le_bytes());
         b
     }
 

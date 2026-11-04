@@ -100,6 +100,12 @@ pub mod views;
 mod generated_arrow_primitives;
 #[cfg(not(target_os = "none"))]
 mod generated_layout;
+// P7 drift-pin consolidation (v26.11.4): the frozen AOQ status band is a
+// generated projection (packs/aoq-pack/templates/status_band_rs.tmpl ->
+// status_band.rs), checksum-frozen at
+// .ggen/freeze/aoq-pack/crates/cgap-arrow/src/status_band.rs.blake3.
+// status_dictionary re-exports its STATUS_BAND as the in-crate producer pin.
+mod status_band;
 // G1 courts (CG-1, v26.11.3): hand-law courts for the never-edit generated
 // module above; live OUTSIDE it so regeneration cannot overwrite them.
 #[cfg(all(not(target_os = "none"), test))]

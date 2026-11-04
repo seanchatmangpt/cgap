@@ -18,10 +18,15 @@
 //! buffer is self-describing).
 //!
 //! The dictionary values are the FROZEN status band (gate 020/070 law):
-//! 8 (wire word, name) pairs, band 0x4347A001..A008. Frozen authority for
-//! (word, name) is cgap-ffi's `status_maps.rs`; this module pins the same
-//! 8 pairs so the producer and the tri-language drift court
-//! (`tests/status_band_tri_court.rs`) share one in-crate table.
+//! 8 (wire word, name) pairs, band 0x4347A001..A008. AUTHORITY = the
+//! canonical graph: this module consumes the GENERATED projection
+//! `crate::status_band::STATUS_BAND` (pack
+//! `ggen-marketplace/packs/aoq-pack/templates/status_band_rs.tmpl` over the
+//! aoq:StatusConstant individuals), checksum-frozen by the consumer-repo
+//! slot `.ggen/freeze/aoq-pack/crates/cgap-arrow/src/status_band.rs.blake3`.
+//! This module carries no band copy of its own: the producer and the
+//! tri-language drift court (`tests/status_band_tri_court.rs`) share the
+//! one generated table.
 
 #![cfg(not(target_os = "none"))]
 
@@ -29,20 +34,12 @@ use alloc::vec::Vec;
 use crate::buffer::{Buf, ALIGNMENT};
 
 /// FROZEN status band (gate 020/070 law): (wire word, symbolic name),
-/// band 0x4347A001..A008, slot i holds 0x4347A001 + i.
-/// The tri-language drift court (`tests/status_band_tri_court.rs`) pins
-/// cgap-ffi `status_maps.rs`, `include/cgap_aoq.h` and arcus `aoq_ipc.go`
-/// to this table byte-exactly.
-pub const STATUS_BAND: &[(u32, &str)] = &[
-    (0x4347A001, "OK"),
-    (0x4347A002, "PENDING"),
-    (0x4347A003, "BUSY"),
-    (0x4347A004, "INCOMPLETE_FRAME"),
-    (0x4347A005, "DIGEST_MISMATCH"),
-    (0x4347A006, "EPOCH_MISMATCH"),
-    (0x4347A007, "KEY_UNKNOWN"),
-    (0x4347A008, "EPOCH_RETIRED"),
-];
+/// band 0x4347A001..A008, slot i holds 0x4347A001 + i. GENERATED projection
+/// (`crate::status_band`, authority = the canonical graph); re-exported here
+/// so the producer and the tri-language drift court
+/// (`tests/status_band_tri_court.rs`) pin all three language tables to ONE
+/// generated table.
+pub use crate::status_band::STATUS_BAND;
 
 /// Producer error: typed refusals, no panics on input facts.
 #[derive(Debug, PartialEq, Eq)]
@@ -91,11 +88,11 @@ pub fn build_dictionary() -> Result<StatusDictionary, DictionaryError> {
         slot.copy_from_slice(&(i as u32).to_le_bytes());
     }
 
-    // Buffer 2: values — child Utf8 offsets + data (8-bit lanes).
-    let names: [&str; 8] = [
-        "OK", "PENDING", "BUSY", "INCOMPLETE_FRAME", "DIGEST_MISMATCH",
-        "EPOCH_MISMATCH", "KEY_UNKNOWN", "EPOCH_RETIRED",
-    ];
+    // Buffer 2: values — child Utf8 offsets + data (8-bit lanes). The
+    // names are the generated band's names, derived in a loop: this file
+    // carries no second copy of the band (P7 drift-pin consolidation).
+    let names: Vec<&str> = STATUS_BAND.iter().map(|(_, n)| *n).collect();
+    assert_eq!(names.len(), 8, "frozen band size checked above");
     let mut offsets = [0u32; 9];
     let mut total = 0usize;
     for (i, n) in names.iter().enumerate() {
@@ -115,11 +112,16 @@ pub fn build_dictionary() -> Result<StatusDictionary, DictionaryError> {
         }
     }
 
+    let mut name_lengths = [0u32; 8];
+    for (i, (_, n)) in STATUS_BAND.iter().enumerate() {
+        name_lengths[i] = n.len() as u32;
+    }
+
     Ok(StatusDictionary {
         validity,
         indices,
         values,
-        name_lengths: [names[0].len() as u32, names[1].len() as u32, names[2].len() as u32, names[3].len() as u32, names[4].len() as u32, names[5].len() as u32, names[6].len() as u32, names[7].len() as u32],
+        name_lengths,
     })
 }
 

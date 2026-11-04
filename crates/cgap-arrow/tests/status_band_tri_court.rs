@@ -265,3 +265,115 @@ fn court_flips_on_mutated_header() {
     let table = parse_cgap_aoq_h(&mutated);
     assert_ne!(table, producer, "VACUOUS COURT: mutated header still matched");
 }
+
+/// Parse the AOQ1 header version literal from a Rust line
+/// `pub const AOQ1_VERSION: u16 = N;`.
+fn parse_rust_version(src: &str) -> Option<u16> {
+    for line in src.lines() {
+        if let Some(rest) = line.trim().strip_prefix("pub const AOQ1_VERSION: u16 = ") {
+            return rest.trim_end_matches(';').trim().parse().ok();
+        }
+    }
+    None
+}
+
+/// Parse the AOQ1 header version from `#define CGAP_AOQ1_VERSION N`.
+fn parse_c_version(src: &str) -> Option<u16> {
+    for line in src.lines() {
+        if let Some(rest) = line.trim().strip_prefix("#define CGAP_AOQ1_VERSION ") {
+            return rest.trim().parse().ok();
+        }
+    }
+    None
+}
+
+/// Parse the AOQ1 header version from `Aoq1Version uint16 = N` (arcus).
+fn parse_go_version(src: &str) -> Option<u16> {
+    for line in src.lines() {
+        if let Some(rest) = line.trim().strip_prefix("Aoq1Version uint16 = ") {
+            return rest.trim().parse().ok();
+        }
+    }
+    None
+}
+
+/// VERSION-PIN LEG: all four wire-law surfaces pin AOQ1_VERSION = 3.
+/// cgap-ffi frame.rs, include/cgap_aoq.h, cgap-aoq
+/// generated_aoq_header_layout.rs (all three sync-projected from the same
+/// aoq:Header graph law) and arcus aoq_ipc.go (v3 promotion, 2026-11-04).
+#[test]
+fn aoq1_version_pinned_to_3_across_all_four_surfaces() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let root = manifest.parent().expect("crate parent").parent().expect("repo root");
+
+    let frame_rs = fs::read_to_string(root.join("crates/cgap-ffi/src/aoq/frame.rs"))
+        .expect("frame.rs readable");
+    let header_h = fs::read_to_string(root.join("include/cgap_aoq.h"))
+        .expect("cgap_aoq.h readable");
+    let layout_rs = fs::read_to_string(root.join("crates/cgap-aoq/src/generated_aoq_header_layout.rs"))
+        .expect("generated_aoq_header_layout.rs readable");
+
+    assert_eq!(
+        parse_rust_version(&frame_rs),
+        Some(3),
+        "frame.rs drifted from AOQ1 wire version 3"
+    );
+    assert_eq!(
+        parse_c_version(&header_h),
+        Some(3),
+        "cgap_aoq.h drifted from AOQ1 wire version 3"
+    );
+    assert_eq!(
+        parse_rust_version(&layout_rs),
+        Some(3),
+        "generated_aoq_header_layout.rs drifted from AOQ1 wire version 3"
+    );
+
+    // Go surface: same v3 pin (loud skip when arcus is absent).
+    if let Some(root) = arcus_root() {
+        let go_src = fs::read_to_string(root.join("internal/arcus/adapter/aoq_ipc.go"))
+            .expect("aoq_ipc.go readable");
+        assert_eq!(
+            parse_go_version(&go_src),
+            Some(3),
+            "arcus aoq_ipc.go drifted from AOQ1 wire version 3"
+        );
+    } else {
+        eprintln!("SKIPPED-ARCUS-ABSENT: Go AOQ1_VERSION pin not observed this run");
+    }
+
+    // ANTI-VACUITY (in-memory): flip one surface's literal to 2 — the pin
+    // parser must flip, never still report 3.
+    let flipped = parse_rust_version(&frame_rs.replace(
+        "pub const AOQ1_VERSION: u16 = 3;",
+        "pub const AOQ1_VERSION: u16 = 2;",
+    ));
+    assert_ne!(flipped, Some(3), "VACUOUS COURT: a flipped version literal still matched the pin");
+    assert_eq!(flipped, Some(2), "flipped literal must parse as 2");
+}
+
+/// ANTI-VACUITY (Go leg): the court's Go parser must flip on a real
+/// in-memory mutation of the parsed aoq_ipc.go source.
+#[test]
+fn court_flips_on_mutated_go_source() {
+    let producer = producer_table();
+    let root = match arcus_root() {
+        Some(r) => r,
+        None => {
+            eprintln!("SKIPPED-ARCUS-ABSENT: set ARCUS_ROOT (default sibling ../../../arcus absent); Go mutation leg not observed this run");
+            return;
+        }
+    };
+    let src = fs::read_to_string(root.join("internal/arcus/adapter/aoq_ipc.go"))
+        .expect("aoq_ipc.go readable");
+
+    // In-memory strings.Replace: the frozen band's first wire word moves
+    // to the retired-band-adjacent value 0x4347A009 (outside 0x...A001..A008).
+    let mutated = src.replace("0x4347A001", "0x4347A009");
+    assert_ne!(mutated, src, "mutation must apply");
+    let table = parse_aoq_ipc_go(&mutated);
+    assert_ne!(
+        table, producer,
+        "VACUOUS COURT: mutated Go source still matched the producer band"
+    );
+}
