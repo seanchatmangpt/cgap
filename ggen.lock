@@ -11,3 +11,7 @@ content_hash = "blake3:3a0c2e2dad360093b8c27a95d8c13d87b97f1c2aa88e3c3e89a43c086
 [packs.cscb-pack]
 source = "path:../ggen-marketplace/packs/cscb-pack"
 content_hash = "blake3:cebe0a0a8609e55845d3873bf1131cdd1ff334056325c762568d4a278d2319cd"
+
+[packs.tort-pack]
+source = "path:../ggen-marketplace/packs/tort-pack"
+content_hash = "blake3:ee7030430e1ae2362e1270fffc6f2ab342f5acc93c2898b19fe3f913d2225cee"

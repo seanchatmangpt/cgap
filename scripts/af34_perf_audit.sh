@@ -23,12 +23,13 @@ log() { printf '%s\n' "$*" | tee -a "$OUT"; }
 # ---------- helpers ----------
 canary() { # $1 template name; 0 if recording succeeded
   local d; d="$(mktemp -d /tmp/af34_canary.XXXX)"
-  xctrace record --template "$1" --time-limit 2s --launch -- /usr/bin/true \
-    --output "$d/t.trace" >/dev/null 2>&1
+  local o; o="$d/out.log"
+  xctrace record --template "$1" --time-limit 2s --output "$d/t.trace" \
+    --launch -- /usr/bin/true >"$o" 2>&1
   local rc=$?
-  grep -rq "Recording failed" "$d" 2>/dev/null
+  grep -q "Recording failed" "$o"
   local failed=$?
-  rm -rf "$d" "$HOME/Launch_true_"*.trace 2>/dev/null
+  rm -rf "$d" "$HOME/Launch_true_"*.trace /tmp/Launch_true_*.trace 2>/dev/null
   [ "$rc" -eq 0 ] && [ "$failed" -ne 0 ]
 }
 perf_available() {
@@ -71,6 +72,7 @@ if perf_available; then
 else
   log "-- leg 1: perf UNAVAILABLE — $(command -v perf >/dev/null 2>&1 && echo 'perf present but no PMU (/sys/devices/cpu/events absent)' || echo 'perf binary absent on macOS host') --"
   BLOCKER="perf: $(command -v perf >/dev/null 2>&1 && echo present-no-PMU || echo absent); "
+  REPORT=1
 fi
 
 # ---------- leg 2: macOS xctrace CPU Counters ----------
@@ -93,6 +95,7 @@ else
   log ""
   log "-- leg 2: xctrace CPU Counters UNAVAILABLE — canary /usr/bin/true recording FAILS on this host ('Data stream: Fatal logging system error: log archive is corrupt or incomplete'), reproduces for Time Profiler too, inside and outside sandbox --"
   BLOCKER="${BLOCKER}xctrace-CPU-Counters: canary-fails(host-level); "
+  REPORT=1
 fi
 
 # ---------- leg 3: colima VM probe (perf in a Linux guest) ----------

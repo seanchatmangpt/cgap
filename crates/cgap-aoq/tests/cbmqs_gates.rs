@@ -239,9 +239,11 @@ fn gate_g1b_slab_rate() -> GateOutcome {
             // Anti-DCE: the slab image must be observed, or release
             // LLVM folds the pushes away and the rate is vacuous
             // (witnessed: 11.08B "pushes/s" before this fix).
+            // RX-4 swap: composes the reusable profile_guard::fence
+            // (AF-10 G1b fix, generalized) instead of inline std::hint calls.
             let image = slab.as_bytes();
-            std::hint::black_box(&image);
-            std::hint::black_box(slab.len());
+            cgap_aoq::profile_guard::fence(&image);
+            cgap_aoq::profile_guard::fence(slab.len());
             drop(slab); // reset-to-new is the release primitive
         }
         let secs = start.elapsed().as_secs_f64();
@@ -371,12 +373,14 @@ fn gate_g2_wire_ceiling() -> GateOutcome {
 
     // AXIS 2, profile pin: the ceiling binds ONLY under release. A debug
     // run records context and loud-SKIPs the fence (never a fake pass).
-    if cfg!(debug_assertions) {
+    // RX-4 swap: composes the reusable profile_guard::assert_release()
+    // (typed ProfileViolation) instead of the inline cfg! check.
+    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
         return skip(
             G,
             C,
             format!(
-                "release-profile fence only (AF-17 axis 2); context: {column} | {detail}"
+                "release-profile fence only (AF-17 axis 2; {v}); context: {column} | {detail}"
             ),
         );
     }

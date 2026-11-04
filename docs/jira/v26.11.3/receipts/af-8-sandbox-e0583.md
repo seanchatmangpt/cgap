@@ -55,12 +55,21 @@ loop breaking on the `src/aoq/` landing. Re-derived per-test this session:
   mutation arms fired and passed, non-vacuous. The cgap-crypto
   ct_scan_court sandbox-add-token kills are exercised by the
   cgap-crypto run below.
-- `cargo test -p cgap-crypto` ×2: BLOCKED at this receipt's writing —
-  another lane's in-flight cgap-crypto edit (`dbg5` test:
-  `module 'sha3' is private`, E0603; earlier: kem.rs E0425/unclosed
-  delimiter, then recovered in-SLA). cgap-crypto compile poll running in
-  background; will be updated to final state when it clears. My diff
-  touches no cgap-crypto file.
+- `cargo test -p cgap-crypto` ×2: **BLOCKED — foreign landed defect**.
+  Evidence chain (this session): (1) compile-freeze windows (kem.rs E0425
+  unclosed delimiter, dbg5 `sha3 is private` E0603) — cleared by their
+  owner in-SLA; (2) one flaky AE8 court death (lease.rs:430, E0460 stale
+  rmeta race under concurrent rebuilds) — cleared by a coherent
+  `cargo clean -p cgap-blake3 -p cgap-crypto` + rebuild (my transition on
+  the shared target, disclosed); after which the lib suite is 25/25 green
+  and every suite green EXCEPT `mlkem_sanity::roundtrip_sanity`
+  (tests/mlkem_sanity.rs:16, ss1≠ss2). `src/kem.rs` (mtime 22:31) and
+  `tests/mlkem_sanity.rs` (22:15) have been idle >1h while their lane
+  iterated KAT-flip courts (kat_flip_demo.rs 23:01, green) — the ML-KEM
+  FO roundtrip in another lane's landed kem.rs is broken, repro
+  `cargo test -p cgap-crypto --test mlkem_sanity` → exit 101, deterministic.
+  I own no cgap-crypto file; the fix belongs to that lane. My diff touches
+  no cgap-crypto file.
 
 ## Compile-freeze disclosures (same-checkout fan-out)
 
@@ -68,6 +77,20 @@ loop breaking on the `src/aoq/` landing. Re-derived per-test this session:
   visibility — other lanes' in-flight edits; I never touched cgap-crypto.
 - cgap-aoq Cargo.toml duplicated `[dev-dependencies]` — other lane; I
   never touched it; recovered in-SLA (~3 min).
+- Shared-target transition: I ran `cargo clean -p cgap-blake3
+  -p cgap-crypto` (148.5 MiB) to clear the AE8 stale-rmeta race; lanes
+  mid-run against those artifacts should rebuild.
 - My only cross-lane file edits: `aoq/kind_enums.rs` (std→core::error,
   2 lines) and `sovereign.rs` walk-root fix — both disclosed above;
   the walk-root fix is one word in a file adjacent to my owned seam.
+
+## Standing
+
+- cgap-ffi sandbox-court E0583 fix + walk-root fix: **ALIVE** — commands +
+  exits cited above (BEFORE 4 failed / FINAL 58 passed, exit 0, this
+  session, exact subject).
+- cgap-crypto ×2 green: **BLOCKED** — foreign landed defect in
+  `src/kem.rs` ML-KEM FO roundtrip (`mlkem_sanity::roundtrip_sanity`,
+  deterministic, repro cited); crypto-lane owner required. All other
+  cgap-crypto suites green after coherent rebuild (lib 25/25; ct_scan
+  sandbox-add-token anti-vacuity kills among them).

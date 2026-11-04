@@ -96,7 +96,12 @@ pub fn keygen(d: &[u8; 32], z: &[u8; 32], ek: &mut [u8; EK_LEN], dk: &mut [u8; D
     f3::hash_h(&mut h_ek, &ek_full);
     for i in 0..f3::K {
         let mut pb = [0u8; 384];
-        f3::poly_tobytes(&mut pb, &s_hat[i]);
+        let mut si = s_hat[i];
+        // FIPS 203: dk stores canonical ByteEncode12(shat). Kyber-R3 code
+        // packed shat unreduced (self-consistent with its own frombytes,
+        // but NOT conformant); liboqs/FIPS 203 reduces first. Reduce here.
+        f3::poly_reduce(&mut si);
+        f3::poly_tobytes(&mut pb, &si);
         dk[384 * i..384 * (i + 1)].copy_from_slice(&pb);
     }
     dk[1152..1152 + EK_LEN].copy_from_slice(&ek_full);

@@ -21,6 +21,9 @@ pub mod header;
 pub mod kem;
 // session.rs landed (AB-7, 21:58); registration restored by AB-1.
 pub mod session;
+// RX-4: reusable release-profile detector + anti-DCE fence (AF-25 axis 2
+// loud-SKIP pattern + AF-10 G1b black_box, generalized).
+pub mod profile_guard;
 // AB-8 (PG-A2 wire seam): window verification + 5-segment scatter writer.
 pub mod verify;
 pub mod writer;

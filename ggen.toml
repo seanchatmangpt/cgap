@@ -12,6 +12,7 @@ source = "ontology/cgap.ttl"
 cgap-pack = { path = "../ggen-marketplace/packs/cgap-pack" }
 aoq-pack = { path = "../ggen-marketplace/packs/aoq-pack" }
 cscb-pack = { path = "../ggen-marketplace/packs/cscb-pack" }
+tort-pack = { path = "../ggen-marketplace/packs/tort-pack" }
 
 [templates]
 dir = "gen-templates"

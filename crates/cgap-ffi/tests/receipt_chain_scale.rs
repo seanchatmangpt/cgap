@@ -188,7 +188,8 @@ fn scale_append_verify_100k_census() {
         // bound or a single-shot ratio).
         let t10 = Instant::now();
         verify_span(&chain, &blocks, &license, 0, 10_000).expect("prefix span");
-        span10_runs.push(ms(t10.elapsed().as_nanos()));
+        let span10_ms = ms(t10.elapsed().as_nanos());
+        span10_runs.push(span10_ms);
         verify_runs.push(verify_ms);
         eprintln!(
             "[run {run}] append 100k: {append_ms:.1}ms | verify_all: {verify_ms:.1}ms | \
@@ -209,7 +210,7 @@ fn scale_append_verify_100k_census() {
     let first = census[0];
     let last = *census.last().expect("non-empty census");
     eprintln!(
-        "[MIN-OF-3] append 100k: {append_ms:.1}ms | verify_all: {verify_ms:.1}ms | \
+        "[MIN-OF-3] append 100k: {append_ms:.1}ms | verify_all: {min_verify:.1}ms | \
          per-1k wall first {}/last {} ms (x{:.2}) | per-1k allocs first {} -> last {} | \
          per-1k bytes first {} -> last {}",
         ms(first.0),
