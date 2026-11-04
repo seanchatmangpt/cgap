@@ -135,6 +135,64 @@ this pass by diff, not memory.
 | ZD-43 | receipts/zd-43-dryrun-ladder.md | PARTIAL (body header: 7/20 dry-run exits 0; two typed failure classes) | `cargo publish --dry-run` ×20 sequential topo order at 37721e2, no source edits / git transitions / real publishes; 7 exit 0; 11 registry-dep-missing exit 101 (26.11.3 siblings unpublished — self-healing at Stage 3); 2 dirty-worktree exit 101 (cgap-audit, cgap-ffi); the predicted license-file blocker never fired; 22-vs-20 publish=true census discrepancy recorded, not repaired, flagged for Stage 3 |
 | ZD-55 | receipts/zd-55-dod-commands.md | UNSTATED as an overall word (Standing section: dod-011/012 MEASURED this session; the skip is disclosed, not silent — yd-7 precedent) | dod-011/012 disposition: `--skip-ea-admission` pinned into packs/dod-pack/ontology.ttl (option (b) ruling; cgap root sync manufactures no SBBs, so a root ea.graph.json would be an admission gate over nothing); ladder: raw sync exit 1 FM-LAW-015 → pack-edit sync exit 1 FM-PACK-008 → documented re-lock exit 0 → fixed point `written: []` exit 0; as-written checklist commands exit 0; ZD-36's open item closed |
 
+## Post-close receipts (zd-116 final coverage pass, 2026-11-04)
+
+Ten receipt stems on disk carried no row in this file at the terminal
+mention-level coverage gate (stems vs README.md — this repo's only index
+file; it carries no RECEIPTS.md, unchanged by this pass): five landed in
+earlier windows without rows (zd-8, zd-53, zd-56, zd-63, zd-76, zd-79)
+and four landed after zd-57's 70-census (zd-97, zd-102, zd-103,
+zd-105). They are rowed below, standing words re-read from each receipt
+body on disk, never from memory; UNSTATED where the body carries none.
+Census at this lane's run: `ls receipts/ | wc -l` = 80 before this
+lane's own receipt, 81 with zd-116-index-final.md on disk;
+zd-113-ladder-refresh.md landed mid-pass during this lane's
+verification run — 82 at final re-census — absorbed with its own row.
+Coverage gate after these rows: UNCOVERED [] (exit 0). zd-106b has no
+receipt file on disk in this tree — nothing to row (disclosed, never a
+row for an absent file).
+
+| Lane | Receipt | Standing | Gate (exit record) |
+|---|---|---|---|
+| ZD-8 | receipts/zd-8-dod006-quiet.md | ALIVE (Standing section: court ALIVE; dod-006 red classified load-bound-flake, close condition satisfied) | `throughput_min_of_n_floor` ×3 exit 0 on quiet host (min 261.26 MB/s open, ~130x the 2 MB/s floor); quiet precondition via bounded pgrep polling with the poller's own self-match defect found and corrected |
+| ZD-53 | receipts/zd-53-cgap-git-courts.md | ALIVE (Standing section: zero-alloc claim now per-thread-scoped, serial ×5 green; alloc_counter.rs untouched, per-thread by construction) | soc court serial ×5 → 3 passed / 0 failed (flake reproduced 3/6 before fix, 0/5 after); full release suite ×2 green (244/0); ANDON child re-exec exit 101 with refusal in captured stdout |
+| ZD-56 | receipts/zd-56-sidecar-e2e.md | ALIVE (Standing section: every command run this session against the exact subject; final state re-read on disk) | rung-8 E2E courts 3 passed / 0 failed ×2 each (E1 happy path digest-equal, E2 flipped-byte typed DIGEST_MISMATCH, E3 process reuse + stdin-EOF stop); full suite exit 0; XIP courts green; 0 stale aoq sockets post-sweep |
+| ZD-63 | receipts/zd-63-membrane-closeout.md | PARTIAL_ALIVE (body Status: documentation-correctness standing, claims no new executions; rungs 7/8 unwitnessed at closeout — rung 8 closed since by zd-56, rung 7 by zd-79's BLOCKED witness then commit f30580ff) | four lane receipts re-read from disk + presence checks on eight lane-owned files (mtimes Nov 4 01:48-03:42); absence checks for zd-56/zd-63 at closeout (self-indexed per YD-5 precedent) |
+| ZD-76 | receipts/zd-76-sweep-verify.md | UNSTATED in body (gate table carries the evidence; intermediate red classified environmental — A07 anti-vacuity needs full debug artifacts, resolved by `cargo build --workspace`) | `cargo check --workspace` exit 0; `cargo test -p cgap-ffi` exit 0 (lib 60/60, sidecar court 7/7, 15 suites ok); `cargo test -p cgap-git --release` exit 0 (40 suites, 0 failed); `manifest_court` 3 passed / 0 failed |
+| ZD-79 | receipts/zd-79-gate0-witness.md | BLOCKED (Status header; deterministic ×2, not flaky; closed since by commit f30580ff per zd-105) | `make gate0` exit 2 ×2 — typed FM-LAW-015 refusal (no ea.graph.json at repo root; recipe passes no `--skip-ea-admission`); byte-stable replay + header compile unreached, disclosed |
+| ZD-97 | receipts/zd-97-dryrun-retry.md | UNSTATED as an overall word (Classification section: registry-dep-missing, the same self-healing class as ZD-43's 11) | `cargo publish -p cgap-audit/-p cgap-ffi --dry-run` exit 101 ×2 (cgap-arrow ^26.11.3 unresolvable on crates.io); ladder closes 20/20: 7 green + 12 registry-dep self-healing + 0 unclassified |
+| ZD-102 | receipts/zd-102-cgap-prelanding.md | ALIVE (Standing section: checks 1, 2, 4a, 4b, 5 executed this session with real exits; UNSAFE verdict rests solely on check 3, executed exit 1) | `git status --porcelain` clean; `cargo check --workspace` exit 0; `cargo fmt --all -- --check` exit 1 — 1268 hunks / 190+ files, repo-wide fmt drift, the finding; deny advisories + licenses exit 0; `make gate0` exit 0 |
+| ZD-103 | receipts/zd-103-ffi-warnings.md | ALIVE (verification header: exact subject, this session) | `cargo check -p cgap-ffi` → 0 warning sites in owned bin; clippy --all-targets → 0 mentions of aoq_sidecar.rs (200 crate-wide typed, recorded not rounded); sidecar + e2e courts 3/0 + 3/0 unregressed |
+| ZD-105 | receipts/zd-105-cgap-closure.md | ALIVE for the seal's contracted scope (both files landed; BLOCKED/DEFERRED carries recorded, not claimed closed) | `cargo check --workspace` exit 0 (13 pre-existing cgap-crypto warnings disclosed); `make gate0` exit 0; `git rev-parse HEAD origin/main` equal (b6d68517); receipt census 78 pre-seal / 80 post-seal |
+| ZD-113 | receipts/zd-113-ladder-refresh.md | ALIVE for the plan refresh (Standing section; Stage 3 itself remains UNEXECUTED — nothing published) | `cargo metadata --no-deps` census exit 0 ×2 (25 members, 21 publishable, 4 `publish = []` excluded); plan §3.2 license-file blocker FALSIFIED against ZD-43/ZD-97 evidence; ladder census 17 → 21 pinned; edits confirmed on disk |
+| ZD-116 | receipts/zd-116-index-final.md | ALIVE (contracted scope, self-row; the gate UNCOVERED [] is the witness) | mention-level coverage gate exit 0 over 82 receipt stems (10 uncovered at lane start, 0 after rows landed; 1 receipt absorbed mid-pass); census 80-before / 82 at final re-census |
+
+## Post-close receipts, second refresh (zd-143 index refresh 5, 2026-11-04)
+
+Coverage loop re-run after zd-116's 82-census: `ls receipts/ | wc -l` = 87
+at this lane's census (zd-141-sed-portability.md landed mid-pass — 86 at
+first count, 87 at re-census — absorbed with its own row). Stems-on-disk
+vs row-IDs diff found six files with no row: zd-57 (the refresh-3 receipt
+itself, narrated in this file since its pass but never rowed), zd-119,
+zd-133, zd-134, zd-136, zd-141. zd-136's own body census said 84 (+1
+untracked); this lane's fresh census supersedes: 87 before this lane's
+receipt, 88 with zd-143-index-refresh5.md on disk. Standing words re-read
+from each receipt body on disk this pass, never from memory; UNSTATED
+where the body carries none. zd-141 (the task brief's candidate) IS on
+disk and rowed below; zd-106b remains absent (still no row, per the
+zd-116 note). Coverage gate after these rows + the self-row: every
+on-disk stem has a row or a disclosed pointer — closed.
+
+| Lane | Receipt | Standing | Gate (exit record) |
+|---|---|---|---|
+| ZD-57 | receipts/zd-57-index-refresh3.md | ALIVE (body Standing section; this row is the refresh's own receipt, census commands ran its session — self-indexed per YD-5 precedent) | refresh-3 census 69-before / 70-after; 6 rows added (zd-6/13/26/36/43/55) + af-43 row refinement; absent-file greps (zd-8/53/56/xd-16) exit 1 each — no rows for absent files; duplicate-lane-label check `uniq -d` empty |
+| ZD-119 | receipts/zd-119-cgap-preflight.md | PARTIAL (body Whoami verdict, verbatim: token present, registry reachable, login identity unverified — `cargo whoami` exit 101, subcommand not installed) | `cargo search cgap-core --limit 1` resolved (registry API reachable); `~/.cargo/credentials.toml` present (0600, one token entry); crates.io API census ×23 crates at 2026-11-04 — zero 26.11.3 collisions, cgap-aoq NAME-FREE, wasm-footprint max 26.11.1; replay path disclosed (`cargo install cargo-whoami`) |
+| ZD-133 | receipts/zd-133-closure-addendum.md | ALIVE (body Standing header; seal claims stay anchored at cfdd58ab — the addendum extends, does not re-grade) | `git diff --stat cfdd58ab..HEAD` → 5 files 270+/40- at c9430086; four post-seal commits listed (zd-103/zd-8/zd-113/zd-119); one source path disclosed (aoq_sidecar.rs warning-fix only, crates/ diff read in full, 14 lines); receipt census 83 at authoring (seal-time 80) |
+| ZD-134 | receipts/zd-134-claude-census.md | ALIVE (body Status: all commands ran this session; header-paragraph drift disclosed, not repaired — lane boundary) | `git pull --ff-only` exit 0 (@09e8c7c7); `cargo metadata --no-deps` member count 25; per-manifest publish grep → 25/25 flagged (21 true / 4 false, wire-shm joined false); CLAUDE.md publish-law paragraph re-derived from the zd-119 live census; stale header "19 of 20" sentence left for its owner, disclosed |
+| ZD-136 | receipts/zd-136-fleet-census.md | ALIVE (body Standing: all figures read live at as-of 2026-11-04T16:43:02Z, zero git mutations, sole write = this receipt) | per-repo census ×6 (ggen/cgap/arcus/lsp-max/claude-code-config-lsp/ggen-marketplace) via rev-parse + ls-remote; fleet receipts total 366; CARRY closed set 8 re-verified; PR #824 OPEN with headRefOid = ggen local HEAD |
+| ZD-141 | receipts/zd-141-sed-portability.md | LANDED (body Status header, verbatim; unpushed at receipt time — body's own word, not one of the ALIVE/PARTIAL/BLOCKED vocabulary terms) | `bash -n scripts/verify_v26.10.31.sh` exit 0; minimal reproduction of the exact classify-branch snippet on the FAIL input state → PRE-EXISTING-FAIL written, tmp consumed by mv (no residue); BSD `sed -i ''` replaced with portable non-`-i` rewrite (ZB-65, GNU-sed parse defect); GNU-side proof deferred to next ubuntu-latest classify-branch run, disclosed |
+| ZD-143 | receipts/zd-143-index-refresh5.md | ALIVE (this row is the refresh's own receipt; census + diff commands cited here ran this session — YD-5 self-index precedent) | `ls receipts/ \| wc -l` = 87 before this receipt, 88 after; stems-vs-row-IDs diff → 6 uncovered (zd-57/119/133/134/136/141), 0 after rows landed; zd-141 absorbed mid-pass (86→87); `uniq -d` on row IDs → no duplicate lane labels |
+
 ## Placement notes (pointer-only)
 
 - e80-06 and e80-07 receipts are hosted in
