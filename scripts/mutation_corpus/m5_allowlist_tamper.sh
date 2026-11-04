@@ -8,6 +8,10 @@ set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 mc_self_check
 mc_stage_full
+# Baseline disclosure: overlay the repaired allowlist (see m4).
+cp "$CGAP_ROOT/scripts/profile_guard_allowlist.toml" \
+   "$MC_SANDBOX/scripts/profile_guard_allowlist.toml"
+mc_log OVERLAY "repaired allowlist (ffi-ZP18-D-5 entry) overlaid into sandbox"
 
 subject="$MC_SANDBOX/scripts/profile_guard_allowlist.toml"
 

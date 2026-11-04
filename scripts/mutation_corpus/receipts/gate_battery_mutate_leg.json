@@ -1,0 +1,9 @@
+{
+  "name": "gate_battery_mutate_leg",
+  "court": "scripts/gate_battery.py --with-self-check (cscb-sram bn3-pin mutate leg)",
+  "flipped": true,
+  "restore_verified": true,
+  "class": "builtin",
+  "scope": "bn3-pin mutant refused (exit 1) witnessed; battery overall exit 1 due to ffi-surface FAIL which is PRE-EXISTING (another lane's in-flight C-prototype surface), not a defect of this corpus leg",
+  "timestamp": "2026-11-04T21:19:09.837720+00:00"
+}

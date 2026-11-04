@@ -189,8 +189,10 @@ mc_with_mutation() {
     set -e
     if [ "$after_rc" -eq 0 ]; then
         cp "$SHIM_BACKUP" "$subject"
-        [ "$(mc_sha "$subject")" = "$baseline" ] || mc_fail RESTORE "restore-after-vaucuous mismatch"
-        mc_fail AFTER "after-witness EXITED 0 on MUTATED subject — court vacuous; subject restored"
+        restore_sha="$(mc_sha "$subject")"
+        mc_write_receipt "$name" "$court" "$subject" false "$baseline" "$restore_sha" "$after_rc"
+        [ "$restore_sha" = "$baseline" ] || mc_fail RESTORE "restore-after-vacuous mismatch"
+        mc_fail AFTER "after-witness EXITED 0 on MUTATED subject — court vacuous (COURT FAILS); subject restored; vacuity receipt written"
     fi
     mc_log AFTER "AFTER witness: gate flipped (exit $after_rc, nonzero as required)"
 
@@ -205,26 +207,29 @@ mc_with_mutation() {
 
     MC_FLIPPED=true MC_BEFORE_RC=0 MC_AFTER_RC="$after_rc" \
     MC_BASELINE_SHA="$baseline" MC_RESTORE_SHA="$restore_sha" \
-        mc_write_receipt "$name" "$court" "$subject"
+        mc_write_receipt "$name" "$court" "$subject" true "$baseline" "$restore_sha" "$after_rc"
     printf '[PASS] %s: non-vacuous (BEFORE green, AFTER flips gate, restore sha256-exact)\n' "$name"
     return 0
 }
 
 mc_write_receipt() {
+    # mc_write_receipt <name> <court> <subject> <flipped-true|false> <baseline-sha> <restore-sha> <after-exit>
     local name="$1" court="$2" subject="$3"
-    python3 - "$MC_RECEIPTS_DIR" "$name" "$court" "$subject" <<'PYEOF'
+    local flipped="${4:-true}" bsha="${5:-}" rsha="${6:-}" arc="${7:-0}"
+    MC_NAME="$name"
+    python3 - "$MC_RECEIPTS_DIR" "$name" "$court" "$subject" "$flipped" "$bsha" "$rsha" "$arc" <<'PYEOF'
 import json, os, sys, datetime
-rdir, name, court, subject = sys.argv[1:5]
+rdir, name, court, subject, flipped, bsha, rsha, arc = sys.argv[1:9]
 d = {
     "name": name,
     "court": court,
     "subject": subject,
-    "flipped": os.environ.get("MC_FLIPPED") == "true",
-    "restore_verified": os.environ.get("MC_RESTORE_SHA") == os.environ.get("MC_BASELINE_SHA"),
-    "baseline_sha256": os.environ.get("MC_BASELINE_SHA", ""),
-    "restore_sha256": os.environ.get("MC_RESTORE_SHA", ""),
-    "before_exit": 0,
-    "after_exit": int(os.environ.get("MC_AFTER_RC", "0")),
+    "flipped": flipped == "true",
+    "court_vacuous": flipped != "true",
+    "restore_verified": rsha == bsha and bool(rsha),
+    "baseline_sha256": bsha,
+    "restore_sha256": rsha,
+    "after_exit": int(arc),
     "sandbox": os.environ.get("MC_SANDBOX", ""),
     "cargo_sandbox": os.environ.get("MC_CARGO_SANDBOX", ""),
     "plane": os.environ.get("MC_PLANE", "cgap-local"),

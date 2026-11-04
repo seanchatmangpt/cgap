@@ -1,0 +1,9 @@
+{
+  "name": "profile_guard_census_selfcheck",
+  "court": "scripts/profile_guard_census.py --self-check",
+  "flipped": true,
+  "restore_verified": true,
+  "class": "builtin",
+  "scope": "poison HIT (unguarded TIMING) + clean PASS, exit 0 witnessed (session log)",
+  "timestamp": "2026-11-04T21:19:09.836951+00:00"
+}

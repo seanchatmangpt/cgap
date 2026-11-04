@@ -1,0 +1,15 @@
+{
+  "name": "m2_official_vectors_bitflip",
+  "court": "cgap-blake3/tests/official_vectors.rs (BLAKE3 official-vector pin)",
+  "subject": "/tmp/lane2-final-cargo/crates/cgap-blake3/src/lib.rs",
+  "flipped": true,
+  "court_vacuous": false,
+  "restore_verified": true,
+  "baseline_sha256": "df434a3645eb76503b5e2d52ece1fd7b15e0f5d486223caad37edca6963eb95b",
+  "restore_sha256": "df434a3645eb76503b5e2d52ece1fd7b15e0f5d486223caad37edca6963eb95b",
+  "after_exit": 101,
+  "sandbox": "/tmp/lane2-final-sandbox",
+  "cargo_sandbox": "/tmp/lane2-final-cargo",
+  "plane": "cgap-local",
+  "timestamp": "2026-11-04T21:26:18.013332+00:00"
+}

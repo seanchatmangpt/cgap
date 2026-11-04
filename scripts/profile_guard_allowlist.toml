@@ -81,3 +81,16 @@ path = "ontology-packs/fibo/tests/wave9_integration_courts.rs"
 ticket = "ZP18-D-residual-6"
 reason = "advisory elapsed PRINT only (file's own doc: 'CORRECTNESS court at 1M scale; elapsed time is printed as an advisory measurement ... never a gate'); conformance is the deliverable"
 added = "2026-11-04"
+
+# --- lane-2 anti-vacuity corpus (2026-11-04): census baseline repair.
+# aoq_flip_ladder_court.rs is a flip-ladder court whose every Instant::now
+# is a bounded-poll deadline (no-sleep doctrine) on flip observables —
+# the same class as its siblings ffi-ZP18-D-1..4. It landed without a
+# ticketed entry and left the census standing RED; entry restores the
+# census to green as the corpus BEFORE baseline (receipt:
+# docs/jira/v26.11.4/receipts/lane2-anti-vacuity-mutation-corpus.md).
+[[allowlist]]
+path = "crates/cgap-ffi/tests/aoq_flip_ladder_court.rs"
+ticket = "ffi-ZP18-D-5"
+reason = "flip-ladder court, no timed entry: every Instant::now is a bounded-poll deadline (flip-observable polls, no-sleep doctrine), never a duration measurement"
+added = "2026-11-04"

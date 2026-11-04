@@ -1,0 +1,15 @@
+{
+  "name": "m2_chain_digest_bitflip",
+  "court": "cgap-blake3/tests/chain_mutation_court.rs (BLAKE3 chain pin)",
+  "subject": "/tmp/lane2-final-cargo/crates/cgap-blake3/src/lib.rs",
+  "flipped": false,
+  "court_vacuous": true,
+  "restore_verified": true,
+  "baseline_sha256": "df434a3645eb76503b5e2d52ece1fd7b15e0f5d486223caad37edca6963eb95b",
+  "restore_sha256": "df434a3645eb76503b5e2d52ece1fd7b15e0f5d486223caad37edca6963eb95b",
+  "after_exit": 0,
+  "sandbox": "/tmp/lane2-final-sandbox",
+  "cargo_sandbox": "/tmp/lane2-final-cargo",
+  "plane": "cgap-local",
+  "timestamp": "2026-11-04T21:26:12.239784+00:00"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "enclave_budget_selfcheck",
+  "court": "scripts/enclave_budget_gate.py --self-check",
+  "flipped": true,
+  "restore_verified": true,
+  "class": "builtin",
+  "scope": "arm C clean PASS exit 0; arm P poisoned 32KiB global refuses exit 1; arm M loud-skip without artifact subject (documented)",
+  "timestamp": "2026-11-04T21:19:09.837579+00:00"
+}

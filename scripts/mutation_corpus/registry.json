@@ -1,0 +1,96 @@
+{
+  "cells": [
+    {
+      "id": "crates/cgap-blake3/tests/zero_alloc.rs",
+      "class": "corpus",
+      "receipts": ["m1_alloc_inject"],
+      "family": "alloc fence (counting GlobalAlloc court)"
+    },
+    {
+      "id": "crates/cgap-blake3/tests/chain_mutation_court.rs",
+      "class": "corpus",
+      "receipts": ["m2_chain_digest_bitflip"],
+      "family": "BLAKE3 chained-receipt pin"
+    },
+    {
+      "id": "crates/cgap-blake3/tests/official_vectors.rs",
+      "class": "corpus",
+      "receipts": ["m2_official_vectors_bitflip"],
+      "family": "BLAKE3 official-vector pin"
+    },
+    {
+      "id": "crates/cgap-aoq/tests/aoq1_layout_drift_court.rs",
+      "class": "corpus",
+      "receipts": ["m3_version_skew"],
+      "family": "AOQ1 codec version gate (generated layout projection)"
+    },
+    {
+      "id": "scripts/profile_guard_census.py",
+      "class": "corpus",
+      "receipts": ["m4_census_debug_profile", "m5_allowlist_tamper", "profile_guard_census_selfcheck"],
+      "family": "timing-fence census + allowlist validation",
+      "tickets": ["*allowlist-tickets*"]
+    },
+    {
+      "id": "scripts/enclave_budget_gate.py",
+      "class": "builtin",
+      "receipts": ["enclave_budget_selfcheck"],
+      "family": "128 KiB whole-envelope footprint court"
+    },
+    {
+      "id": "scripts/gate_battery.py",
+      "class": "builtin",
+      "cells_note": "cscb-sram bn3-pin mutate court PASS (built-in); ffi-surface FAIL is pre-existing (unowned by this lane)",
+      "receipts": ["gate_battery_mutate_leg"]
+    },
+    {
+      "id": "scripts/timing_gate.py",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-2",
+      "reason": "requires built bench binaries + const-time corpora (hardware timing); no in-repo anti-vacuity mode; corpus mutation requires a full bench build outside lane budget"
+    },
+    {
+      "id": "scripts/bench_gate.py",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-1",
+      "reason": "hardware divan bench regression gate; no in-repo anti-vacuity mode; mutation corpus would require the full bench corpus build"
+    },
+    {
+      "id": "scripts/test_census.py",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-3",
+ "reason": "DX-8 census REPORTING tool (compile-abort census; exit 0 unless --strict) - not a fail-closed timing/scale gate"
+    },
+    {
+      "id": "scripts/perf_guard.sh",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-4",
+      "reason": "advisory canary, NOT the spec gate (own header: looser ceiling, SKIP-NOISY semantics); spec gate is ctq_report's REAL gate"
+    },
+    {
+      "id": "scripts/nightly_perf.sh",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-5",
+      "reason": "nightly aggregation driver, not a fail-closed gate"
+    },
+    {
+      "id": "scripts/footprint.sh",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-6",
+      "reason": "fail-closed wasm footprint gate but anti-vacuity requires wasm32 link corpus; typed deferred ticket"
+    },
+    {
+      "id": "scripts/hop_ratio.py",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-7",
+      "reason": "journal analytics gate over journal.jsonl subjects not present in-repo; typed deferred ticket"
+    },
+    {
+      "id": "scripts/af34_perf_audit.sh",
+      "class": "excluded",
+      "ticket": "LANE2-EXC-8",
+      "corpus_leg": "builtin",
+      "reason": "hardware-counter audit with typed UNMEASURED loud-skip (exit 3) as its own anti-vacuity leg"
+    }
+  ]
+}

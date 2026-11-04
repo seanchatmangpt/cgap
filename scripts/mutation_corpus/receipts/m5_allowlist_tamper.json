@@ -1,0 +1,15 @@
+{
+  "name": "m5_allowlist_tamper",
+  "court": "scripts/profile_guard_census.py (allowlist validation leg)",
+  "subject": "/tmp/lane2-final-sandbox/scripts/profile_guard_allowlist.toml",
+  "flipped": true,
+  "court_vacuous": false,
+  "restore_verified": true,
+  "baseline_sha256": "edfb2d569e9e705822a66537fdb3c56072002a7e2b894b6bc99e2b53d9e84aea",
+  "restore_sha256": "edfb2d569e9e705822a66537fdb3c56072002a7e2b894b6bc99e2b53d9e84aea",
+  "after_exit": 1,
+  "sandbox": "/tmp/lane2-final-sandbox",
+  "cargo_sandbox": "/tmp/lane2-final-cargo",
+  "plane": "cgap-local",
+  "timestamp": "2026-11-04T21:26:25.209693+00:00"
+}

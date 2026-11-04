@@ -1,0 +1,15 @@
+{
+  "name": "m4_census_debug_profile",
+  "court": "scripts/profile_guard_census.py (census gate)",
+  "subject": "/tmp/lane2-final-sandbox/crates/cgap-blake3/tests/percall_latency.rs",
+  "flipped": true,
+  "court_vacuous": false,
+  "restore_verified": true,
+  "baseline_sha256": "097c41515e32acdc1b80eb1f223dccc791249947008d2a4b13e31cf8913d8dee",
+  "restore_sha256": "097c41515e32acdc1b80eb1f223dccc791249947008d2a4b13e31cf8913d8dee",
+  "after_exit": 1,
+  "sandbox": "/tmp/lane2-final-sandbox",
+  "cargo_sandbox": "/tmp/lane2-final-cargo",
+  "plane": "cgap-local",
+  "timestamp": "2026-11-04T21:26:24.809882+00:00"
+}
