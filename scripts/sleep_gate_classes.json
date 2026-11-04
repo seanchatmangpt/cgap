@@ -1,0 +1,10 @@
+{
+  "files": [
+    {
+      "path": "crates/cgap-aoq/tests/macro_density_bench.rs",
+      "lines": [100],
+      "reason": "S-9-01: fixed 100ms harness pacing between RSS observations; below violation bar (audited harness pacing, not a test-coordination sleep). Growth here is a reviewed diff."
+    }
+  ],
+  "functions": []
+}

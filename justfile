@@ -149,3 +149,16 @@ aoq-gate:
       echo "[SKIP] riscv32imc target not installed (loud skip, exit class 3)"
     fi
     echo "aoq-gate GREEN"
+
+# sleep-gate — no-sleep doctrine Law 3 (port of smalt just 29-sleep).
+# Fail-closed: unclassified fixed sleeps in crates/** refuse; lawful forms
+# are // SLEEP-CLASS annotation, a bounded poll loop, or a ticketed site in
+# scripts/sleep_gate_classes.json.
+sleep-gate:
+    python3 scripts/sleep_gate.py
+
+# Non-vacuity court: inject an unclassified sleep into a sandbox subject
+# -> gate must REFUSE; restore byte-exact -> PASS. A court that cannot
+# flip is FAIL (VACUOUS GATE).
+sleep-gate-court:
+    bash scripts/sleep_gate_court.sh
