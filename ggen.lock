@@ -14,7 +14,7 @@ content_hash = "blake3:cebe0a0a8609e55845d3873bf1131cdd1ff334056325c762568d4a278
 
 [packs.dod-pack]
 source = "path:packs/dod-pack"
-content_hash = "blake3:f68d7214cf219d48404e613e8068b0ce1189be1776b0057ba20ac4fd4ff6d930"
+content_hash = "blake3:685b7aa5f83a947fcccfdef1f2f4b635a78fe157e3a2e35016251a3ce8f3b820"
 
 [packs.tort-pack]
 source = "path:../ggen-marketplace/packs/tort-pack"

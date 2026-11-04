@@ -88,11 +88,11 @@ dod:g-005 a dod:DoDGate ; dod:gateId "dod-005" ;
     dod:publishBlocking true .
 
 dod:g-006 a dod:DoDGate ; dod:gateId "dod-006" ;
-    dod:description "AB-5 ML-KEM-768 round-trip (encaps/decaps shared-secret agreement) — IN FLIGHT: mlkem_sanity FAILS at HEAD, TestKem fallback still bound (AF1-KD-1)" ;
+    dod:description "AB-5 ML-KEM-768 round-trip (encaps/decaps shared-secret agreement): cgap-crypto suite green x2, corridor join court green x2 on the real ML-KEM-768, AF1-KD-1 CLOSED" ;
     dod:checkCommand "cargo test -p cgap-crypto --test mlkem_sanity" ;
-    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/af-1-corridor.md" ;
-    dod:standing "TARGET-UNMEASURED" ;
-    dod:publishBlocking false .
+    dod:evidenceReceipt "docs/jira/v26.11.3/receipts/bk-1-takeover.md" ;
+    dod:standing "MEASURED" ;
+    dod:publishBlocking true .
 
 dod:g-007 a dod:DoDGate ; dod:gateId "dod-007" ;
     dod:description "no_std embedded check, cgap-arrow on riscv32imc-unknown-none-elf: exit 0" ;
