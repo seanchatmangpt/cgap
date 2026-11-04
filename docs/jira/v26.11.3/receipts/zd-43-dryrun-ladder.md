@@ -77,3 +77,11 @@ doctest behavior of the verify step is UNVERIFIED as-of-37721e2f, re-test at Sta
   (3) Stage 3 may start immediately on the green L0, topo order with bounded polls.
 - Plan §5 falsifiers: §5.1 (path-only dev-dep stripping) and §5.2 (docs.rs rustc-args in
   verify) both remain UNVERIFIED as-of-37721e2f — re-test at Stage 3.
+
+## Correction (2026-11-04, ZB-16 re-baseline)
+
+The "22 publish=true" census recorded above was pre-sweep. Live count at
+e3233191: **21 publishable crates** in the root workspace (4 excluded via
+publish = []: wire-shm, cgap-beam, bench, cgap-court; cgap-mcp is a
+separate workspace with publish=false per yd-3). Stage 3 ladder operates
+on 21.
