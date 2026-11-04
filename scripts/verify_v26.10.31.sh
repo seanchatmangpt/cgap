@@ -77,7 +77,8 @@ if grep -q '^| `check-workspace` | FAIL' "$TABLE"; then
     echo "BASELINE: written from first run (error signatures; failure recorded as pre-existing)" >&2
   fi
   if diff -q "$BASELINE" "$TMPDIR_V/cur.sorted" >/dev/null 2>&1; then
-    sed -i '' 's/| `check-workspace` | FAIL |/| `check-workspace` | PRE-EXISTING-FAIL |/' "$TABLE"
+    sed 's/| `check-workspace` | FAIL |/| `check-workspace` | PRE-EXISTING-FAIL |/' "$TABLE" > "$TABLE.tmp" \
+      && mv "$TABLE.tmp" "$TABLE"
     FAIL_ANY=0
     echo "CLASSIFY: check-workspace matches baseline -> PRE-EXISTING-FAIL (disclosed)" >&2
   else

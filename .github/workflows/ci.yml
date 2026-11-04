@@ -83,9 +83,8 @@ jobs:
             echo "::warning::BEAM gate: OTP NOT available — test-cgap-beam inside verify_v26.10.31.sh is expected to fail/skip. Disclosed gap; qualify OTP on CI before treating CI as authoritative for cgap-beam."
           fi
 
-      # Known transport note (pre-existing, owner: scripts lane I20): the
-      # script's classify branch uses BSD sed (`sed -i ''`), which GNU sed
-      # misparses; that branch is only reachable when check-workspace FAILs.
+      # FIXED (zd-141): the classify branch's in-place table edit is now a
+      # portable sed-to-temp + mv (no `sed -i ''`); works on BSD and GNU sed.
       - name: Run the local gate
         run: bash scripts/verify_v26.10.31.sh
         timeout-minutes: 55
