@@ -109,3 +109,25 @@ Defect hits: **0**.
   for its own cell); quiet-machine witness absent fleet-wide — all values
   upper bounds under disclosed load. Untracked evidence: staging/commit
   coordinator-owned; this file is untracked at write time.
+
+## Addendum — Load-profile re-publication (L27, 2026-11-04, KD-2 close)
+
+Supersedes the unbounded ns/frame reading of the rows above (which carry
+no ns/frame ingress figures themselves; the contested surface is
+`docs/jira/v26.11.2/11-measured-claims.md` rows 5-8/28, quiet-host
+scoped). Paired solo/contended re-derivation, min-of-3, same method
+both profiles; raw TSV + per-leg logs at `/tmp/l27-kd2-paired/`
+(driver: `scripts/l27-kd2-paired-bench.sh`, exit 0 x6 legs;
+`scripts/l27-loadgen.c` reproduces the RED-10 W4 load classes;
+receipt: `docs/jira/v26.11.5/receipts/l27-kd2-claims.md`).
+
+| Row | Claim | Load profile (machine-stated) | fastest | median | slowest | Ratio fence |
+|---|---|---|---|---|---|---|
+| 5/6 | Ingress chain 1M const (ns/frame) | SOLO (min-of-3) | 10.35 | 10.70 (min) | 37.83 (worst) | baseline |
+| 5/6 | Ingress chain 1M const (ns/frame) | CONTENDED bw6+cpu9 (min-of-3, paired) | 11.21 (+8.3%) | 22.27 (+108%) | 98.23 (worst) | **9.49x worst/best vs solo** |
+| 7 | Penstock admission stage | SOLO prior 7.71 / contended UNVERIFIED (RED-10 W5 bw-only witness: tail 12.73) | 7.71 (prior) | — | 12.73 (prior, bw-only) | UNVERIFIED new band |
+
+Load-profile law for consumers: solo numbers are upper bounds under
+disclosed background, never worst-case bounds; under RED-10-class
+combined load the worst sample is 9.49x the solo fastest (this session;
+RED-10 measured 12.2x on 2026-11-02 — same class).

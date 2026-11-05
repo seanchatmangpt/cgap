@@ -37,6 +37,14 @@ its close condition; a court that documents a row is not a fix.
 - **Evidence**: `docs/jira/v26.11.2/redteam/red-10-timing-jitter-exploit.md:43-66` (W4 method: two /tmp load generators, repo untouched; W5 table: quiet fastest 10.66, combined bw6+cpu9 slowest 124.06).
 - **Close condition**: claims-table rows carry a stated load profile + a ratio fence against a sleep-free baseline (per the no-sleep doctrine), or a contention court is run alongside each published bench; flip CLOSED when the table's rows are re-published with load-profile columns.
 - **Registered**: 2026-11-04 (migrated from claims row 28 / red-10).
+- **Status**: CLOSED (2026-11-04, lane L27). Close condition met: the
+  claims-table rows are re-published with machine-stated load-profile
+  columns (SOLO vs CONTENDED bw6+cpu9, paired min-of-3) and a ratio
+  fence against a sleep-free baseline (contended worst 98.23 ns/frame =
+  9.49x solo fastest 10.35; RED-10's 12.2x class reproduced) in the bm6
+  addendum. Receipt: `docs/jira/v26.11.5/receipts/l27-kd2-claims.md`.
+  Residue: penstock (row 7) contended band UNVERIFIED until a paired
+  re-run.
 
 ## KD-3..KD-7 — v26.11.1 campaign ledger §5, migrated verbatim
 
