@@ -704,10 +704,12 @@ mod tests {
 
     /// Build a real wire-shm-layout segment file in a fresh tempdir.
     fn make_segment(capacity: u32) -> (std::path::PathBuf, ()) {
+        static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "aq_slab_test_{}_{}",
+            "aq_slab_test_{}_{}_{}",
             std::process::id(),
-            capacity
+            capacity,
+            N.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
