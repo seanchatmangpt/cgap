@@ -19,5 +19,6 @@ pub mod fips202;
 pub mod fips203;
 pub mod kem;
 pub mod mldsa;
+pub mod pqc_seal;
 pub mod lease;
 pub mod poly1305;
