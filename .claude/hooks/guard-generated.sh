@@ -33,6 +33,8 @@ case "$file" in
   crates/cli/tests/zero_code_cli.rs) exit 2 ;;
   ontology/cgap.ttl) exit 2 ;;
   ontology/cgap.ttl/*) exit 2 ;;
+  reports) exit 2 ;;
+  reports/*) exit 2 ;;
   generated) exit 2 ;;
   generated/*) exit 2 ;;
   *) exit 0 ;;
