@@ -203,75 +203,62 @@ fn mul_barrett_reduce(a: i32, b: i32) -> i32 {
 // ---------------------------------------------------------------------------
 
 pub const ZETAS: [i32; 256] = [
-           0,    25847, -2608894,  -518909,   237124,  -777960,  -876248,   466468,
-     1826347,  2353451,  -359251, -2091905,  3119733, -2884855,  3111497,  2680103,
-     2725464,  1024112, -1079900,  3585928,  -549488, -1119584,  2619752, -2108549,
-    -2118186, -3859737, -1399561, -3277672,  1757237,   -19422,  4010497,   280005,
-     2706023,    95776,  3077325,  3530437, -1661693, -3592148, -2537516,  3915439,
-    -3861115, -3043716,  3574422, -2867647,  3539968,  -300467,  2348700,  -539299,
-    -1699267, -1643818,  3505694, -3821735,  3507263, -2140649, -1600420,  3699596,
-      811944,   531354,   954230,  3881043,  3900724, -2556880,  2071892, -2797779,
-    -3930395, -1528703, -3677745, -3041255, -1452451,  3475950,  2176455, -1585221,
-    -1257611,  1939314, -4083598, -1000202, -3190144, -3157330, -3632928,   126922,
-     3412210,  -983419,  2147896,  2715295, -2967645, -3693493,  -411027, -2477047,
-     -671102, -1228525,   -22981, -1308169,  -381987,  1349076,  1852771, -1430430,
-    -3343383,   264944,   508951,  3097992,    44288, -1100098,   904516,  3958618,
-    -3724342,    -8578,  1653064, -3249728,  2389356,  -210977,   759969, -1316856,
-      189548, -3553272,  3159746, -1851402, -2409325,  -177440,  1315589,  1341330,
-     1285669, -1584928,  -812732, -1439742, -3019102, -3881060, -3628969,  3839961,
-     2091667,  3407706,  2316500,  3817976, -3342478,  2244091, -2446433, -3562462,
-      266997,  2434439, -1235728,  3513181, -3520352, -3759364, -1197226, -3193378,
-      900702,  1859098,   909542,   819034,   495491, -1613174,   -43260,  -522500,
-     -655327, -3122442,  2031748,  3207046, -3556995,  -525098,  -768622, -3595838,
-      342297,   286988, -2437823,  4108315,  3437287, -3342277,  1735879,   203044,
-     2842341,  2691481, -2590150,  1265009,  4055324,  1247620,  2486353,  1595974,
-    -3767016,  1250494,  2635921, -3548272, -2994039,  1869119,  1903435, -1050970,
-    -1333058,  1237275, -3318210, -1430225,  -451100,  1312455,  3306115, -1962642,
-    -1279661,  1917081, -2546312, -1374803,  1500165,   777191,  2235880,  3406031,
-     -542412, -2831860, -1671176, -1846953, -2584293, -3724270,   594136, -3776993,
-    -2013608,  2432395,  2454455,  -164721,  1957272,  3369112,   185531, -1207385,
-    -3183426,   162844,  1616392,  3014001,   810149,  1652634, -3694233, -1799107,
-    -3038916,  3523897,  3866901,   269760,  2213111,  -975884,  1717735,   472078,
-     -426683,  1723600, -1803090,  1910376, -1667432, -1104333,  -260646, -3833893,
-    -2939036, -2235985,  -420899, -2286327,   183443,  -976891,  1612842, -3545687,
-     -554416,  3919660,   -48306, -1362209,  3937738,  1400424,  -846154,  1976782,
+    0, 25847, -2608894, -518909, 237124, -777960, -876248, 466468, 1826347, 2353451, -359251,
+    -2091905, 3119733, -2884855, 3111497, 2680103, 2725464, 1024112, -1079900, 3585928, -549488,
+    -1119584, 2619752, -2108549, -2118186, -3859737, -1399561, -3277672, 1757237, -19422, 4010497,
+    280005, 2706023, 95776, 3077325, 3530437, -1661693, -3592148, -2537516, 3915439, -3861115,
+    -3043716, 3574422, -2867647, 3539968, -300467, 2348700, -539299, -1699267, -1643818, 3505694,
+    -3821735, 3507263, -2140649, -1600420, 3699596, 811944, 531354, 954230, 3881043, 3900724,
+    -2556880, 2071892, -2797779, -3930395, -1528703, -3677745, -3041255, -1452451, 3475950,
+    2176455, -1585221, -1257611, 1939314, -4083598, -1000202, -3190144, -3157330, -3632928, 126922,
+    3412210, -983419, 2147896, 2715295, -2967645, -3693493, -411027, -2477047, -671102, -1228525,
+    -22981, -1308169, -381987, 1349076, 1852771, -1430430, -3343383, 264944, 508951, 3097992,
+    44288, -1100098, 904516, 3958618, -3724342, -8578, 1653064, -3249728, 2389356, -210977, 759969,
+    -1316856, 189548, -3553272, 3159746, -1851402, -2409325, -177440, 1315589, 1341330, 1285669,
+    -1584928, -812732, -1439742, -3019102, -3881060, -3628969, 3839961, 2091667, 3407706, 2316500,
+    3817976, -3342478, 2244091, -2446433, -3562462, 266997, 2434439, -1235728, 3513181, -3520352,
+    -3759364, -1197226, -3193378, 900702, 1859098, 909542, 819034, 495491, -1613174, -43260,
+    -522500, -655327, -3122442, 2031748, 3207046, -3556995, -525098, -768622, -3595838, 342297,
+    286988, -2437823, 4108315, 3437287, -3342277, 1735879, 203044, 2842341, 2691481, -2590150,
+    1265009, 4055324, 1247620, 2486353, 1595974, -3767016, 1250494, 2635921, -3548272, -2994039,
+    1869119, 1903435, -1050970, -1333058, 1237275, -3318210, -1430225, -451100, 1312455, 3306115,
+    -1962642, -1279661, 1917081, -2546312, -1374803, 1500165, 777191, 2235880, 3406031, -542412,
+    -2831860, -1671176, -1846953, -2584293, -3724270, 594136, -3776993, -2013608, 2432395, 2454455,
+    -164721, 1957272, 3369112, 185531, -1207385, -3183426, 162844, 1616392, 3014001, 810149,
+    1652634, -3694233, -1799107, -3038916, 3523897, 3866901, 269760, 2213111, -975884, 1717735,
+    472078, -426683, 1723600, -1803090, 1910376, -1667432, -1104333, -260646, -3833893, -2939036,
+    -2235985, -420899, -2286327, 183443, -976891, 1612842, -3545687, -554416, 3919660, -48306,
+    -1362209, 3937738, 1400424, -846154, 1976782,
 ];
 
 pub const ZETAS_BARRETT: [i32; 256] = [
-           0, -3572223,  3765607,  3761513, -3201494, -2883726, -3145678, -3201430,
-     -601683,  3542485,  2682288,  2129892,  3764867, -1005239,   557458, -1221177,
-    -3370349, -4063053,  2663378, -1674615, -3524442,  -434125,   676590, -1335936,
-    -3227876,  1714295,  2453983,  1460718,  -642628, -3585098,  2815639,  2283733,
-     3602218,  3182878,  2740543, -3586446, -3110818,  2101410,  3704823,  1159875,
-      394148,   928749,  1095468, -3506380,  2071829, -4018989,  3241972,  2156050,
-     3415069,  1759347,  -817536, -3574466,  3756790, -1935799, -1716988, -3950053,
-    -2897314,  3192354,   556856,  3870317,  2917338,  1853806,  3345963,  1858416,
-     3073009,  1277625, -2635473,  3852015,  4183372, -3222807, -3121440,  -274060,
-     2508980,  2028118,  1937570, -3815725,  2811291, -2983781, -1109516,  4158088,
-     1528066,   482649,  1148858, -2962264,  -565603,   169688,  2462444, -3334383,
-    -4166425, -3488383,  1987814, -3197248,  1736313,   235407, -3250154,  3258457,
-    -2579253,  1787943, -2391089, -2254727,  3482206, -4182915, -1300016, -2362063,
-    -1317678,  2461387,  3035980,   621164,  3901472, -1226661,  2925816,  3374250,
-     1356448, -2775755,  2683270, -2778788, -3467665,  2312838,  -653275,  -459163,
-      348812,  -327848,  1011223, -2354215, -3818627, -1922253, -2236726,  1744507,
-        1753, -1935420, -2659525, -1455890,  2660408, -1780227,   -59148,  2772600,
-     1182243,    87208,   636927, -3965306, -3956745, -2296397, -3284915, -3716946,
-      -27812,   822541,  1009365, -2454145, -1979497,  1596822, -3956944, -3759465,
-    -1685153, -3410568,  2678278, -3768948, -3551006,   635956,  -250446, -2455377,
-    -4146264, -1772588,  2192938, -1727088,  2387513, -3611750,  -268456, -3180456,
-     3747250,  2296099,  1239911, -3838479,  3195676,  2642980,  1254190,   -12417,
-     2998219,   141835,   -89301,  2513018, -1354892,   613238, -1310261, -2218467,
-     -458740, -1921994,  4040196, -3472069,  2039144, -1879878,  -818761, -2178965,
-    -1623354,  2105286, -2374402, -2033807,   586241, -1179613,   527981, -2743411,
-    -1476985,  1994046,  2491325, -1393159,   507927, -1187885,  -724804, -1834526,
-    -3033742,  -338420,  2647994,  3009748, -2612853,  4148469,   749577, -4022750,
-     3980599,  2569011, -1615530,  1723229,  1665318,  2028038,  1163598, -3369273,
-     3994671,   -11879, -1370517,  3020393,  3363542,   214880,   545376,  -770441,
-     3105558, -1103344,   508145,  -553718,   860144,  3430436,   140244, -1514152,
-    -2185084,  3123762,  2358373, -2193087, -3014420, -1716814,  2926054,  -392707,
-     -303005,  3531229, -3974485, -3773731,  1900052,  -781875,  1054478,  -731434,
+    0, -3572223, 3765607, 3761513, -3201494, -2883726, -3145678, -3201430, -601683, 3542485,
+    2682288, 2129892, 3764867, -1005239, 557458, -1221177, -3370349, -4063053, 2663378, -1674615,
+    -3524442, -434125, 676590, -1335936, -3227876, 1714295, 2453983, 1460718, -642628, -3585098,
+    2815639, 2283733, 3602218, 3182878, 2740543, -3586446, -3110818, 2101410, 3704823, 1159875,
+    394148, 928749, 1095468, -3506380, 2071829, -4018989, 3241972, 2156050, 3415069, 1759347,
+    -817536, -3574466, 3756790, -1935799, -1716988, -3950053, -2897314, 3192354, 556856, 3870317,
+    2917338, 1853806, 3345963, 1858416, 3073009, 1277625, -2635473, 3852015, 4183372, -3222807,
+    -3121440, -274060, 2508980, 2028118, 1937570, -3815725, 2811291, -2983781, -1109516, 4158088,
+    1528066, 482649, 1148858, -2962264, -565603, 169688, 2462444, -3334383, -4166425, -3488383,
+    1987814, -3197248, 1736313, 235407, -3250154, 3258457, -2579253, 1787943, -2391089, -2254727,
+    3482206, -4182915, -1300016, -2362063, -1317678, 2461387, 3035980, 621164, 3901472, -1226661,
+    2925816, 3374250, 1356448, -2775755, 2683270, -2778788, -3467665, 2312838, -653275, -459163,
+    348812, -327848, 1011223, -2354215, -3818627, -1922253, -2236726, 1744507, 1753, -1935420,
+    -2659525, -1455890, 2660408, -1780227, -59148, 2772600, 1182243, 87208, 636927, -3965306,
+    -3956745, -2296397, -3284915, -3716946, -27812, 822541, 1009365, -2454145, -1979497, 1596822,
+    -3956944, -3759465, -1685153, -3410568, 2678278, -3768948, -3551006, 635956, -250446, -2455377,
+    -4146264, -1772588, 2192938, -1727088, 2387513, -3611750, -268456, -3180456, 3747250, 2296099,
+    1239911, -3838479, 3195676, 2642980, 1254190, -12417, 2998219, 141835, -89301, 2513018,
+    -1354892, 613238, -1310261, -2218467, -458740, -1921994, 4040196, -3472069, 2039144, -1879878,
+    -818761, -2178965, -1623354, 2105286, -2374402, -2033807, 586241, -1179613, 527981, -2743411,
+    -1476985, 1994046, 2491325, -1393159, 507927, -1187885, -724804, -1834526, -3033742, -338420,
+    2647994, 3009748, -2612853, 4148469, 749577, -4022750, 3980599, 2569011, -1615530, 1723229,
+    1665318, 2028038, 1163598, -3369273, 3994671, -11879, -1370517, 3020393, 3363542, 214880,
+    545376, -770441, 3105558, -1103344, 508145, -553718, 860144, 3430436, 140244, -1514152,
+    -2185084, 3123762, 2358373, -2193087, -3014420, -1716814, 2926054, -392707, -303005, 3531229,
+    -3974485, -3773731, 1900052, -781875, 1054478, -731434,
 ];
-
 
 // ---------------------------------------------------------------------------
 // NTT / INTT (in place, fixed trips: 8 stages × 128 butterflies)
@@ -467,11 +454,13 @@ pub fn derive_key_seeds(xi: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
 /// SHAKE256(K || mu || rnd || 0x00) squeezed to 32. (rho' drives ExpandMask;
 /// the rnd domain byte mirrors FIPS 204's hedged branch discriminator.)
 pub fn derive_rho_prime(k_seed: &[u8; 32], mu: &[u8; 64], rnd: &[u8; 32]) -> [u8; 32] {
-    let mut input = alloc::vec::Vec::with_capacity(32 + 64 + 32 + 1);
-    input.extend_from_slice(k_seed);
-    input.extend_from_slice(mu);
-    input.extend_from_slice(rnd);
-    input.push(0x00);
+    // Fixed 129-byte staging buffer (K || mu || rnd || 0x00) — alloc-free
+    // (the sign-side alloc census proves 0; a Vec here would break it).
+    let mut input = [0u8; 32 + MU_BYTES + 32 + 1];
+    input[..32].copy_from_slice(k_seed);
+    input[32..32 + MU_BYTES].copy_from_slice(mu);
+    input[32 + MU_BYTES..32 + MU_BYTES + 32].copy_from_slice(rnd);
+    input[32 + MU_BYTES + 32] = 0x00;
     let mut out = [0u8; 32];
     Shake256::xof(&input, &mut out);
     out
@@ -529,9 +518,8 @@ pub fn expand_a_row_hat(rho: &[u8; 32], idx: u16, r: &mut [i32; N]) {
                 s.squeeze_into(&mut buf);
                 pos = 0;
             }
-            let t = (buf[pos] as u32)
-                | ((buf[pos + 1] as u32) << 8)
-                | ((buf[pos + 2] as u32) << 16);
+            let t =
+                (buf[pos] as u32) | ((buf[pos + 1] as u32) << 8) | ((buf[pos + 2] as u32) << 16);
             pos += 3;
             let t = t & 0x3F_FFFF;
             if t < Q as u32 {
@@ -596,9 +584,8 @@ pub fn expand_mask_poly(rhoprime: &[u8; 32], kappa: u16, r: &mut [i32; N]) {
                 s.squeeze_into(&mut buf);
                 pos = 0;
             }
-            let t = (buf[pos] as u32)
-                | ((buf[pos + 1] as u32) << 8)
-                | ((buf[pos + 2] as u32) << 16);
+            let t =
+                (buf[pos] as u32) | ((buf[pos + 1] as u32) << 8) | ((buf[pos + 2] as u32) << 16);
             pos += 3;
             let t = t & 0xF_FFFF;
             if t < (GAMMA1 as u32 * 2) {
@@ -696,10 +683,7 @@ impl SignKeyInternal {
     /// NOTE: t (= t1·2^13 + t0) requires the A matrix (keygen half);
     /// from-seed construction of t0 lands with the phase-3 keygen/serialize
     /// surface. This constructor takes t0 explicitly for the sign-loop lane.
-    pub fn from_seed_and_t0(
-        xi: &[u8; 32],
-        t0: [[i32; N]; K],
-    ) -> SignKeyInternal {
+    pub fn from_seed_and_t0(xi: &[u8; 32], t0: [[i32; N]; K]) -> SignKeyInternal {
         let (rho, k_seed) = derive_key_seeds(xi);
         let mut s1 = [[0i32; N]; L];
         let mut s2 = [[0i32; N]; K];
@@ -709,7 +693,13 @@ impl SignKeyInternal {
         for (i, p) in s2.iter_mut().enumerate() {
             expand_s_poly(&k_seed, (L + i) as u16, p);
         }
-        SignKeyInternal { rho, k_seed, s1, s2, t0 }
+        SignKeyInternal {
+            rho,
+            k_seed,
+            s1,
+            s2,
+            t0,
+        }
     }
 }
 
@@ -778,8 +768,8 @@ pub fn sign_internal(
             ntt(&mut yhat[j]);
         }
         for r in 0..K {
-            w = mat[r * L];
-            for j in 1..L {
+            w = [0i32; N];
+            for j in 0..L {
                 let mut acc = [0i32; N];
                 pointwise_montgomery(&mut acc, &mat[r * L + j], &yhat[j]);
                 for i2 in 0..N {
@@ -792,7 +782,10 @@ pub fn sign_internal(
                 w1[r][i2] = hi;
                 w0low[r][i2] = low;
             }
-            w1_encode(&w1[r], &mut w1_packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES]);
+            w1_encode(
+                &w1[r],
+                &mut w1_packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES],
+            );
         }
         // c̃ = SHAKE256(mu || w1Encode(w1), 48); c = SampleInBall(c̃).
         let mut hs = Shake256::instance();
@@ -849,6 +842,415 @@ pub fn sign_internal(
     Err(SignAbortLimit)
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3 — signature serializer (FIPS 204 §7.2 sigEncode onto the FROZEN
+// Receipt shape law: SEAL_ML_DSA_65_LEN = 3309, chatman.rs). PREMISE-ROT
+// adjudication, receipt-recorded: the dispatch named "2420-B" — that is the
+// ML-DSA-44 row; the substrate's own courts (chatman_courts.rs
+// wave3_receipt_shape_constant_unchanged / seal_size_law_matches_fips204_
+// derivation) pin ML-DSA-65 at 48 + 3200 + 61 = 3309 and register "flip to
+// 2420" as the anti-vacuity mutation. The wrong-constant court here asserts
+// 3309 exactly (not 2419, not 2420, not 2421).
+//
+// Byte-order convention: LSB-first bitstream throughout — the SAME convention
+// as w1_encode (frozen by V1's w1_encode_roundtrip court); per-poly streams
+// are exactly byte-aligned (256·bits/8 integral for bits ∈ {4,10,13,20}).
+// Hint encoding: count-bytes-then-positions (pq-crystals lineage, pinned by
+// t05:80 "Algorithm 20: k count bytes then <= omega position bytes"), per
+// poly r: out[r] = count_r, positions strictly increasing at out[K..].
+// ---------------------------------------------------------------------------
+
+/// LSB-first bitstream pack: 256 coefficients at `bits` width, each stored
+/// as `(c - offset) mod 2^bits` (offset NEGATIVE = additive shift). Byte-aligned (bits·256 = 8·out.len()).
+fn bitpack(p: &[i32; N], bits: u32, offset: i32, out: &mut [u8]) {
+    debug_assert_eq!(out.len(), N * bits as usize / 8);
+    out.fill(0);
+    let mask = (1u32 << bits) - 1;
+    let mut bitpos = 0usize;
+    for &c in p.iter() {
+        let v = (c - offset) as u32 & mask;
+        let byte = bitpos / 8;
+        let off = bitpos % 8;
+        out[byte] |= ((v << off) & 0xFF) as u8;
+        if off + bits as usize > 8 {
+            out[byte + 1] |= (v >> (8 - off)) as u8;
+        }
+        if off + bits as usize > 16 {
+            out[byte + 2] |= (v >> (16 - off)) as u8;
+        }
+        bitpos += bits as usize;
+    }
+}
+
+/// Inverse of [`bitpack`] (exact inverse for in-range values; the t0 fold —
+/// a0 = +2^12 wrapping to −2^12 — is the pq-crystals lineage behavior and is
+/// self-consistent signer-side, see the phase-5 courts).
+fn bitunpack(bytes: &[u8], bits: u32, offset: i32, p: &mut [i32; N]) {
+    debug_assert_eq!(bytes.len(), N * bits as usize / 8);
+    let mask = (1u32 << bits) - 1;
+    let mut bitpos = 0usize;
+    for c in p.iter_mut() {
+        let byte = bitpos / 8;
+        let off = bitpos % 8;
+        let mut v = (bytes[byte] >> off) as u32;
+        if off + bits as usize > 8 {
+            v |= (bytes[byte + 1] as u32) << (8 - off);
+        }
+        if off + bits as usize > 16 {
+            v |= (bytes[byte + 2] as u32) << (16 - off);
+        }
+        *c = (v & mask) as i32 + offset;
+        bitpos += bits as usize;
+    }
+}
+
+/// Hint encode (ω+k bytes; count-then-positions, t05:80 lineage): per poly
+/// r, out[r] = count_r, then the position bytes at out[K..] strictly
+/// increasing per poly. Caller contract: total weight ≤ OMEGA (sign_internal
+/// guarantees it; a violation is a caller bug → assert).
+pub fn hint_encode(h: &[[i32; N]; K], out: &mut [u8; OMEGA + K]) {
+    out.fill(0);
+    let mut pos = K;
+    for (r, poly) in h.iter().enumerate() {
+        let mut count = 0usize;
+        for (i, &bit) in poly.iter().enumerate() {
+            if bit != 0 {
+                assert!(pos < OMEGA + K, "hint weight exceeds omega");
+                out[pos] = i as u8;
+                pos += 1;
+                count += 1;
+            }
+        }
+        out[r] = count as u8;
+    }
+}
+
+/// Hint decode — validating (verify-side): `None` on malformed input
+/// (per-poly positions must be strictly increasing and in 0..256, total
+/// weight ≤ OMEGA). Never panics on hostile bytes.
+pub fn hint_decode(bytes: &[u8; OMEGA + K]) -> Option<[[i32; N]; K]> {
+    let mut h = [[0i32; N]; K];
+    let mut pos = K;
+    for (r, poly) in h.iter_mut().enumerate() {
+        let count = bytes[r] as usize;
+        let mut prev: i32 = -1;
+        for _ in 0..count {
+            let p = *bytes.get(pos)? as i32;
+            if p <= prev {
+                return None; // must be strictly increasing per poly
+            }
+            if p >= N as i32 {
+                return None;
+            }
+            poly[p as usize] = 1;
+            prev = p;
+            pos += 1;
+        }
+    }
+    if pos > OMEGA + K {
+        return None;
+    }
+    Some(h)
+}
+
+/// sigEncode (FIPS 204 §7.2, repo byte-order conventions): c̃ || z-packed
+/// (γ1-offset, 20-bit LSB-first) || h (ω+k hint encoding). Exactly
+/// SIG_BYTES = 3309 (const-fenced below).
+pub fn encode_signature(sig: &SignatureParts, out: &mut [u8; SIG_BYTES]) {
+    out[..CTILDE_BYTES].copy_from_slice(&sig.c_tilde);
+    let mut idx = CTILDE_BYTES;
+    for z in &sig.z {
+        bitpack(z, Z_BITS, -GAMMA1, &mut out[idx..idx + Z_POLY_BYTES]);
+        idx += Z_POLY_BYTES;
+    }
+    debug_assert_eq!(idx, CTILDE_BYTES + L * Z_POLY_BYTES);
+    let mut hb = [0u8; OMEGA + K];
+    hint_encode(&sig.h, &mut hb);
+    out[idx..].copy_from_slice(&hb);
+}
+
+/// sigDecode (validating; hostile-byte safe): hint decode is `None` →
+/// `None`. z range needs no check (γ1-offset 20-bit values decode into
+/// [−γ1, γ1) by construction).
+pub fn decode_signature(bytes: &[u8; SIG_BYTES]) -> Option<SignatureParts> {
+    let mut c_tilde = [0u8; CTILDE_BYTES];
+    c_tilde.copy_from_slice(&bytes[..CTILDE_BYTES]);
+    let mut z = [[0i32; N]; L];
+    let mut idx = CTILDE_BYTES;
+    for zp in z.iter_mut() {
+        bitunpack(&bytes[idx..idx + Z_POLY_BYTES], Z_BITS, -GAMMA1, zp);
+        idx += Z_POLY_BYTES;
+    }
+    let mut hb = [0u8; OMEGA + K];
+    hb.copy_from_slice(&bytes[idx..]);
+    let h = hint_decode(&hb)?;
+    Some(SignatureParts { z, h, c_tilde })
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — keygen half (FIPS 204 §7.2 keygen_internal; byte emission
+// matching the kem-style surface). ek layout: rho || t1-packed (6×320,
+// 10-bit LSB-first) = PK_BYTES 1952. dk layout: rho(32) || K(32) || tr(64)
+// || s1-packed (6×128, 4-bit +η offset) || s2-packed (6×128, 4-bit +η)
+// || t0-packed (6×416, 13-bit +2^12 offset) = SK_BYTES 4032.
+// ---------------------------------------------------------------------------
+
+/// tr bytes in dk (H(ek, 64)).
+pub const TR_BYTES: usize = 64;
+const _: () = {
+    assert!(PK_BYTES == 32 + K * 320); // rho + t1 at 10 bits
+    assert!(
+        SK_BYTES == 32 + 32 + TR_BYTES + L * S_POLY_BYTES + K * S_POLY_BYTES + K * T0_POLY_BYTES
+    );
+};
+
+/// 10-bit t1 poly pack.
+fn pack_t1(t1: &[i32; N], out: &mut [u8; 320]) {
+    bitpack(t1, T1_BITS, 0, out);
+}
+/// 13-bit t0 poly pack (offset +2^12).
+fn pack_t0(t0: &[i32; N], out: &mut [u8; T0_POLY_BYTES]) {
+    bitpack(t0, T0_BITS, -(1 << (D - 1)), out);
+}
+/// 4-bit secret poly pack (offset +η).
+fn pack_s(p: &[i32; N], out: &mut [u8; S_POLY_BYTES]) {
+    bitpack(p, ETA, -(ETA as i32), out);
+}
+
+/// Byte-emission keygen: (rho, K) = H(ξ, 0x00); ExpandS(s1 nonces 0..L,
+/// s2 nonces L..L+K, sigma = K); A from rho; t = A·s1 + s2; Power2Round →
+/// (t1, t0); tr = H(ek, 64). Deterministic in ξ.
+pub fn keygen(xi: &[u8; 32], ek: &mut [u8; PK_BYTES], dk: &mut [u8; SK_BYTES]) {
+    let (rho, k_seed) = derive_key_seeds(xi);
+    let mut s1 = [[0i32; N]; L];
+    let mut s2 = [[0i32; N]; K];
+    for (j, p) in s1.iter_mut().enumerate() {
+        expand_s_poly(&k_seed, j as u16, p);
+    }
+    for (i, p) in s2.iter_mut().enumerate() {
+        expand_s_poly(&k_seed, (L + i) as u16, p);
+    }
+    // A matrix, NTT domain; t row-by-row (t = A·s1 + s2 mod q).
+    let mut s1hat = [[0i32; N]; L];
+    for (sh, p) in s1hat.iter_mut().zip(&s1) {
+        *sh = *p;
+        ntt(sh);
+    }
+    let mut mat = [[0i32; N]; K * L];
+    let mut t1 = [[0i32; N]; K];
+    let mut t0 = [[0i32; N]; K];
+    for r in 0..K {
+        for c in 0..L {
+            expand_a_row_hat(&rho, ((r << 8) | c) as u16, &mut mat[r * L + c]);
+        }
+        let mut acc = [0i32; N];
+        let mut term = [0i32; N];
+        for j in 0..L {
+            pointwise_montgomery(&mut term, &mat[r * L + j], &s1hat[j]);
+            for (a, t) in acc.iter_mut().zip(&term) {
+                *a += t;
+            }
+        }
+        intt_tomont(&mut acc);
+        // t = Σ_j A[r][j]·s1[j] + s2[r], centered [0,q) reps for Power2Round
+        let mut t = [0i32; N];
+        for i2 in 0..N {
+            t[i2] = cond_add_q(reduce32(acc[i2] + s2[r][i2]));
+            let (hi, lo) = power2round(t[i2]);
+            t1[r][i2] = hi;
+            t0[r][i2] = lo;
+        }
+    }
+    // ek = rho || t1
+    ek[..32].copy_from_slice(&rho);
+    for r in 0..K {
+        let mut buf = [0u8; 320];
+        pack_t1(&t1[r], &mut buf);
+        ek[32 + r * 320..32 + (r + 1) * 320].copy_from_slice(&buf);
+    }
+    // tr = H(ek, 64); dk = rho || K || tr || s1 || s2 || t0
+    let mut tr = [0u8; TR_BYTES];
+    let mut hs = Shake256::instance();
+    hs.absorb(ek);
+    hs.squeeze_into(&mut tr);
+    dk[..32].copy_from_slice(&rho);
+    dk[32..64].copy_from_slice(&k_seed);
+    dk[64..64 + TR_BYTES].copy_from_slice(&tr);
+    let mut idx = 64 + TR_BYTES;
+    for p in &s1 {
+        let mut buf = [0u8; S_POLY_BYTES];
+        pack_s(p, &mut buf);
+        dk[idx..idx + S_POLY_BYTES].copy_from_slice(&buf);
+        idx += S_POLY_BYTES;
+    }
+    for p in &s2 {
+        let mut buf = [0u8; S_POLY_BYTES];
+        pack_s(p, &mut buf);
+        dk[idx..idx + S_POLY_BYTES].copy_from_slice(&buf);
+        idx += S_POLY_BYTES;
+    }
+    for p in &t0 {
+        let mut buf = [0u8; T0_POLY_BYTES];
+        pack_t0(p, &mut buf);
+        dk[idx..idx + T0_POLY_BYTES].copy_from_slice(&buf);
+        idx += T0_POLY_BYTES;
+    }
+    debug_assert_eq!(idx, SK_BYTES);
+}
+
+/// Parse dk bytes into the in-memory signing key (inverse of keygen's dk
+/// emission). Unpacking is exact (bitstream inverse).
+pub fn signing_key_from_dk(dk: &[u8; SK_BYTES]) -> SignKeyInternal {
+    let mut rho = [0u8; 32];
+    rho.copy_from_slice(&dk[..32]);
+    let mut k_seed = [0u8; 32];
+    k_seed.copy_from_slice(&dk[32..64]);
+    let mut idx = 64 + TR_BYTES;
+    let mut s1 = [[0i32; N]; L];
+    let mut s2 = [[0i32; N]; K];
+    let mut t0 = [[0i32; N]; K];
+    for p in &mut s1 {
+        let mut buf = [0u8; S_POLY_BYTES];
+        buf.copy_from_slice(&dk[idx..idx + S_POLY_BYTES]);
+        bitunpack(&buf, ETA, -(ETA as i32), p);
+        idx += S_POLY_BYTES;
+    }
+    for p in &mut s2 {
+        let mut buf = [0u8; S_POLY_BYTES];
+        buf.copy_from_slice(&dk[idx..idx + S_POLY_BYTES]);
+        bitunpack(&buf, ETA, -(ETA as i32), p);
+        idx += S_POLY_BYTES;
+    }
+    for p in &mut t0 {
+        let mut buf = [0u8; T0_POLY_BYTES];
+        buf.copy_from_slice(&dk[idx..idx + T0_POLY_BYTES]);
+        bitunpack(&buf, T0_BITS, -(1 << (D - 1)), p);
+        idx += T0_POLY_BYTES;
+    }
+    SignKeyInternal {
+        rho,
+        k_seed,
+        s1,
+        s2,
+        t0,
+    }
+}
+
+/// μ = H(tr || M'): SHAKE256 over the 64-byte tr (from dk bytes 64..128) and
+/// the message. (The FIPS M' domain-separation prefix is the chatman Receipt
+/// binding surface — phase 6 — not this kernel's.)
+pub fn compute_mu(tr: &[u8; TR_BYTES], msg: &[u8]) -> [u8; MU_BYTES] {
+    let mut s = Shake256::instance();
+    s.absorb(tr);
+    s.absorb(msg);
+    let mut mu = [0u8; MU_BYTES];
+    s.squeeze_into(&mut mu);
+    mu
+}
+
+/// Byte-level sign: parse dk, run the FS-abort loop, sigEncode. Output is
+/// exactly SIG_BYTES = 3309.
+pub fn sign(
+    dk: &[u8; SK_BYTES],
+    mu: &[u8; MU_BYTES],
+    rnd: &[u8; 32],
+) -> Result<[u8; SIG_BYTES], SignAbortLimit> {
+    const _: () = assert!(SIG_BYTES == CTILDE_BYTES + L * Z_POLY_BYTES + OMEGA + K);
+    const _: () = assert!(SIG_BYTES == 3309); // frozen Receipt seal shape
+    let sk = signing_key_from_dk(dk);
+    let sig = sign_internal(&sk, mu, rnd)?;
+    let mut out = [0u8; SIG_BYTES];
+    encode_signature(&sig, &mut out);
+    Ok(out)
+}
+
+/// Byte-level verify (FIPS 204 §8.3): sigDecode (malformed → false);
+/// ‖z‖∞ < γ1−β; wApprox = A·z − c·t1·2^d; w1' = UseHint(h, wApprox);
+/// H(mu || w1Encode(w1')) == c̃ (branchless-fold compare).
+pub fn verify(ek: &[u8; PK_BYTES], mu: &[u8; MU_BYTES], sig: &[u8; SIG_BYTES]) -> bool {
+    let sig_parts = match decode_signature(sig) {
+        Some(s) => s,
+        None => return false,
+    };
+    // ‖z‖∞ < γ1 − β.
+    for z in &sig_parts.z {
+        if poly_chknorm(z, GAMMA1 - BETA) {
+            return false;
+        }
+    }
+    let mut rho = [0u8; 32];
+    rho.copy_from_slice(&ek[..32]);
+    // t1 from ek (10-bit LSB-first bitstream).
+    let mut t1 = [[0i32; N]; K];
+    for (r, t1r) in t1.iter_mut().enumerate() {
+        let mut buf = [0u8; 320];
+        buf.copy_from_slice(&ek[32 + r * 320..32 + (r + 1) * 320]);
+        bitunpack(&buf, T1_BITS, 0, t1r);
+    }
+    // A matrix; zhat; c in NTT domain.
+    let mut mat = [[0i32; N]; K * L];
+    for r in 0..K {
+        for c in 0..L {
+            expand_a_row_hat(&rho, ((r << 8) | c) as u16, &mut mat[r * L + c]);
+        }
+    }
+    let mut chat = [0i32; N];
+    sample_in_ball(&sig_parts.c_tilde, &mut chat);
+    ntt(&mut chat);
+    let mut zhat = [[0i32; N]; L];
+    for (zh, z) in zhat.iter_mut().zip(&sig_parts.z) {
+        *zh = *z;
+        ntt(zh);
+    }
+    // wApprox = A·z − c·t1·2^d per row; w1' = UseHint(h, wApprox).
+    let mut w1p = [[0i32; N]; K];
+    for r in 0..K {
+        let mut acc = [0i32; N];
+        let mut term = [0i32; N];
+        for j in 0..L {
+            pointwise_montgomery(&mut term, &mat[r * L + j], &zhat[j]);
+            for (a, t) in acc.iter_mut().zip(&term) {
+                *a += t;
+            }
+        }
+        intt_tomont(&mut acc);
+        let mut t1h = t1[r];
+        ntt(&mut t1h);
+        let mut ct1 = [0i32; N];
+        pointwise_montgomery(&mut ct1, &chat, &t1h);
+        intt_tomont(&mut ct1);
+        let mut wapp = [0i32; N];
+        for i2 in 0..N {
+            // c·t1·2^13 mod q: the 64-bit shift avoids the i32 overflow a
+            // 23-bit value takes at <<13 (phase-5 e2e court caught this).
+            let shift = ((ct1[i2] as i64) << D) % Q as i64;
+            let shift = reduce32(shift as i32);
+            wapp[i2] = cond_add_q(reduce32(acc[i2] - shift));
+        }
+        for i2 in 0..N {
+            w1p[r][i2] = use_hint(wapp[i2], sig_parts.h[r][i2]);
+        }
+    }
+    // H(mu || w1Encode(w1')) == c̃.
+    let mut packed = [0u8; K * W1_PACKED_BYTES];
+    for r in 0..K {
+        w1_encode(
+            &w1p[r],
+            &mut packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES],
+        );
+    }
+    let mut ct2 = [0u8; CTILDE_BYTES];
+    let mut hs = Shake256::instance();
+    hs.absorb(mu);
+    hs.absorb(&packed);
+    hs.squeeze_into(&mut ct2);
+    let mut diff = 0u8;
+    for i in 0..CTILDE_BYTES {
+        diff |= ct2[i] ^ sig_parts.c_tilde[i];
+    }
+    diff == 0
+}
+
 #[cfg(test)]
 mod sign_property_tests {
     use super::*;
@@ -882,8 +1284,8 @@ mod sign_property_tests {
                 ntt(&mut yhat[j]);
             }
             for r in 0..K {
-                w = mat[r * L];
-                for j in 1..L {
+                w = [0i32; N];
+                for j in 0..L {
                     let mut acc = [0i32; N];
                     pointwise_montgomery(&mut acc, &mat[r * L + j], &yhat[j]);
                     for i2 in 0..N {
@@ -896,7 +1298,10 @@ mod sign_property_tests {
                     w1[r][i2] = mask_to_bucket(hi);
                     w0low[r][i2] = low;
                 }
-                w1_encode(&w1[r], &mut packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES]);
+                w1_encode(
+                    &w1[r],
+                    &mut packed[r * W1_PACKED_BYTES..(r + 1) * W1_PACKED_BYTES],
+                );
             }
             let mut hs = Shake256::instance();
             hs.absorb(mu);
@@ -943,7 +1348,10 @@ mod sign_property_tests {
             }
             sample_in_ball(&seed, &mut c);
             assert_eq!(hw(&c), TAU, "nonzero weight must equal tau at case {case}");
-            assert!(c.iter().all(|&x| x == 0 || x == 1 || x == -1), "coeffs in {{0,±1}}");
+            assert!(
+                c.iter().all(|&x| x == 0 || x == 1 || x == -1),
+                "coeffs in {{0,±1}}"
+            );
             let mut c_rerun = [0i32; N];
             sample_in_ball(&seed, &mut c_rerun);
             assert_eq!(c, c_rerun, "deterministic under seed");
@@ -968,7 +1376,10 @@ mod sign_property_tests {
         }
         let mut y = [0i32; N];
         expand_mask_poly(&rhoprime, 0, &mut y);
-        assert!(y.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1), "y in [-g1, g1)");
+        assert!(
+            y.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1),
+            "y in [-g1, g1)"
+        );
         let mut y2 = [0i32; N];
         expand_mask_poly(&rhoprime, 0, &mut y2);
         assert_eq!(y, y2, "deterministic");
@@ -1191,7 +1602,10 @@ mod sign_property_tests {
                 mismatches += 1;
             }
         }
-        assert!(mismatches > 0, "mutated hint must break the verify relation");
+        assert!(
+            mismatches > 0,
+            "mutated hint must break the verify relation"
+        );
     }
 }
 
@@ -1232,8 +1646,18 @@ mod primitive_property_tests {
         // Deterministic samples across the full [0, q) domain plus the
         // known edge inputs: 0, q−1, bucket boundaries around α·k, and
         // the collapse region near q.
-        let mut samples: Vec<i32> = (0..512).map(|_| (splitmix64(&mut state) % Q as u64) as i32).collect();
-        samples.extend([0i32, Q - 1, ALPHA, ALPHA * 15, ALPHA * 16 - 1, ALPHA * 16, Q - ALPHA]);
+        let mut samples: Vec<i32> = (0..512)
+            .map(|_| (splitmix64(&mut state) % Q as u64) as i32)
+            .collect();
+        samples.extend([
+            0i32,
+            Q - 1,
+            ALPHA,
+            ALPHA * 15,
+            ALPHA * 16 - 1,
+            ALPHA * 16,
+            Q - ALPHA,
+        ]);
         for &a in &samples {
             let (a1, a0) = decompose(a);
             assert_eq!(a1, highbits(a), "highbits({a}) must be decompose().0");
