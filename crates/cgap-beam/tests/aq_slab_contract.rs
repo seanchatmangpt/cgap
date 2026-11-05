@@ -65,6 +65,7 @@ aq_slab_frame(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
+cgap_alloc_stats() -> erlang:nif_error(nif_not_loaded).
 
 main([NifPath]) ->
     ok = case erlang:load_nif(NifPath, 0) of
@@ -190,3 +191,65 @@ wait_stamp_ok(Slab, Payload, N) ->
         ok -> ok;
         _ -> garbage_collect(), wait_stamp_ok(Slab, Payload, N - 1)
     end.
+
+
+t_alloc_spy_egress() ->
+    Dir = mktempd(),
+    Path = make_segment(Dir, "seg.wire", 4),
+    Slab = aq_slab_open(Path),
+    ok = aq_slab_stamp(Slab, <<"census-frame">>),
+    {A0, B0} = cgap_alloc_stats(),
+    K = 1000,
+    Read = fun Read(0, Acc) -> Acc;
+               Read(N, Acc) ->
+                  Bin = aq_slab_frame(Slab, 0),
+                  Acc2 = Acc + byte_size(Bin),
+                  Read(N - 1, Acc2)
+           end,
+    Total = Read(K, 0),
+    K * byte_size(<<"census-frame">>) = Total,
+    {A1, B1} = cgap_alloc_stats(),
+    %% S12 egress law: 0 counted allocs, 0 counted bytes over K projections.
+    {A0, B0} = {A1, B1},
+    %% Window census too.
+    W = fun W(0, Acc) -> Acc;
+            W(N, Acc) ->
+                Win = aq_slab_window(Slab, 0, 2, 4),
+                Acc2 = Acc + byte_size(Win),
+                W(N - 1, Acc2)
+        end,
+    WTotal = W(K, 0),
+    K * 4 = WTotal,
+    {A1, B1} = cgap_alloc_stats(),
+    io:format("ok alloc_spy_egress (K=~p frames+windows, delta 0,0)~n", [K]).
+
+%% mktempd/0: a fresh temp dir per leg (real files on disk, no mocks).
+mktempd() ->
+    D = filename:join([tmp_base(), "aq_court_", integer_to_list(erlang:unique_integer([positive]))]),
+    ok = filelib:ensure_dir(filename:join(D, "x")),
+    D.
+
+tmp_base() ->
+    case init:get_argument(tmpdir) of
+        {ok, [[T]]} -> T;
+        _ -> "/tmp"
+    end.
+
+main2() ->
+    ok.
+
+"##
+
+#[test]
+fn aq_slab_be_court() {
+    let dylib = nif_dylib_path();
+    let escript = write_escript(ESCRIPT);
+    // Leg 1: the court against the real validator must pass.
+    let rc = run_court(&escript, &dylib, false);
+    assert_eq!(rc, 0, "court against the real validator must pass (exit 0), got {rc}");
+    // Leg 2 (SHIM-COURT anti-vacuity): the SAME court under the crc-skip
+    // mutation must FLIP — exit nonzero, failing in the crc leg.
+    let rc_m = run_court(&escript, &dylib, true);
+    assert_ne!(rc_m, 0, "court under AQ_MUTATE_CRC_SKIP=1 must flip (exit nonzero), got {rc_m}");
+    let _ = std::fs::remove_file(&escript);
+}

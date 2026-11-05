@@ -30,12 +30,12 @@
 //! CPU (crc32 over 4080 B ~ 1.3 us). Durability (msync) is a separate NIF
 //! (aq_slab_sync), landed here as the sixth AQ NIF (DirtyIo, direct msync(2) —
 //!
-//! Deviations from spec (each disclosed in the L19 receipt): ingress uses
-//! enif_inspect_binary (stamp arg is a binary term; same law, smaller ABI
-//! surface than enif_inspect_iovec); windows use a direct
-//! enif_make_resource_binary over the mapped window bytes instead of
-//! enif_make_sub_binary of an intermediate frame term (same zero-copy law,
-//! window pins the slab resource directly); open validation applies
+//! Deviations from spec (each disclosed in the owning lane's receipt):
+//! ingress uses enif_inspect_binary (stamp arg is a binary term; same law,
+//! smaller ABI surface than enif_inspect_iovec); windows (lane L23) follow
+//! the spec exactly — enif_make_sub_binary over the frame resource binary
+//! (erl_nif_api_funcs.h:99), no payload copy, parent pins the slab;
+//! open validation applies
 //! WireRing::open's size-mismatch law (ring.rs:57-71) on the mapped bytes
 //! instead of a second WireRing handle (Darwin second-handle law,
 //! shm.rs:31-51).
@@ -572,8 +572,32 @@ pub(crate) extern "C" fn aq_slab_frame(
     }
 }
 
+/// Window [offset, len) bounds law vs the frame's payload length plen:
+/// off + len <= plen (overflow checked). Returns Some((off, len)) or None
+/// (typed refusal `error` at the NIF boundary). Testable seam so the
+/// over-read mutation court can flip against the exact law the NIF applies.
+fn window_bounds(plen: usize, off: usize, len: usize) -> Option<(usize, usize)> {
+    // SHIM-COURT mutation point: AQ_MUTATE_WINDOW_OOB_SKIP=1 skips the
+    // bounds comparison — an over-reading window must be caught by this
+    // check; a court that cannot flip on it is FAIL.
+    if mutate_window_oob_skip() {
+        return Some((off, len));
+    }
+    off.checked_add(len).map(|end| end <= plen).unwrap_or(false)
+        .then_some((off, len))
+}
+
+/// SHIM-COURT mutation flag: AQ_MUTATE_WINDOW_OOB_SKIP=1 skips the window
+/// bounds law. Read once; default OFF.
+fn mutate_window_oob_skip() -> bool {
+    static M: OnceLock<bool> = OnceLock::new();
+    *M.get_or_init(|| std::env::var("AQ_MUTATE_WINDOW_OOB_SKIP").as_deref() == Ok("1"))
+}
+
 /// aq_slab_window(Slab, Ordinal, Offset, Len) -> Binary :: binary() | error.
-/// CPU. Zero-copy window over the mapped payload; bounds vs plen.
+/// CPU. Zero-copy window: enif_make_sub_binary over the frame resource
+/// binary (erl_nif_api_funcs.h:99) — the sub-binary references the parent
+/// refc binary, 0 payload bytes copied; the parent pins the slab resource.
 pub(crate) extern "C" fn aq_slab_window(
     env: *mut ErlNifEnv,
     argc: c_int,
@@ -602,20 +626,24 @@ pub(crate) extern "C" fn aq_slab_window(
             Ok(n) => n,
             Err(_) => return make_atom(env, "error"),
         };
-        let (off, len) = (off as usize, len as usize);
-        if off.checked_add(len).map(|end| end > plen).unwrap_or(true) {
-            return make_atom(env, "error");
-        }
-        let idx = (ord as u32) % st.capacity;
-        let base = BOOK_LEN + idx as usize * SLOT_LEN + HEADER_LEN + off;
-        // SAFETY: as aq_slab_frame — the window binary pins the resource;
-        // base..base+len are validated in-bounds mapped payload bytes.
-        bin_extern::enif_make_resource_binary(
+        let (off, len) = match window_bounds(plen, off as usize, len as usize) {
+            Some(pair) => pair,
+            None => return make_atom(env, "error"),
+        };
+        // Frame resource binary over the mapped payload (the parent refc
+        // binary pins the slab resource), then the spec'd enif_make_sub_binary
+        // window slice — references the parent, no payload copy.
+        let frame = bin_extern::enif_make_resource_binary(
             env,
             slab as *mut c_void,
-            st.map.add(base) as *const c_void,
-            len,
-        )
+            st.map.add(BOOK_LEN + (ord as u32) % st.capacity as usize * SLOT_LEN + HEADER_LEN)
+                as *const c_void,
+            plen,
+        );
+        // SAFETY: off+len <= plen (window_bounds law), so pos..pos+size are
+        // within the parent binary's extent; the sub-binary keeps the parent
+        // (and transitively the resource + mapping) alive — refcount law.
+        bin_extern::enif_make_sub_binary(env, frame, off, len)
     }
 }
 
@@ -736,7 +764,7 @@ pub(crate) extern "C" fn aq_slab_sync(
     let Some(slab) = (unsafe { slab_of(env, args[0]) }) else {
         return make_atom(env, "error");
     };
-    match sync_slab(&unsafe { (*slab).state }) {
+    match sync_slab(&unsafe { (*slab).state.as_ref() }) {
         Ok(()) => make_atom(env, "ok"),
         Err(_) => make_atom(env, "error"),
     }
