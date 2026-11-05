@@ -42,12 +42,21 @@
     "durable_location": "reports/challenger_sales_receipt.json"
   },
   "standing": {
-    "value": "ALIVE",
-    "derived_from": "court_csct_e2e_bench.py exit 0"
+    "value": "PARTIAL",
+    "derived_from": "court_csct_e2e_bench.py exit 0; max lawful standing PARTIAL per CT-23"
   },
   "provider_ext.csct": {
     "suite_id": "csct-rfc0042",
     "timestamp_utc": "2026-11-05T18:44:41Z",
+    "sources": {
+      "status_quo_annual_usd": "const(crates/csct/src/drowning_benchmark.rs:45)",
+      "sut_annual_usd": "const(crates/csct/src/drowning_benchmark.rs:47)",
+      "net_savings_usd": "const(crates/csct/src/drowning_benchmark.rs:50)",
+      "gross_roi_multiple": "const(crates/csct/src/receipt.rs:78)",
+      "littles_law_ceiling_ms": "const(crates/csct/src/lib.rs:25)",
+      "p99_latency_ms": "measured(court_csct_e2e_bench.py, 2026-11-05T18:44:41Z)",
+      "st01_ingested": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
+    },
     "status_quo_annual_usd": 5068632.0,
     "sut_annual_usd": 14400.0,
     "net_savings_usd": 5054232.0,
@@ -59,22 +68,26 @@
     "st01_legs": {
       "aws_kinesis": {
         "status": "PASS",
-        "records": 500
+        "records": 500,
+        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
       },
       "aws_sqs": {
         "status": "PASS",
-        "records": 10
+        "records": 10,
+        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
       },
       "gcp_pubsub": {
         "status": "PASS",
-        "records": 100
+        "records": 100,
+        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
       },
       "aws_msk_kafka": {
         "status": "PASS",
-        "records": 100
+        "records": 100,
+        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
       }
     },
     "alloc_bytes_per_op": null,
-    "standing": "ALIVE"
+    "standing": "PARTIAL"
   }
 }

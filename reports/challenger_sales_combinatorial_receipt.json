@@ -42,12 +42,13 @@
     "durable_location": "reports/challenger_sales_combinatorial_receipt.json"
   },
   "standing": {
-    "value": "ALIVE",
-    "derived_from": "all cells executed & PASS"
+    "value": "PARTIAL",
+    "derived_from": "13/80 cells executed, 67 NOT-TESTED per CSCT-COMBINATORIAL ADR and verdict:11; max lawful standing PARTIAL"
   },
   "provider_ext.csct": {
     "suite_id": "csct-combinatorial-matrix-rfc0042",
     "timestamp_utc": "2026-11-05T18:46:46Z",
+    "standing": "PARTIAL",
     "matrix_dimensions": {
       "dialects_count": 5,
       "transports_count": 4,
@@ -55,6 +56,7 @@
       "total_primary_cells": 80
     },
     "economic_exhibit": {
+      "status": "MODEL-DERIVED UNMEASURED",
       "status_quo_monthly_usd": 422386.0,
       "status_quo_annual_usd": 5068632.0,
       "sut_monthly_usd": 1200.0,
@@ -94,9 +96,10 @@
     ],
     "cells_summary": {
       "total_evaluated": 80,
-      "executed_count": 80,
-      "not_executed_count": 0,
-      "all_cells_admitted": true,
+      "executed_count": 13,
+      "not_executed_count": 67,
+      "all_cells_admitted": false,
+      "audit_note": "Canonical count 13/80 EXECUTED, 67 NOT-TESTED per CSCT-COMBINATORIAL ADR and verdict:11",
       "cells": [
         {
           "cell_id": "C01",
@@ -1220,6 +1223,6 @@
         }
       ]
     },
-    "standing": "ALIVE"
+    "standing": "PARTIAL"
   }
 }

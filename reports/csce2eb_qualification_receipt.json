@@ -54,13 +54,14 @@
     "durable_location": "reports/csce2eb_qualification_receipt.json"
   },
   "standing": {
-    "value": "ALIVE",
-    "derived_from": "court_csct_e2e_bench.py exit 0, court_csct_combinatorial.py exit 0, csct_anti_vacuity_mutations.sh exit 0"
+    "value": "PARTIAL",
+    "derived_from": "Evidence-bounded partial qualification: 13/80 cells executed, CT-23 unclosed; max lawful standing PARTIAL"
   },
   "provider_ext.csce2eb": {
     "suite_id": "csce2eb-qualification-rfc0042",
     "timestamp_utc": "2026-11-05T18:48:00Z",
     "economic_exhibit": {
+      "status": "MODEL-DERIVED UNMEASURED",
       "status_quo_monthly_usd": 422386.0,
       "status_quo_annual_usd": 5068632.0,
       "sut_monthly_usd": 1200.0,
@@ -70,20 +71,19 @@
       "required_roi_multiple": 350.0
     },
     "stages": {
-      "ST-01": {"verdict": "PASS", "description": "Wire Parity 610 unmodified records across Kinesis, SQS, Pub/Sub, MSK"},
-      "ST-02": {"verdict": "PASS", "description": "Serialization tax exposed (4.75x memory amplification vs JSON)"},
-      "ST-03": {"verdict": "PASS", "description": "Rational drowning ($5,068,632 status quo vs $14,400 sovereign hardware)"},
-      "ST-04": {"verdict": "PASS", "description": "P99 tail latency bound holds (0.001 ms < 10.0 ms Little's Law ceiling)"},
-      "ST-05": {"verdict": "PASS", "description": "0 B/op Zero-Copy C-ABI NVMe append path (< 15 ns/record)"},
-      "ST-06": {"verdict": "PASS", "description": "Commercial verdict gate certified (ROI >= 352x)"}
+      "ST-01": {"verdict": "PARTIAL", "description": "Wire Parity 610 records across Kinesis, SQS, Pub/Sub, MSK; D5 Azure NOT-TESTED"},
+      "ST-02": {"verdict": "PARTIAL", "description": "Serialization tax exhibit (amplification UNMEASURED, CT-06)"},
+      "ST-03": {"verdict": "PARTIAL", "description": "Rational drowning ($5,068,632 status quo vs $14,400 SUT assumption, MODEL-DERIVED UNMEASURED, CT-04)"},
+      "ST-04": {"verdict": "PARTIAL", "description": "P99 tail latency bound UNMEASURED (CT-08); Little's Law automated gate UNBUILT (CT-15)"},
+      "ST-05": {"verdict": "PARTIAL", "description": "0 B/op on alloc_boundary; 904.2 B/op UDP drain path (L59 receipt); 12.4 ns REFUTED per 05-cpk"},
+      "ST-06": {"verdict": "PARTIAL", "description": "Commercial ROI gate 350.0x MODEL-DERIVED UNMEASURED (CT-16)"}
     },
     "combinatorial_matrix": {
       "total_cells": 80,
-      "executed_cells": 80,
-      "passed_cells": 80,
-      "max_p99_ms": 0.0164,
-      "littles_law_ceiling_ms": 10.0,
-      "min_safety_headroom_x": 609.8
+      "executed_cells": 13,
+      "not_tested_cells": 67,
+      "passed_cells": 13,
+      "audit_note": "13/80 EXECUTED, 67 NOT-TESTED per CSCT-COMBINATORIAL ADR and verdict:11"
     },
     "anti_vacuity_mutations": [
       {"mutation": "M1_poison_sigv4", "verdict": "FAIL_CLOSED", "http_code": 403},
@@ -92,7 +92,7 @@
       {"mutation": "M4_sigkill_batch_commit", "verdict": "FAIL_CLOSED", "result": "offsets_journal_restored"}
     ],
     "avatars_count": 25,
-    "fleet_avg_gross_roi_multiple": 36.0,
-    "standing": "ALIVE"
+    "avatars_model_status": "MODEL-DERIVED UNMEASURED",
+    "standing": "PARTIAL"
   }
 }
