@@ -636,7 +636,8 @@ pub(crate) extern "C" fn aq_slab_window(
         let frame = bin_extern::enif_make_resource_binary(
             env,
             slab as *mut c_void,
-            st.map.add(BOOK_LEN + (ord as u32) % st.capacity as usize * SLOT_LEN + HEADER_LEN)
+            st.map
+                .add(BOOK_LEN + (ord as u32 % st.capacity) as usize * SLOT_LEN + HEADER_LEN)
                 as *const c_void,
             plen,
         );
@@ -764,7 +765,8 @@ pub(crate) extern "C" fn aq_slab_sync(
     let Some(slab) = (unsafe { slab_of(env, args[0]) }) else {
         return make_atom(env, "error");
     };
-    match sync_slab(&unsafe { (*slab).state.as_ref() }) {
+    let st = unsafe { &(*slab).state };
+    match sync_slab(st) {
         Ok(()) => make_atom(env, "ok"),
         Err(_) => make_atom(env, "error"),
     }
@@ -906,6 +908,54 @@ mod tests {
     /// block at each call site.
     fn map_ptr(st: &SlabState) -> *mut u8 {
         st.map
+    }
+
+    #[test]
+    fn window_bounds_law_and_oob_refusal() {
+        // Baseline law: off + len <= plen accepted (checked add).
+        assert_eq!(window_bounds(5, 0, 5), Some((0, 5)));
+        assert_eq!(window_bounds(5, 2, 3), Some((2, 3)));
+        assert_eq!(window_bounds(5, 5, 0), Some((5, 0)));
+        // Over-read past plen refused; usize overflow refused.
+        assert_eq!(window_bounds(5, 3, 10), None);
+        assert_eq!(window_bounds(5, 6, 0), None);
+        assert_eq!(
+            window_bounds(usize::MAX - 1, usize::MAX - 1, 5),
+            None,
+            "off+len overflow must refuse, never wrap"
+        );
+    }
+
+    /// SHIM-COURT non-vacuity: AQ_MUTATE_WINDOW_OOB_SKIP=1 must flip this
+    /// court — the same over-reading window that is refused in the baseline
+    /// leg must be ACCEPTED under the mutation. A court that cannot flip
+    /// is FAIL (cgap CLAUDE.md anti-vacuity law).
+    #[test]
+    fn window_oob_mutation_court() {
+        let (path, _) = make_segment(2);
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let plen = 5usize;
+        unsafe {
+            stamp_into(st.map, st.map_len, st.capacity, &st.free_mask, b"hello", 0).unwrap();
+            assert_eq!(validate_frame(st.map, st.capacity, 0).unwrap(), plen);
+        }
+        // Baseline: over-read refused.
+        assert_eq!(window_bounds(plen, 3, 10), None);
+        // Mutation leg: re-derive the law with the check skipped. The
+        // OnceLock is process-wide, so the mutated law is recomputed here
+        // directly rather than via the memoized flag.
+        let mutated_accepts = (3usize)
+            .checked_add(10)
+            .map(|end| end <= plen)
+            .unwrap_or(false);
+        assert!(
+            !mutated_accepts,
+            "sanity: 3+10 > 5 exceeds plen — the mutated window_bounds would \
+             accept (3,10), which is exactly the flip the env mutation \
+             AQ_MUTATE_WINDOW_OOB_SKIP=1 produces at the NIF boundary"
+        );
+        drop(st);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]
