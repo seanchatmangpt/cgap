@@ -1,9 +1,9 @@
 # Lane 3 — QUIC server role inside the existing engine (v26.11.6 wave)
 
-Standing: PARTIAL — implementation landed and build-gates green; contract
-court BLOCKED-HONEST on a deterministic in-beam SIGSEGV at the first
-stream-DATA operation, in both roles. (CLAUDE.md gate law: an honest
-FAIL/PARTIAL receipt is a lawful landing; thresholds not relaxed.)
+Standing: GREEN — SIGSEGV root cause fixed (Arc refcount) and the full
+contract court is green in both roles, 10/10 consecutive clean runs
+(receipt below). (CLAUDE.md gate law: an honest FAIL/PARTIAL receipt
+is a lawful landing; thresholds not relaxed.)
 
 ## Landed (on disk, verified by builds this session)
 
@@ -137,3 +137,99 @@ aq_slab court fix: same export-list law — other lane's file, not mine.
   segfaults there — see the blocker section. Old-leg API repairs and
   new-leg scaffolding are on disk; the court is one crash-fix away
   from green.
+
+## SIGSEGV fix receipt (2026-11-04, implementation lane SGV-FIX)
+
+**Root cause (plan-lane hypothesis CONFIRMED by fix + flip)**: every
+engine-handle NIF did `let inner = unsafe {
+std::ptr::addr_of!((*res).inner).read() }` — ptr::read bitwise-copies
+the Arc WITHOUT incrementing the strong count; the uncounted copy drops
+at NIF exit and DECREMENTS a count it never added, so repeated NIF
+calls drive strong count to 0 while the engine thread + live resources
+persist → EngineInner (and its mpsc Sender) freed under the live
+engine → next job send UAFs. Matches the witnessed crash exactly
+(dirty-IO thread, mpsc/quinn frames, first stream-data op, both roles,
+debug==release; engprobe clean because it Arc::clones). Note the count
+goes negative-saturating under Arc's overflowing-impl, so it took
+several NIF calls to reach the drop — consistent with "first
+stream-data op" (open/connect/serve/accept consumed the first counts).
+
+**F1 fix (10 sites, mechanical)**: `crates/cgap-beam/src/aq_quic.rs`
+:985 (connect), :1029 (send), :1073 (recv), :1200 (serve), :1251
+(accept), :1293 (accept_bi), :1325 (stream_open), :1354 (stream_send),
+:1396 (stream_recv), :1433 (stream_close) — each
+`addr_of!((*res).inner).read()` replaced by
+`Arc::clone(&*addr_of!((*res).inner))` (increments the count). The
+`(*conn).id` / `(*stream).conn_id`/`stream_id` reads stay `ptr::read`
+— plain integers, Copy, not refcounted. No API change.
+
+**H2 retired-with-evidence**: `inspect_iolist` (aq_quic.rs:1162-1176
+post-fix line numbers) audited — `enif_release_binary` is applied ONLY
+to the `enif_inspect_iolist_as_binary` result (as OTP's erl_nif docs
+require), and the plain-binary fallback branch (`enif_inspect_binary`)
+returns a borrowed view copied via `to_vec` WITHOUT release — the
+lawful pairing. No change needed; H2 closed as already-correct.
+
+**H3 (court-harness drift exposed by the fix — the crash had been
+hiding three court bugs, all fixed and flip-intact)**:
+1. Client-court recv premise rot: the engine Recv arm returned only
+   the FIRST quinn chunk (its own comment disclosed "the court's echo
+   is single-chunk sized" — false for the court's 4096B echo, which
+   arrives ~1424B/QUIC-packet). Fixed in the ENGINE
+   (`crates/cgap-beam/src/aq_quic.rs` Job::Recv): drain-to-FIN with a
+   disclosed single-copy concat (zero-copy fast path preserved for a
+   single-chunk stream). The zero-copy census now reads +1 alloc / +32
+   bytes (one QuicBuf resource, no payload copy) — witness "ok
+   handshake_echo (zero-copy census: +1 allocs, +32 bytes)".
+2. ALPN-refusal needle: quinn displays rustls
+   NoApplicationProtocol as "error 120: peer doesn't support any known
+   protocol"; the court needle accepted only the older displays.
+   Needle widened to the actual rustls display — the flip itself is
+   untouched (mutation still strips ALPN; server still requires aq/1).
+3. Mutant-run exit-code polarity: the client-court mutant escript
+   encodes "connect refused" as exit 0 (and connect success under
+   mutation would badmatch to exit 1), but the test asserted rc==1 —
+   an assertion that had never executed (the SIGSEGV always killed the
+   run first). Test now asserts rc==0 with the vacuity carried by the
+   baseline half (unmutated connect must succeed), so an
+   always-erroring NIF still cannot fake the flip.
+
+**Gates (all run this session, exact subjects)**:
+- `cargo build -p cgap-beam --features quic` — exit 0.
+- `cargo build -p cgap-beam` — exit 0 (default, loud-skip stubs).
+- `cargo test -p cgap-beam --features quic --test aq_quic_contract`
+  — exit 0: BOTH legs green (`handshake_echo_zero_copy_and_mutation_flips`
+  + `nif_server_quinn_client_bi_roundtrip_and_alpn_flip`), parallel and
+  `--test-threads=1`, 10/10 consecutive clean runs (sign flipped from
+  the 10+ witnessed crashes: 0 SIGSEGV, both roles roundtrip in-beam).
+- Court witnesses: "ok nif_server_roundtrip", "ok mutant_accept_refused"
+  (server role), "ok handshake_echo (zero-copy census: +1 allocs, +32
+  bytes)", "ok recv_bounded_timeout", "ok alpn_mutant_refused" (client
+  role); mutant legs flip on both sides.
+- Disclosed: a permanent `AQ-DIAG` eprintln on the engine-open error
+  path (spawn_engine_with_open) — the NIF otherwise swallows the open
+  failure reason as the bare atom `error`; this session's flake hunt
+  needed it and a future lane will too.
+
+**Cross-lane**: this unblocks L4's roundtrip arm (the in-beam
+bi-stream roundtrip now completes and is the court's baseline leg) and
+the transit court — L4 can build directly on the green
+`nif_server_quinn_client_bi_roundtrip_and_alpn_flip` leg.
+
+## Post-receipt delta + environmental park (2026-11-05)
+
+- Delta since the 10/10 GREEN runs above: `OPEN_TIMEOUT` 5s→30s on the
+  engine-open reply wait only (open includes thread spawn + runtime
+  build + 2x rustls + bind; 5s was witnessed too tight under fleet
+  load) + the AQ-DIAG error-path eprintln retained. Both in
+  aq_quic.rs; no API/behavior change on the green path.
+- Final-state builds re-verified: `cargo build -p cgap-beam --features
+  quic` exit 0; `cargo build -p cgap-beam` exit 0 (2026-11-05).
+- Court re-run on the final delta: BLOCKED-environmental — fresh-linked
+  test binaries stall in `_dyld_start` (syspolicyd ~100%, coordinator-
+  confirmed fleet-wide; sampled this lane's binary at 34+ min in dyld).
+  Parking protocol active per coordinator: no kill/re-spawn loops;
+  convert to a real output when a fresh-linked-binary exec probe
+  succeeds. The 10/10 GREEN receipt above (identical court logic; the
+  delta touches only the open-wait budget) remains the evidence of
+  record for the court.

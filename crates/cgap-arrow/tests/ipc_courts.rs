@@ -650,12 +650,10 @@ fn scan_token(text: &str, token: &str) -> usize {
 // Lane 7 (v26.11.6): flatbuffer-branch courts C-FB1..C-FB5
 // ===========================================================================
 
-use cgap_arrow::flatbuf::{
-    self, Fe, Fields, IndexTy, Kv, Prec, SchemaEnc, SchemaView, Te, TimeUnit, Ty,
-};
+use cgap_arrow::flatbuf::{self, Fe, IndexTy, Prec, SchemaEnc, Te, TimeUnit, Ty};
 use cgap_arrow::ipc::{
-    emit_fb, emit_verified_fb, meta_span_from_fb, read_fb, read_verified_fb, window_len_fb,
-    FB_MAGIC,
+    emit_fb, emit_verified_fb, emit_verified_fb_rows, meta_span_from_fb, read_fb,
+    read_verified_fb, window_len_fb,
 };
 
 mod fb_golden {
@@ -1010,9 +1008,10 @@ fn c_fb2b_nested_roundtrip_structural_identity() {
 fn c_fb3_tamper_tier() {
     let s = fb_schema_int32();
     let body = [11u8; 48];
-    // Control: clean verified window verifies.
+    // Control: clean verified window (WITH the cgap:rows carrier, R4-I
+    // verified-tier law) verifies.
     let mut w = vec![0u8; window_len_fb(8192, body.len(), 64)];
-    let n = emit_verified_fb(&mut w, &s, &body, 64).unwrap();
+    let n = emit_verified_fb_rows(&mut w, &s, &body, 64, 12).unwrap();
     let mut out = [0u8; 4096];
     read_verified_fb(&w[..n], None, &mut out).unwrap();
     // Body flip -> BodyDigestMismatch (exact variant).
@@ -1093,8 +1092,7 @@ fn c_fb4_foreign_meta_and_fences() {
             }
     );
     // bodyLength mutation -> BodyTooLarge / FbBodyLenInvalid (typed).
-    let mut mb = w.clone();
-    let span = u32::from_le_bytes([mb[4], mb[5], mb[6], mb[7]]) as usize;
+    let span = u32::from_le_bytes([w[4], w[5], w[6], w[7]]) as usize;
     // Locate the Message bodyLength slot: mutate a spread of region bytes
     // and require typed verdicts (no accept-with-wrong-body, no panic).
     for off in 8..8 + span {
@@ -1189,4 +1187,192 @@ fn c_fb5b_pyarrow_oracle_leg() {
         matched += 1;
     }
     assert_eq!(matched, 30, "30 pyarrow goldens re-derived and matched");
+}
+
+// ===========================================================================
+// R4-I (v26.11.6 repositioning wave): rows-carrier courts F1-F4
+// ===========================================================================
+
+use cgap_arrow::ipc::emit_verified;
+
+/// The canonical R4-I shared fixture schema: one nullable u32 field "v"
+/// (the lane-12 column layout).
+fn fb_schema_v_u32() -> SchemaEnc<'static> {
+    SchemaEnc {
+        little_endian: true,
+        fields: &[Fe {
+            name: "v",
+            nullable: true,
+            ty: Te::Int { bits: 32, signed: false },
+            dict: None,
+            meta: &[],
+        }],
+        meta: &[],
+    }
+}
+
+/// F1: the legacy carrier stays at window offset 104..112 (alignment-64
+/// IPC1): write the rows u64 there post-emit, read_verified still
+/// passes, bytes round-trip; zero elsewhere in the metadata padding.
+#[test]
+fn f1_legacy_rows_carrier_at_104() {
+    let meta = seal_meta(MetaHeader {
+        magic: MAGIC,
+        version: LAYOUT_VERSION,
+        flags: 0,
+        schema_digest: [7; 32],
+        body_len: 12,
+        alignment: 64,
+        seq: 0,
+        reserved0: 0, header_digest: 0, pad_tail: [0; 4],
+    });
+    let body = [1u8, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+    let mut w = vec![0u8; window_len(12, 64)];
+    emit_verified(&mut w, &meta, &body).unwrap();
+    let rows: u64 = 3;
+    w[104..112].copy_from_slice(&rows.to_le_bytes());
+    let mut out = [0u8; 4096];
+    read_verified(&w, None, &mut out).unwrap();
+    assert_eq!(&w[104..112], &3u64.to_le_bytes());
+    // The rest of the metadata padding (72..104 digest slot occupied by
+    // the emitter, 112..120) is zero except the digest slot.
+    assert_eq!(&w[112..120], &[0u8; 8]);
+}
+
+/// F2: fb cgap:rows — emit_verified_fb_rows -> read_verified_fb carries
+/// Some(rows); the non-verified read_fb ALSO surfaces Some(rows) (the
+/// carrier parses typed on both read tiers).
+#[test]
+fn f2_fb_rows_carrier_roundtrip() {
+    let s = fb_schema_v_u32();
+    let body = [1u8, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+    let mut w = vec![0u8; window_len_fb(8192, body.len(), 64)];
+    let n = emit_verified_fb_rows(&mut w, &s, &body, 64, 3).unwrap();
+    let mut out = [0u8; 4096];
+    let r = read_verified_fb(&w[..n], None, &mut out).unwrap();
+    assert_eq!(r.body_len, 12);
+    assert_eq!(r.rows, Some(3));
+    let mut out2 = [0u8; 4096];
+    let r2 = read_fb(&w[..n], None, &mut out2).unwrap();
+    assert_eq!(r2.rows, Some(3));
+}
+
+/// F3: fb-without-rows -> RowsCarrierMissing through read_verified_fb
+/// (emit_verified_fb without the rows key), exact variant. The plain
+/// (non-verified) window keeps refusing BodyDigestMissing first, per the
+/// gate order.
+#[test]
+fn f3_fb_without_rows_refused_typed() {
+    let s = fb_schema_v_u32();
+    let body = [1u8, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+    // Verified emit WITHOUT rows -> RowsCarrierMissing.
+    let mut w = vec![0u8; window_len_fb(8192, body.len(), 64)];
+    let n = emit_verified_fb(&mut w, &s, &body, 64).unwrap();
+    let mut out = [0u8; 4096];
+    let e = read_verified_fb(&w[..n], None, &mut out).unwrap_err();
+    assert_eq!(e, cgap_arrow::ipc::IpcError::RowsCarrierMissing);
+    // Plain emit (no body digest, no rows) -> BodyDigestMissing first
+    // (gate order: tamper tier precedes the carrier).
+    let (pw, pn) = fb_window(&s, &body, 64);
+    let e = read_verified_fb(&pw[..pn], None, &mut out).unwrap_err();
+    assert_eq!(e, cgap_arrow::ipc::IpcError::BodyDigestMissing);
+}
+
+/// F4a: IPC1 through an fb read -> typed cross-era refusal (both legacy
+/// read tiers), unchanged law.
+#[test]
+fn f4_ipc1_through_fb_read_refused() {
+    let meta = seal_meta(MetaHeader {
+        magic: MAGIC,
+        version: LAYOUT_VERSION,
+        flags: 0,
+        schema_digest: [7; 32],
+        body_len: 12,
+        alignment: 64,
+        seq: 0,
+        reserved0: 0, header_digest: 0, pad_tail: [0; 4],
+    });
+    let body = [1u8, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+    let mut w = vec![0u8; window_len(12, 64)];
+    emit(&mut w, &meta, &body).unwrap();
+    let e = read_fb(&w, None, &mut [0u8; 4096]).unwrap_err();
+    assert_eq!(e, cgap_arrow::ipc::IpcError::LegacyReadForeignMeta);
+    let e = read_verified_fb(&w, None, &mut [0u8; 4096]).unwrap_err();
+    assert_eq!(e, cgap_arrow::ipc::IpcError::LegacyReadForeignMeta);
+}
+/// F4b: R4-I coordination court — the shared fb fixture (committed
+/// byte-for-byte on both repos) classifies IDENTICALLY on the cgap side:
+/// read_verified_fb carries rows=3, body = three u32 LE "v" values
+/// 1,2,3; re-emitting with emit_verified_fb_rows is byte-identical to
+/// the fixture (deterministic emitter = fixture provenance); the
+/// no-rows variant refuses RowsCarrierMissing; IPC1 through an fb read
+/// refuses typed. Any classification asymmetry with smalt's CT court
+/// (court_lakehouse_ipc_SUITE all_fb_*) is a coordination violation.
+#[test]
+fn f4_shared_fixture_identical_classification() {
+    const FIXTURE_HEX: &str = "ffffffff780200000c0000004152524f00000000fcffffff0c0016001a00230028002c00000000000000000000000400000000000000000100000000120000000c00000000000000000000000000fcffffff0a00140018001e002600000000000000000000000000000000006c010000000000000400000003000000d40000004800000004000000fcffffff0800100014001c000000000000000000170000000000000007000000000000010000003300000009000000636761703a726f77730000000000000000fcffffff0800100014001c0000000000000000005800000000000000080000000000000040000000646630376634393034613763636232303364633933356461653762616634613463316630616239323739613836336136393130396265373466323630333265660000000010000000636761703a626f64795f626c616b65330000000000000000fcffffff0800100014001c000000000000000000560000000000000008000000000000004000000036336633633863656630376337376539363761653633356165663939626462326634663539373761333461303833336166326431383562633739643338323763000012000000636761703a736368656d615f626c616b65330000000000000000010000000800000000000000fcffffff0c001400180023002b00300000000000000000003f000000000000000000000100000000000000020000000004000000fcffffff0800100014001f00000000000000000020000000000000000000000000000001000000760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000020000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff00000000";
+    const FIXTURE_NO_ROWS_HEX: &str = "ffffffff380200000c0000004152524f00000000fcffffff0c0016001a00230028002c00000000000000000000000400000000000000000100000000120000000c00000000000000000000000000fcffffff0a00140018001e002600000000000000000000000000000000002c010000000000000800000000000000020000009000000004000000fcffffff0800100014001c0000000000000000005800000000000000080000000000000040000000646630376634393034613763636232303364633933356461653762616634613463316630616239323739613836336136393130396265373466323630333265660000000010000000636761703a626f64795f626c616b65330000000000000000fcffffff0800100014001c000000000000000000560000000000000008000000000000004000000036336633633863656630376337376539363761653633356165663939626462326634663539373761333461303833336166326431383562633739643338323763000012000000636761703a736368656d615f626c616b65330000000000000000010000000800000000000000fcffffff0c001400180023002b00300000000000000000003f000000000000000000000100000000000000020000000004000000fcffffff0800100014001f00000000000000000020000000000000000000000000000001000000760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000020000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffff00000000";
+    let hexbytes = |h: &str| -> Vec<u8> {
+        (0..h.len() / 2)
+            .map(|i| u8::from_str_radix(&h[2 * i..2 * i + 2], 16).unwrap())
+            .collect()
+    };
+    let fx = hexbytes(FIXTURE_HEX);
+    let mut out = [0u8; 4096];
+    let r = read_verified_fb(&fx, None, &mut out).unwrap();
+    assert_eq!(r.body_len, 12);
+    assert_eq!(r.rows, Some(3));
+    assert_eq!(&out[..12], &[1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]);
+    let f0 = r.schema.fields().unwrap().get(0).unwrap();
+    assert_eq!(f0.name, "v");
+    // Deterministic re-emit is byte-identical to the fixture.
+    let s = fb_schema_v_u32();
+    let body = [1u8, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+    let mut w = vec![0u8; window_len_fb(8192, 12, 64)];
+    let n = emit_verified_fb_rows(&mut w, &s, &body, 64, 3).unwrap();
+    assert_eq!(&w[..n], &fx[..]);
+    // No-rows variant refuses typed (same class smalt returns:
+    // ipc_rows_carrier_missing).
+    let fx2 = hexbytes(FIXTURE_NO_ROWS_HEX);
+    let e = read_verified_fb(&fx2, None, &mut out).unwrap_err();
+    assert_eq!(e, cgap_arrow::ipc::IpcError::RowsCarrierMissing);
+}
+
+/// C-FB5c: cross-language leg — the Elixir face (smalt
+/// `Smalt.Aoq.Arrow.Flatbuf`, fixture emitted by its backwards builder,
+/// pinned with provenance below) encodes a 4-field schema (i32/utf8/map/
+/// timestamp+tz); this court structurally decodes it via the Rust reader.
+/// Fixture provenance: emitted by `Smalt.Aoq.Arrow.Flatbuf.encode/1`
+/// (lane 7 probe, smalt _build-lane7), sha256 pin in the smalt court.
+#[test]
+fn c_fb5c_elixir_encoded_bytes_decode() {
+    let hex = include_str!("data/elixir_schema_fb.hex").trim().to_string();
+    let bytes: Vec<u8> = (0..hex.len() / 2)
+        .map(|i| u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap())
+        .collect();
+    let m = flatbuf::read_message(&bytes).unwrap();
+    let f = m.schema.fields().unwrap();
+    assert_eq!(f.len(), 4);
+    let f0 = f.get(0).unwrap();
+    assert_eq!(f0.name, "a");
+    assert!(matches!(f0.ty, Ty::Int { bits: 32, signed: true }));
+    assert!(f0.nullable);
+    let f1 = f.get(1).unwrap();
+    assert_eq!(f1.name, "b");
+    assert!(matches!(f1.ty, Ty::Utf8));
+    assert!(!f1.nullable);
+    let f2 = f.get(2).unwrap();
+    assert_eq!(f2.name, "m");
+    let Ty::Map { sorted, entries } = f2.ty else { panic!("map") };
+    assert!(!sorted);
+    let ent = entries.get(0).unwrap();
+    let Ty::Struct(kv) = ent.ty else { panic!("entries") };
+    assert!(matches!(kv.get(0).unwrap().ty, Ty::Utf8));
+    assert!(matches!(kv.get(1).unwrap().ty, Ty::Int { bits: 32, signed: true }));
+    // field metadata (cgap:kind=probe) rides the KeyValue metadata.
+    assert_eq!(f2.meta.len(), 1);
+    assert_eq!(f2.meta.get(0).unwrap(), ("cgap:kind", "probe"));
+    let f3 = f.get(3).unwrap();
+    assert_eq!(f3.name, "ts");
+    assert!(matches!(f3.ty, Ty::Timestamp { unit: TimeUnit::Nano, tz: Some("UTC") }));
 }

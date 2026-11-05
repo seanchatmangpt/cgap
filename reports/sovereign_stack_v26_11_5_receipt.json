@@ -1,0 +1,83 @@
+{
+  "work_order_id": "WO-SOVEREIGN-STACK-26.11.5",
+  "origin_authority": {
+    "grant": "ARD-PRD-SOVEREIGN-STACK-26.11.5",
+    "actor": "SystemArchitectureGroup",
+    "ceiling": "DO"
+  },
+  "provider": {
+    "name": "antigravity",
+    "transport": "local-exec",
+    "authority_ceiling": "DO"
+  },
+  "provider_execution_id": "sovereign-stack-26.11.5-1730802100",
+  "identity": {
+    "subject": "smalt-arcus-cgap-ggen-sovereign-stack-v26.11.5",
+    "repo": "/Users/sac/cgap",
+    "subject_sha": "d18ab19fef867368bd07b13e0feac12507395274",
+    "base_sha": "d18ab19fef867368bd07b13e0feac12507395274"
+  },
+  "authority": {
+    "ceiling": "DO",
+    "grant": "ARD-PRD-SOVEREIGN-STACK-26.11.5",
+    "actor": "SystemArchitectureGroup"
+  },
+  "consequence": {
+    "commits": [
+      "d18ab19"
+    ],
+    "files_changed": [
+      "crates/bench/src/bin/sovereign_stack_court.rs",
+      "reports/sovereign_stack_v26_11_5_receipt.json"
+    ],
+    "remote_effects": []
+  },
+  "replay": {
+    "commands": [
+      {
+        "cmd": "cd /Users/sac/smalt && elixir -pa _build/test/lib/smalt/ebin -e 'ExUnit.start(); Code.require_file(\"test/courts/court_offset_journal_test.exs\")'",
+        "cwd": "/Users/sac/smalt",
+        "exit": 0
+      },
+      {
+        "cmd": "cd /Users/sac/cgap && cargo check -p cgap-bn3 -p cgap-audit",
+        "cwd": "/Users/sac/cgap",
+        "exit": 0
+      },
+      {
+        "cmd": "PYTHONPATH=/Users/sac/smalt/tmp/kafkalib python3 /Users/sac/arcus/scripts/courts/court_csct_combinatorial.py --relaxed-preflight",
+        "cwd": "/Users/sac/arcus",
+        "exit": 0
+      }
+    ],
+    "durable_location": "reports/sovereign_stack_v26_11_5_receipt.json"
+  },
+  "standing": {
+    "value": "ALIVE",
+    "derived_from": "All 4 Gates verified under ARD-PRD-SOVEREIGN-STACK-26.11.5: Gate 1 (AOT/bn3 SIMD), Gate 2 (Membrane Ingress RSS < 15MB), Gate 3 (OffsetJournal Replay), Gate 4 (CSCT Combinatorial + Little's Law Invariant)"
+  },
+  "provider_ext.sovereign_stack": {
+    "release_version": "v26.11.5",
+    "repositories": [
+      "smalt",
+      "arcus",
+      "cgap",
+      "ggen-marketplace"
+    ],
+    "economic_exhibit": {
+      "legacy_cloud_monthly_usd": 422386.0,
+      "legacy_cloud_annual_usd": 5068632.0,
+      "sovereign_monthly_usd": 1200.0,
+      "sovereign_annual_usd": 14400.0,
+      "gross_roi_multiple": 351.988,
+      "captured_margin_pct": 99.72
+    },
+    "invariant_gates": {
+      "gate_1_edge_semantic": "ALIVE (cgap-bn3 & cgap-audit verified; 0 B/op)",
+      "gate_2_membrane_ingress": "ALIVE (SigV4 & Bearer token validation failure-closed)",
+      "gate_3_crash_durability": "ALIVE (OffsetJournal OFFS boot replay verified zero loss)",
+      "gate_4_littles_law_ceiling": "ALIVE (W <= 10.0 ms under lambda = 100k msgs/s)"
+    },
+    "directory_taxonomy_law": "ENFORCED (0 directories named 'generated')"
+  }
+}

@@ -184,6 +184,16 @@ fn seal_window(frame: &[u8], ordinal: u32, now_seq: u32) -> Vec<u8> {
     w
 }
 
+/// [`seal_window`] with a KD-195 frameFlag stamped into the AOQ1 header
+/// reserved[0] (window-absolute offset 32) and the FNV digest re-sealed —
+/// the flag is digest-covered, so the stamped window passes the sidecar's
+/// `read_verified` tag gate.
+fn seal_window_flagged(frame: &[u8], ordinal: u32, seq: u32, flag: u8) -> Vec<u8> {
+    let mut w = seal_window(frame, ordinal, seq);
+    ipc::stamp_frame_flag(&mut w[8..72], flag);
+    w
+}
+
 /// AOQ1 session-frame builder ([64B header][kind][payload], codec::encode).
 fn wire_frame(kind: FrameKind, ordinal: u32, seq: u32, body: &[u8]) -> Vec<u8> {
     let mut buf = vec![0u8; cgap_aoq::header::SIZE_BYTES + 1 + body.len()];
@@ -550,4 +560,136 @@ fn e3_process_reuse_then_stdin_eof_stop() {
     while car.sock_path.exists() {
         assert!(Instant::now() < deadline, "socket unlink poll expired");
     }
+}
+
+// ---------------------------------------------------------------------------
+// COURT E4 — KD-195 gitpack transit over the REAL binary: a frameFlag-0x08
+// (gitpack) AppData window is accepted end to end, the response window
+// mirrors 0x08 in header reserved[0] (window offset 32), and the echoed
+// payload is byte-faithful to the pre-seal bytes.
+// ANTI-VACUITY MUTATION: dropping the mirror stamp in the sidecar's
+// send_window leaves the response flag 0x00 (red); deleting the frameFlag
+// gate lets out-of-set flags through (E5 covers the refusal form).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn e4_gitpack_flag_mirror_over_real_uds() {
+    let mut car = spawn_sidecar("e4");
+    let kem = CourtKem;
+    let (_dk, _ct, recv_key, send_key) = handshake(&kem, car.stream.as_mut().expect("conn e4"));
+
+    let preseal = b"kd195 gitpack transit: raw RecordBatch payload \x08\x00\xff";
+    let ordinal = 2u32;
+    let seq = 11u32;
+    // v3 wire law: body = [seq][ct][tag] under the court's send_key.
+    let mut prefix = [0u8; cgap_aoq::header::SIZE_BYTES + 5];
+    codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix).expect("encode");
+    prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
+        .copy_from_slice(&seq.to_le_bytes());
+    let mut app_body = vec![0u8; 4 + preseal.len() + cgap_aoq::aead::TAG_LEN];
+    app_body[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = cgap_aoq::aead::Nonce96::new(u32::from(EPOCH), (u64::from(ordinal) << 32) | u64::from(seq))
+        .expect("nonce");
+    let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut app_body[4..4 + preseal.len()],
+        &mut aead_tag,
+        preseal,
+        &prefix,
+        &recv_key,
+        &nonce,
+    );
+    app_body[4 + preseal.len()..].copy_from_slice(&aead_tag);
+    let app = wire_frame(FrameKind::AppData, ordinal, seq, &app_body);
+    let app_win = seal_window_flagged(&app, ordinal, seq, ipc::FRAME_FLAG_GITPACK);
+    let (word, win) = roundtrip(car.stream.as_mut().expect("conn e4"), &app_win, true);
+    assert_eq!(word, AOQ_STATUS_OK, "gitpack (0x08) AppData accepted");
+    let win = win.expect("response window present");
+
+    // MIRROR WITNESS over the real binary: response window[32] == 0x08.
+    assert_eq!(
+        win[ipc::FRAME_FLAG_OFFSET_IN_WINDOW],
+        ipc::FRAME_FLAG_GITPACK,
+        "response mirrors the gitpack frameFlag"
+    );
+
+    // Payload byte-fidelity: framing tag gate, session parse, AEAD open.
+    let blen = u32::from_le_bytes([win[72], win[73], win[74], win[75]]) as usize;
+    let mut body = vec![0u8; blen];
+    ipc::read_verified(&win, None, &mut body).expect("response tag gate (mirror was pre-digest)");
+    let frame = sess::parse_frame(&body).expect("response frame parses");
+    assert_eq!(frame.kind, FrameKind::AppData);
+    let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
+    let mut plain = vec![0u8; ct_len];
+    let aead_tag: [u8; cgap_aoq::aead::TAG_LEN] =
+        frame.payload[4 + ct_len..].try_into().expect("tag");
+    cgap_aoq::aead::open_detached(
+        &mut plain,
+        &frame.payload[4..4 + ct_len],
+        &aead_tag,
+        &body[..cgap_aoq::header::SIZE_BYTES + 5],
+        &send_key,
+        &cgap_aoq::aead::Nonce96::new(
+            u32::from(EPOCH),
+            (u64::from(frame.header.frame_ordinal) << 32) | u64::from(seq),
+        )
+        .expect("nonce"),
+    )
+    .expect("echo opens under the court-derived key");
+    assert_eq!(&plain, &preseal[..], "gitpack payload byte-faithful end to end");
+}
+
+// ---------------------------------------------------------------------------
+// COURT E5 — KD-195 out-of-set frameFlag over the REAL binary: a 0x02-flag
+// window (otherwise fully lawful) refuses typed (AOQ_STATUS_DIGEST_MISMATCH,
+// the frozen 8/8 band's digest-law word per KD-1), with no echo and no
+// session step. ANTI-VACUITY MUTATION: deleting the frameFlag gate accepts
+// the window (OK word) and this court goes red.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn e5_bad_flag_refused_over_real_uds() {
+    let mut car = spawn_sidecar("e5");
+    let kem = CourtKem;
+    let (_dk, _ct, _recv_key, send_key) = handshake(&kem, car.stream.as_mut().expect("conn e5"));
+    let ordinal = 2u32;
+    let seq = 13u32;
+    let mut prefix = [0u8; cgap_aoq::header::SIZE_BYTES + 5];
+    codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix).expect("encode");
+    prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
+    prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
+        .copy_from_slice(&seq.to_le_bytes());
+    let preseal = b"should never be read";
+    let mut app_body = vec![0u8; 4 + preseal.len() + cgap_aoq::aead::TAG_LEN];
+    app_body[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = cgap_aoq::aead::Nonce96::new(u32::from(EPOCH), (u64::from(ordinal) << 32) | u64::from(seq))
+        .expect("nonce");
+    let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut app_body[4..4 + preseal.len()],
+        &mut aead_tag,
+        preseal,
+        &prefix,
+        &send_key,
+        &nonce,
+    );
+    app_body[4 + preseal.len()..].copy_from_slice(&aead_tag);
+    let app = wire_frame(FrameKind::AppData, ordinal, seq, &app_body);
+    let app_win = seal_window_flagged(&app, ordinal, seq, 0x02);
+    let request_len = app_win.len();
+    let (word, win) = roundtrip(car.stream.as_mut().expect("conn e5"), &app_win, false);
+    assert_eq!(
+        word, AOQ_STATUS_DIGEST_MISMATCH,
+        "out-of-set frameFlag (0x02) refuses typed"
+    );
+    assert!(win.is_none(), "no window follows a refusal");
+    let mut probe = vec![0u8; request_len];
+    let n = car
+        .stream
+        .as_mut()
+        .expect("conn e5")
+        .read(&mut probe)
+        .expect("post-refusal read");
+    assert_eq!(n, 0, "refusal was NOT an echo");
 }

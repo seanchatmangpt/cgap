@@ -75,6 +75,9 @@ pub struct FbParsed<'a> {
     pub schema_blake3: Option<[u8; 32]>,
     /// cgap:body_blake3 carried value (None when absent).
     pub body_blake3: Option<[u8; 32]>,
+    /// cgap:rows carried value (None when absent or non-decimal — never
+    /// guessed).
+    pub rows: Option<u64>,
 }
 
 /// Continuation marker (0xFFFFFFFF), Message.fbs `Continuation`.
@@ -572,14 +575,14 @@ fn parse_meta_with(buf: &[u8], allow_fb: bool) -> Result<ParsedMeta<'_>, IpcErro
     }
     let body_len = body_len64 as u32;
     // Ancillary key values ride the schema-level custom_metadata.
-    let (sd_key, bd_key) = ancillary_keys(&message);
+    let (sd_key, bd_key, rows_key) = ancillary_keys(&message);
     if !allow_fb {
         return Err(IpcError::LegacyReadForeignMeta);
     }
     Ok(ParsedMeta {
         alignment,
         body_at,
-        fb: Some(FbParsed { message, schema_digest: fb_schema_digest(region), schema_blake3: sd_key, body_blake3: bd_key }),
+        fb: Some(FbParsed { message, schema_digest: fb_schema_digest(region), schema_blake3: sd_key, body_blake3: bd_key, rows: rows_key }),
         meta: MetaHeader {
             magic: FB_MAGIC,
             version: message.version as u16,
@@ -853,6 +856,10 @@ pub fn meta_span_from_fb(fb_len: usize, alignment: usize) -> usize {
 /// seam.
 pub const KEY_BODY_DIGEST: &str = "cgap:body_blake3";
 pub const KEY_SCHEMA_DIGEST: &str = "cgap:schema_blake3";
+/// The rows carrier, fb era (R4-I): decimal u64 in schema
+/// custom_metadata, mirroring the legacy alignment-64 padding slot at
+/// window offset 104..112.
+pub const KEY_ROWS: &str = "cgap:rows";
 
 /// Hex-encode 32 bytes (lowercase, 64 chars) into `out`; returns the hex
 /// length.
@@ -954,11 +961,18 @@ fn emit_fb_inner(
     let mut hex2 = [0u8; 64];
     hex32(&body_digest, &mut hex2);
     let bd = core::str::from_utf8(&hex2).unwrap_or("");
+    // cgap:rows decimal rendering buffer (lives to end of fn so the
+    // borrowed slice in `combined` stays valid).
+    let mut rd = [0u8; 20];
+    let mut rl = 0usize;
     let mut combined: [(&str, &str); crate::flatbuf::MAX_SLOTS] =
-        [("", ""); crate::flatbuf:: MAX_SLOTS];
+        [("", ""); crate::flatbuf::MAX_SLOTS];
     let mut k = 0usize;
+    // MAX_SLOTS-3 headroom when the rows carrier rides along (R4-I): two
+    // ancillary slots (schema + body digests) plus the rows slot.
+    let headroom = crate::flatbuf::MAX_SLOTS - 2 - usize::from(rows.is_some());
     for pair in schema.meta {
-        if k >= crate::flatbuf::MAX_SLOTS - 2 {
+        if k >= headroom {
             return Err(IpcError::Fb(crate::flatbuf::FbError::FieldCap));
         }
         combined[k] = *pair;
@@ -968,6 +982,26 @@ fn emit_fb_inner(
     k += 1;
     if verified {
         combined[k] = (KEY_BODY_DIGEST, bd);
+        k += 1;
+    }
+    // cgap:rows rides custom_metadata as a decimal u64 string; emitted
+    // only on the verified path (Some), mirroring the legacy 104..112
+    // padding-slot carrier.
+    if let Some(r) = rows {
+        let mut v = r;
+        if v == 0 {
+            rd[0] = b'0';
+            rl = 1;
+        }
+        while v > 0 {
+            rd[rl] = b'0' + (v % 10) as u8;
+            rl += 1;
+            v /= 10;
+        }
+        for i in 0..rl / 2 {
+            rd.swap(i, rl - 1 - i);
+        }
+        combined[k] = (KEY_ROWS, core::str::from_utf8(&rd[..rl]).unwrap_or(""));
         k += 1;
     }
     let enc = crate::flatbuf::SchemaEnc {
@@ -1015,8 +1049,10 @@ pub struct FbRead<'a> {
     /// cgap:schema_blake3 value carried in custom_metadata.
     pub schema_blake3: Option<[u8; 32]>,
     /// cgap:body_blake3 value carried in custom_metadata.
-    /// cgap:body_blake3 value carried in custom_metadata.
     pub body_blake3: Option<[u8; 32]>,
+    /// cgap:rows value carried in custom_metadata (decimal u64; None
+    /// when absent or unparseable — never guessed).
+    pub rows: Option<u64>,
 }
 
 /// The fb read core: framing + flatbuffer parse + bodyLength equality
@@ -1077,6 +1113,12 @@ fn read_fb_core<'a>(
                 }
             }
         }
+        // Rows carrier, fb era (R4-I): the verified tier requires a
+        // parseable cgap:rows value, mirroring the legacy walk's
+        // rows-carrier refusal.
+        if fbi.rows.is_none() {
+            return Err(IpcError::RowsCarrierMissing);
+        }
     }
     // expected_schema seam: compared against cgap:schema_blake3.
     if let Some(exp) = expected_schema {
@@ -1095,13 +1137,19 @@ fn read_fb_core<'a>(
         schema_digest: fbi.schema_digest,
         schema_blake3: fbi.schema_blake3,
         body_blake3: fbi.body_blake3,
+        rows: fbi.rows,
     })
 }
 
 /// Extract the ancillary key values from the schema custom_metadata.
-fn ancillary_keys(m: &crate::flatbuf::MessageView<'_>) -> (Option<[u8; 32]>, Option<[u8; 32]>) {
+/// `cgap:rows` is parsed TYPED: absent or non-decimal => None, never a
+/// guessed value.
+fn ancillary_keys(
+    m: &crate::flatbuf::MessageView<'_>,
+) -> (Option<[u8; 32]>, Option<[u8; 32]>, Option<u64>) {
     let mut sd: Option<[u8; 32]> = None;
     let mut bd: Option<[u8; 32]> = None;
+    let mut rows: Option<u64> = None;
     if let Ok(meta) = m.schema.meta() {
         for i in 0..meta.len() {
             if let Ok((k, v)) = meta.get(i) {
@@ -1109,11 +1157,29 @@ fn ancillary_keys(m: &crate::flatbuf::MessageView<'_>) -> (Option<[u8; 32]>, Opt
                     sd = unhex32(v);
                 } else if k == KEY_BODY_DIGEST {
                     bd = unhex32(v);
+                } else if k == KEY_ROWS {
+                    rows = parse_decimal_u64(v);
                 }
             }
         }
     }
-    (sd, bd)
+    (sd, bd, rows)
+}
+
+/// Strict decimal u64 parse (ASCII digits only, no sign, no whitespace,
+/// no leading `+`); overflow or any non-digit => None.
+fn parse_decimal_u64(s: &str) -> Option<u64> {
+    if s.is_empty() {
+        return None;
+    }
+    let mut v: u64 = 0;
+    for b in s.bytes() {
+        if !b.is_ascii_digit() {
+            return None;
+        }
+        v = v.checked_mul(10)?.checked_add(u64::from(b - b'0'))?;
+    }
+    Some(v)
 }
 
 /// Read an fb window (framing + flatbuffer parse + body copy). The

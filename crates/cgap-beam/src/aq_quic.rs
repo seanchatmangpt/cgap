@@ -66,6 +66,12 @@ mod imp {
 
     /// Bounded handshake/send/open budget (tokio timeout; never a sleep).
     const OP_TIMEOUT: Duration = Duration::from_secs(5);
+    /// Open is NOT a normal op: it includes engine-thread spawn, the tokio
+    /// runtime build, TWO rustls config builds and the endpoint bind. Under
+    /// fleet load (parallel court runs on a shared box) 5 s was witnessed
+    /// too tight — the reply itself is bounded, never a sleep (no-sleep
+    /// law: bounded poll on the real observable `ready_rx`).
+    const OPEN_TIMEOUT: Duration = Duration::from_secs(30);
 
     // -----------------------------------------------------------------------
     // Resource types (opened at load; fail-closed boot, resources.rs law)
@@ -578,18 +584,35 @@ mod imp {
                 let budget = Duration::from_millis(timeout_ms);
                 let fut = async {
                     // Accept the server's echo uni-stream, then hand back
-                    // quinn's OWN buffer: the first chunk's Bytes move out
-                    // untouched (single-chunk fast path, zero-copy at the
-                    // boundary). Multi-chunk payloads would concatenate
-                    // (one copy, disclosed — scaffolding; the court's echo
-                    // is single-chunk sized).
+                    // quinn's buffer: a SINGLE-chunk stream's Bytes move out
+                    // untouched (zero-copy fast path at the boundary). A
+                    // multi-chunk stream (payloads spanning QUIC packets,
+                    // e.g. the court's 4096B echo at ~1424B/packet) drains
+                    // to FIN and concatenates — one copy, disclosed.
                     let mut s = conn.accept_uni().await.map_err(|e| e.to_string())?;
-                    let chunk = s
-                        .read_chunk(usize::MAX, true)
-                        .await
-                        .map_err(|e| e.to_string())?
-                        .ok_or_else(|| "eof before data".to_string())?;
-                    Ok::<Bytes, String>(chunk.bytes)
+                    let mut first: Option<Bytes> = None;
+                    let mut acc: Vec<u8> = Vec::new();
+                    loop {
+                        match s.read_chunk(usize::MAX, true).await {
+                            Ok(Some(chunk)) => {
+                                if first.is_none() && acc.is_empty() {
+                                    first = Some(chunk.bytes);
+                                } else {
+                                    if let Some(b) = first.take() {
+                                        acc.extend_from_slice(&b);
+                                    }
+                                    acc.extend_from_slice(&chunk.bytes);
+                                }
+                            }
+                            Ok(None) => break,
+                            Err(e) => return Err(e.to_string()),
+                        }
+                    }
+                    match (first, acc.is_empty()) {
+                        (Some(b), _) => Ok(b),
+                        (None, true) => Err("eof before data".to_string()),
+                        (None, false) => Ok(Bytes::from(acc)),
+                    }
                 };
                 match tokio::time::timeout(budget, fut).await {
                     Ok(r) => {
@@ -838,12 +861,18 @@ mod imp {
             reply: ready_tx,
         })
         .map_err(|_| "engine died before open".to_string())?;
-        match ready_rx.recv_timeout(OP_TIMEOUT) {
+        match ready_rx.recv_timeout(OPEN_TIMEOUT) {
             Ok(r) => {
+                if let Err(ref e) = r {
+                    eprintln!("AQ-DIAG open failed: {e}");
+                }
                 r?;
                 Ok(Arc::new(EngineInner { tx }))
             }
-            Err(e) => Err(format!("engine open wait: {e}")),
+            Err(e) => {
+                eprintln!("AQ-DIAG open wait: {e}");
+                Err(format!("engine open wait: {e}"))
+            }
         }
     }
 

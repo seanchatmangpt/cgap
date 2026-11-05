@@ -116,8 +116,16 @@ pub fn window_len64(body_len: usize) -> usize {
 /// must confirm or relocate).
 pub const ROWS_CARRIER_AT: usize = 104;
 
+/// The rows carrier, fb era: `cgap:rows` decimal u64 in schema
+/// custom_metadata (R4-I). Mirrors cgap_arrow::ipc::KEY_ROWS.
+pub const KEY_ROWS: &str = "cgap:rows";
+
 /// Extract the rows carrier from a verified window's metadata padding.
 /// All-zero => [`ExportError::RowsCarrierMissing`].
+///
+/// DEPRECATED-BUT-FUNCTIONAL (R4-I): the legacy-era carrier; kept for
+/// the legacy IPC1 walk leg (see [`ipc_walk::walk_verified`]'s dual-era
+/// fork). New emitters write the fb-era `cgap:rows` key.
 #[must_use]
 pub fn rows_carrier(buf: &[u8]) -> Option<u64> {
     if buf.len() < ROWS_CARRIER_AT + 8 {
@@ -131,4 +139,16 @@ pub fn rows_carrier(buf: &[u8]) -> Option<u64> {
     } else {
         Some(v)
     }
+}
+
+/// Extract the rows carrier from an fb-era window (`cgap:rows` decimal
+/// u64 in the schema custom_metadata). Typed parse via cgap's own fb
+/// read path: absent or non-decimal => `None` (never a guess). Returns
+/// `None` too when the window refuses the framing parse.
+#[must_use]
+pub fn rows_carrier_fb(buf: &[u8]) -> Option<u64> {
+    let mut body = vec![0u8; buf.len()];
+    cgap_arrow::ipc::read_fb(buf, None, &mut body)
+        .ok()
+        .and_then(|r| r.rows)
 }

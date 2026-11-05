@@ -49,13 +49,13 @@ use std::ffi::CString;
 use std::fs::File;
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
 use std::os::raw::{c_char, c_int, c_void};
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 use crate::alloc_spy::record_alloc;
 use crate::resources::{ErlNifResourceType, ErlNifResourceTypeInit};
-use crate::{ErlNifBinary, ErlNifEnv, ErlNifTerm, enif_get_long, make_atom};
-use wire_shm::{BOOK_LEN, HEADER_LEN, MAX_PAYLOAD, MAGIC, SLOT_LEN, crc32_ieee};
+use crate::{enif_get_long, make_atom, ErlNifBinary, ErlNifEnv, ErlNifTerm};
+use wire_shm::{crc32_ieee, BOOK_LEN, HEADER_LEN, MAGIC, MAX_PAYLOAD, SLOT_LEN};
 
 // mmap externs — bare extern "C" (wire-shm zero-dep law: zero crates, not
 // zero syscalls; same declaration set as shm.rs's private block).
@@ -206,7 +206,10 @@ unsafe fn stamp_into(
     }
     let base = BOOK_LEN + idx as usize * SLOT_LEN;
     if base + HEADER_LEN + payload.len() > map_len {
-        return Err(SlabErr::BudgetOverflow(base + HEADER_LEN + payload.len(), map_len));
+        return Err(SlabErr::BudgetOverflow(
+            base + HEADER_LEN + payload.len(),
+            map_len,
+        ));
     }
     let crc = crc32_ieee(payload);
     let mut h = [0u8; HEADER_LEN];
@@ -216,7 +219,11 @@ unsafe fn stamp_into(
     h[12..16].copy_from_slice(&ordinal.to_be_bytes());
     let slot = map.add(base);
     std::ptr::copy_nonoverlapping(h.as_ptr(), slot as *mut u8, HEADER_LEN);
-    std::ptr::copy_nonoverlapping(payload.as_ptr(), slot.add(HEADER_LEN) as *mut u8, payload.len());
+    std::ptr::copy_nonoverlapping(
+        payload.as_ptr(),
+        slot.add(HEADER_LEN) as *mut u8,
+        payload.len(),
+    );
     Ok(())
 }
 
@@ -281,7 +288,9 @@ extern "C" fn aq_slab_dtor(_env: *mut ErlNifEnv, obj: *mut c_void) {
 extern "C" fn aq_lease_dtor(_env: *mut ErlNifEnv, obj: *mut c_void) {
     unsafe {
         let l = &mut *(obj.cast::<AqLeaseRes>());
-        l.state.free_mask.fetch_and(!(1u64 << l.slot), Ordering::AcqRel);
+        l.state
+            .free_mask
+            .fetch_and(!(1u64 << l.slot), Ordering::AcqRel);
         std::ptr::drop_in_place(l as *mut AqLeaseRes);
     }
 }
@@ -300,12 +309,10 @@ impl Drop for SlabState {
 pub(crate) fn open_aq_types(env: *mut ErlNifEnv) -> bool {
     static SLAB_INIT: std::sync::OnceLock<ErlNifResourceTypeInit> = std::sync::OnceLock::new();
     static LEASE_INIT: std::sync::OnceLock<ErlNifResourceTypeInit> = std::sync::OnceLock::new();
-    let slab_init = SLAB_INIT.get_or_init(|| {
-        crate::resources::resource_type_init_dtor(aq_slab_dtor)
-    });
-    let lease_init = LEASE_INIT.get_or_init(|| {
-        crate::resources::resource_type_init_dtor(aq_lease_dtor)
-    });
+    let slab_init =
+        SLAB_INIT.get_or_init(|| crate::resources::resource_type_init_dtor(aq_slab_dtor));
+    let lease_init =
+        LEASE_INIT.get_or_init(|| crate::resources::resource_type_init_dtor(aq_lease_dtor));
     unsafe fn open_ty(
         env: *mut ErlNifEnv,
         name: &[u8],
@@ -401,10 +408,7 @@ mod bin_extern {
     use crate::ErlNifBinary;
     extern "C" {
         /// void* enif_alloc_resource(...) (erl_nif_api_funcs.h:113)
-        pub(crate) fn enif_alloc_resource(
-            ty: *mut ErlNifResourceType,
-            size: usize,
-        ) -> *mut c_void;
+        pub(crate) fn enif_alloc_resource(ty: *mut ErlNifResourceType, size: usize) -> *mut c_void;
         /// void enif_release_resource(void*) (:114)
         pub(crate) fn enif_release_resource(obj: *mut c_void);
         /// ERL_NIF_TERM enif_make_resource(ErlNifEnv*, void*) (:115)
@@ -456,7 +460,10 @@ fn open_slab(path: &[u8]) -> Result<SlabState, SlabErr> {
     let cpath = CString::new(path).map_err(|_| SlabErr::Open("nul in path".into()))?;
     let fd = unsafe { c_open(cpath.as_ptr(), O_RDWR) };
     if fd < 0 {
-        return Err(SlabErr::Open(format!("open failed: {}", std::io::Error::last_os_error())));
+        return Err(SlabErr::Open(format!(
+            "open failed: {}",
+            std::io::Error::last_os_error()
+        )));
     }
     // SAFETY: fd is a fresh owning descriptor from open(2).
     let file = unsafe { File::from_raw_fd(fd as RawFd) };
@@ -479,7 +486,10 @@ fn open_slab(path: &[u8]) -> Result<SlabState, SlabErr> {
         )
     };
     if map == std::ptr::null_mut() && map_len > 0 {
-        return Err(SlabErr::Open(format!("mmap failed: {}", std::io::Error::last_os_error())));
+        return Err(SlabErr::Open(format!(
+            "mmap failed: {}",
+            std::io::Error::last_os_error()
+        )));
     }
     let map = map as *mut u8;
     // Wire-shm open law on the mapped bytes: bookkeeping capacity must match
@@ -520,9 +530,7 @@ pub(crate) extern "C" fn aq_slab_open(
         ref_bin: std::ptr::null_mut(),
         __spare__: [std::ptr::null_mut(); 2],
     };
-    if argc != 1
-        || unsafe { bin_extern::enif_inspect_binary(env, args[0], &mut bin) } == 0
-    {
+    if argc != 1 || unsafe { bin_extern::enif_inspect_binary(env, args[0], &mut bin) } == 0 {
         return make_atom(env, "error");
     }
     let path = unsafe { std::slice::from_raw_parts(bin.data, bin.size) };
@@ -587,7 +595,9 @@ fn window_bounds(plen: usize, off: usize, len: usize) -> Option<(usize, usize)> 
     if mutate_window_oob_skip() {
         return Some((off, len));
     }
-    off.checked_add(len).map(|end| end <= plen).unwrap_or(false)
+    off.checked_add(len)
+        .map(|end| end <= plen)
+        .unwrap_or(false)
         .then_some((off, len))
 }
 
@@ -676,9 +686,7 @@ pub(crate) extern "C" fn aq_slab_stamp(
         ref_bin: std::ptr::null_mut(),
         __spare__: [std::ptr::null_mut(); 2],
     };
-    if argc != 2
-        || unsafe { bin_extern::enif_inspect_binary(env, args[1], &mut bin) } == 0
-    {
+    if argc != 2 || unsafe { bin_extern::enif_inspect_binary(env, args[1], &mut bin) } == 0 {
         return make_atom(env, "error");
     }
     let Some(slab) = (unsafe { slab_of(env, args[0]) }) else {
@@ -691,8 +699,14 @@ pub(crate) extern "C" fn aq_slab_stamp(
             return make_atom(env, "error"); // StaleWrite
         }
         let payload = std::slice::from_raw_parts(bin.data, bin.size);
-        if let Err(_) = stamp_into(st.map, st.map_len, st.capacity, &st.free_mask, payload, next as u32)
-        {
+        if let Err(_) = stamp_into(
+            st.map,
+            st.map_len,
+            st.capacity,
+            &st.free_mask,
+            payload,
+            next as u32,
+        ) {
             return make_atom(env, "error");
         }
         // Frame BEFORE ordinal (ring.rs:119-121 order law).
@@ -811,7 +825,9 @@ mod tests {
     #[test]
     fn open_and_stamp_frame_roundtrip() {
         let (path, _) = make_segment(4);
-        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .unwrap();
         let map = st.map;
         unsafe {
             stamp_into(map, st.map_len, st.capacity, &st.free_mask, b"hello", 0).unwrap();
@@ -843,7 +859,9 @@ mod tests {
     #[test]
     fn crc_mismatch_and_budget_laws() {
         let (path, _) = make_segment(2);
-        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .unwrap();
         let map = st.map;
         unsafe {
             stamp_into(map, st.map_len, st.capacity, &st.free_mask, b"payload", 0).unwrap();
@@ -860,13 +878,16 @@ mod tests {
             }
             // FrameTooLarge: plen over budget is refused (wire input).
             let big = [0u8; MAX_PAYLOAD + 1];
-            assert!(
-                stamp_into(map, st.map_len, st.capacity, &st.free_mask, &big[..], 1).is_err()
-            );
-            assert!(
-                stamp_into(map, st.map_len, st.capacity, &st.free_mask, &[0u8; MAX_PAYLOAD], 1)
-                    .is_ok()
-            );
+            assert!(stamp_into(map, st.map_len, st.capacity, &st.free_mask, &big[..], 1).is_err());
+            assert!(stamp_into(
+                map,
+                st.map_len,
+                st.capacity,
+                &st.free_mask,
+                &[0u8; MAX_PAYLOAD],
+                1
+            )
+            .is_ok());
         }
         drop(st);
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
@@ -876,7 +897,9 @@ mod tests {
     fn lease_mask_and_dtor_law() {
         let (path, _) = make_segment(4);
         let st = std::sync::Arc::new(
-            open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap(),
+            open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+                .ok()
+                .unwrap(),
         );
         // Lease slot 2 (fetch_or) — stamp to it must refuse (SlabSlotLeased).
         let prev = st.free_mask.fetch_or(1u64 << 2, Ordering::AcqRel);
@@ -893,20 +916,34 @@ mod tests {
             stamp_into(st.map, st.map_len, st.capacity, &st.free_mask, b"yes", 2).unwrap();
         }
         let _ = std::fs::remove_dir_all(
-            std::path::Path::new(path.as_os_str().to_str().unwrap()).parent().unwrap(),
+            std::path::Path::new(path.as_os_str().to_str().unwrap())
+                .parent()
+                .unwrap(),
         );
     }
 
     #[test]
     fn sync_flushes_mapped_segment() {
         let (path, _) = make_segment(2);
-        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .unwrap();
         unsafe {
-            stamp_into(map_ptr(&st), st.map_len, st.capacity, &st.free_mask, b"durable", 0).unwrap();
+            stamp_into(
+                map_ptr(&st),
+                st.map_len,
+                st.capacity,
+                &st.free_mask,
+                b"durable",
+                0,
+            )
+            .unwrap();
         }
         sync_slab(&st).unwrap();
         // Re-open the same file fresh: the flushed frame must validate.
-        let st2 = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let st2 = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .unwrap();
         unsafe {
             assert_eq!(validate_frame(map_ptr(&st2), st2.capacity, 0).unwrap(), 7);
         }
@@ -944,7 +981,9 @@ mod tests {
     #[test]
     fn window_oob_mutation_court() {
         let (path, _) = make_segment(2);
-        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .unwrap();
         let plen = 5usize;
         unsafe {
             stamp_into(st.map, st.map_len, st.capacity, &st.free_mask, b"hello", 0).unwrap();
@@ -992,5 +1031,348 @@ mod tests {
         st = open_slab(b"/nonexistent/aq/seg.wire");
         assert!(matches!(st, Err(SlabErr::Open(_))));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ------------------------------------------------------------------
+    // WIR0 golden court: the shared self-pinned fixture
+    // (wire-shm tests/fixtures/wir0_golden.txt) run against the IN-MEMORY
+    // law set (validate_frame over mmap'd bytes). Third consumer of the
+    // fixture: catches aq_slab law-copy drift from ring.rs.
+    // ------------------------------------------------------------------
+
+    /// Minimal pure-std sha256 (FIPS 180-4) for the fixture self-pin.
+    /// Test-only; fenced by known vectors below. (wire-shm's golden court
+    /// carries the same implementation; zero-dep law keeps us off sha2.)
+    struct Sha256 {
+        state: [u32; 8],
+        buf: [u8; 64],
+        buf_len: usize,
+        total: u64,
+    }
+
+    impl Sha256 {
+        fn new() -> Self {
+            Sha256 {
+                state: [
+                    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
+                    0x1f83d9ab, 0x5be0cd19,
+                ],
+                buf: [0u8; 64],
+                buf_len: 0,
+                total: 0,
+            }
+        }
+        fn write(&mut self, mut data: &[u8]) {
+            self.total = self.total.wrapping_add(data.len() as u64);
+            if self.buf_len > 0 {
+                let take = (64 - self.buf_len).min(data.len());
+                self.buf[self.buf_len..self.buf_len + take].copy_from_slice(&data[..take]);
+                self.buf_len += take;
+                data = &data[take..];
+                if self.buf_len == 64 {
+                    let block = self.buf;
+                    self.compress(&block);
+                    self.buf_len = 0;
+                }
+            }
+            while data.len() >= 64 {
+                let mut block = [0u8; 64];
+                block.copy_from_slice(&data[..64]);
+                self.compress(&block);
+                data = &data[64..];
+            }
+            if !data.is_empty() {
+                self.buf[..data.len()].copy_from_slice(data);
+                self.buf_len = data.len();
+            }
+        }
+        fn finish(mut self) -> [u8; 32] {
+            // Message length captured BEFORE padding (write() updates total
+            // for padding bytes too).
+            let bits = self.total.wrapping_mul(8);
+            self.write(&[0x80]);
+            while self.buf_len != 56 {
+                self.write(&[0]);
+            }
+            self.write(&bits.to_be_bytes());
+            let mut out = [0u8; 32];
+            for (i, w) in self.state.iter().enumerate() {
+                out[i * 4..i * 4 + 4].copy_from_slice(&w.to_be_bytes());
+            }
+            out
+        }
+        fn compress(&mut self, block: &[u8; 64]) {
+            const K: [u32; 64] = [
+                0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+                0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+                0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+                0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+                0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+                0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+                0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+                0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+                0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+                0xc67178f2,
+            ];
+            let mut w = [0u32; 64];
+            for i in 0..16 {
+                w[i] = u32::from_be_bytes([
+                    block[i * 4],
+                    block[i * 4 + 1],
+                    block[i * 4 + 2],
+                    block[i * 4 + 3],
+                ]);
+            }
+            for i in 16..64 {
+                let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+                let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+                w[i] = w[i - 16]
+                    .wrapping_add(s0)
+                    .wrapping_add(w[i - 7])
+                    .wrapping_add(s1);
+            }
+            let mut h = self.state;
+            for i in 0..64 {
+                let s1 = h[4].rotate_right(6) ^ h[4].rotate_right(11) ^ h[4].rotate_right(25);
+                let ch = (h[4] & h[5]) ^ ((!h[4]) & h[6]);
+                let t1 = h[7]
+                    .wrapping_add(s1)
+                    .wrapping_add(ch)
+                    .wrapping_add(K[i])
+                    .wrapping_add(w[i]);
+                let s0 = h[0].rotate_right(2) ^ h[0].rotate_right(13) ^ h[0].rotate_right(22);
+                let maj = (h[0] & h[1]) ^ (h[0] & h[2]) ^ (h[1] & h[2]);
+                let t2 = s0.wrapping_add(maj);
+                h[7] = h[6];
+                h[6] = h[5];
+                h[5] = h[4];
+                h[4] = h[3].wrapping_add(t1);
+                h[3] = h[2];
+                h[2] = h[1];
+                h[1] = h[0];
+                h[0] = t1.wrapping_add(t2);
+            }
+            for i in 0..8 {
+                self.state[i] = self.state[i].wrapping_add(h[i]);
+            }
+        }
+    }
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        let mut h = Sha256::new();
+        h.write(bytes);
+        h.finish().iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    /// Fixture path: the single fixture copy lives in wire-shm's tests dir.
+    fn golden_fixture_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../wire-shm/tests/fixtures/wir0_golden.txt")
+            // canonicalize so the path is valid regardless of cwd
+            .canonicalize()
+            .expect("fixture present (wire-shm tests/fixtures/wir0_golden.txt)")
+    }
+
+    /// Hardcoded pin — must match the fixture `# pin:` line and both other
+    /// courts (arcus framed_test.go, wire-shm wire_courts_golden.rs).
+    const GOLDEN_PIN: &str = "f56989dcfbcc7ba8135073b162cb24d8c05961aacca4e3e1606d249770eb0da3";
+
+    #[test]
+    fn golden_fixture_aq_slab_court() {
+        let raw = std::fs::read_to_string(golden_fixture_path()).expect("read fixture");
+        let mut cases: Vec<&str> = raw
+            .lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+        assert!(!cases.is_empty());
+        // SELF-PIN LAW: first assertion, before any case runs.
+        let mut pin_input = String::new();
+        for c in &cases {
+            pin_input.push_str(c);
+            pin_input.push('\n');
+        }
+        assert_eq!(
+            sha256_hex(pin_input.as_bytes()),
+            GOLDEN_PIN,
+            "fixture self-pin mismatch — fixture edited without re-deriving its mirrors"
+        );
+        cases.reverse(); // pop-efficient; run in original order below
+        while let Some(c) = cases.pop() {
+            let f: Vec<&str> = c.split_whitespace().collect();
+            match f[0] {
+                "pos" => golden_pos(
+                    f[1],
+                    f[2].parse::<u32>().unwrap(),
+                    f[3].parse::<u32>().unwrap(),
+                    hex_bytes(f[4]),
+                    hex_bytes(f[5]),
+                ),
+                "neg" => golden_neg(
+                    f[1],
+                    f[2].parse::<u32>().unwrap(),
+                    f[3].parse::<u32>().unwrap(),
+                    hex_bytes(f[4]),
+                    hex_bytes(f[5]),
+                    f[6],
+                ),
+                "seg" => golden_seg(f[1], f[2].parse::<u32>().unwrap(), hex_bytes(f[3])),
+                other => panic!("unknown case kind {other}"),
+            }
+        }
+    }
+
+    fn hex_bytes(s: &str) -> Vec<u8> {
+        if s == "-" {
+            return Vec::new();
+        }
+        assert!(s.len() % 2 == 0, "odd hex length");
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex byte"))
+            .collect()
+    }
+
+    /// Open a fresh zeroed slab of `cap` slots; caller writes raw frame
+    /// bytes into the mapping at slot offsets (same tamper protocol as the
+    /// other two courts).
+    fn open_zeroed_slab(tag: &str, cap: u32) -> (std::path::PathBuf, SlabState) {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "wir0_golden_{}_{}_{}",
+            tag,
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed),
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("seg.wire");
+        let mut seg = vec![0u8; BOOK_LEN + cap as usize * SLOT_LEN];
+        seg[8..12].copy_from_slice(&cap.to_be_bytes());
+        std::fs::write(&path, &seg).unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .expect("open zeroed slab");
+        (dir, st)
+    }
+
+    fn slot_off(ordinal: u32, cap: u32) -> usize {
+        BOOK_LEN + (ordinal % cap) as usize * SLOT_LEN
+    }
+
+    fn write_frame(map: *mut u8, ordinal: u32, cap: u32, header: &[u8], payload: &[u8]) {
+        unsafe {
+            let base = slot_off(ordinal, cap);
+            std::ptr::copy_nonoverlapping(header.as_ptr(), map.add(base), HEADER_LEN);
+            std::ptr::copy_nonoverlapping(
+                payload.as_ptr(),
+                map.add(base + HEADER_LEN),
+                payload.len(),
+            );
+        }
+    }
+
+    fn golden_pos(name: &str, cap: u32, ordinal: u32, payload: Vec<u8>, header: Vec<u8>) {
+        let (dir, st) = open_zeroed_slab(name, cap);
+        let map = st.map;
+        unsafe {
+            write_frame(map, ordinal, cap, &header, &payload);
+            // validate_frame must accept; payload length must match the wire.
+            let plen = validate_frame(map, cap, ordinal).unwrap();
+            assert_eq!(plen, payload.len(), "pos {name}: validate_frame plen");
+            // Header bytes in the mapping must be byte-exact vs the fixture.
+            let mut got = vec![0u8; HEADER_LEN];
+            std::ptr::copy_nonoverlapping(
+                map.add(slot_off(ordinal, cap)) as *const u8,
+                got.as_mut_ptr(),
+                HEADER_LEN,
+            );
+            assert_eq!(got, header, "pos {name}: header byte-exact in mapping");
+        }
+        drop(st);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    fn golden_neg(
+        name: &str,
+        cap: u32,
+        ordinal: u32,
+        header: Vec<u8>,
+        payload: Vec<u8>,
+        stage: &str,
+    ) {
+        let (dir, st) = open_zeroed_slab(name, cap);
+        let map = st.map;
+        unsafe {
+            write_frame(map, ordinal, cap, &header, &payload);
+            match (stage, validate_frame(map, cap, ordinal)) {
+                ("MAGIC", Err(SlabErr::BadMagic(found))) => {
+                    let want = u32::from_be_bytes([header[0], header[1], header[2], header[3]]);
+                    assert_eq!(found, want, "neg {name}: BadMagic field");
+                }
+                ("ORDINAL", Err(SlabErr::StaleOrdinal(read, stored))) => {
+                    assert_eq!(read, ordinal, "neg {name}: StaleOrdinal.read");
+                    let want = u32::from_be_bytes([header[12], header[13], header[14], header[15]]);
+                    assert_eq!(stored, want, "neg {name}: StaleOrdinal.stored");
+                }
+                ("LEN", Err(SlabErr::FrameTooLarge(len))) => {
+                    assert_eq!(len, payload_v(&header), "neg {name}: FrameTooLarge.len");
+                }
+                // validate_frame's law set has no budget gate (budget is the
+                // caller's, window_bounds/NIF boundary owns it) — the BUDGET
+                // leg is a LOUD named skip here, never a silent pass.
+                ("BUDGET", r) => {
+                    assert!(
+                        r.is_ok(),
+                        "neg {name}: wire-valid frame must accept in-memory"
+                    );
+                    println!("SKIP [aq_slab validate_frame has no budget gate]: neg {name} accepted in-memory (budget is caller-owned); covered by wire-shm + arcus courts");
+                }
+                ("CRC", Err(SlabErr::CrcMismatch(expect, found))) => {
+                    let want = u32::from_be_bytes([header[4], header[5], header[6], header[7]]);
+                    assert_eq!(expect, want, "neg {name}: CrcMismatch.expected");
+                    assert_eq!(
+                        found,
+                        crc32_ieee(&payload),
+                        "neg {name}: CrcMismatch.found over corrupted payload"
+                    );
+                }
+                (s, r) => panic!("neg {name}: stage {s}: wrong refusal {r:?}"),
+            }
+        }
+        drop(st);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    fn payload_v(header: &[u8]) -> usize {
+        u32::from_be_bytes([header[8], header[9], header[10], header[11]]) as usize
+    }
+
+    fn golden_seg(name: &str, cap: u32, seg: Vec<u8>) {
+        assert_eq!(seg.len(), BOOK_LEN + cap as usize * SLOT_LEN);
+        let next = u64::from_be_bytes(seg[0..8].try_into().unwrap());
+        let seg_cap = u32::from_be_bytes(seg[8..12].try_into().unwrap());
+        assert_eq!(next, 12);
+        assert_eq!(seg_cap, cap);
+        let dir = std::env::temp_dir().join(format!("wir0_golden_seg_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("seg.wire");
+        std::fs::write(&path, &seg).unwrap();
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes())
+            .ok()
+            .expect("open segment image");
+        let map = st.map;
+        unsafe {
+            for (i, want) in [b"seg-slot-zero".as_slice(), b"seg-slot-one".as_slice()]
+                .into_iter()
+                .enumerate()
+            {
+                let ordinal = 10u32 + i as u32;
+                let plen = validate_frame(map, cap, ordinal).unwrap();
+                assert_eq!(plen, want.len(), "seg {name}: ordinal {ordinal} plen");
+            }
+        }
+        drop(st);
+        std::fs::remove_dir_all(dir).ok();
     }
 }

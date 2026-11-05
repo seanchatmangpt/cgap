@@ -530,6 +530,8 @@ fn gate_g5_self() -> GateResult {
                 AoqError::SlabFull { .. } => "SlabFull",
                 // P2 M1 SLA-disclosed minimal unblock (lane co-edit): new error variant.
                 AoqError::AeadMismatch => "AeadMismatch",
+                // L56 SLA-disclosed minimal unblock (lane cgap-arrow-aoq): new error variant.
+                AoqError::KemShapeMismatch { .. } => "KemShapeMismatch",
                 // L56 SLA-disclosed minimal unblock: pqc-feature error variant.
                 #[cfg(feature = "pqc")]
                 AoqError::PqcSealRefused { .. } => "PqcSealRefused",

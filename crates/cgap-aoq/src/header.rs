@@ -15,7 +15,9 @@ use crate::generated_aoq_header_layout as gen;
 
 /// Wire magic constant, "AOQ1" (`aoq:hf-magic aoq:value "0x414F5131"`).
 pub const MAGIC: u32 = gen::AOQ1_MAGIC;
-/// Header version this codec speaks (`aoq:hf-version aoq:value 2`).
+// KD-COVERS: KD-201 (v3 wire-version bump; prose-only doc fix, the const
+// was already graph-pinned to gen::AOQ1_VERSION = 3)
+/// Header version this codec speaks (`aoq:hf-version aoq:value 3`).
 pub const VERSION: u16 = gen::AOQ1_VERSION;
 /// Header size in bytes (`aoq:header-aq1 aoq:sizeBytes 64`).
 pub const SIZE_BYTES: usize = gen::AOQ1_SIZE_BYTES;
@@ -78,7 +80,7 @@ impl From<Epoch> for u16 {
 pub struct AoqHeader {
     /// `aoq:hf-magic` — offset 0, u32, always `0x414F_5131` on the wire.
     pub magic: u32,
-    /// `aoq:hf-version` — offset 4, u16, always 2.
+    /// `aoq:hf-version` — offset 4, u16, always 3.
     pub version: u16,
     /// `aoq:hf-epoch` — offset 6, u16, one of the closed `aoq:Epoch` values.
     pub epoch: u16,
@@ -130,7 +132,7 @@ impl fmt::Debug for AoqHeader {
 }
 
 impl AoqHeader {
-    /// A canonical header: magic `0x414F_5131`, version 2, zeroed reserved
+    /// A canonical header: magic `0x414F_5131`, version 3, zeroed reserved
     /// region, digest zero until encode computes the FNV seal.
     pub const fn new(epoch: u16, key_id: u64, frame_ordinal: u32, seq: u32) -> Self {
         Self {

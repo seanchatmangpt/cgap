@@ -1095,7 +1095,15 @@ impl<'o> Builder<'o> {
     fn table(&mut self, rows: &mut [Row; MAX_SLOTS]) -> Result<usize, FbError> {
         // Highest id first, so the forward layout has ascending ids.
         let n = rows.iter().take_while(|r| r.id != usize::MAX).count();
-        rows[..n].sort_by_key(|r| core::cmp::Reverse(r.id));
+        // no_std: slice sort needs alloc; swap-based insertion sort
+        // (n <= 64, [Row; MAX_SLOTS] fixed buffer).
+        for i in 1..n {
+            let mut j = i;
+            while j > 0 && rows[j - 1].id < rows[j].id {
+                rows.swap(j - 1, j);
+                j -= 1;
+            }
+        }
         let nslots = rows[..n].iter().map(|r| r.id + 1).max().unwrap_or(0);
         if nslots > 64 {
             return Err(FbError::BadTable);
@@ -1111,10 +1119,11 @@ impl<'o> Builder<'o> {
         }
         let table_data_off = self.used();
         let vt_bytes = 4 + 2 * nslots;
-        let mut voffs = [0u8; 2 * 64];
+        let voffs = [0u8; 2 * 64];
         // vtable: [vt_size u16][table_size u16][voffsets...] (voffs slice
         // pushed first, then the head, then the soffset: block layout is
         // [so][head][voffs][slots...]).
+        #[allow(unused_assignments)]
         let mut voffs_off_start = 0usize;
         for r in rows[..n].iter() {
             if let Slot::Off(elem) = &r.slot {

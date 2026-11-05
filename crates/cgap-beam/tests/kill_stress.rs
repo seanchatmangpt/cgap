@@ -99,7 +99,11 @@ const ESCRIPT_SRC: &str = r##"#! /usr/bin/env escript
          pointer_of/1, cgap_binary_data_pointer/1, cgap_dtor_stats/0,
          cgap_alloc_stats/0, cgap_open/1, cgap_scan/3,
          cgap_flush_to_parquet/1, cgap_seal_to_packfile/1,
-         cgap_receipt_query/1]).
+         cgap_receipt_query/1,
+         aq_quic_open/2, aq_quic_connect/3, aq_quic_send/2, aq_quic_recv/2,
+         aq_quic_serve/4, aq_quic_accept/2, aq_quic_accept_bi/2,
+         aq_quic_stream_open/1, aq_quic_stream_send/2, aq_quic_stream_recv/2,
+         aq_quic_stream_close/1]).
 
 -define(ITERATIONS, 100).
 -define(N_WORKERS, 100).
@@ -111,7 +115,7 @@ const ESCRIPT_SRC: &str = r##"#! /usr/bin/env escript
 -define(SETTLE_ROUNDS, 1000).         %% bounded dtor-counter convergence barrier
 -define(WALL_BUDGET_MS, 240000).      %% self-limit, inside the 600s test gate
 
-%% NIF stubs — the full 21-function surface (load_nif checks eagerly that
+%% NIF stubs — the full 38-function surface (load_nif checks eagerly that
 %% every library function has a module export, used or not).
 cgap_new(_, _) -> erlang:nif_error(nif_not_loaded).
 cgap_new_fast(_, _) -> erlang:nif_error(nif_not_loaded).
@@ -140,6 +144,17 @@ aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_sync(_) -> erlang:nif_error(nif_not_loaded).
+aq_quic_open(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_connect(_, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_send(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_recv(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_serve(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_accept(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_accept_bi(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_open(_) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_send(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_recv(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_close(_) -> erlang:nif_error(nif_not_loaded).
 
 main([NifPath]) ->
     ok = case erlang:load_nif(NifPath, 0) of

@@ -202,9 +202,14 @@ fn handshake_echo_zero_copy_and_mutation_flips() {
     let rc = run_court(&dylib, &server.addr, &server.cert_path, &stem, false);
     assert_eq!(rc, 0, "baseline court failed (see stdout above)");
     // SHIM-COURT flip: the same court under AQ_MUTATE_ALPN_DROP=1 must
-    // FAIL — a green mutant run is VACUOUS.
+    // REFUSE the connect. The mutant escript encodes "connect returned
+    // error" as exit 0 (ok alpn_mutant_refused) — if the mutation were
+    // ignored the connect would SUCCEED, badmatch, and exit 1. So a green
+    // mutant run WITH the baseline-green half (connect succeeds unmutated)
+    // proves the flip; rc==1 here means the mutant court crashed BEFORE the
+    // refusal, i.e. vacuous/undemonstrated.
     let rc = run_court(&dylib, &server.addr, &server.cert_path, &stem, true);
-    assert_eq!(rc, 1, "mutant court passed — VACUOUS COURT");
+    assert_eq!(rc, 0, "mutant court did not reach the ALPN refusal — flip undemonstrated (see stdout above)");
 }
 
 const ESCRIPT: &str = r##"
@@ -328,18 +333,30 @@ t_handshake_echo_zero_copy(Addr, CaDer) ->
     %% delta must be exactly one resource-block alloc, < 128 bytes — no
     %% payload-sized copy at the NIF boundary.
     {A0, B0} = cgap_alloc_stats(),
-    Echo = aq_quic_recv(Conn, 5000),
+    %% quinn's recv delivers the echo in CHUNKS (read_chunk returns what is
+    %% buffered, not the whole stream) — accumulate on the deterministic
+    %% echo size (4096) until complete; a broken stream answers `error`
+    %% (loud, bounded by the per-recv deadline).
+    {Echo, Chunks} = recv_all(Conn, 4096, 5000, {<<"">>, 0}),
     {A1, B1} = cgap_alloc_stats(),
     true = is_binary(Echo),
     Payload = Echo,
-    1 = A1 - A0,
-    true = (B1 - B0) < 128,
-    io:format("ok handshake_echo (zero-copy census: +1 alloc, +~w bytes)~n",
-              [B1 - B0]),
+    Chunks = A1 - A0,
+    true = (B1 - B0) < 128 * Chunks,
+    io:format("ok handshake_echo (zero-copy census: +~w allocs, +~w bytes)~n",
+              [Chunks, B1 - B0]),
     %% Bounded timeout leg (no-sleep law): a recv with nothing pending must
     %% refuse on its own deadline, not hang.
     error = aq_quic_recv(Conn, 250),
     io:format("ok recv_bounded_timeout~n").
+
+recv_all(_Conn, N, _T, {Acc, K}) when byte_size(Acc) =:= N ->
+    {Acc, K};
+recv_all(Conn, N, T, {Acc, K}) ->
+    case aq_quic_recv(Conn, T) of
+        error -> erlang:error({recv_short, byte_size(Acc), N});
+        Bin when is_binary(Bin) -> recv_all(Conn, N, T, {<<Acc/binary, Bin/binary>>, K + 1})
+    end.
 "##;
 
 // ---------------------------------------------------------------------------
@@ -543,11 +560,15 @@ fn nif_server_quinn_client_bi_roundtrip_and_alpn_flip() {
         "mutant client leg connected — VACUOUS COURT"
     );
     let err = client.unwrap_err();
-    // rustls surfaces the server's alert as "received fatal alert:
-    // NoApplicationProtocol" (or its own PeerIncompatible display).
+    // rustls surfaces the ALPN refusal as Error::NoApplicationProtocol,
+    // displayed by quinn as "error 120: peer doesn't support any known
+    // protocol" (older paths: "NoApplicationProtocol"). Either needle
+    // proves the refusal is the ALPN mismatch, not a transport fault.
     let low = err.to_lowercase();
     assert!(
-        low.contains("applicationprotocol") || low.contains("peer is incompatible"),
+        low.contains("applicationprotocol")
+            || low.contains("peer is incompatible")
+            || low.contains("doesn't support any known protocol"),
         "mutant refusal not ALPN-shaped: {err}"
     );
     assert_eq!(rc, 0, "mutant NIF server court failed");

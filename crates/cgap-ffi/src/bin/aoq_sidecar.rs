@@ -315,6 +315,18 @@ mod imp {
             | E::BadBodyLen { .. }
             | E::MissingEos { .. }
             | E::BadAlignment { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
+            // Minimal unblock (compile-freeze SLA, disclosed in the lane
+            // receipt): fb-era IpcError variants landed in cgap-arrow's
+            // framing enum (HEAD a216b486..909e1573) without extending this
+            // match. Mapping is the same digest-law reading as the rest of
+            // the frozen band: metadata/tamper-class refusals -> the frozen
+            // DIGEST_MISMATCH word; window-shape classes -> INCOMPLETE_FRAME.
+            E::LegacyReadForeignMeta
+            | E::Fb(_)
+            | E::FbBodyLenInvalid { .. }
+            | E::BodyTooLarge { .. }
+            | E::RowsCarrierMissing => AOQ_STATUS_DIGEST_MISMATCH,
+            E::MetaSizeContinuation { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
         }
     }
 
@@ -1088,6 +1100,293 @@ mod imp {
                 one + 7,
                 "per-frame delta must be EXACTLY the 1 window alloc (1 frame: {one}, 8 frames: {eight})"
             );
+        }
+
+        // ---------------------------------------------------------------------
+        // KD-195 GITPACK TRANSIT COURTS (frameFlag gate + mirror law)
+        // ---------------------------------------------------------------------
+
+        /// [`seal_window`] with a KD-195 frameFlag stamped into the AOQ1
+        /// header reserved[0] (window offset 32) and the FNV digest
+        /// re-sealed over the stamped bytes (the flag is digest-covered).
+        fn seal_window_flagged(frame: &[u8], ordinal: u32, seq: u32, flag: u8) -> Vec<u8> {
+            let mut w = seal_window(frame, ordinal, seq);
+            ipc::stamp_frame_flag(&mut w[8..72], flag);
+            w
+        }
+
+        /// Client leg of the deterministic handshake over `client` (the
+        /// mirror of serve_census's inline block; same pinned constants —
+        /// the sidecar seam is deterministic). Returns (recv_key, send_key)
+        /// for AEAD seal/open of AppData both directions.
+        fn kd195_client_handshake(client: &mut UnixStream) -> ([u8; 32], [u8; 32]) {
+            let d = shake32(&[b"w2c/mlkem/d"]);
+            let z = shake32(&[b"w2c/mlkem/z"]);
+            let mut ek = [0u8; EK_BYTES];
+            let mut dk = [0u8; 2400];
+            cgap_crypto::kem::keygen(&d, &z, &mut ek, &mut dk);
+            let kem = SidecarKem;
+            let (ct_c, ss) = kem.encapsulate(&ek).expect("encapsulate");
+            let ek_win = seal_window(&wire_frame(sess::FrameKind::HandshakeEk, 0, 0, &ek), 0, 0);
+            client.write_all(&ek_win).expect("ek write");
+            let mut word = [0u8; 4];
+            client.read_exact(&mut word).expect("ek word");
+            assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+
+            let transcript = sess::transcript_tag(&kem, &ek, &ss, EPOCH);
+            let hs_master = sess::derive(&kem, sess::CTX_HANDSHAKE, &ss, &ek);
+            let recv_key = kem.kdf(&[sess::CTX_RECV, &hs_master]);
+            let confirm = sess::confirm_tag(&kem, &recv_key, &transcript, &ct_c);
+            let mut fin_body = [0u8; CT_BYTES + 16];
+            fin_body[..CT_BYTES].copy_from_slice(&ct_c);
+            fin_body[CT_BYTES..].copy_from_slice(&confirm);
+            let fin_win = seal_window(
+                &wire_frame(sess::FrameKind::HandshakeFinish, 1, 0, &fin_body),
+                1,
+                0,
+            );
+            client.write_all(&fin_win).expect("fin write");
+            client.read_exact(&mut word).expect("fin word");
+            assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+            let send_key = kem.kdf(&[sess::CTX_SEND, &hs_master]);
+            let _ = dk;
+            (recv_key, send_key)
+        }
+
+        /// One sealed AppData request window with `flag` stamped, under
+        /// `send_key` (ordinal 2, seq 7 — the pinned census shape).
+        fn kd195_appdata_window(send_key: &[u8; 32], payload: &[u8], flag: u8) -> Vec<u8> {
+            let (ordinal, seq) = (2u32, 7u32);
+            let mut prefix = [0u8; FRAME_HEADER_BYTES + 5];
+            codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix)
+                .expect("encode");
+            prefix[FRAME_HEADER_BYTES] = sess::FrameKind::AppData.id();
+            prefix[FRAME_HEADER_BYTES + 1..FRAME_HEADER_BYTES + 5]
+                .copy_from_slice(&seq.to_le_bytes());
+            let mut app_body = vec![0u8; 4 + payload.len() + cgap_aoq::aead::TAG_LEN];
+            app_body[..4].copy_from_slice(&seq.to_le_bytes());
+            let nonce = cgap_aoq::aead::Nonce96::new(
+                u32::from(EPOCH),
+                (u64::from(ordinal) << 32) | u64::from(seq),
+            )
+            .expect("nonce");
+            let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+            cgap_aoq::aead::seal_detached(
+                &mut app_body[4..4 + payload.len()],
+                &mut aead_tag,
+                payload,
+                &prefix,
+                send_key,
+                &nonce,
+            );
+            app_body[4 + payload.len()..].copy_from_slice(&aead_tag);
+            seal_window_flagged(
+                &wire_frame(sess::FrameKind::AppData, ordinal, seq, &app_body),
+                ordinal,
+                seq,
+                flag,
+            )
+        }
+
+        /// Read one response window after a 4-byte status word (prefix +
+        /// 120B metadata + body + pad + EOS), returning the full window.
+        fn kd195_read_response(client: &mut UnixStream) -> Vec<u8> {
+            let mut word = [0u8; 4];
+            client.read_exact(&mut word).expect("resp status");
+            assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);
+            let mut pfx = [0u8; 8];
+            client.read_exact(&mut pfx).expect("resp prefix");
+            let span = u32::from_le_bytes([pfx[4], pfx[5], pfx[6], pfx[7]]) as usize;
+            assert_eq!(span, 120);
+            let mut meta = [0u8; 120];
+            client.read_exact(&mut meta).expect("resp meta");
+            let blen = u32::from_le_bytes([meta[64], meta[65], meta[66], meta[67]]) as usize;
+            let mut rest = vec![0u8; blen + ipc::pad_to(blen, 64) + 8];
+            client.read_exact(&mut rest).expect("resp body");
+            let mut w = Vec::with_capacity(8 + 120 + rest.len());
+            w.extend_from_slice(&pfx);
+            w.extend_from_slice(&meta);
+            w.extend_from_slice(&rest);
+            w
+        }
+
+        /// COURT gitpack_window_roundtrip_flag_mirror: an AppData window
+        /// carrying frameFlag 0x08 is ACCEPTED, the response window mirrors
+        /// 0x08 in its header reserved[0] (window offset 32), the response
+        /// still passes `read_verified` (the mirror stamp was pre-digest),
+        /// and the echoed payload is byte-equal to the pre-seal bytes.
+        /// ANTI-VACUITY MUTATION: flipping the mirror site in `send_window`
+        /// (drop the `stamp_frame_flag` call) leaves the response flag at
+        /// 0x00 and this court goes RED; removing the flag gate lets 0x02
+        /// windows through and `kd195_bad_flag_refused` goes red.
+        #[test]
+        fn kd195_gitpack_window_roundtrip_flag_mirror() {
+            let (server, mut client) = socketpair();
+            let handle = std::thread::spawn(move || serve(server));
+            let (recv_key, send_key) = kd195_client_handshake(&mut client);
+            let preseal = [0x5Au8; 48];
+            let win = kd195_appdata_window(&recv_key, &preseal, ipc::FRAME_FLAG_GITPACK);
+            client.write_all(&win).expect("app write");
+            let resp = kd195_read_response(&mut client);
+            // MIRROR WITNESS: response window[32] == 0x08.
+            assert_eq!(
+                resp[ipc::FRAME_FLAG_OFFSET_IN_WINDOW],
+                ipc::FRAME_FLAG_GITPACK,
+                "response must mirror the request's gitpack frameFlag"
+            );
+            // The mirrored stamp was PRE-digest: the response passes the
+            // framing tag gate.
+            let blen = u32::from_le_bytes([resp[72], resp[73], resp[74], resp[75]]) as usize;
+            let mut body = vec![0u8; blen];
+            ipc::read_verified(&resp, None, &mut body).expect("resp tag gate (pre-digest stamp)");
+            // Payload byte-fidelity: the echo's AEAD plaintext == preseal.
+            let frame = sess::parse_frame(&body).expect("resp frame parses");
+            let ct_len = frame.payload.len() - 4 - cgap_aoq::aead::TAG_LEN;
+            let mut plain = vec![0u8; ct_len];
+            let tag: [u8; cgap_aoq::aead::TAG_LEN] =
+                frame.payload[4 + ct_len..].try_into().expect("tag");
+            cgap_aoq::aead::open_detached(
+                &mut plain,
+                &frame.payload[4..4 + ct_len],
+                &tag,
+                &body[..FRAME_HEADER_BYTES + 5],
+                &send_key,
+                &cgap_aoq::aead::Nonce96::new(
+                    u32::from(EPOCH),
+                    (u64::from(frame.header.frame_ordinal) << 32) | 7,
+                )
+                .expect("nonce"),
+            )
+            .expect("echo opens under recv_key");
+            assert_eq!(&plain, &preseal[..], "echoed payload byte-equal");
+
+            drop(client);
+            handle.join().expect("serve thread");
+        }
+
+        /// COURT bad_flag_refused: a window whose frameFlag is OUTSIDE the
+        /// closed set {0x01, 0x08, legacy 0x00} — here 0x02 — refuses typed
+        /// (AOQ_STATUS_DIGEST_MISMATCH; the frozen band is 8/8 per KD-1),
+        /// with NO echo (zero bytes follow the status word) and NO session
+        /// step. ANTI-VACUITY MUTATION: deleting the frameFlag gate accepts
+        /// the window (it is otherwise fully lawful) and this court goes
+        /// RED on the OK word.
+        #[test]
+        fn kd195_bad_flag_refused() {
+            let (server, mut client) = socketpair();
+            let handle = std::thread::spawn(move || serve(server));
+            let (recv_key, _send_key) = kd195_client_handshake(&mut client);
+            let win = kd195_appdata_window(&recv_key, &[0xAA; 16], 0x02);
+            client.write_all(&win).expect("bad-flag write");
+            let mut word = [0u8; 4];
+            client.read_exact(&mut word).expect("refusal word");
+            assert_eq!(
+                u32::from_le_bytes(word),
+                AOQ_STATUS_DIGEST_MISMATCH,
+                "out-of-set frameFlag refuses typed (0x02)"
+            );
+            // NO ECHO: zero bytes follow the refusal (and serve() closed
+            // the connection — the next read sees EOF).
+            let mut probe = [0u8; 16];
+            let n = client.read(&mut probe).expect("post-refusal read");
+            assert_eq!(n, 0, "refusal was NOT an echo");
+            drop(client);
+            handle.join().expect("serve thread");
+        }
+
+        /// COURT arrow_flag_0x01_unaffected: EXPLICITLY-stamped 0x01
+        /// (Arrow) windows are accepted, and a zero-reserved LEGACY window
+        /// (pre-KD-195 emitters) is accepted unmodified — the closed set
+        /// admits both and the mirror echoes 0x01 for the explicit form.
+        #[test]
+        fn kd195_arrow_flag_0x01_unaffected() {
+            let (server, mut client) = socketpair();
+            let handle = std::thread::spawn(move || serve(server));
+            let (recv_key, send_key) = kd195_client_handshake(&mut client);
+            let preseal = [0x11u8; 32];
+            // Explicit 0x01.
+            let win = kd195_appdata_window(&recv_key, &preseal, ipc::FRAME_FLAG_ARROW);
+            client.write_all(&win).expect("0x01 write");
+            let resp = kd195_read_response(&mut client);
+            assert_eq!(
+                resp[ipc::FRAME_FLAG_OFFSET_IN_WINDOW],
+                ipc::FRAME_FLAG_ARROW,
+                "mirror echoes an explicit Arrow flag"
+            );
+            // Legacy zero-reserved (no stamp): accepted, mirrors 0x01.
+            let legacy = {
+                let (ordinal, seq) = (3u32, 8u32);
+                let mut prefix = [0u8; FRAME_HEADER_BYTES + 5];
+                codec::encode(&AoqHeader::new(EPOCH, KEY_ID, ordinal, seq), &mut prefix)
+                    .expect("encode");
+                prefix[FRAME_HEADER_BYTES] = sess::FrameKind::AppData.id();
+                prefix[FRAME_HEADER_BYTES + 1..FRAME_HEADER_BYTES + 5]
+                    .copy_from_slice(&seq.to_le_bytes());
+                let mut app_body = vec![0u8; 4 + preseal.len() + cgap_aoq::aead::TAG_LEN];
+                app_body[..4].copy_from_slice(&seq.to_le_bytes());
+                let nonce = cgap_aoq::aead::Nonce96::new(
+                    u32::from(EPOCH),
+                    (u64::from(ordinal) << 32) | u64::from(seq),
+                )
+                .expect("nonce");
+                let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
+                cgap_aoq::aead::seal_detached(
+                    &mut app_body[4..4 + preseal.len()],
+                    &mut aead_tag,
+                    &preseal,
+                    &prefix,
+                    &recv_key,
+                    &nonce,
+                );
+                app_body[4 + preseal.len()..].copy_from_slice(&aead_tag);
+                let _ = send_key;
+                seal_window(&wire_frame(sess::FrameKind::AppData, ordinal, seq, &app_body), ordinal, seq)
+            };
+            assert_eq!(legacy[ipc::FRAME_FLAG_OFFSET_IN_WINDOW], 0, "legacy shape");
+            client.write_all(&legacy).expect("legacy write");
+            let resp2 = kd195_read_response(&mut client);
+            assert_eq!(
+                resp2[ipc::FRAME_FLAG_OFFSET_IN_WINDOW],
+                ipc::FRAME_FLAG_ARROW,
+                "legacy 0x00 reads as Arrow and mirrors 0x01"
+            );
+            drop(client);
+            handle.join().expect("serve thread");
+        }
+
+        /// Zero-copy court for `ipc::binary_batch_view` (KD-195 gitpack
+        /// view): the view's data pointer+len ALIAS the source payload
+        /// (pointer-range assert, no copy), and a source-byte flip
+        /// propagates through the view (the borrow is live, not a copy).
+        #[test]
+        fn kd195_gitpack_view_zero_copy() {
+            let mut payload = [0xC0u8; 96];
+            let base = payload.as_mut_ptr();
+            let view = ipc::binary_batch_view(&payload);
+            assert_eq!(view.offsets, (0, payload.len()), "verbatim [0,len) law");
+            assert_eq!(view.data.len(), payload.len());
+            let v_lo = view.data.as_ptr() as usize;
+            let v_hi = v_lo + view.data.len();
+            let s_lo = payload.as_ptr() as usize;
+            let s_hi = s_lo + payload.len();
+            assert!(
+                v_lo >= s_lo && v_hi <= s_hi,
+                "view pointer range must sit inside the source range"
+            );
+            assert_eq!(v_lo, s_lo, "zero-copy: view starts AT the source base");
+            // The flip witness writes through the pointer derived BEFORE the
+            // view borrow (borrowck cannot express "mutate the same memory
+            // a shared view borrows"; the pointer IS the same allocation,
+            // so a flip through it is a flip of the view's source — exactly
+            // the law under test).
+            // SAFETY (court-only): in-bounds writes (indices 0, 95) into the
+            // SAME 96-byte stack array the view borrows.
+            unsafe {
+                base.write(0xFF);
+                base.add(95).write(0x01);
+            }
+            assert_eq!(view.data[0], 0xFF, "source flip propagates (head)");
+            assert_eq!(view.data[95], 0x01, "source flip propagates (tail)");
         }
     }
 }
