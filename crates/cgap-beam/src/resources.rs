@@ -164,6 +164,22 @@ unsafe impl Send for BatchEnvelope {}
 /// happens-before every read; the atomic only de-duplicates.
 static BATCH_ENVELOPE_TYPE: AtomicPtr<ErlNifResourceType> = AtomicPtr::new(std::ptr::null_mut());
 
+/// (aq_slab.rs, lane L19) Build an init struct for a dtor-only resource type.
+/// The struct's fields are private to this module's transcription, so the AQ
+/// slab types go through this constructor rather than re-transcribing the
+/// ABI struct (N-implementations-of-one-calculus law).
+pub(crate) fn resource_type_init_dtor(
+    dtor: extern "C" fn(*mut ErlNifEnv, *mut c_void),
+) -> ErlNifResourceTypeInit {
+    ErlNifResourceTypeInit {
+        dtor: Some(dtor),
+        stop: None,
+        down: None,
+        members: 5,
+        dyncall: None,
+    }
+}
+
 /// `ErlNifResourceDtor` (erl_nif.h:214): runs when the BEAM collects the last
 /// term referencing an envelope. Drops the owned `Batch`; the VM frees the
 /// envelope's own bytes afterwards.
@@ -217,7 +233,10 @@ pub(crate) extern "C" fn nif_load(
     // [wave-8 lane-7 unblock] ops_scan's BatchView type must also open at
     // load: this OTP refuses enif_open_resource_type_x outside load/upgrade
     // (falsified on the real BEAM; see ops_scan.rs). Fail-closed boot.
-    if crate::ops_scan::open_batch_view_type(at_load_env) && open_batch_envelope_type(at_load_env) {
+    if crate::ops_scan::open_batch_view_type(at_load_env)
+        && open_batch_envelope_type(at_load_env)
+        && crate::aq_slab::open_aq_types(at_load_env)
+    {
         0
     } else {
         -1

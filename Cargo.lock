@@ -173,6 +173,7 @@ dependencies = [
  "cgap-blake3 26.11.5",
  "cgap-git 26.11.5",
  "cgap-parquet 26.11.5",
+ "wire-shm",
 ]
 
 [[package]]

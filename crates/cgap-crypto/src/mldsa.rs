@@ -436,32 +436,45 @@ pub fn use_hint(a: i32, h: i32) -> i32 {
 
 /// H seed derivation per FIPS 204 §7.2: from the 32-byte entropy seed ξ,
 /// (rho, K) = H(ξ, SEED domain byte 0x00) — 64-byte SHAKE256(ξ || 0x00).
-/// Returns (rho — the matrix seed, k_seed — the PRF seed).
-pub fn derive_key_seeds(xi: &[u8; 32]) -> ([u8; 32], [u8; 32]) {
-    let mut out = [0u8; 64];
+/// Returns (rho — matrix seed, sigma — the 64-byte ExpandS branch,
+/// K — the PRF seed). FIPS 204 final layout: rho || sigma || K.
+/// FIPS 204 final §5.4 (Algorithm 5): (ρ, σ, K) = H(ξ || k || l, 128) with
+/// the rank bytes k, l appended (k first; ML-DSA-65: 0x06, 0x05). Byte-exact
+/// against NIST ACVP ML-DSA-keyGen-FIPS204 (court:
+/// tests/mldsa65_kat_courts.rs `keygen_kat_byte_exact_vs_nist_acvp`).
+/// NOTE (KD-register candidate): the pre-KAT draft derived (ρ, K) from
+/// H(ξ || 0x00, 64) and expanded s1/s2 from K — both diverged from FIPS 204
+/// final; the KAT court above is the fence.
+pub fn derive_key_seeds(xi: &[u8; 32]) -> ([u8; 32], [u8; 64], [u8; 32]) {
+    let mut input = [0u8; 34];
+    input[..32].copy_from_slice(xi);
+    input[32] = K as u8;
+    input[33] = L as u8;
+    let mut out = [0u8; 128];
     let mut s = Shake256::instance();
-    s.absorb(xi);
-    s.absorb(&[0x00]);
+    s.absorb(&input);
     s.squeeze_into(&mut out);
     let mut rho = [0u8; 32];
+    let mut sigma = [0u8; 64];
     let mut k_seed = [0u8; 32];
     rho.copy_from_slice(&out[..32]);
-    k_seed.copy_from_slice(&out[32..]);
-    (rho, k_seed)
+    sigma.copy_from_slice(&out[32..96]);
+    k_seed.copy_from_slice(&out[96..128]);
+    (rho, sigma, k_seed)
 }
 
-/// PRF mask seed rho' = H(K, mu, rnd domain, 32 bytes) =
-/// SHAKE256(K || mu || rnd || 0x00) squeezed to 32. (rho' drives ExpandMask;
-/// the rnd domain byte mirrors FIPS 204's hedged branch discriminator.)
-pub fn derive_rho_prime(k_seed: &[u8; 32], mu: &[u8; 64], rnd: &[u8; 32]) -> [u8; 32] {
-    // Fixed 129-byte staging buffer (K || mu || rnd || 0x00) — alloc-free
-    // (the sign-side alloc census proves 0; a Vec here would break it).
-    let mut input = [0u8; 32 + MU_BYTES + 32 + 1];
+/// PRF mask seed rho' = H(K || rnd || mu, 64) — FIPS 204 final Algorithm 2
+/// (`R' <- H(K || rnd || mu, 64)`); the deterministic variant passes
+/// rnd = 0^32. rho' drives ExpandMask. Byte-exact against the NIST ACVP
+/// sigGen replay (court: tests/mldsa65_kat_courts.rs
+/// `sign_kat_byte_exact_vs_nist_acvp`). Alloc-free fixed staging buffer
+/// (the sign-side alloc census proves 0; a Vec here would break it).
+pub fn derive_rho_prime(k_seed: &[u8; 32], mu: &[u8; 64], rnd: &[u8; 32]) -> [u8; 64] {
+    let mut input = [0u8; 32 + 32 + MU_BYTES];
     input[..32].copy_from_slice(k_seed);
-    input[32..32 + MU_BYTES].copy_from_slice(mu);
-    input[32 + MU_BYTES..32 + MU_BYTES + 32].copy_from_slice(rnd);
-    input[32 + MU_BYTES + 32] = 0x00;
-    let mut out = [0u8; 32];
+    input[32..64].copy_from_slice(rnd);
+    input[64..].copy_from_slice(mu);
+    let mut out = [0u8; 64];
     Shake256::xof(&input, &mut out);
     out
 }
@@ -491,18 +504,62 @@ pub fn cbd_eta4(stream: &[u8; N], r: &mut [i32; N]) {
     }
 }
 
-/// ExpandS: one secret polynomial from (sigma, nonce) via PRF + CBD_4.
-pub fn expand_s_poly(sigma: &[u8; 32], nonce: u16, r: &mut [i32; N]) {
-    let mut stream = [0u8; N];
-    prf_stream(sigma, nonce, &mut stream);
-    cbd_eta4(&stream, r);
+/// ExpandS: one secret polynomial from (sigma, nonce) via
+/// SHAKE256(sigma || LE16(nonce)) + FIPS 204 Algorithm 31 (`RejBoundedPoly`)
+/// / Algorithm 15 (`CoefFromHalfByte`): low nibble first, accept nibble < 9,
+/// coeff = η − nibble (centered). FIPS 204 final expands s1/s2 from the
+/// 64-byte sigma branch of the keygen seed expansion (see
+/// derive_key_seeds) — NOT the round-3 CBD_η law (`cbd_eta4`, kept as a
+/// pinned primitive for its own court).
+pub fn expand_s_poly(sigma: &[u8], nonce: u16, r: &mut [i32; N]) {
+    let mut s = Shake256::instance();
+    s.absorb(sigma);
+    s.absorb(&[(nonce & 0xFF) as u8, (nonce >> 8) as u8]);
+    let mut buf = [0u8; Shake256::RATE];
+    s.squeeze_into(&mut buf);
+    let mut pos = 0usize;
+    let mut done = 0usize;
+    while done < N {
+        if pos == buf.len() {
+            s.squeeze_into(&mut buf);
+            pos = 0;
+        }
+        // FIPS 204 Algorithm 15, η = 4: low nibble first; accept nibble < 9;
+        // coeff = 4 − nibble (mod_sub centered) — branchless via masking.
+        // One stream byte = one nibble pair (low, high) at the SAME pos.
+        let lo = (buf[pos] & 0x0F) as i32;
+        let hi = (buf[pos] >> 4) as i32;
+        pos += 1;
+        if pos == buf.len() {
+            s.squeeze_into(&mut buf);
+            pos = 0;
+        }
+        let acc_lo = (lo < 9) as i32;
+        let c_lo = 4 - lo;
+        let neg_lo = (c_lo < 0) as i32;
+        let v_lo = c_lo + neg_lo * Q;
+        r[done] = ((1 - acc_lo) * r[done]) + (acc_lo * v_lo);
+        done += acc_lo as usize;
+        if done == N {
+            break;
+        }
+        let acc_hi = (hi < 9) as i32;
+        let c_hi = 4 - hi;
+        let neg_hi = (c_hi < 0) as i32;
+        let v_hi = c_hi + neg_hi * Q;
+        r[done] = ((1 - acc_hi) * r[done]) + (acc_hi * v_hi);
+        done += acc_hi as usize;
+    }
 }
 
 /// ExpandA row slice: one NTT-domain matrix entry from (rho, entry index =
-/// (row << 8) | col), SHAKE128(rho || LE16(idx)) with 22-bit rejection
-/// (3-byte LE candidates masked to 0x3F_FFFF, accept iff < q), centered via
-/// cond_add_q, then NTT. The rejection loop consumes the uniform stream —
-/// trip count depends on the stream, never on secret values.
+/// (row << 8) | col), SHAKE128(rho || LE16(idx)) with FIPS 204 Algorithm 14
+/// (`CoeffFromThreeBytes`) rejection: 3-byte LE candidates with the top bit
+/// of the third byte masked off (0x7F_FFFF, accept iff < q), then NTT. The
+/// rejection loop consumes the uniform stream — trip count depends on the
+/// stream, never on secret values. (The pre-KAT draft masked to 22 bits —
+/// 0x3F_FFFF — which built a different A matrix; the NIST ACVP keygen court
+/// is the fence.)
 pub fn expand_a_row_hat(rho: &[u8; 32], idx: u16, r: &mut [i32; N]) {
     let mut s = Shake128::instance();
     s.absorb(rho);
@@ -521,7 +578,7 @@ pub fn expand_a_row_hat(rho: &[u8; 32], idx: u16, r: &mut [i32; N]) {
             let t =
                 (buf[pos] as u32) | ((buf[pos + 1] as u32) << 8) | ((buf[pos + 2] as u32) << 16);
             pos += 3;
-            let t = t & 0x3F_FFFF;
+            let t = t & 0x7F_FFFF;
             if t < Q as u32 {
                 *c = cond_add_q(t as i32);
                 break;
@@ -568,10 +625,11 @@ pub fn sample_in_ball(c_tilde: &[u8; CTILDE_BYTES], c: &mut [i32; N]) {
 }
 
 /// SampleMask (ExpandMask, gamma1 = 2^19): one y polynomial from
-/// (rho', kappa) via PRF stream with 20-bit rejection: candidate t =
-/// 3-byte LE masked to 0xF_FFFF, accept iff t < 2·γ1, coeff = γ1 − t
-/// ∈ [−γ1, γ1). Stream-trip only; no secret-dependent branches.
-pub fn expand_mask_poly(rhoprime: &[u8; 32], kappa: u16, r: &mut [i32; N]) {
+/// (rho', kappa) via SHAKE256(rho' || LE16(kappa)) with 20-bit rejection:
+/// candidate t = 3-byte LE masked to 0xF_FFFF, accept iff t < 2·γ1,
+/// coeff = γ1 − t ∈ [−γ1, γ1). FIPS 204 final rho' is the full 64-byte
+/// H(K||rnd||mu). Stream-trip only; no secret-dependent branches.
+pub fn expand_mask_poly(rhoprime: &[u8], kappa: u16, r: &mut [i32; N]) {
     let mut s = Shake256::instance();
     s.absorb(rhoprime);
     s.absorb(&[(kappa & 0xFF) as u8, (kappa >> 8) as u8]);
@@ -684,14 +742,14 @@ impl SignKeyInternal {
     /// from-seed construction of t0 lands with the phase-3 keygen/serialize
     /// surface. This constructor takes t0 explicitly for the sign-loop lane.
     pub fn from_seed_and_t0(xi: &[u8; 32], t0: [[i32; N]; K]) -> SignKeyInternal {
-        let (rho, k_seed) = derive_key_seeds(xi);
+        let (rho, sigma, k_seed) = derive_key_seeds(xi);
         let mut s1 = [[0i32; N]; L];
         let mut s2 = [[0i32; N]; K];
         for (j, p) in s1.iter_mut().enumerate() {
-            expand_s_poly(&k_seed, j as u16, p);
+            expand_s_poly(&sigma, j as u16, p);
         }
         for (i, p) in s2.iter_mut().enumerate() {
-            expand_s_poly(&k_seed, (L + i) as u16, p);
+            expand_s_poly(&sigma, (L + i) as u16, p);
         }
         SignKeyInternal {
             rho,
@@ -759,8 +817,11 @@ pub fn sign_internal(
     let mut h = [[0i32; N]; K];
     let mut c_tilde = [0u8; CTILDE_BYTES];
 
-    for kappa in 0..MAX_SIGN_ATTEMPTS {
-        let kappa = kappa as u16;
+    for attempt in 0..MAX_SIGN_ATTEMPTS {
+        // FIPS 204 final: the mask nonce advances by L per attempt
+        // (attempt L, 2L, ...), so per-poly nonces kappa+j never repeat
+        // across attempts (the pre-KAT draft's kappa+j schedule collided).
+        let kappa = (attempt as u16).wrapping_mul(L as u16);
         // y = ExpandMask(rho', kappa); w = A·y per row; decompose rows.
         for j in 0..L {
             expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut y[j]);
@@ -1021,14 +1082,14 @@ fn pack_s(p: &[i32; N], out: &mut [u8; S_POLY_BYTES]) {
 /// s2 nonces L..L+K, sigma = K); A from rho; t = A·s1 + s2; Power2Round →
 /// (t1, t0); tr = H(ek, 64). Deterministic in ξ.
 pub fn keygen(xi: &[u8; 32], ek: &mut [u8; PK_BYTES], dk: &mut [u8; SK_BYTES]) {
-    let (rho, k_seed) = derive_key_seeds(xi);
+    let (rho, sigma, k_seed) = derive_key_seeds(xi);
     let mut s1 = [[0i32; N]; L];
     let mut s2 = [[0i32; N]; K];
     for (j, p) in s1.iter_mut().enumerate() {
-        expand_s_poly(&k_seed, j as u16, p);
+        expand_s_poly(&sigma, j as u16, p);
     }
     for (i, p) in s2.iter_mut().enumerate() {
-        expand_s_poly(&k_seed, (L + i) as u16, p);
+        expand_s_poly(&sigma, (L + i) as u16, p);
     }
     // A matrix, NTT domain; t row-by-row (t = A·s1 + s2 mod q).
     let mut s1hat = [[0i32; N]; L];
@@ -1277,8 +1338,8 @@ mod sign_property_tests {
         let mut w0low = [[0i32; N]; K];
         let mut packed = [0u8; K * W1_PACKED_BYTES];
         let mut ct = [0u8; CTILDE_BYTES];
-        for kappa in 0..MAX_SIGN_ATTEMPTS {
-            let kappa = kappa as u16;
+        for attempt in 0..MAX_SIGN_ATTEMPTS {
+            let kappa = (attempt as u16).wrapping_mul(L as u16);
             for j in 0..L {
                 expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut yhat[j]);
                 ntt(&mut yhat[j]);

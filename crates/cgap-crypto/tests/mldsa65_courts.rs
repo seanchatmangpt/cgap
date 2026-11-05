@@ -129,16 +129,16 @@ fn keygen_byte_compat_court() {
     assert_eq!(&dk[64..128], &tr[..], "tr == H(ek, 64)");
     // (2) dk parse matches in-memory derivation from xi.
     let sk = m::signing_key_from_dk(&dk);
-    let (rho, k_seed) = m::derive_key_seeds(&xi);
+    let (rho, sigma, k_seed) = m::derive_key_seeds(&xi);
     assert_eq!(sk.rho, rho);
     assert_eq!(sk.k_seed, k_seed);
     let mut s1_ref = [[0i32; m::N]; m::L];
     let mut s2_ref = [[0i32; m::N]; m::K];
     for (j, p) in s1_ref.iter_mut().enumerate() {
-        m::expand_s_poly(&k_seed, j as u16, p);
+        m::expand_s_poly(&sigma, j as u16, p);
     }
     for (i, p) in s2_ref.iter_mut().enumerate() {
-        m::expand_s_poly(&k_seed, (m::L + i) as u16, p);
+        m::expand_s_poly(&sigma, (m::L + i) as u16, p);
     }
     assert_eq!(sk.s1, s1_ref, "s1 from dk == ExpandS(xi)");
     assert_eq!(sk.s2, s2_ref, "s2 from dk == ExpandS(xi)");

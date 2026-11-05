@@ -37,6 +37,10 @@ mod dtor_stats;
 
 mod ops_persist;
 
+// AOQ slab surface (lane L19, aq-nif-boundary-spec.md): mmap'd wire-shm-layout
+// slab, zero-copy egress, lease bitmask. Owned by aq_slab.rs.
+mod aq_slab;
+
 pub mod shm;
 pub mod spsc_ring;
 
@@ -477,7 +481,7 @@ extern "C" fn cgap_version(
 /// `ERL_NIF_DIRTY_JOB_CPU_BOUND` (erl_drv_nif.h:50: `= 1`), i.e. 0x01.
 const ERL_NIF_DIRTY_JOB_CPU_BOUND: u32 = 0x01;
 
-static NIF_FUNCS: [ErlNifFunc; 21] = [
+static NIF_FUNCS: [ErlNifFunc; 26] = [
     // n >= 16384 fills build a >= 64 KiB aligned buffer; run it dirty.
     ErlNifFunc {
         name: b"cgap_new\0".as_ptr() as *const c_char,
@@ -634,6 +638,39 @@ static NIF_FUNCS: [ErlNifFunc; 21] = [
         fptr: ops_scan::cgap_scan,
         flags: 0,
     },
+    // AOQ slab surface (aq_slab.rs, lane L19): open is DirtyIo (open/mmap/
+    // validate); frame/window/stamp/lease are CPU (bounded memory ops, crc32
+    // over <= 4080 B). All errors are the atom `error` (cgap_len convention).
+    ErlNifFunc {
+        name: b"aq_slab_open\0".as_ptr() as *const c_char,
+        arity: 1,
+        fptr: aq_slab::aq_slab_open,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_slab_frame\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_slab::aq_slab_frame,
+        flags: 0,
+    },
+    ErlNifFunc {
+        name: b"aq_slab_window\0".as_ptr() as *const c_char,
+        arity: 4,
+        fptr: aq_slab::aq_slab_window,
+        flags: 0,
+    },
+    ErlNifFunc {
+        name: b"aq_slab_stamp\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_slab::aq_slab_stamp,
+        flags: 0,
+    },
+    ErlNifFunc {
+        name: b"aq_slab_lease\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_slab::aq_slab_lease,
+        flags: 0,
+    },
 ];
 
 /// OTP 26+ no-argument entry point. The BEAM resolves this symbol when
@@ -648,7 +685,7 @@ static NIF_ENTRY: ErlNifEntry = ErlNifEntry {
     major: ERL_NIF_MAJOR_VERSION,
     minor: ERL_NIF_MINOR_VERSION,
     name: b"cgap_beam\0".as_ptr() as *const c_char,
-    num_of_funcs: 21,
+    num_of_funcs: 26,
     funcs: NIF_FUNCS.as_ptr() as *mut ErlNifFunc,
     load: Some(resources::nif_load),
     reload: None,
