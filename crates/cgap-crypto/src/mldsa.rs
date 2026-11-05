@@ -536,8 +536,9 @@ pub fn expand_s_poly(sigma: &[u8], nonce: u16, r: &mut [i32; N]) {
         }
         let acc_lo = (lo < 9) as i32;
         let c_lo = 4 - lo;
-        let neg_lo = (c_lo < 0) as i32;
-        let v_lo = c_lo + neg_lo * Q;
+        // FIPS 204 Algorithm 15: coefficient stored CENTERED (η − nib ∈ [−4,4]),
+        // never mod-q (c + Q) — pack_s's nibble = η − z law requires centered z.
+        let v_lo = c_lo;
         r[done] = ((1 - acc_lo) * r[done]) + (acc_lo * v_lo);
         done += acc_lo as usize;
         if done == N {
@@ -545,8 +546,7 @@ pub fn expand_s_poly(sigma: &[u8], nonce: u16, r: &mut [i32; N]) {
         }
         let acc_hi = (hi < 9) as i32;
         let c_hi = 4 - hi;
-        let neg_hi = (c_hi < 0) as i32;
-        let v_hi = c_hi + neg_hi * Q;
+        let v_hi = c_hi; // centered, as v_lo above
         r[done] = ((1 - acc_hi) * r[done]) + (acc_hi * v_hi);
         done += acc_hi as usize;
     }
