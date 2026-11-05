@@ -1,10 +1,15 @@
-//! closure pairs/s bench (p1-closure; harness=false, Instant-timed).
+//! closure pairs/s bench (p1-closure; Divan-timed with AllocProfiler).
 //! Units: pairs/s ONLY (never cross-multiplied). Chains corpus,
-//! splitmix64-seeded from 0xA20C_0FFE_E5A7_E000. Status: measured with
-//! this stated method (harness=false Instant, 1 warmup + 3 reps min);
-//! not Divan-instrumented, so receipt labels stay [TARGET-v26.11.2]
-//! until a Divan entry exists.
-use std::time::Instant;
+//! splitmix64-seeded from 0xA20C_0FFE_E5A7_E000.
+//!
+//! Alloc accounting: uses Divan's AllocProfiler to report precise allocation
+//! counts and bytes allocated per iteration in the alloc column.
+
+use divan::counter::ItemsCount;
+use divan::{black_box, Bencher};
+
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 
 fn splitmix64(state: &mut u64) -> u64 {
     *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -32,33 +37,25 @@ fn chains_corpus(n_nodes: usize, chain_len: usize) -> (Vec<u32>, Vec<u32>) {
     order.iter().map(|&i| (xs[i], zs[i])).unzip()
 }
 
-fn bench(n_nodes: usize, chain_len: usize) {
+#[divan::bench(args = [
+    (65_536, 8),
+    (1_048_576, 32),
+])]
+fn semi_naive_transitive_closure(b: Bencher, (n_nodes, chain_len): (usize, usize)) {
     let (ex, ez) = chains_corpus(n_nodes, chain_len);
-    // Warmup + 3 reps, min taken (no-sleep law: measured, not waited).
-    let mut best = f64::INFINITY;
-    let mut pairs = 0usize;
-    for _ in 0..4 {
-        let t = Instant::now();
-        let (cx, cz, _r) = cgap_storage::closure::semi_naive_closure(&ex, &ez);
-        let d = t.elapsed().as_secs_f64();
-        pairs = cx.len();
+    let (cx_sample, _, _) = cgap_storage::closure::semi_naive_closure(&ex, &ez);
+    let pairs = cx_sample.len();
+
+    b.counter(ItemsCount::new(pairs as u64)).bench_local(|| {
+        let (cx, cz, _r) = cgap_storage::closure::semi_naive_closure(
+            black_box(&ex),
+            black_box(&ez),
+        );
         assert_eq!(cx.len(), cz.len());
-        if d < best {
-            best = d;
-        }
-    }
-    let pps = pairs as f64 / best;
-    println!("N={n_nodes} chain_len={chain_len} pairs={pairs} best_secs={best:.6} pairs_per_sec={pps:.0}");
+        black_box((cx.len(), cz.len()));
+    });
 }
 
 fn main() {
-    if let Err(v) = cgap_aoq::profile_guard::assert_release() {
-        eprintln!(
-            "LOUD-SKIP {} : {v}",
-            std::env::args().next().unwrap_or_default()
-        );
-        return;
-    }
-    bench(65_536, 8);
-    bench(1_048_576, 32);
+    divan::main();
 }

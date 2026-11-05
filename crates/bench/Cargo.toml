@@ -83,6 +83,10 @@ harness = false
 name = "challenger_crypto"
 harness = false
 
+[[bench]]
+name = "csct_sovereign"
+harness = false
+
 # BENCH-* chains: staged end-to-end chains, each over one seeded corpus.
 # Declared ONCE by BENCH-1 (all five targets in this single edit) so the
 # bench surface is fixed and polling lanes see a stable manifest; the file
