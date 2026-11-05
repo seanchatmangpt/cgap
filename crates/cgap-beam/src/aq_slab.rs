@@ -69,9 +69,14 @@ pub(crate) const ERL_NIF_DIRTY_JOB_IO_BOUND: u32 = 0x02;
 type OffT = i64;
 type SizeT = usize;
 
+/// `#define MS_SYNC 0x0010` (macOS SDK <sys/mman.h>:188 — NOT Linux's 4;
+/// 0x0004 here would be MS_KILLPAGES, silently non-durable).
+const MS_SYNC: c_int = 0x0010;
+
 extern "C" {
     #[link_name = "open"]
     fn c_open(path: *const c_char, oflag: c_int, ...) -> c_int;
+    fn msync(addr: *mut c_void, len: SizeT, flags: c_int) -> c_int;
     fn mmap(
         addr: *mut c_void,
         len: SizeT,

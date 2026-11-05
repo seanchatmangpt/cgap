@@ -39,3 +39,50 @@ fn write_escript(src: &str) -> PathBuf {
     std::fs::write(&p, src).expect("write escript");
     p
 }
+
+fn run_court(escript: &PathBuf, dylib: &PathBuf, mutate: bool) -> i32 {
+    let mut cmd = Command::new("escript");
+    cmd.arg(escript).arg(dylib);
+    if mutate {
+        cmd.env("AQ_MUTATE_CRC_SKIP", "1");
+    }
+    let out = cmd.output().expect("spawn escript");
+    if !out.stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(&out.stdout));
+    }
+    if !out.stderr.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&out.stderr));
+    }
+    out.status.code().unwrap_or(1)
+}
+
+const ESCRIPT: &str = r##"
+-module(aq_slab_court).
+-export([main/1]).
+
+aq_slab_open(_) -> erlang:nif_error(nif_not_loaded).
+aq_slab_frame(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
+
+main([NifPath]) ->
+    ok = case erlang:load_nif(NifPath, 0) of
+             ok -> ok;
+             {error, R} -> erlang:error({load_nif_failed, R})
+         end,
+    Res = try contracts() of
+              ok -> 0
+          catch Class:Reason:Stack ->
+              io:format("COURT_FAIL ~p:~p~n~p~n", [Class, Reason, Stack]),
+              1
+          end,
+    halt(Res).
+
+contracts() ->
+    t_open_refusals(),
+    t_stamp_frame_window(),
+    t_crc_negative_leg(),
+    t_lease_lifecycle(),
+    t_alloc_spy_egress(),
+    ok.
