@@ -36,9 +36,8 @@ fn parse_status_maps_rs(src: &str) -> Vec<(u32, String)> {
                 .expect("line starts with 0x")
                 .trim()
                 .to_string();
-            let word =
-                u32::from_str_radix(word_hex.trim_start_matches("0x"), 16)
-                    .expect("frozen-band hex word parses");
+            let word = u32::from_str_radix(word_hex.trim_start_matches("0x"), 16)
+                .expect("frozen-band hex word parses");
             let name = t
                 .split("Some(\"")
                 .nth(1)
@@ -134,10 +133,7 @@ fn producer_table() -> Vec<(u32, String)> {
         .collect()
 }
 
-fn print_matrix(
-    rows: &[(String, Vec<(u32, String)>)],
-    producer: &[(u32, String)],
-) {
+fn print_matrix(rows: &[(String, Vec<(u32, String)>)], producer: &[(u32, String)]) {
     println!("TRI-COURT 8x3 matrix (producer | rust | c | go):");
     for (i, (word, name)) in producer.iter().enumerate() {
         let cell = |t: &[(u32, String)]| -> String {
@@ -147,10 +143,7 @@ fn print_matrix(
                 None => "MISSING".to_string(),
             }
         };
-        let cols: Vec<String> = rows
-            .iter()
-                       .map(|(_, t)| cell(t))
-            .collect();
+        let cols: Vec<String> = rows.iter().map(|(_, t)| cell(t)).collect();
         println!(
             "  [{i}] {word:#010x} {name:<17} producer=REF {}",
             cols.join(" | ")
@@ -164,17 +157,19 @@ fn rust_and_c_tables_match_producer() {
     assert_eq!(producer.len(), 8);
 
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.parent().expect("crate parent").parent().expect("repo root");
+    let root = manifest
+        .parent()
+        .expect("crate parent")
+        .parent()
+        .expect("repo root");
 
-    let rust_src = fs::read_to_string(
-        root.join("crates/cgap-ffi/src/aoq/status_maps.rs"),
-    )
-    .expect("cgap-ffi status_maps.rs readable from cgap-arrow test");
+    let rust_src = fs::read_to_string(root.join("crates/cgap-ffi/src/aoq/status_maps.rs"))
+        .expect("cgap-ffi status_maps.rs readable from cgap-arrow test");
     let rust_table = parse_status_maps_rs(&rust_src);
     assert_eq!(rust_table.len(), 8, "status_maps.rs arms parsed");
 
-    let c_src = fs::read_to_string(root.join("include/cgap_aoq.h"))
-        .expect("include/cgap_aoq.h readable");
+    let c_src =
+        fs::read_to_string(root.join("include/cgap_aoq.h")).expect("include/cgap_aoq.h readable");
     let c_table = parse_cgap_aoq_h(&c_src);
     assert_eq!(c_table.len(), 8, "CGAP_AOQ_STATUS_* defines parsed");
 
@@ -189,10 +184,7 @@ fn rust_and_c_tables_match_producer() {
     );
 
     print_matrix(
-        &[
-            ("rust".to_string(), rust_table),
-            ("c".to_string(), c_table),
-        ],
+        &[("rust".to_string(), rust_table), ("c".to_string(), c_table)],
         &producer,
     );
 }
@@ -230,7 +222,11 @@ fn go_table_matches_producer() {
 fn court_flips_on_mutated_status_maps() {
     let producer = producer_table();
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.parent().expect("crate parent").parent().expect("repo root");
+    let root = manifest
+        .parent()
+        .expect("crate parent")
+        .parent()
+        .expect("repo root");
     let src = fs::read_to_string(root.join("crates/cgap-ffi/src/aoq/status_maps.rs"))
         .expect("status_maps.rs readable");
 
@@ -258,12 +254,22 @@ fn court_flips_on_mutated_status_maps() {
 fn court_flips_on_mutated_header() {
     let producer = producer_table();
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.parent().expect("crate parent").parent().expect("repo root");
+    let root = manifest
+        .parent()
+        .expect("crate parent")
+        .parent()
+        .expect("repo root");
     let src = fs::read_to_string(root.join("include/cgap_aoq.h")).expect("header readable");
-    let mutated = src.replace("#define CGAP_AOQ_STATUS_OK 0x4347A001u", "#define CGAP_AOQ_STATUS_OK 0x4347A009u");
+    let mutated = src.replace(
+        "#define CGAP_AOQ_STATUS_OK 0x4347A001u",
+        "#define CGAP_AOQ_STATUS_OK 0x4347A009u",
+    );
     assert_ne!(mutated, src, "mutation must apply");
     let table = parse_cgap_aoq_h(&mutated);
-    assert_ne!(table, producer, "VACUOUS COURT: mutated header still matched");
+    assert_ne!(
+        table, producer,
+        "VACUOUS COURT: mutated header still matched"
+    );
 }
 
 /// Parse the AOQ1 header version literal from a Rust line
@@ -304,14 +310,19 @@ fn parse_go_version(src: &str) -> Option<u16> {
 #[test]
 fn aoq1_version_pinned_to_3_across_all_four_surfaces() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let root = manifest.parent().expect("crate parent").parent().expect("repo root");
+    let root = manifest
+        .parent()
+        .expect("crate parent")
+        .parent()
+        .expect("repo root");
 
     let frame_rs = fs::read_to_string(root.join("crates/cgap-ffi/src/aoq/frame.rs"))
         .expect("frame.rs readable");
-    let header_h = fs::read_to_string(root.join("include/cgap_aoq.h"))
-        .expect("cgap_aoq.h readable");
-    let layout_rs = fs::read_to_string(root.join("crates/cgap-aoq/src/generated_aoq_header_layout.rs"))
-        .expect("generated_aoq_header_layout.rs readable");
+    let header_h =
+        fs::read_to_string(root.join("include/cgap_aoq.h")).expect("cgap_aoq.h readable");
+    let layout_rs =
+        fs::read_to_string(root.join("crates/cgap-aoq/src/generated_aoq_header_layout.rs"))
+            .expect("generated_aoq_header_layout.rs readable");
 
     assert_eq!(
         parse_rust_version(&frame_rs),
@@ -348,7 +359,11 @@ fn aoq1_version_pinned_to_3_across_all_four_surfaces() {
         "pub const AOQ1_VERSION: u16 = 3;",
         "pub const AOQ1_VERSION: u16 = 2;",
     ));
-    assert_ne!(flipped, Some(3), "VACUOUS COURT: a flipped version literal still matched the pin");
+    assert_ne!(
+        flipped,
+        Some(3),
+        "VACUOUS COURT: a flipped version literal still matched the pin"
+    );
     assert_eq!(flipped, Some(2), "flipped literal must parse as 2");
 }
 

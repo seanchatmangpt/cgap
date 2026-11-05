@@ -34,9 +34,7 @@ fn main() {}
 fn main() {
     use std::io::Read;
 
-    let self_test = std::env::args_os()
-        .skip(1)
-        .any(|a| a == "--self-test");
+    let self_test = std::env::args_os().skip(1).any(|a| a == "--self-test");
 
     if self_test {
         // Vector court: the two pinned vectors above, over the same crate
@@ -64,12 +62,10 @@ fn main() {
     }
 
     let mut body = Vec::new();
-    std::io::stdin()
-        .read_to_end(&mut body)
-        .unwrap_or_else(|e| {
-            eprintln!("aoq_tagtool: stdin read fault: {e}");
-            std::process::exit(2);
-        });
+    std::io::stdin().read_to_end(&mut body).unwrap_or_else(|e| {
+        eprintln!("aoq_tagtool: stdin read fault: {e}");
+        std::process::exit(2);
+    });
     println!("{}", tag16_hex(&body));
 }
 

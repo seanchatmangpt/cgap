@@ -9,7 +9,10 @@ const BIN: &str = env!("CARGO_BIN_EXE_cbmqs-audit");
 const AB14_RECEIPT: &str = "/Users/sac/ggen/docs/jira/v26.11.3/receipts/ab-14-chain-scale.md";
 
 fn run(args: &[&str]) -> (i32, String) {
-    let out = Command::new(BIN).args(args).output().expect("spawn cbmqs-audit");
+    let out = Command::new(BIN)
+        .args(args)
+        .output()
+        .expect("spawn cbmqs-audit");
     (
         out.status.code().expect("exit code"),
         format!(
@@ -38,7 +41,14 @@ fn court_parity_roundtrip_and_four_mutations_flip() {
     // Roundtrip: emit -> verify exit 0.
     let cert = dir.join("cert.json");
     let cert_s = cert.to_str().unwrap();
-    let (code, out) = run(&["--emit-certificate", cert_s, "--run-seq", "7", "--g7-receipt", receipt_s]);
+    let (code, out) = run(&[
+        "--emit-certificate",
+        cert_s,
+        "--run-seq",
+        "7",
+        "--g7-receipt",
+        receipt_s,
+    ]);
     assert_eq!(code, 0, "emit must pass: {out}");
     let (code, out) = run(&["--verify-certificate", cert_s]);
     assert_eq!(code, 0, "verify roundtrip must pass: {out}");

@@ -312,7 +312,11 @@ fn handshake(
     let mut fin_body = [0u8; CT_BYTES + 16];
     fin_body[..CT_BYTES].copy_from_slice(&ct_c);
     fin_body[CT_BYTES..].copy_from_slice(&confirm);
-    let fin_win = seal_window(&wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body), 1, 0);
+    let fin_win = seal_window(
+        &wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body),
+        1,
+        0,
+    );
     let (word, _w) = roundtrip(stream, &fin_win, false);
     assert_eq!(
         word, AOQ_STATUS_OK,
@@ -401,7 +405,11 @@ fn e1_full_path_preseal_bytes_survive_to_echo() {
     .expect("echo opens under the court-derived send_key");
 
     // THE RUNG-8 WITNESS: the recovered payload equals the pre-seal bytes.
-    assert_eq!(&plain, &preseal[..], "decrypted (echoed) payload == pre-seal bytes");
+    assert_eq!(
+        &plain,
+        &preseal[..],
+        "decrypted (echoed) payload == pre-seal bytes"
+    );
     // Transcript digests for the receipt (blake3, 32-byte).
     let d_pre = cgap_arrow::blake3::hash(preseal);
     let d_post = cgap_arrow::blake3::hash(&plain);
@@ -456,8 +464,7 @@ fn e2_flipped_byte_fires_tag_gate() {
 fn e3_process_reuse_then_stdin_eof_stop() {
     let mut car = spawn_sidecar("e3");
     let kem = CourtKem;
-    let (_dk, _ct, _recv_key1, _send_key1) =
-        handshake(&kem, car.stream.as_mut().expect("conn 1"));
+    let (_dk, _ct, _recv_key1, _send_key1) = handshake(&kem, car.stream.as_mut().expect("conn 1"));
 
     // Connection 3 (the reuse witness): a ONE-CONNECTION sidecar (mutation
     // C': the pre-ZD-56 binary) cannot accept this connect — the bounded

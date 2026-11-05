@@ -1075,7 +1075,15 @@ fn pack_t0(t0: &[i32; N], out: &mut [u8; T0_POLY_BYTES]) {
 }
 /// 4-bit secret poly pack (offset +η).
 fn pack_s(p: &[i32; N], out: &mut [u8; S_POLY_BYTES]) {
-    bitpack(p, ETA, -(ETA as i32), out);
+    // FIPS 204 BitPack(eta): nibble = eta - z (NOT z + eta). A negated copy
+    // through the existing bitpack(offset = -eta) yields exactly that; the
+    // pre-KAT draft emitted z + eta — sign-flipped (KD-row closed by the
+    // keygen KAT court asserting the NIST sk s1/s2 regions).
+    let mut negated = *p;
+    for c in negated.iter_mut() {
+        *c = -*c;
+    }
+    bitpack(&negated, ETA, -(ETA as i32), out);
 }
 
 /// Byte-emission keygen: (rho, K) = H(ξ, 0x00); ExpandS(s1 nonces 0..L,
@@ -1174,12 +1182,20 @@ pub fn signing_key_from_dk(dk: &[u8; SK_BYTES]) -> SignKeyInternal {
         let mut buf = [0u8; S_POLY_BYTES];
         buf.copy_from_slice(&dk[idx..idx + S_POLY_BYTES]);
         bitunpack(&buf, ETA, -(ETA as i32), p);
+        // FIPS 204 decode: z = eta - nibble; the generic unpack yields
+        // nibble - eta, so negate (inverse of the pack_s law above).
+        for c in p.iter_mut() {
+            *c = -*c;
+        }
         idx += S_POLY_BYTES;
     }
     for p in &mut s2 {
         let mut buf = [0u8; S_POLY_BYTES];
         buf.copy_from_slice(&dk[idx..idx + S_POLY_BYTES]);
         bitunpack(&buf, ETA, -(ETA as i32), p);
+        for c in p.iter_mut() {
+            *c = -*c;
+        }
         idx += S_POLY_BYTES;
     }
     for p in &mut t0 {

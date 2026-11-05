@@ -418,9 +418,7 @@ fn admission_e2e_timing_probe_min_of_100() {
     // Profile guard (ZP-18): loud-SKIP under a dev profile — green-but-loud
     // unmeasured, never a fake pass.
     if let Err(v) = assert_release() {
-        eprintln!(
-            "LOUD-SKIP admission_e2e_timing_probe_min_of_100: non-release profile ({v})"
-        );
+        eprintln!("LOUD-SKIP admission_e2e_timing_probe_min_of_100: non-release profile ({v})");
         return;
     }
     let quads = make_quads(256);

@@ -35,7 +35,6 @@
 
 // court-consumed surface (CEN2 ALLOW-WITH-REASON): commit_synth_court / e2e_wire_substrate_court / soc_full_chip_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
 #![allow(dead_code)]
-
 #![deny(unsafe_code)]
 
 use core::fmt;

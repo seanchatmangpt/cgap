@@ -79,26 +79,39 @@ fn court_tamper_four_mutations_each_flip_verify_to_exit_2() {
     let seal = std::fs::read_to_string(&seal_path).unwrap();
     let first = seal.chars().next().expect("seal nonempty");
     let flipped_char = if first == '0' { '1' } else { '0' };
-    std::fs::write(&seal_path, seal.replacen(first, &flipped_char.to_string(), 1)).unwrap();
+    std::fs::write(
+        &seal_path,
+        seal.replacen(first, &flipped_char.to_string(), 1),
+    )
+    .unwrap();
     let (code, _) = verify(&cert);
     assert_eq!(code, 2, "seal-hex flip must refuse with exit 2");
 
     // Mutation 3 — swap run_seq (identity law, typed RunSeqCollision).
     std::fs::write(&seal_path, &seal).unwrap();
     let seq_pat = format!("\"run_seq\":{RUN_SEQ}");
-    let swapped = original.replace(&seq_pat, &format!("\"run_seq\":{}", RUN_SEQ.parse::<u64>().unwrap() + 1));
+    let swapped = original.replace(
+        &seq_pat,
+        &format!("\"run_seq\":{}", RUN_SEQ.parse::<u64>().unwrap() + 1),
+    );
     assert_ne!(swapped, original, "run_seq swap must change bytes");
     std::fs::write(&cert, &swapped).unwrap();
     let (code, stderr) = verify(&cert);
     assert_eq!(code, 2, "run_seq swap must refuse with exit 2");
-    assert!(stderr.contains("RunSeqCollision"), "typed RunSeqCollision required, got: {stderr}");
+    assert!(
+        stderr.contains("RunSeqCollision"),
+        "typed RunSeqCollision required, got: {stderr}"
+    );
 
     // Mutation 4 — delete the sidecar.
     std::fs::write(&cert, &original).unwrap();
     std::fs::remove_file(&seal_path).unwrap();
     let (code, stderr) = verify(&cert);
     assert_eq!(code, 2, "missing sidecar must refuse with exit 2");
-    assert!(stderr.contains("sidecar"), "missing-sidecar typing required, got: {stderr}");
+    assert!(
+        stderr.contains("sidecar"),
+        "missing-sidecar typing required, got: {stderr}"
+    );
 }
 
 #[test]
@@ -111,7 +124,9 @@ fn court_run_seq_collision_law_typed() {
     // Rebind input_hash in-place (keeps the original seal -> BOTH the
     // identity law and the seal would refuse; the identity law fires
     // first, so the refusal must be TYPED RunSeqCollision).
-    let idx = original.find("\"input_hash\":\"").expect("input_hash present");
+    let idx = original
+        .find("\"input_hash\":\"")
+        .expect("input_hash present");
     let start = idx + "\"input_hash\":\"".len();
     let end = start + 64;
     let mut rebound = original.clone();
@@ -120,14 +135,27 @@ fn court_run_seq_collision_law_typed() {
     let flipped: String = bytes
         .iter()
         .enumerate()
-        .map(|(i, c)| if i == 0 { if *c == '0' { '1' } else { '0' } } else { *c })
+        .map(|(i, c)| {
+            if i == 0 {
+                if *c == '0' {
+                    '1'
+                } else {
+                    '0'
+                }
+            } else {
+                *c
+            }
+        })
         .collect();
     rebound.replace_range(start..end, &flipped);
     assert_ne!(rebound, original);
     std::fs::write(&cert, &rebound).unwrap();
     let (code, stderr) = verify(&cert);
     assert_eq!(code, 2);
-    assert!(stderr.contains("RunSeqCollision"), "typed RunSeqCollision required, got: {stderr}");
+    assert!(
+        stderr.contains("RunSeqCollision"),
+        "typed RunSeqCollision required, got: {stderr}"
+    );
 }
 
 // ------------------------------------------------ DOD4 forgery courts
@@ -149,7 +177,10 @@ use cgap_blake3::hash as attacker_hash;
 /// Attacker-side reseal: hex BLAKE3-256 over the patched bytes — the
 /// exact move D4's A13 proved sufficient against the old verify.
 fn reseal(bytes: &[u8]) -> String {
-    attacker_hash(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    attacker_hash(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[test]
@@ -170,9 +201,16 @@ fn court_a12_prepend_forgery_refused_typed() {
     );
     assert_ne!(forged, original);
     std::fs::write(&cert, &forged).unwrap();
-    std::fs::write(format!("{cert}.seal"), format!("{}\n", reseal(forged.as_bytes()))).unwrap();
+    std::fs::write(
+        format!("{cert}.seal"),
+        format!("{}\n", reseal(forged.as_bytes())),
+    )
+    .unwrap();
     let (code, stderr) = verify(&cert);
-    assert_eq!(code, 2, "prepend forgery must refuse with exit 2, got: {stderr}");
+    assert_eq!(
+        code, 2,
+        "prepend forgery must refuse with exit 2, got: {stderr}"
+    );
     assert!(
         stderr.contains("malformed"),
         "typed Malformed required, got: {stderr}"
@@ -191,8 +229,14 @@ fn court_a12_prepend_forgery_refused_typed() {
     std::fs::write(&cert, &dup).unwrap();
     std::fs::write(format!("{cert}.seal"), &seal).unwrap();
     let (code, stderr) = verify(&cert);
-    assert_eq!(code, 2, "duplicate-key envelope must refuse with exit 2, got: {stderr}");
-    assert!(stderr.contains("malformed"), "typed Malformed required, got: {stderr}");
+    assert_eq!(
+        code, 2,
+        "duplicate-key envelope must refuse with exit 2, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("malformed"),
+        "typed Malformed required, got: {stderr}"
+    );
 }
 
 #[test]
@@ -217,12 +261,19 @@ fn court_a13_reseal_forgery_refused_typed() {
     // SAME machinery. input_hash and run_seq stay lawful, so the
     // RunSeqCollision law passes; the seal check passes too (resealed).
     // Only the H2 body-hash law catches this — it must refuse exit 2.
-    let patched = original.replacen("\"kind\":\"pass\"", "\"kind\":\"fail\",\"why\":\"forged\"", 1);
+    let patched = original.replacen(
+        "\"kind\":\"pass\"",
+        "\"kind\":\"fail\",\"why\":\"forged\"",
+        1,
+    );
     assert_ne!(patched, original, "gate patch must change bytes");
     std::fs::write(&cert, &patched).unwrap();
     std::fs::write(&seal_path, format!("{}\n", reseal(patched.as_bytes()))).unwrap();
     let (code, stderr) = verify(&cert);
-    assert_eq!(code, 2, "reseal forgery must refuse with exit 2, got: {stderr}");
+    assert_eq!(
+        code, 2,
+        "reseal forgery must refuse with exit 2, got: {stderr}"
+    );
     assert!(
         stderr.contains("BodyHashMismatch"),
         "typed BodyHashMismatch required, got: {stderr}"

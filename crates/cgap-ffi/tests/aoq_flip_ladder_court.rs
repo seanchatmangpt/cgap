@@ -41,11 +41,11 @@ use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
 use cgap_arrow::ipc::{self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE};
+use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{
     AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
     AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_OK,
 };
-use cgap_crypto::fips202::Shake256;
 
 const EPOCH: u16 = 1;
 const KEY_ID: u64 = 0xA0_71;
@@ -234,9 +234,14 @@ fn roundtrip(
     let mut prefix = [0u8; PREFIX_SIZE];
     stream.read_exact(&mut prefix).expect("response prefix");
     let meta_span = u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]) as usize;
-    assert_eq!(meta_span, META_SPAN, "response meta span is the align-64 span");
+    assert_eq!(
+        meta_span, META_SPAN,
+        "response meta span is the align-64 span"
+    );
     let mut meta_bytes = [0u8; META_SPAN];
-    stream.read_exact(&mut meta_bytes).expect("response metadata");
+    stream
+        .read_exact(&mut meta_bytes)
+        .expect("response metadata");
     let blen = u32::from_le_bytes([
         meta_bytes[64],
         meta_bytes[65],
@@ -277,9 +282,16 @@ fn handshake(
     let mut fin_body = [0u8; CT_BYTES + 16];
     fin_body[..CT_BYTES].copy_from_slice(&ct_c);
     fin_body[CT_BYTES..].copy_from_slice(&confirm);
-    let fin_win = seal_window(&wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body), 1, 0);
+    let fin_win = seal_window(
+        &wire_frame(FrameKind::HandshakeFinish, 1, 0, &fin_body),
+        1,
+        0,
+    );
     let (word, _w) = roundtrip(stream, &fin_win, false);
-    assert_eq!(word, AOQ_STATUS_OK, "HandshakeFinish accepted (Established)");
+    assert_eq!(
+        word, AOQ_STATUS_OK,
+        "HandshakeFinish accepted (Established)"
+    );
     let send_key = kem.kdf(&[sess::CTX_SEND, &hs_master]);
     (dk, ct_c, recv_key, send_key)
 }
@@ -294,8 +306,11 @@ fn appdata_window(key: &[u8; 32], payload: &[u8], ordinal: u32, seq: u32) -> Vec
         .copy_from_slice(&seq.to_le_bytes());
     let mut app_body = vec![0u8; 4 + payload.len() + cgap_aoq::aead::TAG_LEN];
     app_body[..4].copy_from_slice(&seq.to_le_bytes());
-    let nonce = cgap_aoq::aead::Nonce96::new(u32::from(EPOCH), (u64::from(ordinal) << 32) | u64::from(seq))
-        .expect("nonce");
+    let nonce = cgap_aoq::aead::Nonce96::new(
+        u32::from(EPOCH),
+        (u64::from(ordinal) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
     let mut aead_tag = [0u8; cgap_aoq::aead::TAG_LEN];
     cgap_aoq::aead::seal_detached(
         &mut app_body[4..4 + payload.len()],
@@ -415,7 +430,8 @@ fn l2b_unknown_epoch_fires_epoch_mismatch() {
     let win = seal_window(&frame, 0, 0);
     let (word, _w) = roundtrip(car.stream.as_mut().expect("conn"), &win, false);
     assert_eq!(
-        word, AOQ_STATUS_EPOCH_MISMATCH,
+        word,
+        AOQ_STATUS_EPOCH_MISMATCH,
         "L2-EPOCH: unknown epoch must fire EPOCH_MISMATCH (0x4347A006), got {} ({:#010x})",
         leg_name(word),
         word
@@ -511,7 +527,8 @@ fn l4_legacy_1088b_finish_refused_1104b_accepted() {
     let win = appdata_window(&recv_key, b"flip-ladder L4 established", 2, 1);
     let (word, w) = roundtrip(car2.stream.as_mut().expect("conn"), &win, true);
     assert_eq!(
-        word, AOQ_STATUS_OK,
+        word,
+        AOQ_STATUS_OK,
         "L4: lawful 1104B Finish must be accepted (AppData OK after), got {} ({:#010x})",
         leg_name(word),
         word
@@ -532,9 +549,9 @@ fn l5_budget_refusal_at_exactly_frame_4097() {
     let (_dk, _ct, recv_key, _send_key) = handshake(&kem, car.stream.as_mut().expect("conn"));
     let payload = [0x42u8; 32];
     let budget_frames = REKEY_BUDGET as usize; // 4096 frames per key
-    // Walk the budget boundary ONE FRAME AT A TIME with tolerant reads:
-    // write the window, read the 4-byte word; only on OK read the echo
-    // window. The refusal frame index is the court's observable.
+                                               // Walk the budget boundary ONE FRAME AT A TIME with tolerant reads:
+                                               // write the window, read the 4-byte word; only on OK read the echo
+                                               // window. The refusal frame index is the court's observable.
     let mut refused_at: Option<usize> = None;
     for i in 0..=(budget_frames + 1) {
         let ordinal = (i + 2) as u32; // ordinals 0,1 = Ek,Finish; AppData continues
@@ -618,7 +635,10 @@ fn av_anti_vacuity_honest_frame_flips_the_ladder_leg() {
     let frame = wire_frame(FrameKind::HandshakeEk, 0, 0, &ek);
     let win = seal_window(&frame, 0, 0);
     let (word, _w) = roundtrip(car.stream.as_mut().expect("conn"), &win, false);
-    assert_eq!(word, AOQ_STATUS_OK, "AV setup: honest HandshakeEk must be OK");
+    assert_eq!(
+        word, AOQ_STATUS_OK,
+        "AV setup: honest HandshakeEk must be OK"
+    );
     // Now run the SAME expectation L2 applies (expects refusal at
     // EPOCH_MISMATCH) against this VALID frame. The expectation must FAIL
     // — if the court passes here, L2 is vacuous and the court is FAIL.

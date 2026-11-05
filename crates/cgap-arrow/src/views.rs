@@ -244,10 +244,7 @@ mod tests {
         let v = b.finish();
         assert_eq!(v.len(), 3);
         assert_eq!(v.row(0).expect("row 0"), b"short");
-        assert_eq!(
-            v.row(1).expect("row 1"),
-            b"this-one-is-longer-than-twelve"
-        );
+        assert_eq!(v.row(1).expect("row 1"), b"this-one-is-longer-than-twelve");
         assert!(!v.validity().unwrap().get(2));
         // descriptor count
         assert_eq!(v.views_bytes().len(), 3 * 16);

@@ -56,12 +56,8 @@ use alloc::vec;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     Pass,
-    Fail {
-        why: String,
-    },
-    Skip {
-        reason: String,
-    },
+    Fail { why: String },
+    Skip { reason: String },
 }
 
 /// One gate's row in the scorecard verdict table (RX-3 surface).
@@ -338,7 +334,12 @@ pub fn issue(
     table: &VerdictTable,
     evidence_receipts: Vec<String>,
 ) -> Result<(Certificate, String), CertificateIncomplete> {
-    issue_with_seal(&hash, |json| hex(&hash(json.as_bytes())), table, evidence_receipts)
+    issue_with_seal(
+        &hash,
+        |json| hex(&hash(json.as_bytes())),
+        table,
+        evidence_receipts,
+    )
 }
 
 // ------------------------------------------------------------- hex codec

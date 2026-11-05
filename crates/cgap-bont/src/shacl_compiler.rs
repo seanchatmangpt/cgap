@@ -1297,7 +1297,10 @@ pub fn compile_shapes(shapes_ttl: &str) -> Result<CompileReport, ShaclParseError
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| ShaclParseError {
                 line: 0, // compile-stage: post-parse, no source line survives
-                message: format!("shape {} lost a sh:path between court and layout", shape.iri),
+                message: format!(
+                    "shape {} lost a sh:path between court and layout",
+                    shape.iri
+                ),
             })?;
         sorted.sort_by(|a, b| a.1.cmp(b.1));
         let n = sorted.len();

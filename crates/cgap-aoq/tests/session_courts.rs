@@ -3,14 +3,13 @@
 //! and must observe typed flips; byte-identity is asserted via
 //! `Session::fingerprint` (full canonical state, KDF-sealed).
 
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{
-    derive, parse_frame, transcript_tag, FrameKind, KemSeam, Session, SessionError,
-    SessionState, CTX_HANDSHAKE, CTX_REKEY, CTX_RECV, CTX_SEND, CT_BYTES, EK_BYTES,
-    REKEY_BUDGET, SS_BYTES,
+    derive, parse_frame, transcript_tag, FrameKind, KemSeam, Session, SessionError, SessionState,
+    CTX_HANDSHAKE, CTX_RECV, CTX_REKEY, CTX_SEND, CT_BYTES, EK_BYTES, REKEY_BUDGET, SS_BYTES,
 };
-use cgap_aoq::aead::{Nonce96, TAG_LEN};
 
 fn mix32(parts: &[&[u8]]) -> [u8; 32] {
     let mut a: u64 = 0xcbf2_9ce4_8422_2325;
@@ -143,13 +142,7 @@ fn test_recv_key() -> [u8; 32] {
 /// A REAL sealed AppData frame (v3 wire law): body = [seq 4B][ct][tag 16B],
 /// AEAD under the test session's send_key, AAD = the frame's own covered
 /// prefix (header + kind + seq), nonce = Nonce96(epoch, ordinal<<32|seq).
-fn sealed_app_frame(
-    key: &[u8; 32],
-    epoch: u16,
-    ordinal: u32,
-    seq: u32,
-    payload: &[u8],
-) -> Vec<u8> {
+fn sealed_app_frame(key: &[u8; 32], epoch: u16, ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
     let mut prefix = [0u8; 69];
     let h = AoqHeader::new(epoch, 7, ordinal, seq);
     codec::encode(&h, &mut prefix).expect("encode prefix");
@@ -157,8 +150,11 @@ fn sealed_app_frame(
     prefix[65..69].copy_from_slice(&seq.to_le_bytes());
     let mut body = vec![0u8; 4 + payload.len() + TAG_LEN];
     body[..4].copy_from_slice(&seq.to_le_bytes());
-    let nonce = Nonce96::new(u32::from(epoch), ((u64::from(ordinal)) << 32) | u64::from(seq))
-        .expect("nonce");
+    let nonce = Nonce96::new(
+        u32::from(epoch),
+        ((u64::from(ordinal)) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
     let mut tag = [0u8; TAG_LEN];
     cgap_aoq::aead::seal_detached(
         &mut body[4..4 + payload.len()],
@@ -173,7 +169,13 @@ fn sealed_app_frame(
 }
 
 /// Sealed frame under the session's CURRENT recv_key (tracks rekeys).
-fn app_frame(s: &Session<'static, TestKem>, epoch: u16, ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> {
+fn app_frame(
+    s: &Session<'static, TestKem>,
+    epoch: u16,
+    ordinal: u32,
+    seq: u32,
+    payload: &[u8],
+) -> Vec<u8> {
     sealed_app_frame(&s.recv_key(), epoch, ordinal, seq, payload)
 }
 
@@ -655,7 +657,11 @@ fn s9_direction_keys_derived_stored_and_send_ne_recv() {
     // ek sensitivity: a different ek derives a different key set.
     let mut s3 = Session::new(&KEM, 0, 7, 0);
     step(&mut s3, &ek_frame(0, 7, 0, &ek_of(2))).unwrap();
-    assert_ne!(s3.send_key(), s.send_key(), "different ek => different keys");
+    assert_ne!(
+        s3.send_key(),
+        s.send_key(),
+        "different ek => different keys"
+    );
 }
 
 /// COURT S10 — rekey durability: an accepted rekey ROTATES the direction
@@ -681,9 +687,21 @@ fn s10_rekey_rotates_stored_keys_not_dropped() {
     let want_recv = KEM.kdf(&[CTX_RECV, &master2]);
     assert_eq!(s.send_key(), want_send, "rekey send_key stored");
     assert_eq!(s.recv_key(), want_recv, "rekey recv_key stored");
-    assert_ne!(s.send_key(), old_send, "rekey must rotate away the old keys");
-    assert_ne!(s.recv_key(), old_recv, "rekey must rotate away the old keys");
-    assert_ne!(s.send_key(), s.recv_key(), "directions separate after rekey");
+    assert_ne!(
+        s.send_key(),
+        old_send,
+        "rekey must rotate away the old keys"
+    );
+    assert_ne!(
+        s.recv_key(),
+        old_recv,
+        "rekey must rotate away the old keys"
+    );
+    assert_ne!(
+        s.send_key(),
+        s.recv_key(),
+        "directions separate after rekey"
+    );
 }
 
 /// COURT S11 — RandomnessSeam injection: the deterministic counter seam
@@ -699,7 +717,7 @@ fn s11_randomness_seam_injection() {
             for (i, cell) in out.iter_mut().enumerate() {
                 *cell = (self.0 as u8).wrapping_add(i as u8);
             }
- out
+            out
         }
     }
     let c = Counter(7);
@@ -709,7 +727,11 @@ fn s11_randomness_seam_injection() {
     assert_eq!(got[31], 7u8.wrapping_add(31));
     // Default constructor: zero seam.
     let s0 = Session::new(&KEM, 0, 7, 0);
-    assert_eq!(s0.rng().fill32(), [0u8; 32], "default seam is the zero seam");
+    assert_eq!(
+        s0.rng().fill32(),
+        [0u8; 32],
+        "default seam is the zero seam"
+    );
     // Different injected seam yields different entropy (seam is live).
     let c2 = Counter(9);
     let s2 = Session::new_with_rng(&KEM, &c2, 0, 7, 0);

@@ -23,12 +23,12 @@
 
 use std::vec::Vec;
 
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
-use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::session::{
-    self as sess, derive, transcript_tag, FrameKind, KemSeam, SessionError, CT_BYTES,
-    CTX_HANDSHAKE, CTX_RECV, EK_BYTES,
+    self as sess, derive, transcript_tag, FrameKind, KemSeam, SessionError, CTX_HANDSHAKE,
+    CTX_RECV, CT_BYTES, EK_BYTES,
 };
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq_events::{AoqEvent, AoqEventRow, AoqEventTap};
@@ -121,9 +121,11 @@ fn app_frame(key: &[u8; 32], ordinal: u32, seq: u32, payload: &[u8]) -> Vec<u8> 
     prefix[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&seq.to_le_bytes());
     let mut body = std::vec![0u8; 4 + payload.len() + TAG_LEN];
     body[..4].copy_from_slice(&seq.to_le_bytes());
-    let nonce =
-        Nonce96::new(u32::from(EPOCH), ((u64::from(ordinal)) << 32) | u64::from(seq))
-            .expect("nonce");
+    let nonce = Nonce96::new(
+        u32::from(EPOCH),
+        ((u64::from(ordinal)) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
     let mut tag = [0u8; TAG_LEN];
     cgap_aoq::aead::seal_detached(
         &mut body[4..4 + payload.len()],
@@ -179,7 +181,13 @@ const TABLE: [[Option<u8>; 5]; 4] = [
     // from HandshakeWait (1)
     [None, Some(ESTABLISHED), None, None, Some(CLOSED)],
     // from Established (2)
-    [None, None, Some(ESTABLISHED), Some(ESTABLISHED), Some(CLOSED)],
+    [
+        None,
+        None,
+        Some(ESTABLISHED),
+        Some(ESTABLISHED),
+        Some(CLOSED),
+    ],
     // from Closed (3): terminal; every frame refused (SessionClosed)
     [None; 5],
 ];
@@ -219,15 +227,14 @@ fn peer_keypair() -> [u8; EK_BYTES] {
 fn run_happy_walk(tap: &AoqEventTap, ek_fresh: &[u8; EK_BYTES]) {
     let kem = CourtKem;
     let mut session = sess::Session::new(&kem, EPOCH, KEY_ID, 0);
-    let step_with = |s: &mut sess::Session<'_, CourtKem>,
-                         buf: &std::vec::Vec<u8>,
-                         kind: FrameKind| {
-        let frame = sess::parse_frame(buf).expect("court frame parses");
-        // CALLER-SIDE LAW: refusals emit nothing — no tap on Err.
-        if let Ok(()) = s.step(&frame) {
-            tap.tap(&AoqEvent::mint(s, kind));
-        }
-    };
+    let step_with =
+        |s: &mut sess::Session<'_, CourtKem>, buf: &std::vec::Vec<u8>, kind: FrameKind| {
+            let frame = sess::parse_frame(buf).expect("court frame parses");
+            // CALLER-SIDE LAW: refusals emit nothing — no tap on Err.
+            if let Ok(()) = s.step(&frame) {
+                tap.tap(&AoqEvent::mint(s, kind));
+            }
+        };
     let ek = peer_keypair();
     let pending_ct = {
         let m = shake32(&[b"pl16/mlkem/m", &ek]);
@@ -299,8 +306,7 @@ fn c1_rows_are_lawful_table_cells() {
             row.reserved == [0u8; 20],
             "row {i} violates the reserved-zero law"
         );
-        oracle(replay, row.kind, row.state)
-            .unwrap_or_else(|e| panic!("row {i}: {e}"));
+        oracle(replay, row.kind, row.state).unwrap_or_else(|e| panic!("row {i}: {e}"));
         replay = row.state;
     }
     assert_eq!(replay, CLOSED, "replay must land in Closed");
@@ -320,7 +326,7 @@ fn c2_refusals_emit_nothing() {
     // Refusal 1: wrong epoch on the opening HandshakeEk.
     let mut bad_epoch = ek_frame(0, &ek);
     bad_epoch[6..8].copy_from_slice(&99u16.to_le_bytes()); // AOQ1_EPOCH_OFFSET=6
-    // Refusal 2: wrong ordinal.
+                                                           // Refusal 2: wrong ordinal.
     let wrong_ord = ek_frame(7, &ek);
     // Refusal 3: AppData in HandshakeInit (refusal cell of the table).
     let app_early = app_frame(&session.recv_key(), 0, 0, b"x");
@@ -352,7 +358,11 @@ fn c2_refusals_emit_nothing() {
     let frame = sess::parse_frame(&buf).expect("parses");
     session.step(&frame).expect("lawful ek accepted");
     tap.tap(&AoqEvent::mint(&session, FrameKind::HandshakeEk));
-    assert_eq!(tap.total_tapped(), 1, "count law: one event per accepted step");
+    assert_eq!(
+        tap.total_tapped(),
+        1,
+        "count law: one event per accepted step"
+    );
 
     let mut rows = std::vec![AoqEventRow {
         ordinal: 0,
@@ -433,5 +443,8 @@ fn c4_overwrite_on_full_and_dropped_is_loud() {
     // Overwrite law: the OLDEST rows (ordinals 0, 1) are gone.
     assert_eq!(rows[0].ordinal, 2, "oldest two rows evicted");
     assert_eq!(rows[3].ordinal, 5);
-    assert!(tap.dropped() > 0, "dropped counter must be loud, not silent");
+    assert!(
+        tap.dropped() > 0,
+        "dropped counter must be loud, not silent"
+    );
 }

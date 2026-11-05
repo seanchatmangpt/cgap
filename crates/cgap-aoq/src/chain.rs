@@ -194,7 +194,7 @@ impl<'a, H: ChainDigest> AoqChain<'a, H> {
     /// Current head digest (GENESIS when empty).
     #[must_use]
     #[inline]
-pub fn checkpoint(&self) -> [u8; 32] {
+    pub fn checkpoint(&self) -> [u8; 32] {
         if self.len == 0 {
             GENESIS
         } else {

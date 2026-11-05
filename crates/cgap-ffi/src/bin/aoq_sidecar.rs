@@ -81,8 +81,7 @@ mod imp {
     use cgap_crypto::fips202::Shake256;
     use cgap_ffi::aoq::status_maps::{
         AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
-        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME,
-        AOQ_STATUS_OK,
+        AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_OK,
     };
 
     // ---------------------------------------------------------------------------
@@ -405,7 +404,11 @@ mod imp {
                 // Stack-resident piece array (alloc-elimination lane):
                 // write_vectored pieces are built in place — never a heap
                 // Vec — so the per-segment scatter stays alloc-free.
-                let mut pieces = [IoSlice::new(&[][..]), IoSlice::new(&[][..]), IoSlice::new(&[][..])];
+                let mut pieces = [
+                    IoSlice::new(&[][..]),
+                    IoSlice::new(&[][..]),
+                    IoSlice::new(&[][..]),
+                ];
                 let mut n_pieces = 0usize;
                 if abs_hi <= plo || abs_lo >= phi {
                     pieces[0] = IoSlice::new(seg);
@@ -970,8 +973,11 @@ mod imp {
             let mut fin_body = [0u8; CT_BYTES + 16];
             fin_body[..CT_BYTES].copy_from_slice(&ct_c);
             fin_body[CT_BYTES..].copy_from_slice(&confirm);
-            let fin_win =
-                seal_window(&wire_frame(sess::FrameKind::HandshakeFinish, 1, 0, &fin_body), 1, 0);
+            let fin_win = seal_window(
+                &wire_frame(sess::FrameKind::HandshakeFinish, 1, 0, &fin_body),
+                1,
+                0,
+            );
             client.write_all(&fin_win).expect("fin write");
             client.read_exact(&mut word).expect("fin word");
             assert_eq!(u32::from_le_bytes(word), AOQ_STATUS_OK);

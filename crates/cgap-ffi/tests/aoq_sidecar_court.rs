@@ -29,9 +29,9 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::Instant;
 
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
-use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
 use cgap_arrow::ipc::{self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE};
 use cgap_crypto::fips202::Shake256;
@@ -292,11 +292,9 @@ fn j1_sidecar_handshake_and_verified_appdata_roundtrip() {
     prefix[cgap_aoq::header::SIZE_BYTES] = FrameKind::AppData.id();
     prefix[cgap_aoq::header::SIZE_BYTES + 1..cgap_aoq::header::SIZE_BYTES + 5]
         .copy_from_slice(&7u32.to_le_bytes());
-    let mut app_body =
-        vec![0u8; 4 + payload.len() + TAG_LEN];
+    let mut app_body = vec![0u8; 4 + payload.len() + TAG_LEN];
     app_body[..4].copy_from_slice(&7u32.to_le_bytes());
-    let nonce = Nonce96::new(u32::from(EPOCH), (u64::from(2u32) << 32) | 7)
-        .expect("nonce");
+    let nonce = Nonce96::new(u32::from(EPOCH), (u64::from(2u32) << 32) | 7).expect("nonce");
     let mut aead_tag = [0u8; TAG_LEN];
     cgap_aoq::aead::seal_detached(
         &mut app_body[4..4 + payload.len()],

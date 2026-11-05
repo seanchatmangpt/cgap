@@ -49,9 +49,7 @@ fn bench_append(links: usize) -> f64 {
     for i in 0u64..links as u64 {
         c.append((i % 3) as u16, &payload).unwrap();
     }
-    let per_op_us = cgap_aoq::profile_guard::fence(
-        t0.elapsed().as_secs_f64() * 1e6 / links as f64,
-    );
+    let per_op_us = cgap_aoq::profile_guard::fence(t0.elapsed().as_secs_f64() * 1e6 / links as f64);
     assert_eq!(c.len(), links);
     per_op_us
 }
@@ -65,9 +63,7 @@ fn bench_verify(links: usize) -> f64 {
     }
     let t0 = Instant::now();
     assert_eq!(c.verify_all(), Ok(()));
-    let per_op_us = cgap_aoq::profile_guard::fence(
-        t0.elapsed().as_secs_f64() * 1e6 / links as f64,
-    );
+    let per_op_us = cgap_aoq::profile_guard::fence(t0.elapsed().as_secs_f64() * 1e6 / links as f64);
     per_op_us
 }
 

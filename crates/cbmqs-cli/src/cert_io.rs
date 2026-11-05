@@ -42,7 +42,8 @@ pub const SEAL_ALGORITHM: &str = "BLAKE3-256-hex";
 
 /// The kernel's trailing schema-key tail, verbatim as
 /// `cgap_aoq::rfc0089_certificate::certificate_json` emits it.
-const KERNEL_SCHEMA_TAIL: &str = "\"canonical_form\":\"fixed-declaration-order-v1\",\"seal_algorithm\":\"BLAKE3-256\"";
+const KERNEL_SCHEMA_TAIL: &str =
+    "\"canonical_form\":\"fixed-declaration-order-v1\",\"seal_algorithm\":\"BLAKE3-256\"";
 
 /// Typed refusal surface. Every variant maps to exit 2 except
 /// `CertificateIncomplete` (exit 3, loud skip, no artifact).
@@ -158,7 +159,10 @@ pub fn envelope_json(cert_json: &str) -> Result<String, Refusal> {
 
 /// Seal = hex(BLAKE3-256 over the canonical envelope bytes).
 pub fn seal_over(canonical: &[u8]) -> String {
-    cgap_blake3::hash(canonical).iter().map(|b| format!("{b:02x}")).collect()
+    cgap_blake3::hash(canonical)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 // ------------------------------------- strict canonical JSON parser (H1)
@@ -280,13 +284,11 @@ impl<'a> Cur<'a> {
                         }
                         self.i = end;
                     }
-                    out.push_str(
-                        std::str::from_utf8(&self.b[start..self.i]).map_err(|_| {
-                            Refusal::Malformed {
-                                detail: "invalid UTF-8 in string".into(),
-                            }
-                        })?,
-                    );
+                    out.push_str(std::str::from_utf8(&self.b[start..self.i]).map_err(|_| {
+                        Refusal::Malformed {
+                            detail: "invalid UTF-8 in string".into(),
+                        }
+                    })?);
                 }
             }
         }
@@ -297,11 +299,10 @@ impl<'a> Cur<'a> {
                 detail: "truncated \\u escape".into(),
             });
         }
-        let s = std::str::from_utf8(&self.b[self.i..self.i + 4]).map_err(|_| {
-            Refusal::Malformed {
+        let s =
+            std::str::from_utf8(&self.b[self.i..self.i + 4]).map_err(|_| Refusal::Malformed {
                 detail: "invalid \\u hex".into(),
-            }
-        })?;
+            })?;
         let v = u32::from_str_radix(s, 16).map_err(|_| Refusal::Malformed {
             detail: "invalid \\u hex".into(),
         })?;
@@ -486,21 +487,20 @@ pub fn parse_envelope(canon: &str) -> Result<ParsedCertificate, Refusal> {
     c.lit(",\"canonical_form\":")?;
     let form = c.string()?;
     if form != CANONICAL_FORM {
-        return Err(Refusal::CanonicalFormUnknown {
-            observed: form,
-        });
+        return Err(Refusal::CanonicalFormUnknown { observed: form });
     }
     c.lit(",\"seal_algorithm\":")?;
     let alg = c.string()?;
     if alg != SEAL_ALGORITHM {
-        return Err(Refusal::SealAlgorithmUnknown {
-            observed: alg,
-        });
+        return Err(Refusal::SealAlgorithmUnknown { observed: alg });
     }
     c.lit("}")?;
     if c.i != c.b.len() {
         return Err(Refusal::Malformed {
-            detail: format!("{} trailing bytes after the canonical object", c.b.len() - c.i),
+            detail: format!(
+                "{} trailing bytes after the canonical object",
+                c.b.len() - c.i
+            ),
         });
     }
     Ok(ParsedCertificate {

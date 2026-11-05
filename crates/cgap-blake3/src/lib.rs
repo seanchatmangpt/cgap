@@ -1001,13 +1001,16 @@ pub fn hash_many_independent_into(payloads: &[&[u8]], out: &mut [[u8; 32]]) {
     debug_assert_eq!(payloads.len(), out.len());
     let mut i = 0;
     while i < payloads.len() {
-        if i + 4 <= payloads.len()
-            && payloads[i..i + 4].iter().all(|p| p.len() <= 1024)
-        {
+        if i + 4 <= payloads.len() && payloads[i..i + 4].iter().all(|p| p.len() <= 1024) {
             // minimal-unblock (2026-11-04 soak lane, disclosed): g held
             // double-refs ([&&[u8];4]); hash_blocks_4way_independent takes
             // &[&[u8]]. Owned-ref copy, same four payloads, no behavior change.
-            let g = [payloads[i], payloads[i + 1], payloads[i + 2], payloads[i + 3]];
+            let g = [
+                payloads[i],
+                payloads[i + 1],
+                payloads[i + 2],
+                payloads[i + 3],
+            ];
             let digests = multi_chunk::hash_blocks_4way_independent(&g);
             out[i..i + 4].copy_from_slice(&digests);
             i += 4;

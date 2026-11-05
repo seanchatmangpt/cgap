@@ -31,8 +31,14 @@ use divan::{black_box, Bencher};
 // ---------------------------------------------------------------------------
 const _: () = assert!(kem::SS_LEN == 32, "ML-KEM-768 shared secret is 32 B");
 const _: () = assert!(kem::CT_LEN == 1088, "ML-KEM-768 ciphertext is 1088 B");
-const _: () = assert!(kem::EK_LEN == 1184, "ML-KEM-768 encapsulation key is 1184 B");
-const _: () = assert!(mldsa::SIG_BYTES == 3309, "ML-DSA-65 signature is 3309 B (chatman constant)");
+const _: () = assert!(
+    kem::EK_LEN == 1184,
+    "ML-KEM-768 encapsulation key is 1184 B"
+);
+const _: () = assert!(
+    mldsa::SIG_BYTES == 3309,
+    "ML-DSA-65 signature is 3309 B (chatman constant)"
+);
 const _: () = assert!(mldsa::PK_BYTES == 1952, "ML-DSA-65 public key is 1952 B");
 const _: () = assert!(mldsa::SK_BYTES == 4032, "ML-DSA-65 secret key is 4032 B");
 const _: () = assert!(aead::KEY_LEN == 32 && aead::TAG_LEN == 16 && aead::NONCE_LEN == 12);
@@ -129,7 +135,10 @@ fn poly1305_one_shot(b: Bencher, len: usize) {
     fill_splitmix(&mut key, CORPUS_SEED ^ 0xB2);
     let expected: [u8; poly1305::TAG_LEN] = poly1305::one_shot(&key, &data);
     b.bench(|| {
-        fence(black_box(poly1305::one_shot(black_box(&key), black_box(&data))));
+        fence(black_box(poly1305::one_shot(
+            black_box(&key),
+            black_box(&data),
+        )));
     });
     let got = poly1305::one_shot(&key, &data);
     assert_eq!(got, expected, "poly1305 corpus tag drifted mid-bench");
@@ -149,7 +158,12 @@ fn aead_mac_var_aad(b: Bencher, len: usize) {
     let nonce = aead::Nonce96::new(0x0000_0007, 0x4746_4544_4342_4140).expect("lawful epoch");
     let expected: [u8; aead::TAG_LEN] = aead::mac_tag_var_aad(&aad, &ct, &key, &nonce);
     b.bench(|| {
-        fence(black_box(aead::mac_tag_var_aad(black_box(&ct), &aad, &key, &nonce)));
+        fence(black_box(aead::mac_tag_var_aad(
+            black_box(&ct),
+            &aad,
+            &key,
+            &nonce,
+        )));
     });
     let got = aead::mac_tag_var_aad(&aad, &ct, &key, &nonce);
     assert_eq!(got, expected, "var-AAD mac corpus tag drifted mid-bench");

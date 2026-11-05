@@ -36,7 +36,6 @@
 
 // court-consumed surface (CEN2 ALLOW-WITH-REASON): egress_ring_court / egress_layout_court / soc_full_chip_court / quota_alloc_purity_court / andon_liveness_court; wire consumers pending — module-level allow (uniform surface, not scattered attrs).
 #![allow(dead_code)]
-
 #![forbid(unsafe_code)]
 
 use core::sync::atomic::{AtomicUsize, Ordering};

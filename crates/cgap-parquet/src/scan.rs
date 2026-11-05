@@ -1519,11 +1519,11 @@ mod tests {
 mod scan_into_tests {
     extern crate std;
 
+    use crate::level_free::{write_file, LevelFreeColumn, LevelFreeType};
+    use crate::scan::ParquetFile;
     use alloc::format;
     use alloc::vec;
     use alloc::vec::Vec;
-    use crate::level_free::{write_file, LevelFreeColumn, LevelFreeType};
-    use crate::scan::ParquetFile;
 
     fn fixture_u64_col(values: &[u64]) -> Vec<u8> {
         let cols = [LevelFreeColumn {
@@ -1563,7 +1563,11 @@ mod scan_into_tests {
         assert_eq!(hits, alloc_form);
         let cap_after_first = hits.capacity();
         pf.scan_u64_pred_into(0, pred, &mut hits).expect("frame 2");
-        assert_eq!(hits.capacity(), cap_after_first, "hit buffer must be reused");
+        assert_eq!(
+            hits.capacity(),
+            cap_after_first,
+            "hit buffer must be reused"
+        );
         assert_eq!(hits, alloc_form, "frame 2 identical to frame 1");
     }
 }

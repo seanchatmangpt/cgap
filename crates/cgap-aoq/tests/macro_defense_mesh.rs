@@ -343,11 +343,24 @@ fn run_slot(slot: usize, tx: &mpsc::Sender<(usize, Vec<AoqChainRecord>)>) {
                     // flipped tag must refuse typed, never silent.
                     let mut ct = vec![0u8; full.len()];
                     let mut tag = [0u8; cgap_aoq::aead::TAG_LEN];
-                    cgap_aoq::aead::seal_detached(&mut ct, &mut tag, full, &[], &CENSUS_KEY, &census_nonce());
+                    cgap_aoq::aead::seal_detached(
+                        &mut ct,
+                        &mut tag,
+                        full,
+                        &[],
+                        &CENSUS_KEY,
+                        &census_nonce(),
+                    );
                     let mut bad_tag = tag;
                     bad_tag[0] ^= 0x01;
                     assert!(matches!(
-                        cgap_aoq::aead::verify_detached(&[], &ct, &bad_tag, &CENSUS_KEY, &census_nonce()),
+                        cgap_aoq::aead::verify_detached(
+                            &[],
+                            &ct,
+                            &bad_tag,
+                            &CENSUS_KEY,
+                            &census_nonce()
+                        ),
                         Err(cgap_aoq::error::AoqError::AeadMismatch)
                     ));
                     cgap_aoq::aead::verify_detached(&[], &ct, &tag, &CENSUS_KEY, &census_nonce())

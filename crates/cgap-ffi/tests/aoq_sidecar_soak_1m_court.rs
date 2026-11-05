@@ -58,8 +58,8 @@ use std::time::{Duration, Instant};
 use cgap_aoq::aead::{self, Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
-use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
 use cgap_aoq::profile_guard;
+use cgap_aoq::session::{self as sess, FrameKind, KemSeam, SessionError, CT_BYTES, EK_BYTES};
 use cgap_arrow::ipc::{self, AOQ1_TAG_AT, AOQ1_TAG_BYTES, EOS_SIZE, PREFIX_SIZE};
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_OK};
@@ -108,10 +108,8 @@ impl Drop for Sidecar {
 /// Spawn the real sidecar binary (CARGO_BIN_EXE — cargo builds the exact
 /// binary under test for the run), stdin PIPED and held open (G2 law).
 fn spawn_sidecar(tag: &str) -> Sidecar {
-    let sock_path: PathBuf = std::env::temp_dir().join(format!(
-        "aoq_soak_1m_{tag}_{:?}.sock",
-        std::process::id()
-    ));
+    let sock_path: PathBuf =
+        std::env::temp_dir().join(format!("aoq_soak_1m_{tag}_{:?}.sock", std::process::id()));
     let _ = std::fs::remove_file(&sock_path);
     let mut child = Command::new(env!("CARGO_BIN_EXE_aoq_sidecar"))
         .arg(&sock_path)
@@ -214,11 +212,12 @@ fn roundtrip(
     }
     let mut prefix = [0u8; PREFIX_SIZE];
     stream.read_exact(&mut prefix).expect("response prefix");
-    let meta_span =
-        u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]) as usize;
+    let meta_span = u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]) as usize;
     assert_eq!(meta_span, META_SPAN, "response meta span");
     let mut meta_bytes = [0u8; META_SPAN];
-    stream.read_exact(&mut meta_bytes).expect("response metadata");
+    stream
+        .read_exact(&mut meta_bytes)
+        .expect("response metadata");
     let blen = u32::from_le_bytes([
         meta_bytes[64],
         meta_bytes[65],
@@ -263,10 +262,7 @@ fn shake32(parts: &[&[u8]]) -> [u8; 32] {
 struct CourtKem;
 
 impl KemSeam for CourtKem {
-    fn encapsulate(
-        &self,
-        ek: &[u8; EK_BYTES],
-    ) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
+    fn encapsulate(&self, ek: &[u8; EK_BYTES]) -> Result<([u8; CT_BYTES], [u8; 32]), SessionError> {
         let m = shake32(&[b"w2c/mlkem/m", ek]);
         let mut ct = [0u8; CT_BYTES];
         let mut ss = [0u8; 32];
@@ -274,11 +270,7 @@ impl KemSeam for CourtKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; 32], SessionError> {
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; 32], SessionError> {
         let dk: &[u8; 2400] = dk
             .try_into()
             .map_err(|_| SessionError::KemRefused { op: 1 })?;
@@ -378,16 +370,9 @@ fn try_connect_established(sock_path: &PathBuf) -> Result<(UnixStream, SessionKe
         return Err(format!("HandshakeFinish refused {word:#010x}"));
     }
     let hs_master = sess::derive(&kem, sess::CTX_HANDSHAKE, &ss, &ek);
-    let recv_key: [u8; 32] = kem
-        .kdf(&[sess::CTX_RECV, &hs_master]);
+    let recv_key: [u8; 32] = kem.kdf(&[sess::CTX_RECV, &hs_master]);
     let send_key: [u8; 32] = kem.kdf(&[sess::CTX_SEND, &hs_master]);
-    Ok((
-        stream,
-        SessionKeys {
-            recv_key,
-            send_key,
-        },
-    ))
+    Ok((stream, SessionKeys { recv_key, send_key }))
 }
 
 /// One AppData echo trip on an established connection at (ordinal, seq),
@@ -402,8 +387,11 @@ fn echo_trip(stream: &mut UnixStream, keys: &SessionKeys, ordinal: u32, seq: u32
         .copy_from_slice(&seq.to_le_bytes());
     let mut app_body = vec![0u8; 4 + payload.len() + TAG_LEN];
     app_body[..4].copy_from_slice(&seq.to_le_bytes());
-    let nonce = Nonce96::new(u32::from(EPOCH), (u64::from(ordinal) << 32) | u64::from(seq))
-        .expect("nonce");
+    let nonce = Nonce96::new(
+        u32::from(EPOCH),
+        (u64::from(ordinal) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
     let mut aead_tag = [0u8; TAG_LEN];
     aead::seal_detached(
         &mut app_body[4..4 + payload.len()],

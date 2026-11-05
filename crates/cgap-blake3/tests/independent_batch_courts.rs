@@ -56,9 +56,12 @@ fn court_batch_vs_sequential_scalar_equality() {
         assert_eq!(got.len(), want.len(), "len drift at batch {}", batch);
         for i in 0..want.len() {
             assert_eq!(
-                got[i], want[i],
+                got[i],
+                want[i],
                 "batch {} payload {} ({} B) diverges",
-                batch, i, payloads[i].len()
+                batch,
+                i,
+                payloads[i].len()
             );
         }
     }
@@ -102,7 +105,13 @@ fn court_kernel_4way_group_equality() {
         let refslices: Vec<&[u8]> = group.iter().map(|p| p.as_slice()).collect();
         let got = hash_blocks_4way_independent(&refslices);
         for l in 0..4 {
-            assert_eq!(got[l], hash(&group[l]), "lane {} size {} diverges", l, four[l]);
+            assert_eq!(
+                got[l],
+                hash(&group[l]),
+                "lane {} size {} diverges",
+                l,
+                four[l]
+            );
         }
     }
 }

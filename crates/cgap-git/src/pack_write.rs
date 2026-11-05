@@ -596,9 +596,15 @@ pub fn parse_idx_v2(
     // usize on 32-bit targets: every section end is Some(_) and within the
     // buffer, or the whole idx refuses as truncated — never a wrapping
     // offset, never a slice panic.
-    let oids_end = n_table_end.checked_add(20usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
-    let crcs_end = oids_end.checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
-    let offs_end = crcs_end.checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?).ok_or(GitError::Truncated)?;
+    let oids_end = n_table_end
+        .checked_add(20usize.checked_mul(n).ok_or(GitError::Truncated)?)
+        .ok_or(GitError::Truncated)?;
+    let crcs_end = oids_end
+        .checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?)
+        .ok_or(GitError::Truncated)?;
+    let offs_end = crcs_end
+        .checked_add(4usize.checked_mul(n).ok_or(GitError::Truncated)?)
+        .ok_or(GitError::Truncated)?;
     if idx.len() < offs_end.checked_add(40).ok_or(GitError::Truncated)? {
         return Err(GitError::Truncated);
     }

@@ -121,7 +121,10 @@ fn consume_u64(o: &[u64]) {
 
 fn main() {
     if let Err(v) = cgap_aoq::profile_guard::assert_release() {
-        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        eprintln!(
+            "LOUD-SKIP {} : {v}",
+            std::env::args().next().unwrap_or_default()
+        );
         return;
     }
     // Non-vacuity probe: a deliberate allocation must bump COUNT before any

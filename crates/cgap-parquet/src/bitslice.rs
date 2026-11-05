@@ -99,9 +99,10 @@ pub fn pack_vertical_into(values: &[u32], w: u8, out: &mut Vec<u64>) -> Result<(
     );
     let wf = w as usize;
     let groups = values.len().div_ceil(64);
-    let total = groups
-        .checked_mul(wf)
-        .ok_or(PackError::OutputOverflow { groups: groups as u64, w })?;
+    let total = groups.checked_mul(wf).ok_or(PackError::OutputOverflow {
+        groups: groups as u64,
+        w,
+    })?;
     out.clear();
     out.resize(total, 0);
     for (g, chunk) in values.chunks(64).enumerate() {

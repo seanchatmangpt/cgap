@@ -377,7 +377,10 @@ impl LeaseEpochSealer {
         // Structural guard (S13): the span is a compile-time constant, so the
         // 256 B buffer bound is proven at monomorphization, not assumed.
         const {
-            assert!(N <= 256, "signed span exceeds the 256 B epoch-binding buffer");
+            assert!(
+                N <= 256,
+                "signed span exceeds the 256 B epoch-binding buffer"
+            );
         }
         let key = *self.lease.issued_root();
         let mut buf = [0u8; 20 + 256];

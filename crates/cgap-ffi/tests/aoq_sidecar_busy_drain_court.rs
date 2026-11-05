@@ -126,8 +126,7 @@ fn busy_drain_refuses_backlog_peer_with_busy_word() {
         }
     });
     assert_eq!(
-        word,
-        0x4347_A003,
+        word, 0x4347_A003,
         "backlog peer must receive the frozen-band BUSY word"
     );
     // Post-BUSY: the drain closed the peer — a further read sees EOF.
@@ -137,7 +136,7 @@ fn busy_drain_refuses_backlog_peer_with_busy_word() {
     // The sidecar must still be serving (drain != poison).
     let c = connect(&car);
     let _ = c; // accepted into the next blocking serve round
-    // Lawful stop: stdin EOF -> exit 0.
+               // Lawful stop: stdin EOF -> exit 0.
     car.stop_signal = None;
     let status = poll_until("stdin-EOF exit", Duration::from_secs(10), || {
         car.child.try_wait().ok().flatten()
@@ -335,9 +334,16 @@ fn sha256(data: &str) -> String {
             c.stdin.as_mut().unwrap().write_all(data.as_bytes())?;
             let o = c.wait_with_output()?;
             if o.status.success() {
-                Ok(String::from_utf8_lossy(&o.stdout).split_whitespace().next().map(str::to_string).unwrap_or_default())
+                Ok(String::from_utf8_lossy(&o.stdout)
+                    .split_whitespace()
+                    .next()
+                    .map(str::to_string)
+                    .unwrap_or_default())
             } else {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "shasum failed"))
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "shasum failed",
+                ))
             }
         })
         .expect("shasum -a 256 on PATH");

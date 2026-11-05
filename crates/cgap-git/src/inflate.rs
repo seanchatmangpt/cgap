@@ -323,9 +323,8 @@ pub fn inflate_into_bounded(
                     return Err(InflateError::Truncated);
                 }
                 let len = u16::from_le_bytes(data[byte..byte + 2].try_into().expect("2 bytes"));
-                let nlen = u16::from_le_bytes(
-                    data[byte + 2..byte + 4].try_into().expect("2 bytes"),
-                );
+                let nlen =
+                    u16::from_le_bytes(data[byte + 2..byte + 4].try_into().expect("2 bytes"));
                 if len != !nlen {
                     return Err(InflateError::BadCodeLengths);
                 }
@@ -507,11 +506,7 @@ pub fn zlib_decode(data: &[u8]) -> Result<Vec<u8>, InflateError> {
 /// and refuses typed [`InflateError::BudgetExceeded`] the moment the stream
 /// would produce byte `budget + 1`. Budget gate mirrors the checked pack
 /// arithmetic law; pass `usize::MAX` for the unbudgeted form.
-pub fn zlib_decode_into(
-    data: &[u8],
-    out: &mut Vec<u8>,
-    budget: usize,
-) -> Result<(), InflateError> {
+pub fn zlib_decode_into(data: &[u8], out: &mut Vec<u8>, budget: usize) -> Result<(), InflateError> {
     if data.len() < 6 {
         return Err(InflateError::Truncated);
     }

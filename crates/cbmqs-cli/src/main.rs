@@ -46,7 +46,6 @@ fn ab14_receipt_path() -> String {
 /// RFC-0089 §6 G7 target, per-link, at the 50k span.
 const G7_TARGET_US_PER_LINK: f64 = 25.0;
 
-
 fn main() -> ExitCode {
     let cmd = command().get_matches();
     let emit = cmd.get_one::<String>("emit_certificate");
@@ -229,7 +228,9 @@ fn scorecard_table(run_seq: u64, g7_receipt: Option<&str>) -> VerdictTable {
                 composes: "AB-14/AF-21 receipt chain (§6 scorecard source, leg B binding)",
                 verdict: g7v.clone(),
                 measured: match &g7v {
-                    Verdict::Pass => "leg B within 25 µs/link at 50k span (per receipt on disk)".into(),
+                    Verdict::Pass => {
+                        "leg B within 25 µs/link at 50k span (per receipt on disk)".into()
+                    }
                     Verdict::Fail { why } => why.clone(),
                     Verdict::Skip { reason } => reason.clone(),
                 },
@@ -240,24 +241,19 @@ fn scorecard_table(run_seq: u64, g7_receipt: Option<&str>) -> VerdictTable {
 }
 
 /// Issue + envelope + write. Emit path of the exit ABI.
-fn cmd_emit(
-    path: &str,
-    run_seq: u64,
-    g7_receipt: Option<&str>,
-    evidence: Vec<String>,
-) -> i32 {
+fn cmd_emit(path: &str, run_seq: u64, g7_receipt: Option<&str>, evidence: Vec<String>) -> i32 {
     let table = scorecard_table(run_seq, g7_receipt);
-    let (cert, _kernel_seal) = match issue_with_seal(&cgap_blake3::hash, seal_fn(), &table, evidence)
-    {
-        Ok(pair) => pair,
-        Err(incomplete) => {
-            eprintln!(
-                "SKIP CertificateIncomplete: skipped gates {:?} -- no certificate written",
-                incomplete.skipped_gates
-            );
-            return 3;
-        }
-    };
+    let (cert, _kernel_seal) =
+        match issue_with_seal(&cgap_blake3::hash, seal_fn(), &table, evidence) {
+            Ok(pair) => pair,
+            Err(incomplete) => {
+                eprintln!(
+                    "SKIP CertificateIncomplete: skipped gates {:?} -- no certificate written",
+                    incomplete.skipped_gates
+                );
+                return 3;
+            }
+        };
     let canonical = match envelope_json(&certificate_json(&cert)) {
         Ok(s) => s,
         Err(r) => {

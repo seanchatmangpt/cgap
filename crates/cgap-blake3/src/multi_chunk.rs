@@ -354,8 +354,6 @@ unsafe fn hash_blocks_4way_independent_neon(payloads: &[&[u8]]) -> [[u8; 32]; 4]
         m[15] = p[8];
     }
 
-
-
     unsafe {
         let mut nb = [0usize; 4];
         let mut max_nb = 1usize;
@@ -384,7 +382,6 @@ unsafe fn hash_blocks_4way_independent_neon(payloads: &[&[u8]]) -> [[u8; 32]; 4]
         let mut done = vdupq_n_u32(0);
 
         for b in 0..max_nb {
-
             // Message schedule: lane-transposed, zero-padded past each
             // lane's block end (partial final block and finished lanes read 0).
             let mut m = [vdupq_n_u32(0); 16];

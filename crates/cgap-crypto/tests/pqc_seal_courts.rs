@@ -50,8 +50,8 @@ fn roundtrip_across_sizes_and_aads() {
     for pt_len in [0usize, 1, 15, 16, 17, 64, 513] {
         for (i, aad) in aads.iter().enumerate() {
             let pt = vec![(i as u8) + 1; pt_len];
-            let sealed = pqc_seal(&dk, &ek, &pt, aad, &key, &nonce, &[42; 32])
-                .expect("seal succeeds");
+            let sealed =
+                pqc_seal(&dk, &ek, &pt, aad, &key, &nonce, &[42; 32]).expect("seal succeeds");
             assert_eq!(sealed.len(), pt_len + CT_OVERHEAD);
             let mut out = vec![0u8; pt_len];
             pqc_open(&ek, &mut out, &sealed, aad, &key, &nonce).expect("open succeeds");

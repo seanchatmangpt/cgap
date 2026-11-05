@@ -159,7 +159,11 @@ fn lineage_workflow_seal_pack_commit_chain_roundtrip_and_typed_refusals() {
             .expect("idx well-formed")
             .expect("oid present");
         assert_eq!(off, u64::from(obj.offset), "idx offset == pack offset");
-        assert_eq!(idxt.crc(slot).expect("crc"), obj.crc, "idx crc == parsed crc");
+        assert_eq!(
+            idxt.crc(slot).expect("crc"),
+            obj.crc,
+            "idx crc == parsed crc"
+        );
     }
 
     // Audit court: one flipped pack byte -> typed refusal.

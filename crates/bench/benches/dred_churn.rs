@@ -147,7 +147,10 @@ fn facts_per_s(facts: usize, ns: u64) -> f64 {
 
 fn main() {
     if let Err(v) = cgap_aoq::profile_guard::assert_release() {
-        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        eprintln!(
+            "LOUD-SKIP {} : {v}",
+            std::env::args().next().unwrap_or_default()
+        );
         return;
     }
     println!(

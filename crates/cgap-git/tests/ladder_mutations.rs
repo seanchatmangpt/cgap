@@ -336,7 +336,11 @@ fn fanout_inflation_window_and_inversion_typed_refusals() {
     let (bstar, bucket) = biggest_bucket(&table);
     let bytes = flipped(&base, FANOUT_OFF + bstar * 4 + 1, 0x01); // +2^16
     let idx = IdxV2::parse(&bytes).expect("parse accepts inflated fanout");
-    let lo = if bstar == 0 { 0 } else { idx.fanout(bstar - 1).expect("fanout") };
+    let lo = if bstar == 0 {
+        0
+    } else {
+        idx.fanout(bstar - 1).expect("fanout")
+    };
     let hi = idx.fanout(bstar).expect("fanout");
     let part = hi - lo;
     assert_eq!(part, 65_536 + bucket, "inflated partition must be exact");
@@ -576,7 +580,11 @@ fn crc_corruption_invisible_to_lookup() {
                         .try_into()
                         .expect("4"),
                 );
-                assert_eq!(idx.crc(row as u32).expect("crc"), want, "crc() must read live bytes");
+                assert_eq!(
+                    idx.crc(row as u32).expect("crc"),
+                    want,
+                    "crc() must read live bytes"
+                );
                 if changed {
                     assert_eq!(
                         idx.verify_idx_checksum(),

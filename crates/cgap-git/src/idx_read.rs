@@ -525,8 +525,7 @@ mod tests {
             // part == 0 guard) — the constancy claim covers ladder-entered
             // inputs: hits and non-empty-partition misses
             let f = |b: usize| idx.fanout(b).expect("fanout in-range");
-            if f(t[0] as usize) == f(t[0] as usize - if t[0] == 0 { 0 } else { 1 })
-            {
+            if f(t[0] as usize) == f(t[0] as usize - if t[0] == 0 { 0 } else { 1 }) {
                 continue;
             }
             let _ = idx.lookup(&t);

@@ -531,12 +531,7 @@ impl<'k, K: KemSeam> Session<'k, K> {
                 // v3 Finish law (M2a): the confirm tag binds
                 // recv_key ‖ transcript ‖ ct_echo; verify before any
                 // mutation (law 4).
-                let want = confirm_tag(
-                    self.kem,
-                    &self.recv_key,
-                    &self.transcript,
-                    &echo,
-                );
+                let want = confirm_tag(self.kem, &self.recv_key, &self.transcript, &echo);
                 if frame.payload[CT_BYTES..FINISH_BODY_BYTES] != want[..] {
                     return Err(SessionError::ConfirmMismatch);
                 }
@@ -1001,13 +996,19 @@ mod tests {
         let kem = TestKem;
         let (a, mut b) = paired_sessions(&kem);
         let mut wire = [0u8; 256];
-        let n = a.emit_verified(42, b"roundtrip-payload", &mut wire).unwrap();
+        let n = a
+            .emit_verified(42, b"roundtrip-payload", &mut wire)
+            .unwrap();
         assert_eq!(n, 69 + 17 + TAG_LEN);
         let mut pt = [0u8; 17];
         b.open_verified(&wire[..n], &mut pt).unwrap();
         assert_eq!(&pt, b"roundtrip-payload");
         b.step(&parse_frame(&wire[..n]).unwrap()).unwrap();
-        assert_eq!(b.budget_used(), 1, "authenticated receive advances the budget");
+        assert_eq!(
+            b.budget_used(),
+            1,
+            "authenticated receive advances the budget"
+        );
     }
 
     /// Wire-nonce law: same (epoch, ordinal, seq) = same nonce;
@@ -1112,7 +1113,11 @@ mod tests {
             c.records()[1].payload_digest,
             "tamper must be carried in the record hash"
         );
-        assert_eq!(c.verify_all(), Ok(()), "the chain walk verifies its own hashes");
+        assert_eq!(
+            c.verify_all(),
+            Ok(()),
+            "the chain walk verifies its own hashes"
+        );
     }
 
     /// M2a court — confirm tag binds the transcript: a Finish frame whose
@@ -1158,7 +1163,10 @@ mod tests {
         let err = parse_frame(&buf).unwrap_err();
         assert_eq!(
             err,
-            SessionError::LengthMismatch { expected: FINISH_BODY_BYTES, got: CT_BYTES }
+            SessionError::LengthMismatch {
+                expected: FINISH_BODY_BYTES,
+                got: CT_BYTES
+            }
         );
         // v3 parse law refuses the v2-shaped body BEFORE the machine sees
         // it; the session is untouched.
@@ -1167,7 +1175,9 @@ mod tests {
 
     /// Stack-array shim: parse_frame borrows, so the v2 refusal leg
     /// re-parses a copied wire image.
-    fn finish_wire_v2(buf: &[u8; crate::header::SIZE_BYTES + 1 + CT_BYTES]) -> [u8; crate::header::SIZE_BYTES + 1 + CT_BYTES] {
+    fn finish_wire_v2(
+        buf: &[u8; crate::header::SIZE_BYTES + 1 + CT_BYTES],
+    ) -> [u8; crate::header::SIZE_BYTES + 1 + CT_BYTES] {
         let mut out = [0u8; crate::header::SIZE_BYTES + 1 + CT_BYTES];
         out.copy_from_slice(buf);
         out

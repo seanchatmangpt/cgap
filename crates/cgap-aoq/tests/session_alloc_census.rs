@@ -21,7 +21,7 @@ use cgap_aoq::codec;
 use cgap_aoq::header::{AoqHeader, SIZE_BYTES};
 use cgap_aoq::session::{
     confirm_tag, derive, parse_frame, transcript_tag, FrameKind, KemSeam, Session, SessionError,
-    SessionState, CT_BYTES, CTX_HANDSHAKE, CTX_RECV, EK_BYTES, SS_BYTES,
+    SessionState, CTX_HANDSHAKE, CTX_RECV, CT_BYTES, EK_BYTES, SS_BYTES,
 };
 use cgap_audit::alloc_counter::with_alloc_tracking;
 
@@ -68,11 +68,7 @@ impl KemSeam for TestKem {
         Ok((ct, ss))
     }
 
-    fn decapsulate(
-        &self,
-        dk: &[u8],
-        ct: &[u8; CT_BYTES],
-    ) -> Result<[u8; SS_BYTES], SessionError> {
+    fn decapsulate(&self, dk: &[u8], ct: &[u8; CT_BYTES]) -> Result<[u8; SS_BYTES], SessionError> {
         if dk.len() != EK_BYTES {
             return Err(SessionError::KemRefused { op: 1 });
         }
@@ -115,7 +111,8 @@ fn established(epoch: u16, ordinal: u32, ek_seed: u8) -> Session<'static, TestKe
     let mut s = Session::new(&KEM, epoch, 7, ordinal);
     let ek = ek_of(ek_seed);
     let w = wire(epoch, 7, ordinal, 0, FrameKind::HandshakeEk, &ek);
-    s.step(&parse_frame(&w).expect("ek frame")).expect("ek step");
+    s.step(&parse_frame(&w).expect("ek frame"))
+        .expect("ek step");
     let (ct, ss) = KEM.encapsulate(&ek).expect("encapsulate");
     let transcript = transcript_tag(&KEM, &ek, &ss, epoch);
     let hs_master = derive(&KEM, CTX_HANDSHAKE, &ss, &ek);
@@ -125,7 +122,8 @@ fn established(epoch: u16, ordinal: u32, ek_seed: u8) -> Session<'static, TestKe
     body[..CT_BYTES].copy_from_slice(&ct);
     body[CT_BYTES..].copy_from_slice(&tag);
     let w = wire(epoch, 7, ordinal + 1, 0, FrameKind::HandshakeFinish, &body);
-    s.step(&parse_frame(&w).expect("fin frame")).expect("fin step");
+    s.step(&parse_frame(&w).expect("fin frame"))
+        .expect("fin step");
     assert_eq!(s.state(), SessionState::Established);
     s
 }
@@ -139,10 +137,14 @@ fn emit_verified_1kib_alloc_free() {
     let mut out = vec![0u8; SIZE_BYTES + 1 + 4 + payload.len() + TAG_LEN];
 
     let (written, report) = with_alloc_tracking(|| {
-        s.emit_verified(7, &payload, &mut out).expect("emit_verified")
+        s.emit_verified(7, &payload, &mut out)
+            .expect("emit_verified")
     });
     assert_eq!(written, SIZE_BYTES + 5 + payload.len() + TAG_LEN);
-    assert_eq!(report.count, 0, "emit at 1 KiB must be alloc-free ({report:?})");
+    assert_eq!(
+        report.count, 0,
+        "emit at 1 KiB must be alloc-free ({report:?})"
+    );
 }
 
 /// CENSUS 2 — open/parse direction: the inbound AppData frame the wire
@@ -163,11 +165,8 @@ fn open_parse_1kib_alloc_free() {
     prefix[SIZE_BYTES + 1..SIZE_BYTES + 5].copy_from_slice(&9u32.to_le_bytes());
     let mut frame_in = vec![0u8; SIZE_BYTES + 1 + 4 + payload.len() + TAG_LEN];
     frame_in[..SIZE_BYTES + 5].copy_from_slice(&prefix);
-    let nonce = cgap_aoq::aead::Nonce96::new(
-        0,
-        (u64::from(102u32) << 32) | u64::from(9u32),
-    )
-    .expect("nonce");
+    let nonce = cgap_aoq::aead::Nonce96::new(0, (u64::from(102u32) << 32) | u64::from(9u32))
+        .expect("nonce");
     let mut tag = [0u8; TAG_LEN];
     cgap_aoq::aead::seal_detached(
         &mut frame_in[SIZE_BYTES + 5..SIZE_BYTES + 5 + payload.len()],
@@ -184,10 +183,14 @@ fn open_parse_1kib_alloc_free() {
         let ((), r) = with_alloc_tracking(|| {
             let frame = parse_frame(&frame_in).expect("parse_frame");
             assert_eq!(frame.kind, FrameKind::AppData);
-            s.open_verified(&frame_in, &mut plain).expect("open_verified");
+            s.open_verified(&frame_in, &mut plain)
+                .expect("open_verified");
         });
         r
     };
-    assert_eq!(report.count, 0, "parse+open at 1 KiB must be alloc-free ({report:?})");
+    assert_eq!(
+        report.count, 0,
+        "parse+open at 1 KiB must be alloc-free ({report:?})"
+    );
     assert_eq!(plain, payload, "plaintext round trip (final state)");
 }

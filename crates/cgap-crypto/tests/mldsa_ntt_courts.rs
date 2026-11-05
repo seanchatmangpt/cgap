@@ -87,7 +87,10 @@ const GMUCERG_ZETAS_BARRETT_255: [i32; 255] = [
 struct Lcg(u64);
 impl Lcg {
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0
     }
     fn poly(&mut self) -> [i32; mldsa::N] {
@@ -107,15 +110,21 @@ impl Lcg {
 #[test]
 fn zetas_entry_check_vs_pqcrystals() {
     assert_eq!(mldsa::ZETAS[0], 0, "ZETAS[0] is padding");
-    assert_eq!(&mldsa::ZETAS[1..256], &PQCRYSTALS_ZETAS_255,
-        "ZETAS[1..] must equal the fetched pq-crystals ref/ntt.c literal");
+    assert_eq!(
+        &mldsa::ZETAS[1..256],
+        &PQCRYSTALS_ZETAS_255,
+        "ZETAS[1..] must equal the fetched pq-crystals ref/ntt.c literal"
+    );
 }
 
 #[test]
 fn zetas_barrett_entry_check_vs_gmucerg() {
     assert_eq!(mldsa::ZETAS_BARRETT[0], 0, "ZETAS_BARRETT[0] is padding");
-    assert_eq!(&mldsa::ZETAS_BARRETT[1..256], &GMUCERG_ZETAS_BARRETT_255,
-        "ZETAS_BARRETT[1..] must equal the fetched GMUCERG zetas_barrett literal");
+    assert_eq!(
+        &mldsa::ZETAS_BARRETT[1..256],
+        &GMUCERG_ZETAS_BARRETT_255,
+        "ZETAS_BARRETT[1..] must equal the fetched GMUCERG zetas_barrett literal"
+    );
 }
 
 /// blake3 digest pins over the full 256-entry tables (LE i32 bytes).
@@ -131,7 +140,10 @@ fn zetas_digest_pins() {
     for b in d.iter() {
         hexs.push_str(&format!("{:02x}", b));
     }
-    assert_eq!(hexs, "2772b1df66a71a02db41a967550dcde1bbe3d29413716cac69d61e1cf0b7e71b");
+    assert_eq!(
+        hexs,
+        "2772b1df66a71a02db41a967550dcde1bbe3d29413716cac69d61e1cf0b7e71b"
+    );
     let mut bytes = Vec::new();
     for v in mldsa::ZETAS_BARRETT.iter() {
         bytes.extend_from_slice(&v.to_le_bytes());
@@ -141,7 +153,10 @@ fn zetas_digest_pins() {
     for b in d.iter() {
         hexs.push_str(&format!("{:02x}", b));
     }
-    assert_eq!(hexs, "ba458d8d259c4e3c6318ba27d1291fe075ef2df35bbc9dab13d44b8db947dfcd");
+    assert_eq!(
+        hexs,
+        "ba458d8d259c4e3c6318ba27d1291fe075ef2df35bbc9dab13d44b8db947dfcd"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +172,9 @@ fn ntt_intt_tomont_vs_scalar() {
         let mut g = p;
         mldsa::ntt(&mut g);
         // ref contract: intt inputs must be smaller than Q in abs value
-        for c in g.iter_mut() { *c = mldsa::reduce32(*c); }
+        for c in g.iter_mut() {
+            *c = mldsa::reduce32(*c);
+        }
         mldsa::intt_tomont(&mut g);
         for i in 0..mldsa::N {
             let expect = ((p[i] as i64).rem_euclid(mldsa::Q as i64) * (1u64 << 32) as i64
@@ -178,7 +195,9 @@ fn ntt_intt_plain_identity_vs_scalar() {
         let mut g = p;
         mldsa::ntt(&mut g);
         // ref contract: intt inputs must be smaller than Q in abs value
-        for c in g.iter_mut() { *c = mldsa::reduce32(*c); }
+        for c in g.iter_mut() {
+            *c = mldsa::reduce32(*c);
+        }
         mldsa::intt_plain(&mut g);
         for i in 0..mldsa::N {
             assert_eq!(
@@ -217,8 +236,12 @@ fn ntt_pointwise_convolution_vs_scalar() {
         mldsa::ntt(&mut ahat);
         mldsa::ntt(&mut bhat);
         // ref contract: pointwise inputs in Montgomery domain, |coeff| < q
-        for c in ahat.iter_mut() { *c = mldsa::reduce32(*c); }
-        for c in bhat.iter_mut() { *c = mldsa::reduce32(*c); }
+        for c in ahat.iter_mut() {
+            *c = mldsa::reduce32(*c);
+        }
+        for c in bhat.iter_mut() {
+            *c = mldsa::reduce32(*c);
+        }
         let mut ch = [0i32; mldsa::N];
         mldsa::pointwise_montgomery(&mut ch, &ahat, &bhat);
         mldsa::intt_tomont(&mut ch);
@@ -259,8 +282,12 @@ fn decompose_tiling_exhaustive_vs_scalar() {
         let (r1, r0) = mldsa::decompose(a);
         let (e1, e0) = decompose_ref(a);
         assert_eq!((r1, r0), (e1, e0), "a = {}", a);
-        assert_eq!((r1 as i64 * mldsa::ALPHA as i64 + r0 as i64).rem_euclid(mldsa::Q as i64),
-            (a as i64).rem_euclid(mldsa::Q as i64), "a = {}", a);
+        assert_eq!(
+            (r1 as i64 * mldsa::ALPHA as i64 + r0 as i64).rem_euclid(mldsa::Q as i64),
+            (a as i64).rem_euclid(mldsa::Q as i64),
+            "a = {}",
+            a
+        );
         assert!(r1 >= 0 && r1 < mldsa::M_BUCKETS, "a = {}", a);
         assert!(r0 >= -mldsa::GAMMA2 && r0 <= mldsa::GAMMA2, "a = {}", a);
     }
@@ -274,7 +301,11 @@ fn power2round_tiling_exhaustive() {
     for a in 0..mldsa::Q {
         let (r1, r0) = mldsa::power2round(a);
         assert_eq!(r1 * (1 << mldsa::D) + r0, a, "a = {}", a);
-        assert!(r0 > -(1 << (mldsa::D - 1)) && r0 <= (1 << (mldsa::D - 1)), "a = {}", a);
+        assert!(
+            r0 > -(1 << (mldsa::D - 1)) && r0 <= (1 << (mldsa::D - 1)),
+            "a = {}",
+            a
+        );
     }
 }
 
@@ -292,13 +323,7 @@ fn hint_usehint_property_court() {
         for z in -2048i32..=2048 {
             let h = mldsa::make_hint(a0w + z, a1w);
             let wz = (w + z).rem_euclid(mldsa::Q);
-            assert_eq!(
-                mldsa::use_hint(wz, h),
-                a1w,
-                "w = {}, z = {}",
-                w,
-                z
-            );
+            assert_eq!(mldsa::use_hint(wz, h), a1w, "w = {}, z = {}", w, z);
         }
     }
 }

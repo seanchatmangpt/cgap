@@ -517,12 +517,13 @@ pub fn write_row_group_page_into(
     // (the previous saturating_mul would mis-emit a truncated expected width).
     let mut body_len = 0usize;
     for c in cols.iter() {
-        let col_bytes = num_rows
-            .checked_mul(c.ty.width())
-            .ok_or(LevelFreeError::RowGroupOverflow {
-                rows: num_rows,
-                width: c.ty.width(),
-            })?;
+        let col_bytes =
+            num_rows
+                .checked_mul(c.ty.width())
+                .ok_or(LevelFreeError::RowGroupOverflow {
+                    rows: num_rows,
+                    width: c.ty.width(),
+                })?;
         body_len = body_len
             .checked_add(col_bytes)
             .ok_or(LevelFreeError::RowGroupOverflow {
@@ -533,12 +534,13 @@ pub fn write_row_group_page_into(
     dst.clear();
     dst.reserve(body_len + 64);
     for (c, p) in cols.iter().zip(payloads.iter()) {
-        let expected = num_rows
-            .checked_mul(c.ty.width())
-            .ok_or(LevelFreeError::RowGroupOverflow {
-                rows: num_rows,
-                width: c.ty.width(),
-            })?;
+        let expected =
+            num_rows
+                .checked_mul(c.ty.width())
+                .ok_or(LevelFreeError::RowGroupOverflow {
+                    rows: num_rows,
+                    width: c.ty.width(),
+                })?;
         if p.len() != expected {
             return Err(LevelFreeError::PayloadMismatch {
                 expected,
@@ -552,14 +554,12 @@ pub fn write_row_group_page_into(
         uncompressed_page_size: size_i32(body_len),
         compressed_page_size: size_i32(body_len),
         data_page_header_v2: Some(DataPageHeaderV2 {
-            num_values: size_i32(
-                num_rows
-                    .checked_mul(ncols)
-                    .ok_or(LevelFreeError::RowGroupOverflow {
-                        rows: num_rows,
-                        width: ncols,
-                    })?,
-            ),
+            num_values: size_i32(num_rows.checked_mul(ncols).ok_or(
+                LevelFreeError::RowGroupOverflow {
+                    rows: num_rows,
+                    width: ncols,
+                },
+            )?),
             num_nulls: 0,
             num_rows: size_i32(num_rows),
             definition_levels_byte_length: 0,

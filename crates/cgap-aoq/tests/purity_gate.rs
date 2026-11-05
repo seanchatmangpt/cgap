@@ -36,24 +36,57 @@ struct Registered {
 /// Registered modules of the lib target (must match src/lib.rs `pub mod`,
 /// cfg'd or not — the file-walk counts on-disk sources regardless of cfg).
 const REGISTERED: [Registered; 14] = [
-    Registered { name: "aead.rs", exempt: &[] },
-    Registered { name: "chain.rs", exempt: &[] },
-    Registered { name: "codec.rs", exempt: &[] },
-    Registered { name: "error.rs", exempt: &[] },
+    Registered {
+        name: "aead.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "chain.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "codec.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "error.rs",
+        exempt: &[],
+    },
     Registered {
         name: "generated_aoq_header_layout.rs",
         exempt: &[],
     },
-    Registered { name: "header.rs", exempt: &[] },
-    Registered { name: "kem.rs", exempt: &[] },
-    Registered { name: "lib.rs", exempt: &[] },
-    Registered { name: "session.rs", exempt: &[] },
+    Registered {
+        name: "header.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "kem.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "lib.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "session.rs",
+        exempt: &[],
+    },
     // [AF-43 SLA sync 2026-11-04] profile_guard.rs landed in src/ (registered
     // in lib.rs by its lane); adding it to the scanned set.
-    Registered { name: "profile_guard.rs", exempt: &[] },
+    Registered {
+        name: "profile_guard.rs",
+        exempt: &[],
+    },
     // [AB-7 SLA sync 2026-11-03] AB-8 landed verify.rs/writer.rs mid-pass.
-    Registered { name: "verify.rs", exempt: &[] },
-    Registered { name: "writer.rs", exempt: &[] },
+    Registered {
+        name: "verify.rs",
+        exempt: &[],
+    },
+    Registered {
+        name: "writer.rs",
+        exempt: &[],
+    },
     // [D1 SLA sync 2026-11-04] rfc0089_certificate.rs landed in src/,
     // registered in lib.rs behind #[cfg(feature = "cert")]. The cert feature
     // is alloc-using by design (extern crate alloc; String/Vec certificate
@@ -82,7 +115,10 @@ const REGISTERED: [Registered; 14] = [
     // [Q6 M2b SLA sync 2026-11-04] pin_table.rs landed in src/ (registered
     // in lib.rs by its lane); adding it to the scanned set (index 13; the
     // flips-both-ways court pins cert at REGISTERED[12]).
-    Registered { name: "pin_table.rs", exempt: &[] },
+    Registered {
+        name: "pin_table.rs",
+        exempt: &[],
+    },
 ];
 
 /// [FLIPPED 2026-11-03 by AB-7, disclosed in ab-7-chain-session.md] The
@@ -265,11 +301,7 @@ fn unregistered_sources(dir: &std::path::Path) -> Vec<String> {
             .file_name()
             .and_then(|n| n.to_str())
             .expect("utf8 name");
-        if !REGISTERED
-            .iter()
-            .any(|r| r.name == name)
-            && !KNOWN_UNREGISTERED.contains(&name)
-        {
+        if !REGISTERED.iter().any(|r| r.name == name) && !KNOWN_UNREGISTERED.contains(&name) {
             found.push(name.to_string());
         }
     }
@@ -293,9 +325,8 @@ fn gate_exits_clean_on_registered_sources() {
     let mut scanned = 0usize;
     for entry in &REGISTERED {
         let path = src.join(entry.name);
-        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            panic!("registered source under {} missing: ({e})", entry.name)
-        });
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("registered source under {} missing: ({e})", entry.name));
         violations.extend(gate_side_scan(&text, entry.name, entry.exempt));
         scanned += 1;
     }
@@ -320,11 +351,7 @@ fn gate_exits_clean_on_registered_sources() {
 /// exemption channels are lawful; invalid in-file markers are reported,
 /// never silently accepted. Invalid table rows are rejected upstream by
 /// `validate_registration`.
-fn gate_side_scan(
-    text: &str,
-    name: &str,
-    exempt: &[(&'static str, &'static str)],
-) -> Vec<String> {
+fn gate_side_scan(text: &str, name: &str, exempt: &[(&'static str, &'static str)]) -> Vec<String> {
     let mut violations = Vec::new();
     let mut allowed: Vec<&'static str> = exempt.iter().map(|(t, _)| *t).collect();
     for (tok, just, valid) in parse_exemptions(text) {

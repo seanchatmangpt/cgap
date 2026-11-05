@@ -83,7 +83,10 @@ fn consume_u32(o: &[u32]) {
 
 fn main() {
     if let Err(v) = cgap_aoq::profile_guard::assert_release() {
-        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        eprintln!(
+            "LOUD-SKIP {} : {v}",
+            std::env::args().next().unwrap_or_default()
+        );
         return;
     }
     // ---- (a) bit-unpack: widths 1/2/4/8 over 64 MiB of u64 lanes ----

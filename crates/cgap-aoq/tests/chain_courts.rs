@@ -6,9 +6,7 @@
 //! Anti-vacuity: courts 3/4/5 inject real mutations and MUST flip — a green
 //! run with no observed refusal is a VACUOUS GATE.
 
-use cgap_aoq::chain::{
-    verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS,
-};
+use cgap_aoq::chain::{verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 
@@ -315,7 +313,8 @@ fn c7_compose_emit_verified_law() {
     fin[64] = FrameKind::HandshakeFinish.id();
     let (ct, _) = kem.encapsulate(&ek).unwrap();
     fin[65..65 + CT_BYTES].copy_from_slice(&ct);
-    let confirm = cgap_aoq::session::confirm_tag(&kem, &session.recv_key(), &session.transcript(), &ct);
+    let confirm =
+        cgap_aoq::session::confirm_tag(&kem, &session.recv_key(), &session.transcript(), &ct);
     fin[65 + CT_BYTES..].copy_from_slice(&confirm);
     let frame = parse_frame(&fin).unwrap();
     session.step(&frame).unwrap();
@@ -438,13 +437,8 @@ fn c9_fold_payload_flip_and_tag_flip_refuse() {
 #[test]
 fn c10_batch_admitted_equals_sequential_appends() {
     const N: usize = 9;
-    let payloads: Vec<Vec<u8>> = (0..N)
-        .map(|i| vec![(i * 7 + 3) as u8; 16 + i])
-        .collect();
-    let digests: Vec<[u8; 32]> = payloads
-        .iter()
-        .map(|p| Mix32.digest(&[p]))
-        .collect();
+    let payloads: Vec<Vec<u8>> = (0..N).map(|i| vec![(i * 7 + 3) as u8; 16 + i]).collect();
+    let digests: Vec<[u8; 32]> = payloads.iter().map(|p| Mix32.digest(&[p])).collect();
     let epochs: Vec<u16> = (0..N).map(|i| (i % 3) as u16).collect();
 
     let mut batched = chain(16);
@@ -474,7 +468,9 @@ fn c11_batch_refusal_is_all_or_nothing() {
     let head_before = c.checkpoint();
 
     // 4 more need indices 5..9 > cap 8 -> must refuse whole.
-    let more: Vec<[u8; 32]> = (0..4).map(|i| Mix32.digest(&[&[(i + 9) as u8; 8]])).collect();
+    let more: Vec<[u8; 32]> = (0..4)
+        .map(|i| Mix32.digest(&[&[(i + 9) as u8; 8]]))
+        .collect();
     let e4: Vec<u16> = vec![1; 4];
     match c.append_batch_admitted(&e4, &more) {
         Err(cgap_aoq::error::AoqError::SlabFull { len }) => assert_eq!(len, 8),
@@ -496,7 +492,7 @@ fn c12_batch_length_parity_refusal() {
         Err(cgap_aoq::error::AoqError::SeqGap { expected, got }) => {
             assert_eq!((expected, got), (2, 3));
         }
-        other => panic!("expected SeqGap parity refusal, got {other:?}")
+        other => panic!("expected SeqGap parity refusal, got {other:?}"),
     }
     assert_eq!(c.len(), 0);
 }

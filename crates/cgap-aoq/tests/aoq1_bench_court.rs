@@ -47,7 +47,8 @@ fn bench_encode_decode_ns_per_header() {
                 // FULL encode work (digest loop included) is required to
                 // produce it. Fencing a digest-independent byte (w[0] magic,
                 // w[8] key_id) lets DSE kill the digest as a dead store.
-                sink = sink.wrapping_add(cgap_aoq::profile_guard::fence(w[60] as u64));            }
+                sink = sink.wrapping_add(cgap_aoq::profile_guard::fence(w[60] as u64));
+            }
         }) / ITERS as f64;
         let dec = timed(|| {
             for _ in 0..ITERS {

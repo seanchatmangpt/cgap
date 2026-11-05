@@ -61,7 +61,9 @@ fn cbd_exhaustive_per_byte_vs_scalar() {
 fn cbd_random_polys_vs_scalar() {
     let mut s: u64 = 0xA20C_0FFE_E5A7_E005;
     let mut next = move || -> u64 {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         s
     };
     for eta in [2u8, 4u8] {
@@ -83,7 +85,9 @@ fn cbd_random_polys_vs_scalar() {
 fn cbd_coefficient_range_law() {
     let mut s: u64 = 0xA20C_0FFE_E5A7_E006;
     let mut next = move || -> u64 {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         s
     };
     for eta in [2u8, 4u8] {

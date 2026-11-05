@@ -30,7 +30,11 @@ mod tests {
     fn band_is_frozen_eight_in_contiguous_order() {
         assert_eq!(STATUS_BAND.len(), 8);
         for (i, (word, _)) in STATUS_BAND.iter().enumerate() {
-            assert_eq!(*word, 0x4347A001 + i as u32, "slot {i} must be contiguous in the frozen band");
+            assert_eq!(
+                *word,
+                0x4347A001 + i as u32,
+                "slot {i} must be contiguous in the frozen band"
+            );
         }
     }
 }

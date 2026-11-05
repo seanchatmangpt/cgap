@@ -30,8 +30,8 @@
 
 #![cfg(not(target_os = "none"))]
 
-use alloc::vec::Vec;
 use crate::buffer::{Buf, ALIGNMENT};
+use alloc::vec::Vec;
 
 /// FROZEN status band (gate 020/070 law): (wire word, symbolic name),
 /// band 0x4347A001..A008, slot i holds 0x4347A001 + i. GENERATED projection
@@ -144,7 +144,11 @@ pub fn decode_names(dict: &StatusDictionary) -> Result<Vec<&str>, DictionaryErro
     let mut names = Vec::with_capacity(8);
     for i in 0..8 {
         let start = u32::from_le_bytes(v[i * 4..i * 4 + 4].try_into().expect("band word"));
-        let end = u32::from_le_bytes(v[(i + 1) * 4..(i + 1) * 4 + 4].try_into().expect("band word"));
+        let end = u32::from_le_bytes(
+            v[(i + 1) * 4..(i + 1) * 4 + 4]
+                .try_into()
+                .expect("band word"),
+        );
         // Hostile offsets: refuse typed instead of slicing past the buffer.
         if start > end || 9 * 4 + end as usize > v.len() {
             return Err(DictionaryError::BandRange {

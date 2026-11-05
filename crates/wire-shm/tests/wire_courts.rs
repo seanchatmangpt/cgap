@@ -212,7 +212,13 @@ fn corrupt_plen_budget_refusal_typed() {
         .read_frame_into(0, &mut ctrl)
         .expect_err("mutated plen must refuse");
     assert!(
-        matches!(err, WireError::BudgetTooSmall { need: 2016, have: 64 }),
+        matches!(
+            err,
+            WireError::BudgetTooSmall {
+                need: 2016,
+                have: 64
+            }
+        ),
         "expected typed BudgetTooSmall {{need:2016, have:64}}, got {err}"
     );
 

@@ -41,8 +41,18 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
     let mut f: Vec<String> = Vec::new();
 
     // §7.2 cache-line discipline (cgap-git ingress/egress reuse this law).
-    require(&mut f, rs, "CACHE_LINE_BYTES=64", "pub const CACHE_LINE_BYTES: usize = 64");
-    require(&mut f, rs, "CachePaddedIndex align(64)", "#[repr(align(64))]");
+    require(
+        &mut f,
+        rs,
+        "CACHE_LINE_BYTES=64",
+        "pub const CACHE_LINE_BYTES: usize = 64",
+    );
+    require(
+        &mut f,
+        rs,
+        "CachePaddedIndex align(64)",
+        "#[repr(align(64))]",
+    );
     require(
         &mut f,
         rs,
@@ -57,7 +67,12 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
     );
 
     // §7.1 ring layout: power-of-two capacity, mask indexing, head/tail atomics.
-    require(&mut f, rs, "power-of-two capacity", "let capacity = 1usize << slot_pow2");
+    require(
+        &mut f,
+        rs,
+        "power-of-two capacity",
+        "let capacity = 1usize << slot_pow2",
+    );
     require(
         &mut f,
         rs,
@@ -74,10 +89,20 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
     require(&mut f, rs, "tail index atomic", "tail: CachePaddedIndex");
 
     // §10 claim zero-fill law (no stale bytes at publish).
-    require(&mut f, rs, "claim zero-fill", "slot.fill(0); // §10 padding law");
+    require(
+        &mut f,
+        rs,
+        "claim zero-fill",
+        "slot.fill(0); // §10 padding law",
+    );
 
     // §7.3 publish law: typed refusals + payload-length agreement.
-    require(&mut f, rs, "Overflow refusal", "return Err(RingError::Overflow)");
+    require(
+        &mut f,
+        rs,
+        "Overflow refusal",
+        "return Err(RingError::Overflow)",
+    );
     require(&mut f, rs, "BadFrame refusal", "RingError::BadFrame");
     require(
         &mut f,
@@ -100,7 +125,12 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
     );
 
     // §8.3 read law: fail-closed, never garbage; widened u64 bound (A04 fix).
-    require(&mut f, rs, "read empty -> None", "if head == tail {\n            return None;");
+    require(
+        &mut f,
+        rs,
+        "read empty -> None",
+        "if head == tail {\n            return None;",
+    );
     require(
         &mut f,
         rs,
@@ -117,12 +147,22 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
     );
 
     // ReleaseOnEmpty typed refusal.
-    require(&mut f, rs, "ReleaseOnEmpty refusal", "RingError::ReleaseOnEmpty");
+    require(
+        &mut f,
+        rs,
+        "ReleaseOnEmpty refusal",
+        "RingError::ReleaseOnEmpty",
+    );
 
     // Export surface (cgap-bn3 edge-closure court consumption: lib.rs exports
     // dma_ring / frame / isomorphism; tracking_alloc is #[path]-included).
     require(&mut f, lib, "lib.rs exports dma_ring", "pub mod dma_ring;");
-    require(&mut f, lib, "lib.rs exports isomorphism", "pub mod isomorphism;");
+    require(
+        &mut f,
+        lib,
+        "lib.rs exports isomorphism",
+        "pub mod isomorphism;",
+    );
 
     // Consumer self-court: cgap-git ingress_ring must still declare its
     // documented dma_ring law-reuse contract.
@@ -133,8 +173,16 @@ fn dma_ring_pins(rs: &str, lib: &str, ingress: &str) -> Vec<String> {
             "single-accessor by construction (dma_ring law)",
         ),
         (ingress, "ingress §7.2 reuse", "dma_ring §7.2 reuse"),
-        (ingress, "ingress §7.1 publish reuse", "Publish law (dma_ring §7.1 reuse)"),
-        (ingress, "ingress §8.3 read law reuse", "dma_ring §8.3 read law"),
+        (
+            ingress,
+            "ingress §7.1 publish reuse",
+            "Publish law (dma_ring §7.1 reuse)",
+        ),
+        (
+            ingress,
+            "ingress §8.3 read law reuse",
+            "dma_ring §8.3 read law",
+        ),
     ] {
         require(&mut f, hay, what, pat);
     }
@@ -175,7 +223,12 @@ fn isomorphism_pins(rs: &str) -> Vec<String> {
         "fail-line format",
         "IDENTITY_COURT_FAIL tier={} offset={} wire=0x{:02x} mem=0x{:02x} disk=0x{:02x}",
     );
-    require(&mut f, rs, "TierMismatch report struct", "pub struct TierMismatch");
+    require(
+        &mut f,
+        rs,
+        "TierMismatch report struct",
+        "pub struct TierMismatch",
+    );
 
     // §8.1 identity law: full-region value identity, addr-independent.
     require(&mut f, rs, "identity_assert entry", "pub fn identity_assert(wire: &[u8], tier: Tier, projection: &[u8]) -> Result<(), TierMismatch>");

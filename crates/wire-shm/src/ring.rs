@@ -155,11 +155,7 @@ impl WireRing {
     /// by the caller. `plen` is wire input, so the budget check is
     /// `HEADER_LEN.checked_add(plen)` — overflow and undersized buffers are
     /// typed refusals (`FrameTooLarge` / `BudgetTooSmall`), never panics.
-    pub fn read_frame_into(
-        &self,
-        ordinal: u32,
-        out: &mut [u8],
-    ) -> Result<usize, WireError> {
+    pub fn read_frame_into(&self, ordinal: u32, out: &mut [u8]) -> Result<usize, WireError> {
         let off = Self::slot_offset(ordinal % self.capacity);
         let header = self.read_validated_header(ordinal)?;
         let plen = Self::header_payload_len(&header)?;

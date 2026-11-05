@@ -273,7 +273,10 @@ pub fn keyed_digest(key: &[u8; 32], data: &[u8]) -> Result<[u8; DIGEST_LEN], Dig
 /// # Errors
 /// [`DigestError::InputTooLong`] when the concatenated length exceeds
 /// [`KEYED_MAX_INPUT_LEN`] — loud UNSUPPORTED, never a silent downgrade.
-pub fn keyed_digest_parts(key: &[u8; 32], parts: &[&[u8]]) -> Result<[u8; DIGEST_LEN], DigestError> {
+pub fn keyed_digest_parts(
+    key: &[u8; 32],
+    parts: &[&[u8]],
+) -> Result<[u8; DIGEST_LEN], DigestError> {
     let total: usize = parts.iter().map(|p| p.len()).sum();
     if total > KEYED_MAX_INPUT_LEN {
         return Err(DigestError::InputTooLong {

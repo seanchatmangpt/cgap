@@ -11,14 +11,14 @@
 //! `aoq_status_name` round-trip is asserted for every word the surface
 //! returns.
 
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::codec;
 use cgap_aoq::header::{AoqHeader, SIZE_BYTES};
-use cgap_aoq::aead::{Nonce96, TAG_LEN};
-use cgap_aoq::session::{
-    derive, parse_frame, transcript_tag, FrameKind, KemSeam, CT_BYTES, CTX_HANDSHAKE, CTX_RECV,
-    CTX_SEND, EK_BYTES, SS_BYTES,
-};
 use cgap_aoq::session::SessionError;
+use cgap_aoq::session::{
+    derive, parse_frame, transcript_tag, FrameKind, KemSeam, CTX_HANDSHAKE, CTX_RECV, CTX_SEND,
+    CT_BYTES, EK_BYTES, SS_BYTES,
+};
 use cgap_crypto::fips202::Shake256;
 use cgap_ffi::aoq::status_maps::{
     aoq_status_name, AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
@@ -135,12 +135,7 @@ fn court_send_key(ek: &[u8; EK_BYTES], _dk: &[u8]) -> [u8; 32] {
     kem.kdf(&[CTX_SEND, &hs_master])
 }
 
-fn finish_frame(
-    ordinal: u32,
-    ct: &[u8; CT_BYTES],
-    ek: &[u8; EK_BYTES],
-    dk: &[u8],
-) -> Vec<u8> {
+fn finish_frame(ordinal: u32, ct: &[u8; CT_BYTES], ek: &[u8; EK_BYTES], dk: &[u8]) -> Vec<u8> {
     // v3 Finish law (M2a): body = ct echo + confirm tag over the session's
     // recv_key/transcript, both derived by the court from the held dk.
     let kem = CourtSeam;

@@ -336,7 +336,10 @@ mod tests {
     fn kdf_is_order_sensitive_and_unambiguous() {
         let a = bridge_kdf(&COURT_KEY, &[b"ab", b"c"]);
         let b = bridge_kdf(&COURT_KEY, &[b"a", b"bc"]);
-        assert_ne!(a, b, "length prefixes must keep part boundaries load-bearing");
+        assert_ne!(
+            a, b,
+            "length prefixes must keep part boundaries load-bearing"
+        );
         assert_eq!(a, bridge_kdf(&COURT_KEY, &[b"ab", b"c"]), "deterministic");
         assert_ne!(
             bridge_kdf(&[8u8; 32], &[b"ab", b"c"]),

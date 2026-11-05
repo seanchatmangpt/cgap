@@ -865,7 +865,10 @@ fn guard_finish() {
 fn main() {
     // ZP-18-C: release-profile fence — dev-profile runs loud-SKIP.
     if let Err(v) = cgap_aoq::profile_guard::assert_release() {
-        eprintln!("LOUD-SKIP {} : {v}", std::env::args().next().unwrap_or_default());
+        eprintln!(
+            "LOUD-SKIP {} : {v}",
+            std::env::args().next().unwrap_or_default()
+        );
         return;
     }
     contention_guard();

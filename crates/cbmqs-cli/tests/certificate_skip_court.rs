@@ -67,7 +67,10 @@ fn court_min_of_3_strip_fails_closed_no_artifact() {
         .expect("spawn emit (stripped)");
     let code = out.status.code().expect("emit exit code");
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    assert_eq!(code, 3, "stripped receipt must exit 3 (loud skip), got {code}: {stderr}");
+    assert_eq!(
+        code, 3,
+        "stripped receipt must exit 3 (loud skip), got {code}: {stderr}"
+    );
     assert!(
         stderr.contains("CertificateIncomplete"),
         "typed CertificateIncomplete required, got: {stderr}"
@@ -80,7 +83,10 @@ fn court_min_of_3_strip_fails_closed_no_artifact() {
 
     // Restore law: the shared AB-14 receipt is untouched (byte-identical).
     let after = std::fs::read_to_string(AB14_RECEIPT).expect("receipt still readable");
-    assert_eq!(after, source, "shared tree must be byte-identical after the court");
+    assert_eq!(
+        after, source,
+        "shared tree must be byte-identical after the court"
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

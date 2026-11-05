@@ -188,7 +188,8 @@ fn stalled_client_dropped_and_accept_resumes() {
     probe_win[4..8].copy_from_slice(&120u32.to_le_bytes());
     c.write_all(&probe_win).expect("probe window write");
     let mut word_c = [0u8; 4];
-    c.set_read_timeout(Some(DROP_DEADLINE)).expect("C read deadline");
+    c.set_read_timeout(Some(DROP_DEADLINE))
+        .expect("C read deadline");
     c.read_exact(&mut word_c)
         .expect("C must be served (accept loop out of the wedge)");
     assert_ne!(
@@ -203,7 +204,10 @@ fn stalled_client_dropped_and_accept_resumes() {
     let status = poll_until("stdin-EOF exit", Duration::from_secs(10), || {
         car.child.try_wait().ok().flatten()
     });
-    assert!(status.success(), "stdin-EOF stop must exit 0, got {status:?}");
+    assert!(
+        status.success(),
+        "stdin-EOF stop must exit 0, got {status:?}"
+    );
     let _ = a;
 }
 
@@ -228,7 +232,15 @@ fn timeout_mutation_flips() {
     let sandbox = std::env::temp_dir().join(format!("aoq_timeout_mut_{:?}", std::process::id()));
     let _ = std::fs::remove_dir_all(&sandbox);
     let cp = Command::new("rsync")
-        .args(["-a", "--exclude", ".git", "--exclude", "target", "--exclude", "target-*"])
+        .args([
+            "-a",
+            "--exclude",
+            ".git",
+            "--exclude",
+            "target",
+            "--exclude",
+            "target-*",
+        ])
         .arg(format!("{}/", root.display()))
         .arg(format!("{}/", sandbox.display()))
         .status()
@@ -331,7 +343,10 @@ fn sha256(data: &str) -> String {
                     .map(str::to_string)
                     .unwrap_or_default())
             } else {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "shasum failed"))
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "shasum failed",
+                ))
             }
         })
         .expect("shasum -a 256 on PATH");
