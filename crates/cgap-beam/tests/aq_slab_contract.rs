@@ -86,3 +86,107 @@ contracts() ->
     t_lease_lifecycle(),
     t_alloc_spy_egress(),
     ok.
+
+%% Segment builder: a real wire-shm-layout file (bookkeeping + zero slots).
+make_segment(Dir, Name, Capacity) ->
+    Path = filename:join(Dir, Name),
+    Book = <<0:64/big-unsigned-integer, Capacity:32/big-unsigned-integer,
+             0:((4096 - 12) * 8)/unit:1>>,
+    Slots = <<0:((4096 * Capacity) * 8)/unit:1>>,
+    ok = file:write_file(Path, <<Book/binary, Slots/binary>>),
+    Path.
+
+t_open_refusals() ->
+    Dir = mktempd(),
+    %% capacity 65: over the u64 free-mask law -> typed open refusal.
+    Wide = make_segment(Dir, "wide.wire", 65),
+    error = aq_slab_open(Wide),
+    %% capacity-field vs file-size mismatch (ring.rs:57-71 law).
+    Path = filename:join(Dir, "mismatch.wire"),
+    ok = file:write_file(Path, <<0:((4096 + 2 * 4096) * 8)/unit:1>>),
+    error = aq_slab_open(Path),
+    %% missing file
+    error = aq_slab_open(filename:join(Dir, "nope.wire")),
+    %% non-binary arg
+    error = aq_slab_open(42),
+    io:format("ok open_refusals~n").
+
+t_stamp_frame_window() ->
+    Dir = mktempd(),
+    Cap = 4,
+    Path = make_segment(Dir, "seg.wire", Cap),
+    Slab = aq_slab_open(Path),
+    true = is_reference(Slab),
+    %% stamp 3 frames (writer side, one bounded BEAM->slab copy).
+    ok = aq_slab_stamp(Slab, <<"hello">>),
+    ok = aq_slab_stamp(Slab, <<"the entire continuity of memory">>),
+    ok = aq_slab_stamp(Slab, <<0, 255, 1, 254>>),
+    %% zero-copy egress: bytes out == bytes in, incl. wrap addressing.
+    <<"hello">> = aq_slab_frame(Slab, 0),
+    <<"the entire continuity of memory">> = aq_slab_frame(Slab, 1),
+    <<0, 255, 1, 254>> = aq_slab_frame(Slab, 2),
+    error = aq_slab_frame(Slab, 3),         %% unstamped slot: BadMagic
+    error = aq_slab_frame(Slab, 8),         %% 8 mod 4 = 0 but stored ord 0 != 8
+    error = aq_slab_frame(not_a_slab, 0),
+    error = aq_slab_frame(Slab, -1),
+    %% windows: O(1) slices of the projected frame, bounds vs plen.
+    <<"hello">> = aq_slab_window(Slab, 0, 0, 5),
+    <<"ello">> = aq_slab_window(Slab, 0, 1, 4),
+    <<>> = aq_slab_window(Slab, 0, 5, 0),
+    error = aq_slab_window(Slab, 0, 4, 2),  %% off+len > plen
+    error = aq_slab_window(Slab, 0, 7, 0),
+    io:format("ok stamp_frame_window~n").
+
+t_crc_negative_leg() ->
+    Dir = mktempd(),
+    Path = make_segment(Dir, "seg.wire", 2),
+    Slab = aq_slab_open(Path),
+    ok = aq_slab_stamp(Slab, <<"tamper-target">>),
+    <<"tamper-target">> = aq_slab_frame(Slab, 0),
+    %% Corrupt the payload THROUGH THE FILE (pwrite): macOS unified buffer
+    %% cache makes the byte visible to the mapping.
+    {ok, 16} = file:pwrite(Path, 4096 + 16, <<$X>>),
+    %% Typed in-memory CrcMismatch refusal -> atom error; never a binary over
+    %% bad bytes.
+    error = aq_slab_frame(Slab, 0),
+    error = aq_slab_window(Slab, 0, 0, 1),
+    io:format("ok crc_negative_leg~n").
+
+t_lease_lifecycle() ->
+t_lease_lifecycle() ->
+    Dir = mktempd(),
+    Path = make_segment(Dir, "seg.wire", 4),
+    Slab = aq_slab_open(Path),
+    %% Fill slots 0..1 so next_ordinal = 2; lease slot 2 (the next write
+    %% target) and prove stamp refuses it while the bit is set.
+    ok = aq_slab_stamp(Slab, <<"first">>),
+    ok = aq_slab_stamp(Slab, <<"second">>),
+    <<"first">> = aq_slab_frame(Slab, 0),
+    Lease = aq_slab_lease(Slab, 2),
+    true = is_reference(Lease),
+    error = aq_slab_stamp(Slab, <<"third">>),
+    %% Double lease -> error (bit already set).
+    error = aq_slab_lease(Slab, 2),
+    %% Lease slot 3 too; then drop BOTH lease refs and poll (bounded, on the
+    %% stamp observable, no sleeps) until the dtor cleared the bits.
+    Lease2 = aLease2_placeholder
+
+    Lease2 = aq_slab_lease(Slab, 3),
+    true = is_reference(Lease2),
+    error = aq_slab_stamp(Slab, <<"third">>),
+    Leases = [Lease, Lease2],
+    Leases2 = [Leases, Lease2],
+    _ = Leases2,
+    %% Bounded poll on the stamp observable until the lease dtors clear the
+    %% bits (no sleeps).
+    wait_stamp_ok(Slab, <<"third">>, 200),
+    <<"third">> = aq_slab_frame(Slab, 2),
+    io:format("ok lease_lifecycle~n").
+
+wait_stamp_ok(_Slab, _Payload, 0) ->
+    erlang:error({lease_dtor_did_not_fire, bounded_poll_exhausted});
+wait_stamp_ok(Slab, Payload, N) ->
+    case aq_slab_stamp(Slab, Payload) of
+        ok -> ok;
+        _ -> garbage_collect(), wait_stamp_ok(Slab, Payload, N - 1)
+    end.

@@ -28,7 +28,7 @@
 //!
 //! Dirty classification (spec): open = DirtyIo; frame/window/stamp/lease =
 //! CPU (crc32 over 4080 B ~ 1.3 us). Durability (msync) is a separate NIF
-//! (aq_slab_sync), declared in the spec, NOT landed here.
+//! (aq_slab_sync), landed here as the sixth AQ NIF (DirtyIo, direct msync(2) —
 //!
 //! Deviations from spec (each disclosed in the L19 receipt): ingress uses
 //! enif_inspect_binary (stamp arg is a binary term; same law, smaller ABI
@@ -120,6 +120,7 @@ enum SlabErr {
     BudgetOverflow(usize, usize),
     SlotLeased(u32),
     StaleWrite(u64),
+    Sync(String),
     PathTooLong(usize),
     EmptyPath,
 }
@@ -426,6 +427,14 @@ mod bin_extern {
             term: ErlNifTerm,
             bin: *mut ErlNifBinary,
         ) -> c_int;
+        /// ERL_NIF_TERM enif_make_sub_binary(ErlNifEnv*, ERL_NIF_TERM,
+        /// size_t pos, size_t size) (erl_nif_api_funcs.h:99)
+        pub(crate) fn enif_make_sub_binary(
+            env: *mut ErlNifEnv,
+            src: ErlNifTerm,
+            pos: usize,
+            size: usize,
+        ) -> ErlNifTerm;
     }
 }
 
@@ -699,8 +708,39 @@ pub(crate) extern "C" fn aq_slab_lease(
 }
 
 // ---------------------------------------------------------------------------
-// Rust-side tests (Chicago: real tempdir segment files, no mocks)
+// Sync (durability)
 // ---------------------------------------------------------------------------
+
+/// msync(MS_SYNC) the full mapping to its backing file. `Ok(())` = flushed;
+/// `Err` maps any msync failure (the lease Arc keeps the mapping alive, so
+/// failure here is an OS-level refusal, never a use-after-free).
+fn sync_slab(st: &SlabState) -> Result<(), SlabErr> {
+    let rc = unsafe { msync(st.map as *mut c_void, st.map_len, MS_SYNC) };
+    if rc != 0 {
+        return Err(SlabErr::Sync(std::io::Error::last_os_error().to_string()));
+    }
+    Ok(())
+}
+
+/// `aq_slab_sync(Slab) -> ok | error`. DirtyIo: msync is blocking disk I/O
+/// (the spec's durability NIF; never on a normal scheduler).
+pub(crate) extern "C" fn aq_slab_sync(
+    env: *mut ErlNifEnv,
+    argc: c_int,
+    argv: *const ErlNifTerm,
+) -> ErlNifTerm {
+    let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
+    if argc != 1 {
+        return make_atom(env, "error");
+    }
+    let Some(slab) = (unsafe { slab_of(env, args[0]) }) else {
+        return make_atom(env, "error");
+    };
+    match sync_slab(&unsafe { (*slab).state }) {
+        Ok(()) => make_atom(env, "ok"),
+        Err(_) => make_atom(env, "error"),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -814,6 +854,30 @@ mod tests {
         let _ = std::fs::remove_dir_all(
             std::path::Path::new(path.as_os_str().to_str().unwrap()).parent().unwrap(),
         );
+    }
+
+    #[test]
+    fn sync_flushes_mapped_segment() {
+        let (path, _) = make_segment(2);
+        let st = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        unsafe {
+            stamp_into(map_ptr(&st), st.map_len, st.capacity, &st.free_mask, b"durable", 0).unwrap();
+        }
+        sync_slab(&st).unwrap();
+        // Re-open the same file fresh: the flushed frame must validate.
+        let st2 = open_slab(path.as_os_str().to_str().unwrap().as_bytes()).ok().unwrap();
+        unsafe {
+            assert_eq!(validate_frame(map_ptr(&st2), st2.capacity, 0).unwrap(), 7);
+        }
+        drop(st);
+        drop(st2);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// Helper so tests can share the raw map pointer without an extra unsafe
+    /// block at each call site.
+    fn map_ptr(st: &SlabState) -> *mut u8 {
+        st.map
     }
 
     #[test]

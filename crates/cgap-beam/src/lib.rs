@@ -481,7 +481,7 @@ extern "C" fn cgap_version(
 /// `ERL_NIF_DIRTY_JOB_CPU_BOUND` (erl_drv_nif.h:50: `= 1`), i.e. 0x01.
 const ERL_NIF_DIRTY_JOB_CPU_BOUND: u32 = 0x01;
 
-static NIF_FUNCS: [ErlNifFunc; 26] = [
+static NIF_FUNCS: [ErlNifFunc; 27] = [
     // n >= 16384 fills build a >= 64 KiB aligned buffer; run it dirty.
     ErlNifFunc {
         name: b"cgap_new\0".as_ptr() as *const c_char,
@@ -638,9 +638,10 @@ static NIF_FUNCS: [ErlNifFunc; 26] = [
         fptr: ops_scan::cgap_scan,
         flags: 0,
     },
-    // AOQ slab surface (aq_slab.rs, lane L19): open is DirtyIo (open/mmap/
-    // validate); frame/window/stamp/lease are CPU (bounded memory ops, crc32
-    // over <= 4080 B). All errors are the atom `error` (cgap_len convention).
+    // AOQ slab surface (aq_slab.rs, lane L19): open and sync are DirtyIo
+    // (open/mmap/validate and blocking msync); frame/window/stamp/lease are
+    // CPU (bounded memory ops, crc32 over <= 4080 B). All errors are the atom
+    // `error` (cgap_len convention).
     ErlNifFunc {
         name: b"aq_slab_open\0".as_ptr() as *const c_char,
         arity: 1,
@@ -671,6 +672,13 @@ static NIF_FUNCS: [ErlNifFunc; 26] = [
         fptr: aq_slab::aq_slab_lease,
         flags: 0,
     },
+    // Durability (aq_slab.rs): msync(MS_SYNC) is blocking disk I/O — DirtyIo.
+    ErlNifFunc {
+        name: b"aq_slab_sync\0".as_ptr() as *const c_char,
+        arity: 1,
+        fptr: aq_slab::aq_slab_sync,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
 ];
 
 /// OTP 26+ no-argument entry point. The BEAM resolves this symbol when
@@ -685,7 +693,7 @@ static NIF_ENTRY: ErlNifEntry = ErlNifEntry {
     major: ERL_NIF_MAJOR_VERSION,
     minor: ERL_NIF_MINOR_VERSION,
     name: b"cgap_beam\0".as_ptr() as *const c_char,
-    num_of_funcs: 26,
+    num_of_funcs: 27,
     funcs: NIF_FUNCS.as_ptr() as *mut ErlNifFunc,
     load: Some(resources::nif_load),
     reload: None,
