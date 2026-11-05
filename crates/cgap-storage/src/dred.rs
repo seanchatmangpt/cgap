@@ -102,7 +102,7 @@ pub fn keep_mask(
 /// harmless-but-real slot at the final count position); the returned
 /// count is the only authoritative length.
 pub fn compact_lanes(keep: &[u64], base: u32, out: &mut [u32]) -> u32 {
-    debug_assert!(out.len() >= base as usize + keep.len() * 64 + 1);
+    debug_assert!(out.len() > base as usize + keep.len() * 64);
     let mut run = base;
     for (w, &k) in keep.iter().enumerate() {
         let wbase = w as u32 * 64;
@@ -322,6 +322,10 @@ pub fn build_csr(
 ///
 /// Zero heap allocation: purged/keep masks, the BFS worklist ring, and the
 /// CSR are all caller-leased.
+// Court-fixed surface: the 11-argument caller-leased mask/CSR kernel shape
+// (zero-heap contract) is the public API; refactoring signatures is out of
+// scope for this pass.
+#[allow(clippy::too_many_arguments)]
 pub fn cascade_retract(
     derived_deps: &[u64],
     del_mask: &[u64],
@@ -419,6 +423,10 @@ pub fn cascade_retract(
 /// single-pass filter runs. On the FA5 N=10,000 chain corpus this yields
 /// 9,999 phantom survivors exactly as the forensic defect describes.
 #[doc(hidden)]
+// Court-fixed surface: mirrors `cascade_retract`'s caller-leased kernel
+// shape exactly; signature parity with the real path is the anti-vacuity
+// witness, so the argument count is intentional.
+#[allow(clippy::too_many_arguments)]
 pub fn cascade_retract_mutant_nocascade(
     derived_deps: &[u64],
     del_mask: &[u64],
@@ -441,8 +449,8 @@ pub fn cascade_retract_mutant_nocascade(
 /// mask propagation to fixpoint, no CSR, no BFS — the naive O(V*E)-worst
 /// least-fixpoint computation. Converges because each round either purges
 /// >= 1 new fact or terminates; the fixpoint is the same least fixpoint the
-/// BFS computes (both saturate the rule: purged(root) for deleted root;
-/// purged(d) if purged(p), edge p->d, alt(d)==0).
+/// > BFS computes (both saturate the rule: purged(root) for deleted root;
+/// > purged(d) if purged(p), edge p->d, alt(d)==0).
 pub fn cascade_oracle(
     derived_deps: &[u64],
     del_mask: &[u64],
@@ -491,7 +499,7 @@ mod courts {
     /// Canonical padded corpus: `facts` facts as (derived, del, alt) words.
     /// Entropy e in 0..=100 controls the Bernoulli p of each bit class.
     fn corpus(facts: usize, del_entropy_pct: u32, seed: u64) -> (Vec<u64>, Vec<u64>, Vec<u32>) {
-        let words = (facts + 63) / 64;
+        let words = facts.div_ceil(64);
         let mut st = seed;
         let mut derived = vec![0u64; words];
         let mut del = vec![0u64; words];

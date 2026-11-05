@@ -645,7 +645,7 @@ mod tests {
             (Sigil::VarExi, 7),
         )
         .expect("legal terms encode");
-        assert_eq!(stmt.s, (0x00u64 << 56) | 0xA1B2);
+        assert_eq!(stmt.s, 0xA1B2);
         assert_eq!(stmt.p, (0x01u64 << 56) | 42);
         assert_eq!(stmt.o, (0x02u64 << 56) | 7);
         let decoded = stmt.decode_terms().expect("legal words decode");
@@ -661,11 +661,7 @@ mod tests {
         // Raw words (the FFI reinterpretation path) are gated by
         // validate: a FormulaRef in the p slot is the typed refusal even
         // when minted raw.
-        let raw = BN3Statement::from_words(
-            (0x00u64 << 56) | 1,
-            (0x03u64 << 56) | 0,
-            (0x00u64 << 56) | 2,
-        );
+        let raw = BN3Statement::from_words(1, 0x03u64 << 56, 2);
         assert_eq!(raw.validate(), Err(BN3Error::FormulaInPredicate));
         // And a reserved code in any slot refuses on decode.
         let raw = BN3Statement::from_words(0x05u64 << 56, 0, 0);

@@ -981,7 +981,7 @@ fn emit_join_masks_view<V: ColView>(
         .find(|&si| matches!(join_atom[si], CompiledTerm::Var(_)))
         .unwrap_or(0);
     let mut rows = 0u64;
-    for g in 0..groups {
+    for (g, out_slot) in out_masks.iter_mut().enumerate().take(groups) {
         let lo = g * 64;
         let hi = (lo + 64).min(n);
         let mut m_key = 0u64;
@@ -1003,7 +1003,7 @@ fn emit_join_masks_view<V: ColView>(
         }
         let mut semi_out = [0u64; 1];
         rows += semi_join_masks(&[m_key], &[m_const], &mut semi_out);
-        out_masks[g] = semi_out[0];
+        *out_slot = semi_out[0];
     }
     rows
 }
@@ -1032,6 +1032,9 @@ fn atom_local_match_into<V: ColView>(
     // semantics and first-occurrence binding order are identical to the
     // retired early-return form. One branch, on the final mask.
     let mut acc = MASK_ALL;
+    // Fixed 3-slot atom: `si` indexes the atom tuple AND the column view
+    // (multi-array access, not iteration).
+    #[allow(clippy::needless_range_loop)]
     for si in 0..3 {
         let w = cols.w(si, row);
         match atom[si] {
@@ -1814,9 +1817,14 @@ pub(crate) mod tests {
             let atom = &rule.body[ai];
             let slots = [atom.s, atom.p, atom.o];
             let columns: [&[u64]; 3] = [s, p, o];
+            // Naive-oracle kernel: `j` is the row index into three parallel
+            // columns and is itself carried as match data; `si` walks the
+            // 3-slot atom across those columns (multi-array access).
+            #[allow(clippy::needless_range_loop)]
             for j in 0..s.len() {
                 let saved = binding.clone();
                 let mut ok = true;
+                #[allow(clippy::needless_range_loop)]
                 for si in 0..3 {
                     let want = slots[si];
                     let have = columns[si][j];
@@ -2483,8 +2491,10 @@ pub(crate) mod tests {
         for seed in 0..5u64 {
             let c = gen_witnessed_corpus(seed);
             let cols = StatementColumns::new(&c.s, &c.p, &c.o).unwrap();
-            let mut reference: Option<Vec<(u32, u64, [u8; 32], u32, Vec<(u64, u64, u64, u16)>)>> =
-                None;
+            #[allow(clippy::type_complexity)] // test-oracle snapshot shape
+            let mut reference: Option<
+                Vec<(u32, u64, [u8; 32], u32, Vec<(u64, u64, u64, u16)>)>,
+            > = None;
             for &chunk in &[1usize, 3, 64, DEFAULT_CHUNK_ROWS] {
                 let batches =
                     unify_to_fixpoint_opt(&c.rules, &cols, DEFAULT_MAX_ROUNDS, chunk).unwrap();
@@ -2698,6 +2708,7 @@ pub(crate) mod tests {
         // first pass warms the match-side buffers and the second pass
         // warms the expansion-side reserve — steady state (zero allocs)
         // is the third and later identical runs.
+        #[allow(clippy::type_complexity)] // warmup/measured snapshot shape
         let mut reference: Vec<([u8; 32], Vec<(u64, u64, u64, u16)>)> = Vec::new();
         for _pass in 0..2 {
             for c in &compiled {
@@ -2722,6 +2733,7 @@ pub(crate) mod tests {
         // Pre-reserve the capture buffers from the warmup's exact shapes:
         // every allocation the capture could need happens here, outside
         // the measured window.
+        #[allow(clippy::type_complexity)] // measured-window snapshot shape
         let mut measured: Vec<([u8; 32], Vec<(u64, u64, u64, u16)>)> = Vec::new();
         for (d, rows_snapshot) in &reference {
             measured.push((*d, Vec::with_capacity(rows_snapshot.len())));
@@ -2796,10 +2808,12 @@ pub(crate) mod tests {
         }
         let cols = StatementColumns::new(&s, &p, &o).unwrap();
         let rules = rule_set();
+        #[allow(clippy::type_complexity)] // test-oracle snapshot shape
         let mut reference: Option<Vec<(u32, u64, [u8; 32], u32)>> = None;
         for &chunk in &[1usize, 64, 256] {
             let batches =
                 unify_to_fixpoint_opt(&rules, &cols, 200, chunk).expect("fixpoint converges");
+            #[allow(clippy::type_complexity)] // test-oracle snapshot shape
             let shape: Vec<(u32, u64, [u8; 32], u32)> = batches
                 .iter()
                 .map(|b| (b.rule_id, b.epoch, b.digest, b.source_mask_popcount))
@@ -2831,6 +2845,7 @@ pub(crate) mod tests {
     ///   4. epochs are 1 then 2 per rule (round 2 re-emits, adds nothing);
     ///   5. batch shapes — ids, epochs, digests, popcounts — are identical
     ///      across chunk sizes 262144 and DEFAULT_CHUNK_ROWS (M12-6 at 1M).
+    ///
     /// Mutation that MUST flip this court: silently skipping one of the
     /// three rules (the derived-set equality drops below the model), any
     /// mask/join corruption at scale, or a budget bypass.
@@ -2905,6 +2920,7 @@ pub(crate) mod tests {
         );
         assert!(n_r2 > 50_000, "model selectivity sanity: n_r2={n_r2}");
 
+        #[allow(clippy::type_complexity)] // test-oracle snapshot shape
         let mut reference: Option<Vec<(u32, u64, [u8; 32], u32)>> = None;
         for chunk in [262_144usize, DEFAULT_CHUNK_ROWS] {
             let batches = unify_to_fixpoint_opt(&rules, &cols, BUDGET, chunk)
@@ -2920,7 +2936,7 @@ pub(crate) mod tests {
                     other => panic!("unexpected rule id {other}"),
                 };
                 assert_eq!(b.source_mask_popcount as u64, expect_popcount, "batch {k}");
-                assert!(b.rows.len() > 0, "every rule derives at 1M scale");
+                assert!(!b.rows.is_empty(), "every rule derives at 1M scale");
             }
             // Distinct derived set == model set (no phantom, no missing).
             let mut derived: BTreeSet<(u64, u64, u64)> = BTreeSet::new();
@@ -2933,6 +2949,7 @@ pub(crate) mod tests {
                 }
             }
             assert_eq!(derived, model, "derived set vs closed-form model");
+            #[allow(clippy::type_complexity)] // test-oracle snapshot shape
             let shape: Vec<(u32, u64, [u8; 32], u32)> = batches
                 .iter()
                 .map(|b| (b.rule_id, b.epoch, b.digest, b.source_mask_popcount))

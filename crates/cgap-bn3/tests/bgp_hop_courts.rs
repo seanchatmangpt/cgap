@@ -56,7 +56,7 @@ impl SplitMix {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_490B_BADD_03);
+        z = (z ^ (z >> 27)).wrapping_mul(0x0094_D049_0BBA_DD03);
         z ^ (z >> 31)
     }
 }
@@ -150,10 +150,10 @@ fn oracle(cols: &StatementColumns<'_>, hops: usize) -> (Vec<usize>, HashSet<Bind
     }
     let mut counts = vec![cur.len()];
     // Candidate index per later hop: payload(s-word) -> rows.
-    for h in 1..hops {
+    for pred in &preds[1..hops] {
         let mut idx: HashMap<u64, Vec<usize>> = HashMap::new();
         for j in 0..cols.len() {
-            if cols.p[j] == preds[h] {
+            if cols.p[j] == *pred {
                 idx.entry(jk(cols.s[j])).or_default().push(j);
             }
         }
@@ -228,7 +228,7 @@ fn court(hops: usize, n: usize) {
     for &p in &[P1, HOP2_RULE_PRED, P3][..hops] {
         let want = cst(p);
         assert!(
-            cols.p.iter().any(|&w| w == want),
+            cols.p.contains(&want),
             "corpus lacks predicate payload {p:#x} at N={n}: court vacuous"
         );
     }

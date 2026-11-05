@@ -468,6 +468,12 @@ impl Slab {
     }
 }
 
+impl Default for Slab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Formula table (spec C4: `Vec<BN3FormulaHeader>`; "Index intervals
 /// [start,end) into the arena; no pointers"). Fixed-capacity tables are
 /// built by [`FormulaTable::fixed`] (same law as [`Slab::fixed`], bound
@@ -571,6 +577,12 @@ impl FormulaTable {
     /// Private to the transactional path; see [`Slab::truncate_to`].
     fn truncate_to(&mut self, len: usize) {
         self.headers.truncate(len);
+    }
+}
+
+impl Default for FormulaTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -748,7 +760,7 @@ pub fn innermost_scope(ftab: &[BN3FormulaHeader], stmt_idx: u32) -> Option<u32> 
     for (idx, h) in ftab.iter().enumerate() {
         if h.start <= stmt_idx && stmt_idx < h.end {
             let width = h.end - h.start;
-            if best.map_or(true, |(w, _)| width < w) {
+            if best.is_none_or(|(w, _)| width < w) {
                 best = Some((width, idx as u32));
             }
         }
@@ -982,6 +994,12 @@ impl Arena {
     }
 }
 
+impl Default for Arena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1066,9 +1084,11 @@ mod tests {
         assert_eq!(STATEMENT_INDEX_BITS, 32);
         // A u32 interval endpoint really can index any statement address
         // the 32-bit index space names.
-        assert_eq!(size_of::<u32>() * 8, STATEMENT_INDEX_BITS as usize);
-        // Nesting-depth cap fits in the interval field type.
-        assert!(MAX_FORMULA_NESTING_DEPTH <= u32::MAX);
+        assert_eq!((u32::BITS as usize), STATEMENT_INDEX_BITS as usize);
+        // Nesting-depth cap fits in the interval field type: the cap is
+        // itself stored as a `u32` — the same type interval endpoints use
+        // (compile-time typing fact, witnessed here).
+        let _: u32 = MAX_FORMULA_NESTING_DEPTH;
     }
 
     /// Flatten court (spec Section 8): a real nested `{ { ... } }`
@@ -1786,13 +1806,7 @@ mod tests {
     /// rows h/i; M-W9-3 flips rows a/b/g/j.
     #[test]
     fn wave9_hostile_image_court_typed_refusals_dam_layers() {
-        let ok_stmt = |i: u64| {
-            BN3Statement::from_words(
-                (0x00u64 << 56) | i,
-                (0x04u64 << 56) | i,
-                (0x00u64 << 56) | i,
-            )
-        };
+        let ok_stmt = |i: u64| BN3Statement::from_words(i, (0x04u64 << 56) | i, i);
 
         // (a) count-prefix lie: declared n_stmts = actual + 1.
         let mut img = image_with(2, 0, &[ok_stmt(1)], &[]);
@@ -1902,9 +1916,9 @@ mod tests {
             1,
             0,
             &[BN3Statement::from_words(
-                (0x03u64 << 56) | 0, // FormulaRef(0) in s
+                0x03u64 << 56, // FormulaRef(0) in s
                 (0x04u64 << 56) | 1,
-                (0x00u64 << 56) | 2,
+                2,
             )],
             &[],
         );
@@ -1922,7 +1936,7 @@ mod tests {
                 BN3Statement::from_words(
                     (0x03u64 << 56) | 2, // FormulaRef(2) = header C
                     (0x04u64 << 56) | 1,
-                    (0x00u64 << 56) | 3,
+                    3,
                 ),
                 ok_stmt(1),
                 ok_stmt(2),
@@ -1961,7 +1975,7 @@ mod tests {
             &[BN3Statement::from_words(
                 (0x03u64 << 56) | (u32::MAX as u64 + 1), // 2^32: no header
                 (0x04u64 << 56) | 1,
-                (0x00u64 << 56) | 2,
+                2,
             )],
             &[BN3FormulaHeader {
                 start: 0,

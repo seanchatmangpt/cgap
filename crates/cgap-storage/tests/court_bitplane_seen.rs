@@ -72,7 +72,7 @@ fn court_capacity_refusal_is_typed_and_loud() {
     // Duplicates of stored pairs still resolve Ok(false), not Err.
     assert_eq!(seen.insert(0, 0), Ok(false));
     seen.clear();
-    assert!(seen.is_empty() && seen.len() == 0);
+    assert!(seen.is_empty() && seen.is_empty());
 }
 
 #[test]

@@ -60,7 +60,7 @@ fn assert_invariants(out: RecoveryOutcome, prior: &NewRootDescriptor, new: &NewR
     );
     // Degradation law: Degraded ⇔ the journal tail was LOST (no record
     // applied) AND damage (non-conforming bytes) is present on the medium.
-    let damaged = out.slot_verdicts.iter().any(|&v| v == SlotVerdict::Damaged);
+    let damaged = out.slot_verdicts.contains(&SlotVerdict::Damaged);
     assert_eq!(
         out.report == RecoveryReport::RecoveryDegraded,
         out.recovered_seq.is_none() && damaged,

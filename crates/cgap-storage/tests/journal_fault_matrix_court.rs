@@ -307,7 +307,7 @@ fn fault_matrix_matches_derived_classes() {
 fn m3_trailer_digest_mutation_flips() {
     let (base, mut slots) = fixture();
     flip_bit(&mut slots, 1, 105);
-    let strict = recover(&FixtureMedium { base, slots: slots }).expect("strict");
+    let strict = recover(&FixtureMedium { base, slots }).expect("strict");
     assert_eq!(strict.root, p(10), "strict must fall back to seq 1");
     assert_eq!(strict.recovered_seq, Some(1));
     let mutated = recover_mode(

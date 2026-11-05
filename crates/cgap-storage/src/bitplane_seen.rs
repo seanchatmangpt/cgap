@@ -88,6 +88,9 @@ impl<const SLOTS: usize> BitPlaneSeenSet<SLOTS> {
         }
         let slot = self.len;
         let key = ((x as u128) << 64) | z as u128;
+        // Multi-plane kernel: `p` is both the plane index and the bit-shift
+        // amount; indexing `self.planes[p][slot]` is bounds-check elision.
+        #[allow(clippy::needless_range_loop)]
         for p in 0..PLANE_COUNT {
             if (key >> (127 - p)) & 1 == 1 {
                 self.planes[p][slot] = 1;
@@ -101,8 +104,14 @@ impl<const SLOTS: usize> BitPlaneSeenSet<SLOTS> {
     /// and compare against the probe key. Never mutates.
     pub fn contains(&self, x: u64, z: u64) -> bool {
         let key = ((x as u128) << 64) | z as u128;
+        // Outer loop indexes the plane matrix column-wise (`planes[p][slot]`):
+        // range indexing is the multi-array access pattern, not iteration.
+        #[allow(clippy::needless_range_loop)]
         for slot in 0..self.len {
             let mut probe: u128 = 0;
+            // Hot membership kernel: `p` is plane index and shift amount;
+            // 2-D `self.planes[p][slot]` indexing elides bounds checks.
+            #[allow(clippy::needless_range_loop)]
             for p in 0..PLANE_COUNT {
                 probe |= (self.planes[p][slot] as u128) << (127 - p);
             }
@@ -129,5 +138,11 @@ impl<const SLOTS: usize> BitPlaneSeenSet<SLOTS> {
     pub fn clear(&mut self) {
         self.len = 0;
         self.planes = [[0; SLOTS]; PLANE_COUNT]
+    }
+}
+
+impl<const SLOTS: usize> Default for BitPlaneSeenSet<SLOTS> {
+    fn default() -> Self {
+        Self::new()
     }
 }

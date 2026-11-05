@@ -875,9 +875,9 @@ pub fn write_record_cut<M: JournalWriter>(
     }
     let bytes = encode_record(seq, payload);
     let slot = slot_for_seq(seq);
-    for i in 0..k.min(RECORD_SIZE) {
+    for (i, &b) in bytes.iter().enumerate().take(k.min(RECORD_SIZE)) {
         medium
-            .write_journal_byte(slot, i, bytes[i])
+            .write_journal_byte(slot, i, b)
             .map_err(TxnError::Medium)?;
     }
     Ok(())
@@ -989,7 +989,7 @@ pub fn recover_mode<M: Medium>(
             // No valid candidate: base root stands. Degraded only when a slot
             // holds non-conforming bytes (damage), not when slots are erased
             // (fresh journal) — F2 semantics with the erased-state carve-out.
-            let degraded = verdicts.iter().any(|&v| v == SlotVerdict::Damaged);
+            let degraded = verdicts.contains(&SlotVerdict::Damaged);
             Ok(RecoveryOutcome {
                 root: base,
                 report: if degraded {
@@ -1092,9 +1092,9 @@ pub fn recover_loss_classified<M: Medium>(medium: &M) -> Result<RecoveryVerdict,
     if !medium.base_root_present() {
         let mut verdicts = [SlotVerdict::Empty; SLOT_COUNT];
         let mut top: Option<u64> = None;
-        for slot in 0..SLOT_COUNT {
+        for (slot, verdict) in verdicts.iter_mut().enumerate() {
             if let Ok(rec) = decode_slot_mode(&medium.read_slot(slot), Strict) {
-                verdicts[slot] = SlotVerdict::Valid;
+                *verdict = SlotVerdict::Valid;
                 top = Some(match top {
                     Some(t) => t.max(rec.header.seq),
                     None => rec.header.seq,
@@ -1159,7 +1159,7 @@ mod tests {
         let slot0 = m.read_slot(0);
         let verdict = decode_slot(&slot0);
         assert!(
-            matches!(verdict, Ok(_)),
+            verdict.is_ok(),
             "flash-stored record must decode: {verdict:?}"
         );
         assert_eq!(recover(&m).unwrap().root, p(10));

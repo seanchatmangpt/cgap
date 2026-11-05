@@ -43,7 +43,7 @@ impl CourtRng {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_490B_BADD_03);
+        z = (z ^ (z >> 27)).wrapping_mul(0x0094_D049_0BBA_DD03);
         z ^ (z >> 31)
     }
 
@@ -111,8 +111,10 @@ fn run(cols: &StatementColumns<'_>, rule: &Rule, chunk: usize, radix: bool) -> H
     let compiled = RuleCompiler::compile(rule).expect("compile");
     let mut scratch = EvalScratch::default();
     let mut out = MatchSet::default();
-    let mut probe = JoinProbeScratch::default();
-    probe.radix = radix;
+    let mut probe = JoinProbeScratch {
+        radix,
+        ..JoinProbeScratch::default()
+    };
     unify_batch_probe(&compiled, cols, chunk, &mut scratch, &mut out, &mut probe)
         .expect("probe ok");
     let mut set = HashSet::new();
@@ -174,7 +176,7 @@ fn repair20_occupancy_summary_exact() {
         // Final state: summary rebuilt with the last chunk's chains.
         assert_eq!(
             probe.bucket_occupancy.len(),
-            (probe.bucket_head.len() + 63) / 64,
+            probe.bucket_head.len().div_ceil(64),
             "N={n}: summary covers every bucket"
         );
         let mut occupied = 0usize;

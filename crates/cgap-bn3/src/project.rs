@@ -408,6 +408,9 @@ impl ConsequentProjector {
         }
 
         rows.clear();
+        // Emission kernel: `m` indexes the 2-D match-set slab and doubles
+        // as the row-API scalar; `idx` likewise pairs slab + register index.
+        #[allow(clippy::needless_range_loop)]
         for m in 0..matches.len {
             // Bind the variable band for this match, then read the head
             // template through the register file (spec 4.2: scratch/output
@@ -848,7 +851,7 @@ mod tests {
     /// Test-only term-word builders (A11 sigil ABI: sigil in bits 63..56,
     /// payload in bits 55..0).
     fn cw(id: u64) -> u64 {
-        (0x00u64 << 56) | id
+        id
     }
     fn vw(reg: u8) -> u64 {
         (0x01u64 << 56) | reg as u64

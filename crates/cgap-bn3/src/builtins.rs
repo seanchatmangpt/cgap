@@ -708,9 +708,9 @@ mod tests {
         assert_eq!(ALL_OPCODES.len(), OPCODE_COUNT);
         assert_eq!(ALL_OPCODES.len(), 9);
         // No duplicates: every pairwise pair differs.
-        for i in 0..ALL_OPCODES.len() {
-            for j in (i + 1)..ALL_OPCODES.len() {
-                assert_ne!(ALL_OPCODES[i], ALL_OPCODES[j], "i={i} j={j}");
+        for (i, a) in ALL_OPCODES.iter().enumerate() {
+            for b in &ALL_OPCODES[(i + 1)..] {
+                assert_ne!(a, b, "i={i}");
             }
         }
         // Strictly ascending == dense within a namespace and gapped across.
@@ -1216,6 +1216,7 @@ mod tests {
     fn refusal_write_isolation_court() {
         let slab: Vec<u8> = (0..16u32).map(|i| i as u8).collect();
         // (name, init, payload, slab_len_used) — all refusal outcomes.
+        #[allow(clippy::type_complexity)] // exhaustive refusal-case table
         let cases: [(&str, [(usize, u64); 2], BuiltinPayload, usize); 8] = [
             (
                 "unknown",
@@ -1298,8 +1299,10 @@ mod tests {
     #[test]
     fn eval_count_wraps_at_u64_max_court() {
         let mut regs = [0u64; REGISTER_COUNT];
-        let mut ctx = BuiltinContext::default();
-        ctx.eval_count = u64::MAX;
+        let mut ctx = BuiltinContext {
+            eval_count: u64::MAX,
+            ..BuiltinContext::default()
+        };
         let payload = BuiltinPayload::new(0x03, 9, 0, 0); // log:counters
         let n = dispatch(payload, &mut regs, &[], &mut ctx)
             .expect("wrapping increment has no panic path at u64::MAX");

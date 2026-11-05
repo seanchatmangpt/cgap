@@ -14,8 +14,10 @@ use cgap_storage::dred::{self, CascadeError};
 
 const CHAIN_N: usize = 10_000;
 
+// Test-only corpus builder; tuple shape mirrors the court's fixture layout.
+#[allow(clippy::type_complexity)]
 fn chain_corpus(n: usize) -> (Vec<u64>, Vec<u64>, Vec<u32>, Vec<(u32, u32)>) {
-    let words = (n + 63) / 64;
+    let words = n.div_ceil(64);
     let mut derived = vec![0u64; words];
     let mut del = vec![0u64; words];
     let alt = vec![0u32; n];
@@ -76,7 +78,7 @@ fn court_chain_root_delete_no_phantoms() {
         survivors.len()
     );
     // Flip witness: the mutant (BFS dropped) reproduces the defect.
-    let words = (CHAIN_N + 63) / 64;
+    let words = CHAIN_N.div_ceil(64);
     let mut counts = vec![0u32; CHAIN_N + 1];
     let mut fill = vec![0u32; CHAIN_N];
     let mut adj = vec![0u32; edges.len()];
@@ -152,7 +154,7 @@ fn court_oracle_equivalence() {
     let mut st: u64 = dred::CORPUS_SEED ^ 0x5EED;
     for case in 0..8u64 {
         let facts = 32usize + (case as usize) * 96;
-        let words = (facts + 63) / 64;
+        let words = facts.div_ceil(64);
         let mut derived = vec![0u64; words];
         let mut del = vec![0u64; words];
         let mut alt = vec![0u32; facts];

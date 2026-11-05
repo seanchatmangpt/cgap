@@ -34,7 +34,7 @@ impl CourtRng {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_490B_BADD_03);
+        z = (z ^ (z >> 27)).wrapping_mul(0x0094_D049_0BBA_DD03);
         z ^ (z >> 31)
     }
 
@@ -359,8 +359,8 @@ fn l3_noalloc_radix_differential() {
         for m in 0..out.len {
             assert_eq!(ms.atom_rows[0][m], out.atom_row(m, 0), "atom0 m={m}");
             assert_eq!(ms.atom_rows[1][m], out.atom_row(m, 1), "atom1 m={m}");
-            for idx in 0..compiled.var_count {
-                assert_eq!(ms.var_values[idx][m], out.var_value(m, idx), "var m={m}");
+            for (idx, vv) in ms.var_values.iter().enumerate().take(compiled.var_count) {
+                assert_eq!(vv[m], out.var_value(m, idx), "var m={m}");
             }
         }
     }

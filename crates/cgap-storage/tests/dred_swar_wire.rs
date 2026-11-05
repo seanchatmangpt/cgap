@@ -24,7 +24,7 @@ fn splitmix(state: &mut u64) -> u64 {
 
 /// Build a corpus: masks word-parallel, alt_support u32 with edge values.
 fn corpus(facts: usize, seed: u64) -> (Vec<u64>, Vec<u64>, Vec<u32>) {
-    let words = (facts + 63) / 64;
+    let words = facts.div_ceil(64);
     let mut st = seed;
     let mut derived = vec![0u64; words];
     let mut del = vec![0u64; words];
@@ -40,9 +40,9 @@ fn corpus(facts: usize, seed: u64) -> (Vec<u64>, Vec<u64>, Vec<u32>) {
         del[words - 1] &= valid;
     }
     let edges = [0u32, 1, 0x7F, 0x80, 0xFF, 0xFFFF, 0x1_0000, u32::MAX];
-    for f in 0..facts {
+    for slot in alt.iter_mut().take(facts) {
         let pick = splitmix(&mut st) % 10;
-        alt[f] = if pick < 4 {
+        *slot = if pick < 4 {
             0
         } else {
             edges[(splitmix(&mut st) % edges.len() as u64) as usize]
@@ -54,8 +54,8 @@ fn corpus(facts: usize, seed: u64) -> (Vec<u64>, Vec<u64>, Vec<u32>) {
 /// Compact keep_mask to a sorted surviving fact index vector.
 fn surviving(masks: &[u64], words: usize, facts: usize) -> Vec<u32> {
     let mut v = Vec::new();
-    for w in 0..words {
-        let mut bits = masks[w];
+    for (w, &bits0) in masks.iter().enumerate().take(words) {
+        let mut bits = bits0;
         while bits != 0 {
             let f = w * 64 + bits.trailing_zeros() as usize;
             if f < facts {
