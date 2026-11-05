@@ -20,8 +20,7 @@ fn fill(buf: &mut [u8]) {
 
 /// Deterministic payload sizes: cycles the full 0..=1024 spread.
 fn size_at(batch: usize, j: usize) -> usize {
-    let x = (batch * 131 + j * 97) % 1025;
-    x
+    (batch * 131 + j * 97) % 1025
 }
 
 fn payloads_for(batch: usize, n: usize) -> Vec<Vec<u8>> {

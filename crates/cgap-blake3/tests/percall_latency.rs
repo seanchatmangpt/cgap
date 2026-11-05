@@ -80,7 +80,7 @@ fn percall_latency_64b_1kib_64kib() {
             s.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let med = pct(&mut s, 50.0);
             round_medians.push(med);
-            if best.as_ref().map_or(true, |(_, m)| med < *m) {
+            if best.as_ref().is_none_or(|(_, m)| med < *m) {
                 best = Some((s, med));
             }
         }

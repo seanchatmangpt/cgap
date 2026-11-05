@@ -11,7 +11,6 @@
 /// Returns the 16-word compression output of each chunk's final block,
 /// per lane — identical to calling [`crate::hash_chunk`] on each 1 KiB chunk
 /// with `is_root = false`.
-
 pub fn compress_chunks_4way(data: &[u8], base_chunk_idx: u64) -> [[u32; 16]; 4] {
     debug_assert_eq!(data.len(), 4096);
 

@@ -69,9 +69,9 @@ fn derivative_from(parent: &P28LicenseAttestation) -> P28LicenseAttestation {
 /// so it stays <= MAX (§5.8). Hand-count pin: popcount(5_000_000_000) = 11.
 fn predicted_ceiling_survivors(good: &[u8; 80]) -> Vec<(usize, u8)> {
     let mut v = Vec::new();
-    for i in 8..16 {
+    for (i, &byte) in good.iter().enumerate().skip(8).take(8) {
         for j in 0..8u8 {
-            if good[i] & (1 << j) != 0 {
+            if byte & (1 << j) != 0 {
                 v.push((i, j));
             }
         }
@@ -183,6 +183,9 @@ fn ceiling_boundary_court() {
 /// One sweep pass over `limit` single-bit mutations, classifying each by
 /// `verdict`. Returns (executed, survivors). The count law and the survivor
 /// law live at the call sites; this function only observes.
+// verdict is the §5 validation closure; the &dyn signature mirrors the real
+// consumer seam and factoring it out would hide the wire-shaped contract.
+#[allow(clippy::type_complexity)]
 fn run_sweep(
     good: &[u8; 80],
     parent: Option<&P28LicenseAttestation>,

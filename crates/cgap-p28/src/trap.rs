@@ -368,7 +368,7 @@ mod tests {
             }
             Err(_) => None,
         };
-        if rec.validate(&span, parent.as_ref()).is_err() {
+        if rec.validate(span, parent.as_ref()).is_err() {
             loader_die("§5 validation failed");
         }
     }
@@ -638,6 +638,9 @@ mod tests {
                 "{label}: 5_000_000_000 has 11 set bits"
             );
 
+            // 5-tuple is the sweep result row (i, j, admitted, verify_ok,
+            // lineage_ok); a named tuple struct would obscure the court body.
+            #[allow(clippy::type_complexity)]
             let results: Mutex<Vec<(usize, u8, bool, bool, bool)>> = Mutex::new(Vec::new());
             // Per-worker owned env (cloned, not captured): the two-closure
             // capture chain is not worth the borrow subtleties.

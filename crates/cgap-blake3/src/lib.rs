@@ -10,6 +10,8 @@
 
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
+// code intentionally uses post-1.85 stable APIs; toolchain is floating nightly (rust-toolchain.toml)
+#![allow(clippy::incompatible_msrv)]
 
 /// BLAKE3 IV constants (first 8 fractional words of sqrt(primes 2..19)).
 pub const IV: [u32; 8] = [
@@ -665,6 +667,9 @@ pub fn reduce_level_simd(cvs: &mut [[u32; 8]; 64], cv_count: &mut usize) {
         while i + 4 <= pairs {
             let mut left = [[0u32; 8]; 4];
             let mut right = [[0u32; 8]; 4];
+            // Hot NEON parent-gather loop: strided (even/odd) access that no
+            // slice copy expresses; keep the index form.
+            #[allow(clippy::needless_range_loop)]
             for p in 0..4 {
                 left[p] = cvs[(i + p) * 2];
                 right[p] = cvs[(i + p) * 2 + 1];
@@ -675,9 +680,7 @@ pub fn reduce_level_simd(cvs: &mut [[u32; 8]; 64], cv_count: &mut usize) {
                 neon_parent::compress_parents_4way_neon(&left, &right, [PARENT; 4], &mut out);
             }
 
-            for p in 0..4 {
-                cvs[i + p] = out[p];
-            }
+            cvs[i..i + 4].copy_from_slice(&out);
             i += 4;
         }
     }
@@ -882,8 +885,8 @@ fn hash_many_simd_4way(data: &[u8]) -> [u8; 32] {
             let start = chunk_idx * 1024;
             let outs =
                 multi_chunk::compress_chunks_4way(&data[start..start + 4096], chunk_idx as u64);
-            for k in 0..4 {
-                current_cv.copy_from_slice(&outs[k][0..8]);
+            for (k, out) in outs.iter().enumerate() {
+                current_cv.copy_from_slice(&out[0..8]);
                 let idx = chunk_idx + k;
                 merge_into_stack(&mut stack, &mut stack_len, current_cv, idx, num_chunks);
             }
@@ -936,10 +939,10 @@ pub fn hash_many_simd_x2(data: &[u8]) -> [u8; 32] {
             let start = chunk_idx * 1024;
             let outs =
                 multi_chunk::compress_chunks_4way_x2(&data[start..start + 8192], chunk_idx as u64);
-            for g in 0..2 {
-                for k in 0..4 {
+            for (g, group) in outs.iter().enumerate() {
+                for (k, out) in group.iter().enumerate() {
                     let mut current_cv = [0u32; 8];
-                    current_cv.copy_from_slice(&outs[g][k][0..8]);
+                    current_cv.copy_from_slice(&out[0..8]);
                     let idx = chunk_idx + g * 4 + k;
                     merge_into_stack(&mut stack, &mut stack_len, current_cv, idx, num_chunks);
                 }
@@ -953,9 +956,9 @@ pub fn hash_many_simd_x2(data: &[u8]) -> [u8; 32] {
             let start = chunk_idx * 1024;
             let outs =
                 multi_chunk::compress_chunks_4way(&data[start..start + 4096], chunk_idx as u64);
-            for k in 0..4 {
+            for (k, out) in outs.iter().enumerate() {
                 let mut current_cv = [0u32; 8];
-                current_cv.copy_from_slice(&outs[k][0..8]);
+                current_cv.copy_from_slice(&out[0..8]);
                 let idx = chunk_idx + k;
                 merge_into_stack(&mut stack, &mut stack_len, current_cv, idx, num_chunks);
             }

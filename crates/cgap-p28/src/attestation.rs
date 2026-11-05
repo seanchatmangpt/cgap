@@ -31,7 +31,6 @@
 //! offsets 0/4/6/8/16/48, size 80, align 8, magic `P28S` all match.
 
 /// offset 0, 4 B — `'P','2','8','S'` = 0x50 0x32 0x38 0x53 (§2.1).
-
 pub const LICENSE_MAGIC: [u8; 4] = *b"P28S";
 
 /// offset 4, 2 B — u16 LE, currently 1 (§2.1). Unknown versions fail closed (§5.3).
@@ -515,9 +514,9 @@ pub(crate) mod test_support {
     /// bits of the ceiling field (bytes 8..16).
     pub(crate) fn predicted_ceiling_survivors(good: &[u8; 80]) -> Vec<(usize, u8)> {
         let mut v = Vec::new();
-        for i in 8..16 {
+        for (i, &byte) in good.iter().enumerate().skip(8).take(8) {
             for j in 0..8u8 {
-                if good[i] & (1 << j) != 0 {
+                if byte & (1 << j) != 0 {
                     v.push((i, j));
                 }
             }
@@ -1010,9 +1009,9 @@ mod tests {
             // keeps the value <= MAX (§5.8), and no other mutation can stay
             // lawful.
             let mut predicted: Vec<(usize, u8)> = Vec::new();
-            for i in 8..16 {
+            for (i, &byte) in good.iter().enumerate().skip(8).take(8) {
                 for j in 0..8u8 {
-                    if good[i] & (1 << j) != 0 {
+                    if byte & (1 << j) != 0 {
                         predicted.push((i, j));
                     }
                 }

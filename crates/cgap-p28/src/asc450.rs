@@ -1,16 +1,16 @@
 //! Lane A18 — ASC 450-20 / SOX 404 liability-proof emitter: full mechanism.
 //!
 //! Spec: `docs/jira/v26.11.1/lanes/A18-asc450-proof.md` §4 (ADR), §5 (168-byte
-//! record, frozen at Wave 1), §6 (courts C1-C7). Wave 1 froze the ABI (struct
-//! + consts + layout pins). Wave 3 (this file) lands the full lane scope: the
-//! [`Asc450Meter`] accumulator with checked, overflow-rejecting accounting
-//! (§4.3), boundary-exact threshold semantics — emit iff `prev <= ceiling &&
-//! next > ceiling`, never at `next == ceiling` (§4.2) — the one-shot latch
-//! with monotone seq (§4.2/§4.4), the proof digest chain (`prev_proof_digest`
-//! = BLAKE3 over the full 168 B of the prior proof; genesis all-zero), the
-//! sealed meter state with reset detection (§4.4), the seal bridge to A16's
-//! sealer machinery, and the court suite C1-C7 (§6) with named anti-vacuity
-//! mutations.
+//! record, frozen at Wave 1), §6 (courts C1-C7). Wave 1 froze the ABI
+//! (struct + consts + layout pins). Wave 3 (this file) lands the full lane
+//! scope: the [`Asc450Meter`] accumulator with checked, overflow-rejecting
+//! accounting (§4.3), boundary-exact threshold semantics — emit iff
+//! `prev <= ceiling && next > ceiling`, never at `next == ceiling` (§4.2) —
+//! the one-shot latch with monotone seq (§4.2/§4.4), the proof digest chain
+//! (`prev_proof_digest` = BLAKE3 over the full 168 B of the prior proof;
+//! genesis all-zero), the sealed meter state with reset detection (§4.4),
+//! the seal bridge to A16's sealer machinery, and the court suite C1-C7
+//! (§6) with named anti-vacuity mutations.
 //!
 //! What "signed" means here (divergence D3, recorded in the lane receipt):
 //! the A18 doc §5 says "Ed25519-class"; no asymmetric primitive exists in
@@ -1022,7 +1022,7 @@ mod tests {
             version: ATTESTATION_VERSION,
             attestation_flags: FLAG_ROOT,
             safe_harbor_ceiling_cents: SAFE_HARBOR_CEILING_MAX_CENTS,
-            origin_authority_digest: origin_authority_digest(&span),
+            origin_authority_digest: origin_authority_digest(span),
             upstream_receipt: [0u8; 32],
         }
     }
@@ -2015,7 +2015,7 @@ mod tests {
         let mut m = meter(CEILING, 0xA50);
         let mut sealed: [Option<SealedMeterState>; RUN] = Default::default();
         let mut crossing_proof = None;
-        for k in 0..RUN {
+        for (k, slot) in sealed.iter_mut().enumerate() {
             let event = k + 1;
             let emit = m.record_unlicensed(10, event as u64).expect("accept");
             if event == CROSSING_EVENT {
@@ -2023,7 +2023,7 @@ mod tests {
             } else {
                 assert!(emit.is_none(), "only the crossing emits");
             }
-            sealed[k] = Some(m.seal_state());
+            *slot = Some(m.seal_state());
         }
         let p1 = crossing_proof.expect("the run crosses exactly once");
         let p1_bytes = p1.to_bytes();

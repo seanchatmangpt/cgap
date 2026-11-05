@@ -268,15 +268,15 @@ fn x2_kernel_matches_scalar_and_4way() {
     let data: Vec<u8> = (0..8192usize).map(|i| (i % 251) as u8).collect();
     for base in [0u64, 1, 5, 63, 1 << 20, u64::MAX - 7] {
         let x2 = cgap_blake3::multi_chunk::compress_chunks_4way_x2(&data, base);
-        for g in 0..2usize {
-            for l in 0..4usize {
+        for (g, group) in x2.iter().enumerate() {
+            for (l, lane) in group.iter().enumerate() {
                 let c = g * 4 + l;
                 let s = cgap_blake3::hash_chunk(
                     &data[c * 1024..(c + 1) * 1024],
                     base + c as u64,
                     false,
                 );
-                assert_eq!(x2[g][l], s, "x2 group {g} lane {l} (base={base}) != scalar");
+                assert_eq!(lane, &s, "x2 group {g} lane {l} (base={base}) != scalar");
             }
         }
     }
