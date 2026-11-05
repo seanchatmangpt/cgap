@@ -88,7 +88,7 @@ const ESCRIPT_SRC: &str = r##"#! /usr/bin/env escript
 %% Concurrent-kill stress court (wave-14 lane 4).
 %% Usage: escript <this> <nif-dylib-path>. Exit 0 = all courts hold.
 -module(cgap_beam).
--export([main/1]).
+-export([main/1, aq_slab_open/1, aq_slab_frame/2, aq_slab_window/4, aq_slab_stamp/2, aq_slab_lease/2, aq_slab_sync/1]).
 %% load_nif's eager check refuses any library entry the module cannot be
 %% found to have (witnessed on this OTP: an uncalled, unexported stub fails
 %% with bad_lib "Function not found"); this escript exports the full stub
@@ -134,6 +134,12 @@ cgap_scan(_, _, _) -> erlang:nif_error(nif_not_loaded).
 cgap_flush_to_parquet(_) -> erlang:nif_error(nif_not_loaded).
 cgap_seal_to_packfile(_) -> erlang:nif_error(nif_not_loaded).
 cgap_receipt_query(_) -> erlang:nif_error(nif_not_loaded).
+aq_slab_open(_) -> erlang:nif_error(nif_not_loaded).
+aq_slab_frame(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_sync(_) -> erlang:nif_error(nif_not_loaded).
 
 main([NifPath]) ->
     ok = case erlang:load_nif(NifPath, 0) of

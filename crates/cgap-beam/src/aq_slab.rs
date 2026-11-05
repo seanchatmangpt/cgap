@@ -110,6 +110,10 @@ unsafe impl Sync for SlabState {}
 /// (cgap_len convention); the types exist for tests, the receipt, fail-loud
 /// debugging.
 #[derive(Debug)]
+// The variant payloads are the typed-refusal surface (receipt/debug/tests);
+// the BEAM surface maps every variant to the `error` atom, so the fields are
+// deliberately unread outside tests.
+#[allow(dead_code)]
 enum SlabErr {
     Open(String),
     CapacityTooWide(u32),

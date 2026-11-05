@@ -59,6 +59,8 @@ const ESCRIPT_SRC: &str = r##"#! /usr/bin/env escript
 %%FR-07 bridge contract. Usage: escript <this> <nif-dylib-path>. Exit 0 = hold.
 -module(cgap_beam).
 -export([main/1]).
+-export([cgap_new/2, cgap_new_fast/2, cgap_new_i64/2, cgap_len/1, cgap_stats/1, cgap_get/2, cgap_get_i64/2, cgap_free/1, cgap_version/0, cgap_envelope_new/1, cgap_envelope_len/1, cgap_batch_binary/1, pointer_of/1, cgap_binary_data_pointer/1, cgap_dtor_stats/0, cgap_alloc_stats/0, cgap_open/1, cgap_scan/3, cgap_flush_to_parquet/1, cgap_seal_to_packfile/1, cgap_receipt_query/1, aq_slab_open/1, aq_slab_frame/2, aq_slab_window/4, aq_slab_stamp/2, aq_slab_lease/2, aq_slab_sync/1]).
+
 
 %% NIF stubs (the real bodies live in libcgap_beam.dylib).
 cgap_new(_, _) -> erlang:nif_error(nif_not_loaded).
@@ -82,6 +84,12 @@ cgap_scan(_, _, _) -> erlang:nif_error(nif_not_loaded).
 cgap_flush_to_parquet(_) -> erlang:nif_error(nif_not_loaded).
 cgap_seal_to_packfile(_) -> erlang:nif_error(nif_not_loaded).
 cgap_receipt_query(_) -> erlang:nif_error(nif_not_loaded).
+aq_slab_open(_) -> erlang:nif_error(nif_not_loaded).
+aq_slab_frame(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_slab_sync(_) -> erlang:nif_error(nif_not_loaded).
 
 main([NifPath]) ->
     ok = case erlang:load_nif(NifPath, 0) of
