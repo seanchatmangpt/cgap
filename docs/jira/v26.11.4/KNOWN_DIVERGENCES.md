@@ -84,7 +84,11 @@ collapse landed on main.
 
 f3-07:38-41; auditor ls: 564 B, mtime Oct 31 22:40. Real content,
 scratch-flavored name. **Close**: rename to a non-scratch name in a
-later wave. **Status**: OPEN (cosmetic).
+later wave. **Status**: CLOSED-PREMISE-ROTTED 2026-11-05 — the file
+does not exist on disk and is not tracked in git (`git ls-files
+crates/cgap-blake3/tests/` has no bench_tmp.rs; ls of the tests dir
+confirms). Nothing to rename; the registered subject is gone.
+Witnessed by the coordinator after lane L31 died on the task.
 
 ### KD-7 — `_cgap_p28_invariant_check` header question
 
