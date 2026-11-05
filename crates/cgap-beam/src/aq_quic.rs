@@ -982,7 +982,7 @@ mod imp {
         };
         // SAFETY: engine_of validated the resource type; the borrow is
         // confined to this NIF call (the argument term pins the resource).
-        let inner = unsafe { std::ptr::addr_of!((*engine).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*engine).inner)) };
         let (reply_tx, reply_rx) = channel();
         if inner
             .tx
@@ -1026,7 +1026,7 @@ mod imp {
             return make_atom(env, "error");
         };
         // SAFETY: conn_of validated the resource type (see aq_quic_connect).
-        let inner = unsafe { std::ptr::addr_of!((*conn).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*conn).inner)) };
         let id = unsafe { std::ptr::addr_of!((*conn).id).read() };
         let (reply_tx, reply_rx) = channel();
         let data = data.to_vec();
@@ -1070,7 +1070,7 @@ mod imp {
             return make_atom(env, "error");
         };
         // SAFETY: conn_of validated the resource type (see aq_quic_connect).
-        let inner = unsafe { std::ptr::addr_of!((*conn).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*conn).inner)) };
         let id = unsafe { std::ptr::addr_of!((*conn).id).read() };
         let (reply_tx, reply_rx) = channel();
         if inner
@@ -1197,7 +1197,7 @@ mod imp {
             return make_atom(env, "error");
         };
         // SAFETY: engine_of validated the resource type (aq_quic_connect).
-        let inner = unsafe { std::ptr::addr_of!((*engine).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*engine).inner)) };
         let (reply_tx, reply_rx) = channel();
         if inner
             .tx
@@ -1248,7 +1248,7 @@ mod imp {
             return make_atom(env, "error");
         };
         // SAFETY: listener_of validated the resource type.
-        let inner = unsafe { std::ptr::addr_of!((*listener).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*listener).inner)) };
         let (reply_tx, reply_rx) = channel();
         if inner
             .tx
@@ -1290,7 +1290,7 @@ mod imp {
         let Some(conn) = (unsafe { conn_of(env, args[0]) }) else {
             return make_atom(env, "error");
         };
-        let inner = unsafe { std::ptr::addr_of!((*conn).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*conn).inner)) };
         let id = unsafe { std::ptr::addr_of!((*conn).id).read() };
         let (reply_tx, reply_rx) = channel();
         if inner
@@ -1322,7 +1322,7 @@ mod imp {
         let Some(conn) = (unsafe { conn_of(env, args[0]) }) else {
             return make_atom(env, "error");
         };
-        let inner = unsafe { std::ptr::addr_of!((*conn).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*conn).inner)) };
         let id = unsafe { std::ptr::addr_of!((*conn).id).read() };
         let (reply_tx, reply_rx) = channel();
         if inner.tx.send(Job::OpenBi { conn_id: id, reply: reply_tx }).is_err() {
@@ -1351,7 +1351,7 @@ mod imp {
         let Some(data) = inspect_iolist(env, args[1]) else {
             return make_atom(env, "error");
         };
-        let inner = unsafe { std::ptr::addr_of!((*stream).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*stream).inner)) };
         let conn_id = unsafe { std::ptr::addr_of!((*stream).conn_id).read() };
         let stream_id = unsafe { std::ptr::addr_of!((*stream).stream_id).read() };
         let (reply_tx, reply_rx) = channel();
@@ -1393,7 +1393,7 @@ mod imp {
         let Some(stream) = (unsafe { stream_of(env, args[0]) }) else {
             return make_atom(env, "error");
         };
-        let inner = unsafe { std::ptr::addr_of!((*stream).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*stream).inner)) };
         let conn_id = unsafe { std::ptr::addr_of!((*stream).conn_id).read() };
         let stream_id = unsafe { std::ptr::addr_of!((*stream).stream_id).read() };
         let (reply_tx, reply_rx) = channel();
@@ -1430,7 +1430,7 @@ mod imp {
         let Some(stream) = (unsafe { stream_of(env, args[0]) }) else {
             return make_atom(env, "error");
         };
-        let inner = unsafe { std::ptr::addr_of!((*stream).inner).read() };
+        let inner = unsafe { Arc::clone(&*std::ptr::addr_of!((*stream).inner)) };
         let conn_id = unsafe { std::ptr::addr_of!((*stream).conn_id).read() };
         let stream_id = unsafe { std::ptr::addr_of!((*stream).stream_id).read() };
         // Fire-and-forget: the Job carries no reply (the engine's map

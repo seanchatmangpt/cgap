@@ -519,6 +519,26 @@ mod imp {
                 return;
             }
 
+            // KD-195 frameFlag gate (POST-digest-gate law: the flag rides the
+            // AOQ1 header reserved[0], window-absolute offset 32, INSIDE the
+            // FNV digest span, so it is only trustworthy after the tag gate
+            // above). Closed set {0x01 Arrow, 0x08 gitpack}; 0x00 is the
+            // pre-KD-195 Arrow-legacy shape (all-zero reserved) and reads as
+            // 0x01 so every legacy emitter stays green. Anything else refuses
+            // typed — the frozen band is 8/8 (KD-1), so the refusal reuses
+            // AOQ_STATUS_DIGEST_MISMATCH (digest-law reading: the flag is a
+            // digest-covered header byte and this word is the band's
+            // header-law refusal) — the request bytes are NEVER echoed.
+            let frame_flag = match ipc::window_frame_flag(&window) {
+                Some(0x00) | Some(ipc::FRAME_FLAG_ARROW) => ipc::FRAME_FLAG_ARROW,
+                Some(f) if f == ipc::FRAME_FLAG_GITPACK => ipc::FRAME_FLAG_GITPACK,
+                // Junk / 0x02 / 0x04 / out-of-set: typed refusal, no echo.
+                _ => {
+                    let _ = send_status(&mut stream, AOQ_STATUS_DIGEST_MISMATCH);
+                    return;
+                }
+            };
+
             // Session step: parse_frame + step, typed refusals mapped to the
             // frozen band; on refusal the body is NEVER echoed back.
             let frame = match sess::parse_frame(&body) {
@@ -568,6 +588,7 @@ mod imp {
                             &frame_buf[..written],
                             frame.header.frame_ordinal,
                             seq,
+                            frame_flag,
                             &mut scratch,
                         ) {
                             let word = match &err {
@@ -609,6 +630,7 @@ mod imp {
         frame: &[u8],
         ordinal: u32,
         seq: u32,
+        frame_flag: u8,
         scratch: &mut Vec<u8>,
     ) -> Result<usize, StreamError<io::Error>> {
         let tag = {
@@ -621,6 +643,13 @@ mod imp {
         let h = AoqHeader::new(EPOCH, KEY_ID, ordinal, seq);
         codec::encode(&h, &mut meta[..64])
             .map_err(|_| StreamError::Framing(ipc::IpcError::TagMissing))?;
+        // KD-195 MIRROR LAW: the request's frameFlag is copied into the
+        // response header reserved[0] (window-absolute offset 32), stamped
+        // PRE-digest — the FNV-1a32 span [0x00,0x3C) covers offset 24 of the
+        // header, so the stamp must land before the seal for the response
+        // window to pass a consumer's `read_verified` digest gate.
+        // (`stamp_frame_flag` is the shared emitter-side seal helper.)
+        ipc::stamp_frame_flag(&mut meta[..64], frame_flag);
         let blen = frame.len() as u32;
         meta[64..68].copy_from_slice(&blen.to_le_bytes());
         meta[68..84].copy_from_slice(&tag);

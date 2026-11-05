@@ -103,6 +103,43 @@ pub const PREFIX_SIZE: usize = 8;
 /// End-of-stream size: continuation + zero.
 pub const EOS_SIZE: usize = 8;
 
+// KD-195 gitpack transit pin (docs/jira/v26.11.6 receipt
+// kd195-gitpack-transit.md): the AOQ1 window carries a frameFlag byte at
+// window-absolute offset 32 — the AOQ1 metadata header's `reserved[0]`
+// (header offset 24 = 8-byte prefix + 24). The FNV-1a32 header digest
+// spans header [0x00,0x3C) (window [8,68)), so the flag IS digest-covered:
+// a reader observes the flag only AFTER the digest gate, and an emitter
+// must stamp the flag BEFORE sealing (the stamped byte is inside the
+// digest span; stamping after sealing is a typed HeaderDigestMismatch).
+/// Window-absolute offset of the KD-195 frameFlag byte (`reserved[0]`).
+pub const FRAME_FLAG_OFFSET_IN_WINDOW: usize = PREFIX_SIZE + 24;
+/// frameFlag value: Arrow transit (the legacy/all-zero-reserved default;
+/// `0x00` reserved reads as this value for pre-KD-195 emitters).
+pub const FRAME_FLAG_ARROW: u8 = 0x01;
+/// frameFlag value: gitpack transit (raw Kafka RecordBatch bytes verbatim,
+/// one payload per window body, no envelope).
+pub const FRAME_FLAG_GITPACK: u8 = 0x08;
+
+/// The frameFlag byte at [`FRAME_FLAG_OFFSET_IN_WINDOW`], post-digest-gate.
+/// `None` only when the window is too short to carry a header (a shape the
+/// digest gate refuses first); callers invoke this AFTER `read_verified`.
+#[must_use]
+pub fn window_frame_flag(window: &[u8]) -> Option<u8> {
+    window.get(FRAME_FLAG_OFFSET_IN_WINDOW).copied()
+}
+
+/// Stamp `flag` into an ALREADY-SEALED 64-byte AOQ1 metadata header
+/// (in place) and re-seal: `hdr[24] = flag`, FNV-1a32 recomputed over
+/// `[0x00,0x3C)` and stored at `[0x3C,0x40)`. This is the emitter-side
+/// mirror-law helper: the stamp is PRE-digest in the sealed output (the
+/// digest covers the flag), which is the only seal order `read_verified`'s
+/// digest gate accepts. `hdr` must be at least 64 bytes.
+pub fn stamp_frame_flag(hdr: &mut [u8], flag: u8) {
+    hdr[24] = flag;
+    let digest = fnv1a32(&hdr[..0x3C]);
+    hdr[0x3C..0x40].copy_from_slice(&digest.to_le_bytes());
+}
+
 /// Metadata header: exactly 64 bytes (`repr(C)`, offsets pinned by the
 /// static assert below).
 #[repr(C)]
@@ -264,6 +301,12 @@ pub enum IpcError {
         /// metadata_size observed.
         got: u32,
     },
+    /// fb branch, verified read: the schema custom_metadata carries no
+    /// parseable `cgap:rows` value (absent, or not a decimal u64) — the
+    /// rows carrier, fb-era form (R4-I: mirrors the legacy 104..112
+    /// slot; zero-row batches are never emitted, so absence is a typed
+    /// refusal, never a guess).
+    RowsCarrierMissing,
 }
 
 impl core::fmt::Debug for FbRead<'_> {
@@ -854,30 +897,40 @@ fn unhex32(s: &str) -> Option<[u8; 32]> {
 /// metadata_size law. `schema_meta` is the caller's schema custom_metadata
 /// (<= 62 pairs); the ancillary keys are appended by the emitter.
 pub fn emit_fb(
-    out: &mut [u8],
-    schema: &crate::flatbuf::SchemaEnc<'_>,
-    body: &[u8],
-    alignment: usize,
+    out: &mut [u8], schema: &crate::flatbuf::SchemaEnc<'_>, body: &[u8], alignment: usize,
 ) -> Result<usize, IpcError> {
-    emit_fb_inner(out, schema, body, alignment, false)
+    emit_fb_inner(out, schema, body, alignment, false, None)
 }
 
 /// Emit a verified fb window: [`emit_fb`] plus the `cgap:body_blake3`
 /// key. Plain fb windows refuse on [`read_verified_fb`] with
-/// [`IpcError::BodyDigestMissing`].
+/// [`IpcError::BodyDigestMissing`]. The window carries NO `cgap:rows`
+/// key, so [`read_verified_fb`] refuses it with
+/// [`IpcError::RowsCarrierMissing`] — verified emitters should use
+/// [`emit_verified_fb_rows`].
 pub fn emit_verified_fb(
-    out: &mut [u8],
-    schema: &crate::flatbuf::SchemaEnc<'_>,
-    body: &[u8],
-    alignment: usize,
+    out: &mut [u8], schema: &crate::flatbuf::SchemaEnc<'_>, body: &[u8], alignment: usize,
 ) -> Result<usize, IpcError> {
-    emit_fb_inner(out, schema, body, alignment, true)
-}fn emit_fb_inner(
+    emit_fb_inner(out, schema, body, alignment, true, None)
+}
+
+/// Emit a verified fb window WITH the rows carrier: [`emit_verified_fb`]
+/// plus the `cgap:rows` custom-metadata key (decimal u64, mirroring the
+/// legacy 104..112 padding slot on the fb era).
+pub fn emit_verified_fb_rows(
+    out: &mut [u8], schema: &crate::flatbuf::SchemaEnc<'_>, body: &[u8], alignment: usize,
+    rows: u64,
+) -> Result<usize, IpcError> {
+    emit_fb_inner(out, schema, body, alignment, true, Some(rows))
+}
+
+fn emit_fb_inner(
     out: &mut [u8],
     schema: &crate::flatbuf::SchemaEnc<'_>,
     body: &[u8],
     alignment: usize,
     verified: bool,
+    rows: Option<u64>,
 ) -> Result<usize, IpcError> {
     if !matches!(alignment, 8 | 64) {
         return Err(IpcError::BadAlignment { got: alignment as u32 });
@@ -1086,3 +1139,33 @@ pub fn read_verified_fb<'a>(
     read_fb_core(buf, expected_schema, body_out, true)
 }
 
+
+// ===========================================================================
+// gitpack view (KD-195 transit, v26.11.6): zero-copy payload projection
+// ===========================================================================
+
+/// The gitpack view of one AOQ1 window body (KD-195 carrier decision):
+/// the body bytes ARE the batch — raw Kafka RecordBatch bytes verbatim,
+/// exactly one payload per window body, NO envelope, NO length prefix, NO
+/// copy. The offsets span `[0, len)` by construction (the whole body is
+/// the batch; a consumer with a parser slices it itself).
+///
+/// `no_std` pure fn: a borrowed slice view, no allocation, no panic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BinaryBatchView<'a> {
+    /// `[0, len)` — the batch's offsets within the payload (verbatim law:
+    /// the batch starts at 0 and ends at the body length).
+    pub offsets: (usize, usize),
+    /// The batch bytes, borrowed from the payload (zero-copy: the pointer
+    /// and length alias the source; no re-allocation ever happens).
+    pub data: &'a [u8],
+}
+
+/// Project the gitpack view of `payload` (see [`BinaryBatchView`]).
+#[must_use]
+pub fn binary_batch_view(payload: &[u8]) -> BinaryBatchView<'_> {
+    BinaryBatchView {
+        offsets: (0, payload.len()),
+        data: payload,
+    }
+}
