@@ -11,9 +11,38 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+# Phase-2 QUIC scaffold (lane L50, aq-quic-transport-decision.md option 2):
+# quinn behind the LANE-02 NIF boundary. Feature-gated so the crate's
+# zero-external-crate DEFAULT build stays byte-law intact; the QUIC NIFs are
+# always present in the func table and return the `error` atom (loud skip)
+# when compiled without the feature.
+#
+# Pin law: quinn >= 0.11.12 (re-derived 2026-11-05: 0.11.15 does not
+# exist on crates.io — latest 0.11.12, `cargo info quinn`; the
+# aq-quic-transport-decision.md "CVE-2026-25800 affects < 0.11.15"
+# version claim is UNVERIFIED against the registry — L50 owes the
+# re-derivation of the real patched floor from the advisory before
+# landing; this pin unblocks workspace resolution).
+[features]
+quic = ["dep:quinn", "dep:tokio", "dep:bytes", "dep:rcgen", "dep:rustls"]
+
 [dependencies]
 cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
 cgap-parquet = { path = "../cgap-parquet", version = "26.11.3" }
 cgap-git = { path = "../cgap-git", version = "26.11.3" }
 cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
 wire-shm = { path = "../wire-shm", version = "26.11.5" }
+quinn = { version = ">=0.11.12, <0.12", optional = true, default-features = false, features = [
+    "rustls-ring",
+    "runtime-tokio",
+] }
+tokio = { version = "1", optional = true, default-features = false, features = [
+    "rt",
+    "net",
+    "time",
+] }
+bytes = { version = "1", optional = true }
+# Test-only: self-signed server certificate for the loopback handshake court.
+# (L57 SLA unblock: cargo rejects optional dev-deps; `dep:rcgen` in the quic
+# feature requires it in [dependencies].)
+rcgen = { version = "0.13", optional = true }
