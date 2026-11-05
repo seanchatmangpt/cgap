@@ -93,3 +93,26 @@ round	profile	fastest_ms	median_ms	slowest_ms
   met; receipt path cited).
 - Standing: PASS (all six legs exit 0, fence computed from raw TSV
   above; UNVERIFIED residue: penstock new band, fleet background load).
+
+---
+
+## Appendix — Delta (L57, 2026-11-04): penstock row 7 residue retired
+
+Appended by lane L57 (history not rewritten). The row 7 residue named
+above ("Penstock stage (row 7): NOT re-run this lane ... status
+UNVERIFIED-new-band until a paired re-run") is RETIRED: the paired
+re-run landed.
+
+- Driver: `scripts/l57-penstock-paired-bench.sh` (L27 method extended
+  verbatim; same `scripts/l27-loadgen.c`, combined 6 9 profile), N=3
+  paired rounds, min-of-3, all six legs rc=0.
+- Row 7 penstock admission 1M const, min-of-3 (ns/frame):
+  SOLO fastest 8.02 / median-min 8.31 / slowest-worst 86.48;
+  CONTENDED bw6+cpu9 fastest 9.65 (+20.3%) / median-min 16.64 (+100%)
+  / slowest-worst 318.15. Fence worst/best **39.7x**.
+- The RED-10 bw-only tail (12.73 ns/frame) is not a contended bound —
+  combined load reaches 25x that. Penstock alone is ~4.2x more
+  contention-sensitive than the full chain (39.7x vs 9.49x worst/best).
+- bm6 row 7 re-published with machine-stated load-profile columns;
+  full method + guard witnesses: `docs/jira/v26.11.5/receipts/l57-penstock.md`
+  (Standing: PASS).

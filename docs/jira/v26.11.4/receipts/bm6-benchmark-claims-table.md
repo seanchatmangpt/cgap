@@ -125,9 +125,12 @@ receipt: `docs/jira/v26.11.5/receipts/l27-kd2-claims.md`).
 |---|---|---|---|---|---|---|
 | 5/6 | Ingress chain 1M const (ns/frame) | SOLO (min-of-3) | 10.35 | 10.70 (min) | 37.83 (worst) | baseline |
 | 5/6 | Ingress chain 1M const (ns/frame) | CONTENDED bw6+cpu9 (min-of-3, paired) | 11.21 (+8.3%) | 22.27 (+108%) | 98.23 (worst) | **9.49x worst/best vs solo** |
-| 7 | Penstock admission stage | SOLO prior 7.71 / contended UNVERIFIED (RED-10 W5 bw-only witness: tail 12.73) | 7.71 (prior) | — | 12.73 (prior, bw-only) | UNVERIFIED new band |
+| 7 | Penstock admission stage | SOLO (min-of-3, L57 paired) | 8.02 | 8.31 (min) | 86.48 (worst) | baseline |
+| 7 | Penstock admission stage | CONTENDED bw6+cpu9 (min-of-3, paired, L57) | 9.65 (+20.3%) | 16.64 (+100%) | 318.15 (worst) | **39.7x worst/best vs solo** |
 
 Load-profile law for consumers: solo numbers are upper bounds under
 disclosed background, never worst-case bounds; under RED-10-class
-combined load the worst sample is 9.49x the solo fastest (this session;
-RED-10 measured 12.2x on 2026-11-02 — same class).
+combined load the worst sample is 9.49x the solo fastest for the
+ingress chain (L27) and 39.7x for the penstock stage alone (L57;
+prior bw-only tail 12.73 is not a contended bound). RED-10 measured
+12.2x on 2026-11-02 — same class.
