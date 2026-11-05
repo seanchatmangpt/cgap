@@ -10,12 +10,12 @@
     "transport": "local-exec",
     "authority_ceiling": "DO"
   },
-  "provider_execution_id": "csct-e2e-1793858020",
+  "provider_execution_id": "csct-e2e-1793904281",
   "identity": {
     "subject": "smalt-arcus-cgap-v26.11.6",
     "repo": "/Users/sac/cgap",
-    "subject_sha": "a216b486fe7d312ad982ff66b158c30ae493ec09",
-    "base_sha": "a216b486fe7d312ad982ff66b158c30ae493ec09"
+    "subject_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2",
+    "base_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2"
   },
   "authority": {
     "ceiling": "DO",
@@ -24,7 +24,7 @@
   },
   "consequence": {
     "commits": [
-      "a216b48"
+      "3f33c67"
     ],
     "files_changed": [
       "reports/challenger_sales_receipt.json"
@@ -47,20 +47,34 @@
   },
   "provider_ext.csct": {
     "suite_id": "csct-rfc0042",
-    "timestamp_utc": "2026-11-05T05:53:40Z",
+    "timestamp_utc": "2026-11-05T18:44:41Z",
     "status_quo_annual_usd": 5068632.0,
     "sut_annual_usd": 14400.0,
     "net_savings_usd": 5054232.0,
     "gross_roi_multiple": 351.99,
     "littles_law_ceiling_ms": 10.0,
-    "p99_latency_ms": 0.045,
-    "alloc_bytes_per_op": 0,
-    "anti_vacuity_mutations": [
-      "sigv4_403",
-      "spsc_overflow",
-      "bitweaving_parity",
-      "sigkill_replay"
-    ],
+    "p99_latency_ms": 0.0006,
+    "incumbent_p99_ms": "UNMEASURED",
+    "st01_ingested": 710,
+    "st01_legs": {
+      "aws_kinesis": {
+        "status": "PASS",
+        "records": 500
+      },
+      "aws_sqs": {
+        "status": "PASS",
+        "records": 10
+      },
+      "gcp_pubsub": {
+        "status": "PASS",
+        "records": 100
+      },
+      "aws_msk_kafka": {
+        "status": "PASS",
+        "records": 100
+      }
+    },
+    "alloc_bytes_per_op": null,
     "standing": "ALIVE"
   }
 }
