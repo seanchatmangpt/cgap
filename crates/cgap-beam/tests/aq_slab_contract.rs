@@ -43,11 +43,14 @@ fn write_escript(src: &str) -> PathBuf {
     p
 }
 
-fn run_court(escript: &PathBuf, dylib: &PathBuf, mutate: bool) -> i32 {
+fn run_court(escript: &PathBuf, dylib: &PathBuf, mutate: &str) -> i32 {
     let mut cmd = Command::new("escript");
     cmd.arg(escript).arg(dylib);
-    if mutate {
+    if mutate == "crc" {
         cmd.env("AQ_MUTATE_CRC_SKIP", "1");
+    }
+    if mutate == "window-oob" {
+        cmd.env("AQ_MUTATE_WINDOW_OOB_SKIP", "1");
     }
     let out = cmd.output().expect("spawn escript");
     if !out.stdout.is_empty() {
@@ -103,7 +106,12 @@ main([NifPath0]) ->
              ok -> ok;
              {error, R} -> erlang:error({load_nif_failed, R})
          end,
-    Res = try contracts() of
+    Res = try
+              case os:getenv("AQ_MUTATE_WINDOW_OOB_SKIP") of
+                  "1" -> t_window_oob_mutant();
+                  _ -> contracts()
+              end
+          of
               ok -> 0
           catch Class:Reason:Stack ->
               io:format("COURT_FAIL ~p:~p~n~p~n", [Class, Reason, Stack]),
@@ -115,6 +123,7 @@ contracts() ->
     t_open_refusals(),
     t_stamp_frame_window(),
     t_crc_negative_leg(),
+    t_window_lease_respect(),
     t_lease_lifecycle(),
     t_alloc_spy_egress(),
     ok.
@@ -168,6 +177,66 @@ t_stamp_frame_window() ->
     error = aq_slab_window(Slab, 0, 4, 2),  %% off+len > plen
     error = aq_slab_window(Slab, 0, 7, 0),
     io:format("ok stamp_frame_window~n").
+
+%% L23 lease-respect law: a window over a leased slot's frame refuses
+%% (typed SlabSlotLeased -> error atom); after the lease dtor clears the
+%% bit (bounded poll, no sleep), the same window succeeds.
+t_window_lease_respect() ->
+    Dir = mktempd(),
+    Path = make_segment(Dir, "seg.wire", 4),
+    Slab = aq_slab_open(unicode:characters_to_binary(Path)),
+    ok = aq_slab_stamp(Slab, <<"leased-frame-payload">>),
+    <<"leased">> = aq_slab_window(Slab, 0, 0, 6),
+    Parent = self(),
+    Child = spawn(fun() ->
+        L = aq_slab_lease(Slab, 0),
+        true = is_reference(L),
+        Parent ! {lease_held, self()},
+        receive
+            release -> ok
+        after 5000 -> ok
+        end
+    end),
+    receive
+        {lease_held, Child} -> ok
+    after 5000 -> erlang:error({window_lease_child_timeout, lease_held})
+    end,
+    %% While the lease is alive in the child: window must refuse.
+    error = aq_slab_window(Slab, 0, 0, 6),
+    Child ! release,
+    Ref = erlang:monitor(process, Child),
+    receive
+        {'DOWN', Ref, process, Child, _} -> ok
+    after 5000 -> erlang:error({window_lease_child_timeout, down})
+    end,
+    %% Bounded poll until the dtor cleared the bit (GC is asynchronous).
+    wait_window_ok(Slab, 500),
+    <<"leased">> = aq_slab_window(Slab, 0, 0, 6),
+    io:format("ok window_lease_respect~n").
+
+wait_window_ok(_Slab, 0) ->
+    erlang:error({lease_dtor_did_not_fire, window_bounded_poll_exhausted});
+wait_window_ok(Slab, N) ->
+    garbage_collect(),
+    case aq_slab_window(Slab, 0, 0, 6) of
+        <<"leased">> -> ok;
+        error -> wait_window_ok(Slab, N - 1)
+    end.
+
+%% L23 SHIM-COURT mutant leg: under AQ_MUTATE_WINDOW_OOB_SKIP=1 the same
+%% over-reading window (3, 7) past plen=5 must NOT be refused — either it
+%% returns a binary (flip witnessed) or the VM aborts on the illegal
+%% enif_make_sub_binary (also a flip, nonzero exit). Baseline runs refuse.
+t_window_oob_mutant() ->
+    Dir = mktempd(),
+    Path = make_segment(Dir, "seg.wire", 2),
+    Slab = aq_slab_open(unicode:characters_to_binary(Path)),
+    ok = aq_slab_stamp(Slab, <<"hello">>),
+    <<"hello">> = aq_slab_window(Slab, 0, 0, 5),  %% in-bounds sanity
+    case aq_slab_window(Slab, 0, 3, 7) of
+        error -> erlang:error({window_oob_mutation_did_not_flip, oob_window_still_refused});
+        _Bin -> io:format("ok window_oob_mutant (over-read window accepted)~n")
+    end.
 
 t_crc_negative_leg() ->
     Dir = mktempd(),
@@ -285,11 +354,21 @@ fn aq_slab_be_court() {
     let dylib = nif_dylib_path();
     let escript = write_escript(ESCRIPT);
     // Leg 1: the court against the real validator must pass.
-    let rc = run_court(&escript, &dylib, false);
+    let rc = run_court(&escript, &dylib, "");
     assert_eq!(rc, 0, "court against the real validator must pass (exit 0), got {rc}");
     // Leg 2 (SHIM-COURT anti-vacuity): the SAME court under the crc-skip
     // mutation must FLIP — exit nonzero, failing in the crc leg.
-    let rc_m = run_court(&escript, &dylib, true);
+    let rc_m = run_court(&escript, &dylib, "crc");
     assert_ne!(rc_m, 0, "court under AQ_MUTATE_CRC_SKIP=1 must flip (exit nonzero), got {rc_m}");
+    // Leg 3 (L23 window SHIM-COURT): under AQ_MUTATE_WINDOW_OOB_SKIP=1 the
+    // mutant leg must PASS (exit 0) — the over-reading window (3,7) past
+    // plen=5 is ACCEPTED by the mutated boundary, proving the baseline `error`
+    // refusal is enforced by exactly this bounds check. A mutation leg that
+    // exits nonzero is indistinguishable from an unapplied mutation = vacuous.
+    let rc_w = run_court(&escript, &dylib, "window-oob");
+    assert_eq!(
+        rc_w, 0,
+        "window OOB mutation leg must PASS under AQ_MUTATE_WINDOW_OOB_SKIP=1 (flip witnessed: over-read accepted), got {rc_w}"
+    );
     let _ = std::fs::remove_file(&escript);
 }

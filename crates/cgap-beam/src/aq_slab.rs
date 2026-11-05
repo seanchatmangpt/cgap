@@ -630,6 +630,13 @@ pub(crate) extern "C" fn aq_slab_window(
             Ok(n) => n,
             Err(_) => return make_atom(env, "error"),
         };
+        // Lease-respect law: a leased slot's frame is frozen for its holder —
+        // the window refuses it (typed SlabSlotLeased → the `error` atom),
+        // same immutability class as the L19 stamp refusal (resbin.rs:28-38).
+        let idx = (ord as u32) % st.capacity;
+        if st.free_mask.load(Ordering::Acquire) & (1u64 << idx) != 0 {
+            return make_atom(env, "error"); // SlabErr::SlotLeased(idx)
+        }
         let (off, len) = match window_bounds(plen, off as usize, len as usize) {
             Some(pair) => pair,
             None => return make_atom(env, "error"),
