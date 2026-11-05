@@ -66,7 +66,11 @@ lands slot resolution and oabi-lookup gains a real implementation.
 transpose.rs:3-7 self-documents the self-contained-by-design note that
 predates the layout lane's landing. **Close**: collapse into one
 definition (recorded coordination point; auditor grep: exactly two
-struct Quad64 definitions repo-wide). **Status**: OPEN.
+struct Quad64 definitions repo-wide). **Status**: CLOSED 2026-11-05 —
+transpose.rs is now a re-export (`pub use crate::layout::Quad64`,
+canonical def at layout.rs:36 with static size==64 / align==64
+asserts at layout.rs:59-60); witnessed on disk this session after the
+collapse landed on main.
 
 ### KD-6 — cgap-blake3/tests/bench_tmp.rs ships in the package
 
