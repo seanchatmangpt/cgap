@@ -188,6 +188,7 @@ fn gen_json(i: usize, po_len: usize, permute_keys: bool) -> String {
     let w = ((splitmix64(&mut s) % 40_000) as f64) / 1000.0;
     let po_zeros = "0".repeat(po_len);
     let id = format!("MF-{i:08}");
+    let po = format!("PO-{po_zeros}{v:08}");
     let base = format!(
         concat!(
             r#"{{"manifest_id":"{id}","origin":"{o}","dest":"{d}","#,
@@ -196,7 +197,7 @@ fn gen_json(i: usize, po_len: usize, permute_keys: bool) -> String {
         id = id,
         o = ORIGINS[o as usize],
         d = DESTS[d as usize],
-        po = format!("PO-{po_zeros}{v:08}"),
+        po = po,
         v = v,
         w = w,
     );

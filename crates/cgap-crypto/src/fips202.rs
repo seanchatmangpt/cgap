@@ -65,7 +65,7 @@ const PI_DST: [usize; 25] = {
 
 /// KECCAK-p[1600,24] permutation in place: theta, rho+pi, chi, iota, 24 rounds.
 pub fn keccak_f1600(state: &mut [u64; 25]) {
-    for round in 0..24 {
+    for &rc in RC.iter() {
         // theta
         let mut c = [0u64; 5];
         for x in 0..5 {
@@ -90,7 +90,7 @@ pub fn keccak_f1600(state: &mut [u64; 25]) {
             }
         }
         // iota
-        state[0] ^= RC[round];
+        state[0] ^= rc;
     }
 }
 

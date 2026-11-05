@@ -142,19 +142,19 @@ fn absorb_block(state: &mut Poly1305, block: &[u8], hibit: u32) {
         + h[4] as u64 * r[0] as u64;
 
     // (partial) h %= p — donna's sequential carry chain.
-    let mut c = (d0 >> 26) as u64;
+    let mut c = d0 >> 26;
     let mut h0 = (d0 & LIMB_MASK as u64) as u32;
     d1 += c;
-    c = (d1 >> 26) as u64;
+    c = d1 >> 26;
     let mut h1 = (d1 & LIMB_MASK as u64) as u32;
     d2 += c;
-    c = (d2 >> 26) as u64;
+    c = d2 >> 26;
     let h2 = (d2 & LIMB_MASK as u64) as u32;
     d3 += c;
-    c = (d3 >> 26) as u64;
+    c = d3 >> 26;
     let h3 = (d3 & LIMB_MASK as u64) as u32;
     d4 += c;
-    c = (d4 >> 26) as u64;
+    c = d4 >> 26;
     let h4 = (d4 & LIMB_MASK as u64) as u32;
     h0 += (c * 5) as u32;
     c = (h0 >> 26) as u64;
@@ -192,10 +192,10 @@ pub fn finish(state: Poly1305) -> [u8; TAG_LEN] {
     h[4] += c;
     c = h[4] >> 26;
     h[4] &= LIMB_MASK;
-    h[0] += (c * 5) as u32;
+    h[0] += c * 5;
     c = h[0] >> 26;
     h[0] &= LIMB_MASK;
-    h[1] += c as u32;
+    h[1] += c;
 
     // Compute g = h + 5 - 2^130 (= h - p when h >= p, negative otherwise).
     let mut g0 = h[0] as u64 + 5;
@@ -215,7 +215,7 @@ pub fn finish(state: Poly1305) -> [u8; TAG_LEN] {
     // Branchless select: g4 negative <=> h < p <=> keep h. Masks are
     // data-derived constants, not branch conditions; timing is flat.
     let neg = ((g4 >> 63) as u64) & 1;
-    let mask_g = neg.wrapping_sub(1) as u64;
+    let mask_g = neg.wrapping_sub(1);
     let mask_h = !mask_g;
     let h0 = ((h[0] as u64 & mask_h) | (g0 & mask_g)) as u32;
     let h1 = ((h[1] as u64 & mask_h) | (g1 & mask_g)) as u32;

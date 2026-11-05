@@ -31,8 +31,10 @@ fn court_1_sound_update_admits_and_ref_advances() {
     let req = fixture_update();
     // Sound derivation: parent facts + a converging transitive-closure
     // rule. Termination is structural (finite term domain, monotone).
-    let mut u = ProposedUpdate::default();
-    u.facts = vec![(1, 900, 2), (2, 900, 3)];
+    let mut u = ProposedUpdate {
+        facts: vec![(1, 900, 2), (2, 900, 3)],
+        ..Default::default()
+    };
     u.rules.push(admission_gate::GateRule {
         rule_id: 1,
         body: vec![(admission_gate::var(0), 900, admission_gate::var(1))],
@@ -94,8 +96,10 @@ fn court_3_contradiction_refuses_and_ref_table_byte_unchanged() {
     // ontology. Flip twin: a gate that skips the functional-predicate law
     // (or a proposal that drops the declaration) admits here.
     let req = fixture_update();
-    let mut u = ProposedUpdate::default();
-    u.facts = vec![(5, 0xF00D, 6), (5, 0xF00D, 7)];
+    let mut u = ProposedUpdate {
+        facts: vec![(5, 0xF00D, 6), (5, 0xF00D, 7)],
+        ..Default::default()
+    };
     u.functional_predicates.insert(0xF00D);
     let mut table = RefTable::new();
     table.set(b"refs/heads/main", req.old_sha);
@@ -121,8 +125,10 @@ fn court_4_unbound_head_variable_is_ontology_broken() {
     // Flip twin: a gate that accepts head-only variables (bn3's
     // UnboundHeadVariable law dropped) admits here.
     let req = fixture_update();
-    let mut u = ProposedUpdate::default();
-    u.facts = vec![(1, 900, 2)];
+    let mut u = ProposedUpdate {
+        facts: vec![(1, 900, 2)],
+        ..Default::default()
+    };
     u.rules.push(admission_gate::GateRule {
         rule_id: 9,
         body: vec![(admission_gate::var(0), 900, 2)],
@@ -160,8 +166,10 @@ fn court_5_wire_roundtrip_through_real_pkt_codec() {
     line.clear();
     let parsed = parse_update_pkt(&wire).expect("framed command parses");
     assert_eq!(parsed, req);
-    let mut u = ProposedUpdate::default();
-    u.facts = vec![(1, 900, 2)];
+    let u = ProposedUpdate {
+        facts: vec![(1, 900, 2)],
+        ..Default::default()
+    };
     admit_update(&parsed, &u).expect("sound parsed update admits");
 }
 

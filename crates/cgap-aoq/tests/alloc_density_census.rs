@@ -31,6 +31,9 @@ use cgap_audit::alloc_counter::with_alloc_tracking;
 #[test]
 fn census_harness_counts_positive_control() {
     let (_, report) = with_alloc_tracking(|| {
+        // Heap allocation IS the property under test here — the vec! is the
+        // point (useless_vec would delete the allocation and vacuous the control).
+        #[allow(clippy::useless_vec)]
         let v = vec![0u8; 32];
         assert_eq!(v.len(), 32);
     });
@@ -165,8 +168,8 @@ fn pin_table_verify_hit_alloc_free() {
 fn sealed_window() -> (Vec<u8>, [u8; 16]) {
     let plain = vec![0xA5u8; 1024];
     let mut ct = plain;
-    for i in 0..ct.len() {
-        ct[i] ^= (i as u8) | 1;
+    for (i, byte) in ct.iter_mut().enumerate() {
+        *byte ^= (i as u8) | 1;
     }
     let tag_full = cgap_blake3::hash(&ct);
     let mut tag = [0u8; 16];

@@ -21,11 +21,11 @@
 //!     sections "Encapsulated message" / "Stream format"), and
 //!   - REFUSE the metadata payload (an unknown flatbuffer identifier is a
 //!     typed parse failure there, never a misread).
-//! Implemented: byte-exact framing, alignment 8 or 64, typed refusal of
-//! every corrupt framing class (continuation, metadata size, magic, header
-//! digest, schema digest, body length, alignment field, nonzero padding,
-//! truncation, missing EOS). A future lane may swap the flatbuffer in
-//! behind the same emit/read signatures.
+//!     Implemented: byte-exact framing, alignment 8 or 64, typed refusal of
+//!     every corrupt framing class (continuation, metadata size, magic, header
+//!     digest, schema digest, body length, alignment field, nonzero padding,
+//!     truncation, missing EOS). A future lane may swap the flatbuffer in
+//!     behind the same emit/read signatures.
 //!
 //! WITNESS TIERS (G3, CG-1 v26.11.3; PG-6 decision: NO shared digest
 //! seam). The fleet's wire surfaces use deliberately different digests and
@@ -38,10 +38,10 @@
 //! - plain [`read`] is NOT a verifying tier: it never re-hashes the body
 //!   (see BODY INTEGRITY CONTRACT above); body integrity is the
 //!   consumer's duty on that path.
-//! Anti-confusion is courted, not narrated: `tests/ipc_courts.rs` C13
-//! asserts zero checksum-tier contamination in this file's source, and
-//! wire-shm's court asserts zero "blake3" in its sources, each with a
-//! sandbox-add-token anti-vacuity kill.
+//!   Anti-confusion is courted, not narrated: `tests/ipc_courts.rs` C13
+//!   asserts zero checksum-tier contamination in this file's source, and
+//!   wire-shm's court asserts zero "blake3" in its sources, each with a
+//!   sandbox-add-token anti-vacuity kill.
 //!
 //! Zero external deps, `no_std`, no `alloc`: emit/read operate on caller
 //! buffers, so the module is allocation-free and panic-free on inputs.
@@ -57,6 +57,25 @@
 //! published, legacy `read`/`emit` unchanged, existing courts green.
 
 use core::fmt;
+
+/// ARRO fb-window magic (the Message flatbuffer's 4-byte file identifier,
+/// seen LE as a magic word for the parse fork). Synthesized MetaHeaders on
+/// the fb branch carry it so verified paths dispatch per magic.
+pub const FB_MAGIC: u32 = u32::from_le_bytes(*b"ARRO");
+
+/// The fb-branch parse result.
+#[derive(Clone, Copy)]
+pub struct FbParsed<'a> {
+    /// Parsed Message envelope (borrows the window).
+    pub message: crate::flatbuf::MessageView<'a>,
+    /// blake3 over the flatbuffer region (the `expected_schema` seam
+    /// value on the fb read paths).
+    pub schema_digest: [u8; 32],
+    /// cgap:schema_blake3 carried value (None when absent).
+    pub schema_blake3: Option<[u8; 32]>,
+    /// cgap:body_blake3 carried value (None when absent).
+    pub body_blake3: Option<[u8; 32]>,
+}
 
 /// Continuation marker (0xFFFFFFFF), Message.fbs `Continuation`.
 pub const CONTINUATION: u32 = 0xFFFF_FFFF;
@@ -214,12 +233,46 @@ pub enum IpcError {
     /// carries no tag (all zero) — the window was not sealed, or it is an
     /// alignment-8 AOQ1 framing (no padding to carry the tag).
     TagMissing,
-    /// Verified read, AOQ1 magic: the stored 16-byte tag disagrees with
-    /// `blake3(body)[..16]` recomputed over the carried body.
+    /// Verified read, AOQ1 tag mismatch variant.
     TagMismatch {
         /// Tag observed in the metadata padding.
         got: [u8; 16],
     },
+    /// A window whose metadata is the flatbuffer Message (fb branch) read
+    /// through a legacy path, or an IPC1/AOQ1 window read through the fb
+    /// path. Typed refusal both directions (compat window law).
+    LegacyReadForeignMeta,
+    /// fb branch: the Message `bodyLength` disagrees with the framing body
+    /// length.
+    FbBodyLenInvalid {
+        /// Value observed in the flatbuffer.
+        got: i64,
+        /// Body length implied by the framing.
+        expected: u32,
+    },
+    /// fb branch: the flatbuffer metadata itself refused (typed
+    /// [`crate::flatbuf::FbError`]).
+    Fb(crate::flatbuf::FbError),
+    /// fb branch: body larger than 2 GiB.
+    BodyTooLarge {
+        /// Observed bodyLength.
+        got: i64,
+    },
+    /// metadata_size carries the 64-bit metadata continuation bit (high
+    /// bit set) — typed refusal, never a silent reinterpretation.
+    MetaSizeContinuation {
+        /// metadata_size observed.
+        got: u32,
+    },
+}
+
+impl core::fmt::Debug for FbRead<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FbRead")
+            .field("body_len", &self.body_len)
+            .field("schema_digest", &self.schema_digest)
+            .finish_non_exhaustive()
+    }
 }
 
 impl fmt::Display for IpcError {
@@ -370,13 +423,26 @@ pub fn emit(out: &mut [u8], meta: &MetaHeader, body: &[u8]) -> Result<usize, Ipc
 /// Gates, in PG-6's order: truncation-to-prefix -> continuation ->
 /// metadata span -> truncation-to-header -> magic -> reserved fields ->
 /// header digest -> version -> flags -> alignment field.
-struct ParsedMeta {
+struct ParsedMeta<'a> {
     alignment: usize,
     body_at: usize,
     meta: MetaHeader,
+    /// fb-branch payload (`None` on the legacy/AOQ1 branches).
+    fb: Option<FbParsed<'a>>,
 }
 
-fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
+
+fn parse_meta(buf: &[u8]) -> Result<ParsedMeta<'_>, IpcError> {
+    parse_meta_with(buf, false)
+}
+
+/// The parse seam with the fb window (`allow_fb`). Legacy callers
+/// (`read`/`read_verified`) pass `false` and refuse fb windows with
+/// [`IpcError::LegacyReadForeignMeta`]; fb callers pass `true` and refuse
+/// legacy windows the same way. The magic fork: `IPC1` legacy,
+/// `AOQ1` per the AOQ1 branch, anything else goes to the flatbuffer
+/// Message branch (typed [`IpcError::Fb`] on any flatbuffer refusal).
+fn parse_meta_with(buf: &[u8], allow_fb: bool) -> Result<ParsedMeta<'_>, IpcError> {
     if buf.len() < PREFIX_SIZE {
         return Err(IpcError::Truncated {
             needed: PREFIX_SIZE,
@@ -388,69 +454,111 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
         return Err(IpcError::BadContinuation { got: cont });
     }
     let meta_span = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
-    if meta_span != meta_span_for(8) && meta_span != meta_span_for(64) {
+    // The 64-bit metadata continuation bit (high bit) is a typed refusal.
+    if meta_span & 0x8000_0000 != 0 {
+        return Err(IpcError::MetaSizeContinuation {
+            got: meta_span as u32,
+        });
+    }
+    // Fork shape: legacy windows carry fixed metadata spans {64, 120};
+    // fb windows carry the variable flatbuffer length (multiple of 8, so
+    // the body starts 8-aligned; 64-alignment is derived when the span
+    // puts the body on a 64-B boundary).
+    let raw_magic = if buf.len() >= 12 {
+        u32::from_le_bytes([buf[8], buf[8 + 1], buf[8 + 2], buf[8 + 3]])
+    } else {
+        0
+    };
+    let legacy_span = meta_span == meta_span_for(8) || meta_span == meta_span_for(64);
+    let is_fb = !legacy_span || (raw_magic != MAGIC && raw_magic != AOQ1_MAGIC && raw_magic != 0);
+    if !is_fb && !legacy_span {
+        // Legacy magic with a non-legacy span: BadMetaSize, unchanged law.
         return Err(IpcError::BadMetaSize {
             got: meta_span as u32,
             expected: meta_span as u32,
         });
     }
-    let alignment = if meta_span == meta_span_for(8) { 8 } else { 64 };
     let body_at = PREFIX_SIZE + meta_span;
-    // Read-ahead minimum (AB-9, AF-4 v26.11.3): demand only the bytes the
-    // gate actually consumes — prefix + the full metadata span (the header
-    // is `buf[8..72]`, and the AOQ1 branch additionally inspects the span's
-    // padding `buf[72..body_at]`), all strictly inside `body_at`. The old
-    // fixed `+ META_HEADER_SIZE` past body start demanded bytes no emitted
-    // window carries for tiny bodies (body+pad < 56): an emit-accepted
-    // window classified `Truncated` on read. Every typed refusal class
-    // stays intact — genuinely truncated windows still classify `Truncated`
-    // here, and shorter-body/missing-EOS windows classify downstream as
-    // `BadBodyLen`/`MissingEos` in `read_with_meta`.
     if buf.len() < body_at {
         return Err(IpcError::Truncated {
             needed: body_at,
             got: buf.len(),
         });
     }
-    let raw = meta_from(&buf[8..72]);
-    // The magic fork is a single LE read: both magics are little-endian
-    // on the wire (AOQ1's landed codec law is LE, reconciled 22:03).
-    if raw.magic == AOQ1_MAGIC {
-        return parse_meta_aoq1(buf, alignment, body_at);
-    }
-    let meta = raw;
-    if meta.magic != MAGIC {
-        return Err(IpcError::BadMagic { got: meta.magic });
-    }
-    if meta.reserved0 != 0 || meta.pad_tail != [0; 4] {
-        return Err(IpcError::HeaderDigestMismatch {
-            got: meta.header_digest,
+    if !is_fb {
+        // Legacy gate order unchanged: header fields + seal + version/flags/alignment.
+        let meta = meta_from(&buf[8..72]);
+        if raw_magic == AOQ1_MAGIC {
+            return parse_meta_aoq1(buf, meta_span);
+        }
+        if meta.magic != MAGIC {
+            return Err(IpcError::BadMagic { got: meta.magic });
+        }
+        if meta.reserved0 != 0 || meta.pad_tail != [0; 4] {
+            return Err(IpcError::HeaderDigestMismatch { got: meta.header_digest });
+        }
+        let sealed = seal_meta(meta);
+        if sealed.header_digest != meta.header_digest {
+            return Err(IpcError::HeaderDigestMismatch { got: meta.header_digest });
+        }
+        if meta.version != LAYOUT_VERSION {
+            return Err(IpcError::BadVersion { got: meta.version });
+        }
+        if meta.flags != 0 {
+            return Err(IpcError::BadFlags { got: meta.flags });
+        }
+        let alignment = if meta_span == meta_span_for(8) { 8 } else { 64 };
+        if meta.alignment as usize != alignment {
+            return Err(IpcError::BadAlignment { got: meta.alignment });
+        }
+        return Ok(ParsedMeta {
+            alignment,
+            body_at,
+            meta,
+            fb: None,
         });
     }
-    let sealed = seal_meta(meta);
-    if sealed.header_digest != meta.header_digest {
-        return Err(IpcError::HeaderDigestMismatch {
-            got: meta.header_digest,
-        });
+    // fb branch: variable metadata span, Message flatbuffer validated.
+    let alignment = if (PREFIX_SIZE + meta_span).is_multiple_of(64) { 64 } else { 8 };
+    let region = &buf[8..body_at];
+    let message = crate::flatbuf::read_message(region)
+        .map_err(|e| IpcError::Fb(e))?;
+    let body_len64 = message.body_length;
+    if body_len64 < 0 || body_len64 > FB_BODY_MAX as i64 {
+        return Err(IpcError::BodyTooLarge { got: body_len64 });
     }
-    if meta.version != LAYOUT_VERSION {
-        return Err(IpcError::BadVersion { got: meta.version });
-    }
-    if meta.flags != 0 {
-        return Err(IpcError::BadFlags { got: meta.flags });
-    }
-    if meta.alignment as usize != alignment {
-        return Err(IpcError::BadAlignment {
-            got: meta.alignment,
-        });
+    let body_len = body_len64 as u32;
+    // Ancillary key values ride the schema-level custom_metadata.
+    let (sd_key, bd_key) = ancillary_keys(&message);
+    if !allow_fb {
+        return Err(IpcError::LegacyReadForeignMeta);
     }
     Ok(ParsedMeta {
         alignment,
         body_at,
-        meta,
+        fb: Some(FbParsed { message, schema_digest: fb_schema_digest(region), schema_blake3: sd_key, body_blake3: bd_key }),
+        meta: MetaHeader {
+            magic: FB_MAGIC,
+            version: message.version as u16,
+            flags: 0,
+            schema_digest: fb_schema_digest(region),
+            body_len,
+            alignment: alignment as u32,
+            seq: 0,
+            reserved0: 0,
+            header_digest: 0,
+            pad_tail: [0; 4],
+        },
     })
 }
 
+/// fb window body ceiling (2 GiB).
+const FB_BODY_MAX: usize = 2 * 1024 * 1024 * 1024;
+
+/// blake3 over the metadata flatbuffer region.
+fn fb_schema_digest(region: &[u8]) -> [u8; 32] {
+    crate::blake3::hash(region)
+}
 /// The AOQ1 branch of the [`parse_meta`] magic fork (PG-A2 §2, AB-8):
 /// same gate order as the IPC1 path, per-magic domain values. The AOQ1
 /// header is LITTLE-endian (landed codec law), the digest span is
@@ -458,8 +566,9 @@ fn parse_meta(buf: &[u8]) -> Result<ParsedMeta, IpcError> {
 /// closed epoch enum, and the metadata padding carries `body_len` u32 LE
 /// plus the 16-byte tag. Alignment-8 AOQ1 framing has no padding to carry
 /// either — typed [`IpcError::TagMissing`], never a misread.
-fn parse_meta_aoq1(buf: &[u8], alignment: usize, body_at: usize) -> Result<ParsedMeta, IpcError> {
-    if alignment != 64 {
+fn parse_meta_aoq1(buf: &[u8], meta_span: usize) -> Result<ParsedMeta<'_>, IpcError> {
+    let body_at = PREFIX_SIZE + meta_span;
+    if meta_span != meta_span_for(64) {
         return Err(IpcError::TagMissing);
     }
     let hb = &buf[8..72];
@@ -490,6 +599,7 @@ fn parse_meta_aoq1(buf: &[u8], alignment: usize, body_at: usize) -> Result<Parse
     Ok(ParsedMeta {
         alignment: 64,
         body_at,
+        fb: None,
         meta: MetaHeader {
             magic: AOQ1_MAGIC,
             version: 2,
@@ -675,3 +785,304 @@ pub fn read_verified(
     let _ = meta;
     Ok(n)
 }
+
+// ===========================================================================
+// fb branch: flatbuffer Message windows (lane 7, v26.11.6)
+// ===========================================================================
+
+/// Window length for an fb window: prefix + metadata span + body + body
+/// pad + EOS. `meta_span` must be `pad_to(fb_len + 8, alignment) - 8`.
+#[must_use]
+pub fn window_len_fb(fb_len: usize, body_len: usize, alignment: usize) -> usize {
+    PREFIX_SIZE + meta_span_from_fb(fb_len, alignment) + body_len + pad_to(body_len, alignment) + EOS_SIZE
+}
+
+/// Metadata span for an fb window: the flatbuffer length zero-padded so
+/// the body starts `alignment`-aligned (variable metadata_size law).
+#[must_use]
+pub fn meta_span_from_fb(fb_len: usize, alignment: usize) -> usize {
+    pad_to(fb_len + PREFIX_SIZE, alignment) - PREFIX_SIZE
+}
+
+/// Ancillary keys (custom_metadata KeyValue law). `cgap:body_blake3`
+/// carries the body tamper tier on the fb branch (replaces the legacy
+/// padding-slot digest); `cgap:schema_blake3` keeps the expected_schema
+/// seam.
+pub const KEY_BODY_DIGEST: &str = "cgap:body_blake3";
+pub const KEY_SCHEMA_DIGEST: &str = "cgap:schema_blake3";
+
+/// Hex-encode 32 bytes (lowercase, 64 chars) into `out`; returns the hex
+/// length.
+fn hex32(d: &[u8; 32], out: &mut [u8]) -> usize {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for (i, b) in d.iter().enumerate() {
+        out[2 * i] = HEX[usize::from(b >> 4)];
+        out[2 * i + 1] = HEX[usize::from(b & 0xf)];
+    }
+    64
+}
+
+
+/// Parse a 64-char lowercase hex string back to 32 bytes.
+fn unhex32(s: &str) -> Option<[u8; 32]> {
+    if s.len() != 64 {
+        return None;
+    }
+    let b = s.as_bytes();
+    let hv = |c: u8| -> Option<u8> {
+        match c {
+            b'0'..=b'9' => Some(c - b'0'),
+            b'a'..=b'f' => Some(c - b'a' + 10),
+            _ => None,
+        }
+    };
+    let mut out = [0u8; 32];
+    for i in 0..32 {
+        let hi = hv(b[2 * i])?;
+        let lo = hv(b[2 * i + 1])?;
+        out[i] = (hi << 4) | lo;
+    }
+    Some(out)
+}
+
+/// Ancillary keys ride the schema-level custom_metadata (lane 7 law):
+/// `cgap:body_blake3` is the body tamper tier (replaces the legacy
+/// padding-slot digest); `cgap:schema_blake3` keeps the expected_schema
+/// seam (blake3 over the pre-ancillary schema region, pass 1).
+
+/// Emit an fb window: Message flatbuffer + body, framed per the variable
+/// metadata_size law. `schema_meta` is the caller's schema custom_metadata
+/// (<= 62 pairs); the ancillary keys are appended by the emitter.
+pub fn emit_fb(
+    out: &mut [u8],
+    schema: &crate::flatbuf::SchemaEnc<'_>,
+    body: &[u8],
+    alignment: usize,
+) -> Result<usize, IpcError> {
+    emit_fb_inner(out, schema, body, alignment, false)
+}
+
+/// Emit a verified fb window: [`emit_fb`] plus the `cgap:body_blake3`
+/// key. Plain fb windows refuse on [`read_verified_fb`] with
+/// [`IpcError::BodyDigestMissing`].
+pub fn emit_verified_fb(
+    out: &mut [u8],
+    schema: &crate::flatbuf::SchemaEnc<'_>,
+    body: &[u8],
+    alignment: usize,
+) -> Result<usize, IpcError> {
+    emit_fb_inner(out, schema, body, alignment, true)
+}fn emit_fb_inner(
+    out: &mut [u8],
+    schema: &crate::flatbuf::SchemaEnc<'_>,
+    body: &[u8],
+    alignment: usize,
+    verified: bool,
+) -> Result<usize, IpcError> {
+    if !matches!(alignment, 8 | 64) {
+        return Err(IpcError::BadAlignment { got: alignment as u32 });
+    }
+    if body.len() > FB_BODY_MAX {
+        return Err(IpcError::BodyTooLarge { got: body.len() as i64 });
+    }
+    let buf_len = out.len();
+    // Pass 1: pre-ancillary region + its digest (non-circular: the digest
+    // is over the schema message WITHOUT the ancillary keys).
+    let n1 = match crate::flatbuf::emit_message(out, schema, body.len() as i64) {
+        Ok(v) => v,
+        Err(e) => return Err(IpcError::Fb(e)),
+    };
+    let schema_digest = crate::blake3::hash(&out[buf_len - n1..buf_len]);
+    // Pass 2: schema meta = caller meta ++ ancillary keys.
+    let mut hex1 = [0u8; 64];
+    hex32(&schema_digest, &mut hex1);
+    let sd = core::str::from_utf8(&hex1).unwrap_or("");
+    let body_digest = crate::blake3::hash(body);
+    let mut hex2 = [0u8; 64];
+    hex32(&body_digest, &mut hex2);
+    let bd = core::str::from_utf8(&hex2).unwrap_or("");
+    let mut combined: [(&str, &str); crate::flatbuf::MAX_SLOTS] =
+        [("", ""); crate::flatbuf:: MAX_SLOTS];
+    let mut k = 0usize;
+    for pair in schema.meta {
+        if k >= crate::flatbuf::MAX_SLOTS - 2 {
+            return Err(IpcError::Fb(crate::flatbuf::FbError::FieldCap));
+        }
+        combined[k] = *pair;
+        k += 1;
+    }
+    combined[k] = (KEY_SCHEMA_DIGEST, sd);
+    k += 1;
+    if verified {
+        combined[k] = (KEY_BODY_DIGEST, bd);
+        k += 1;
+    }
+    let enc = crate::flatbuf::SchemaEnc {
+        little_endian: schema.little_endian,
+        fields: schema.fields,
+        meta: &combined[..k],
+    };
+    let n2 = match crate::flatbuf::emit_message(out, &enc, body.len() as i64) {
+        Ok(v) => v,
+        Err(e) => return Err(IpcError::Fb(e)),
+    };
+    // Relocate fb to the window position out[8..], pad, frame.
+    let span = meta_span_from_fb(n2, alignment);
+    let total = window_len_fb(n2, body.len(), alignment);
+    if out.len() < total {
+        return Err(IpcError::Truncated { needed: total, got: out.len() });
+    }
+    out.copy_within(buf_len - n2..buf_len, 8);
+    for b in out[8 + n2..8 + span].iter_mut() {
+        *b = 0;
+    }
+    let body_at = PREFIX_SIZE + span;
+    out[body_at..body_at + body.len()].copy_from_slice(body);
+    for b in out[body_at + body.len()..body_at + span + body.len()].iter_mut() {
+        *b = 0;
+    }
+    let eos_at = body_at + body.len() + pad_to(body.len(), alignment);
+    out[eos_at..eos_at + 4].copy_from_slice(&CONTINUATION.to_le_bytes());
+    out[eos_at + 4..eos_at + 8].copy_from_slice(&EOS.to_le_bytes());
+    // Prefix words.
+    out[0..4].copy_from_slice(&CONTINUATION.to_le_bytes());
+    out[4..8].copy_from_slice(&((span) as u32).to_le_bytes());
+    Ok(total)
+}
+
+/// Read result for the fb branch: body length, schema view, digests.
+pub struct FbRead<'a> {
+    /// Body length (== Message.bodyLength, equality is a gate).
+    pub body_len: usize,
+    /// The parsed schema message.
+    pub schema: crate::flatbuf::SchemaView<'a>,
+    /// blake3 over the pre-ancillary schema region? NO: blake3 over the
+    /// carried flatbuffer region (as carried).
+    pub schema_digest: [u8; 32],
+    /// cgap:schema_blake3 value carried in custom_metadata.
+    pub schema_blake3: Option<[u8; 32]>,
+    /// cgap:body_blake3 value carried in custom_metadata.
+    /// cgap:body_blake3 value carried in custom_metadata.
+    pub body_blake3: Option<[u8; 32]>,
+}
+
+/// The fb read core: framing + flatbuffer parse + bodyLength equality
+/// gate + body copy. `verified` adds the cgap:body_blake3 gate.
+fn read_fb_core<'a>(
+    buf: &'a [u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+    verified: bool,
+) -> Result<FbRead<'a>, IpcError> {
+    let p = parse_meta_with(buf, true)?;
+    let fbi = match p.fb {
+        Some(f) => f,
+        None => return Err(IpcError::LegacyReadForeignMeta),
+    };
+    let body_len = p.meta.body_len as usize;
+    let body_at = p.body_at;
+    let alignment = p.alignment;
+    // bodyLength equality gate.
+    if i64::from(p.meta.body_len) != fbi.message.body_length {
+        return Err(IpcError::FbBodyLenInvalid {
+            got: fbi.message.body_length,
+            expected: p.meta.body_len,
+        });
+    }
+    if body_out.len() < body_len {
+        return Err(IpcError::Truncated {
+            needed: body_len,
+            got: body_out.len(),
+        });
+    }
+    // Extent gate BEFORE the copy (DoS fence: a mutated bodyLength must
+    // classify typed, never panic or over-read).
+    let body_pad = pad_to(body_len, alignment);
+    if buf.len() < body_at + body_len + body_pad + EOS_SIZE {
+        return Err(IpcError::MissingEos { got: 0 });
+    }
+    body_out[..body_len].copy_from_slice(&buf[body_at..body_at + body_len]);
+    // Body pad + EOS gates (same classes as legacy).
+    for i in 0..body_pad {
+        if buf[body_at + body_len + i] != 0 {
+            return Err(IpcError::PadNonZero { at: body_at + body_len + i });
+        }
+    }
+    let eos_at = body_at + body_len + body_pad;
+    let cont2 = u32::from_le_bytes([buf[eos_at], buf[eos_at+1], buf[eos_at+2], buf[eos_at+3]]);
+    let tail = u32::from_le_bytes([buf[eos_at+4], buf[eos_at+5], buf[eos_at+6], buf[eos_at+7]]);
+    if cont2 != CONTINUATION || tail != EOS {
+        return Err(IpcError::MissingEos { got: tail });
+    }
+    // Tamper tier (fb): cgap:body_blake3 gate on the verified path.
+    if verified {
+        match fbi.body_blake3 {
+            None => return Err(IpcError::BodyDigestMissing),
+            Some(d) => {
+                if crate::blake3::hash(&body_out[..body_len]) != d {
+                    return Err(IpcError::BodyDigestMismatch { got: d });
+                }
+            }
+        }
+    }
+    // expected_schema seam: compared against cgap:schema_blake3.
+    if let Some(exp) = expected_schema {
+        match fbi.schema_blake3 {
+            None => return Err(IpcError::SchemaMismatch { got: None }),
+            Some(sd) => {
+                if &sd != exp {
+                    return Err(IpcError::SchemaMismatch { got: None });
+                }
+            }
+        }
+    }
+    Ok(FbRead {
+        body_len,
+        schema: fbi.message.schema,
+        schema_digest: fbi.schema_digest,
+        schema_blake3: fbi.schema_blake3,
+        body_blake3: fbi.body_blake3,
+    })
+}
+
+/// Extract the ancillary key values from the schema custom_metadata.
+fn ancillary_keys(m: &crate::flatbuf::MessageView<'_>) -> (Option<[u8; 32]>, Option<[u8; 32]>) {
+    let mut sd: Option<[u8; 32]> = None;
+    let mut bd: Option<[u8; 32]> = None;
+    if let Ok(meta) = m.schema.meta() {
+        for i in 0..meta.len() {
+            if let Ok((k, v)) = meta.get(i) {
+                if k == KEY_SCHEMA_DIGEST {
+                    sd = unhex32(v);
+                } else if k == KEY_BODY_DIGEST {
+                    bd = unhex32(v);
+                }
+            }
+        }
+    }
+    (sd, bd)
+}
+
+/// Read an fb window (framing + flatbuffer parse + body copy). The
+/// expected_schema seam is compared against the carried cgap:schema_blake3
+/// (None expected => skip; expected but window lacks the key =>
+/// SchemaMismatch { got: None }).
+pub fn read_fb<'a>(
+    buf: &'a [u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+) -> Result<FbRead<'a>, IpcError> {
+    read_fb_core(buf, expected_schema, body_out, false)
+}
+
+/// Read with body integrity on the fb branch: every framing class plus the
+/// cgap:body_blake3 gate (tamper tier): missing key => BodyDigestMissing,
+/// mismatch => BodyDigestMismatch { got }.
+pub fn read_verified_fb<'a>(
+    buf: &'a [u8],
+    expected_schema: Option<&[u8; 32]>,
+    body_out: &mut [u8],
+) -> Result<FbRead<'a>, IpcError> {
+    read_fb_core(buf, expected_schema, body_out, true)
+}
+

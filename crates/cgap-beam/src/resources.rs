@@ -236,6 +236,7 @@ pub(crate) extern "C" fn nif_load(
     if crate::ops_scan::open_batch_view_type(at_load_env)
         && open_batch_envelope_type(at_load_env)
         && crate::aq_slab::open_aq_types(at_load_env)
+        && crate::aq_quic::open_quic_types(at_load_env)
     {
         0
     } else {

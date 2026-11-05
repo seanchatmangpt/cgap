@@ -14,11 +14,11 @@
 //!     (red-11 finding 1); breaking one breaks the build everywhere.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Recursively copy `src_dir` into `dst_dir/src`.
-fn copy_src(src_dir: &PathBuf, dst_root: &PathBuf) -> std::io::Result<()> {
+fn copy_src(src_dir: &PathBuf, dst_root: &Path) -> std::io::Result<()> {
     let dst_src = dst_root.join("src");
     fs::create_dir_all(&dst_src)?;
     for entry in fs::read_dir(src_dir)? {
@@ -63,7 +63,7 @@ fn make_sandbox(tag: &str) -> PathBuf {
 }
 
 /// Run cargo against a sandbox manifest with its own isolated target dir.
-fn sandbox_build(root: &PathBuf, args: &[&str]) -> (bool, String) {
+fn sandbox_build(root: &Path, args: &[&str]) -> (bool, String) {
     let target_dir = root.join("target");
     let out = Command::new(cargo_bin())
         .args(args)

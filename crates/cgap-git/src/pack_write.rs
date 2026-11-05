@@ -363,6 +363,8 @@ pub fn write_idx_v2(
 
 /// Build pack + idx + the per-object `(oid, offset, crc)` table from blob
 /// contents in one pass. This is the primary entry point.
+// Tuple result is the pack/idx contract; kept inline by design.
+#[allow(clippy::type_complexity)]
 pub fn build_pack_and_idx(
     blobs: &[&[u8]],
 ) -> Result<
@@ -556,6 +558,8 @@ pub fn parse_pack_v2(pack: &[u8]) -> Result<alloc::vec::Vec<ParsedObject>, GitEr
 
 /// Parse a v2 `.idx`: verify magic, version, both trailing checksums, fan-out
 /// monotonicity, OID sort order, and return `(oids, crcs, offsets)`.
+// Tuple result is the idx parse contract; kept inline by design.
+#[allow(clippy::type_complexity)]
 pub fn parse_idx_v2(
     idx: &[u8],
 ) -> Result<

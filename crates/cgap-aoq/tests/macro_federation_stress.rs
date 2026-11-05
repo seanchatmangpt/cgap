@@ -25,7 +25,7 @@
 //! Scale honesty (essay-claims law): the 50M-records claim is
 //! TARGET-UNMEASURED. Default mode measures **1M records** (900k admitted
 //! + 100k probes over 500 endpoints); `#[ignore]` mode measures 10M. The
-//! 50M claim stays TARGET-UNMEASURED and is never cited as measured.
+//!   50M claim stays TARGET-UNMEASURED and is never cited as measured.
 //!
 //! Measured surfaces: per-record pipeline latency distribution, aggregate
 //! throughput, refusal census by class code, plaintext-absence court,
@@ -111,7 +111,7 @@ impl Hist {
 
     fn observe(&mut self, ns: u64) {
         let ns = ns.max(1); // log2 bucket needs a nonzero sample
-        let idx = (63 - u64::from(ns).leading_zeros()).min(47) as usize;
+        let idx = (63 - ns.leading_zeros()).min(47) as usize;
         self.buckets[idx] += 1;
         self.min = self.min.min(ns);
         self.max = self.max.max(ns);
@@ -243,7 +243,7 @@ fn admit_record(
     let header = codec::decode(frame).map_err(|e: AoqError| e.class_code())?;
 
     // -- Stage 2: consent preimage law (AB-7) ---------------------------
-    let consent_epoch = (u16::from(header.epoch & 0x01) << 14) | (origin & ORIGIN_MASK);
+    let consent_epoch = ((header.epoch & 0x01) << 14) | (origin & ORIGIN_MASK);
     if consent_epoch & CONSENT_BIT == 0 {
         return Err(CONSENT_REVOKED);
     }

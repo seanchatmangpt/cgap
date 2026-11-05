@@ -31,7 +31,7 @@ use cgap_arrow::c_abi::{export, ArrowArray};
 use cgap_arrow::primitive::PrimitiveBuilder;
 use cgap_audit::alloc_counter::with_alloc_tracking;
 
-const FMT_I: *const core::ffi::c_char = b"i\0".as_ptr() as *const _;
+const FMT_I: *const core::ffi::c_char = c"i".as_ptr();
 
 /// Process-global static export slots: tests driving `cgap_i32_batch` race
 /// otherwise (witnessed failure class in zero_copy.rs). Also keeps each

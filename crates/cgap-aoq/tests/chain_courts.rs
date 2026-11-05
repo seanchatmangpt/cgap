@@ -7,8 +7,6 @@
 //! run with no observed refusal is a VACUOUS GATE.
 
 use cgap_aoq::chain::{verify_records, AoqChain, AoqChainRecord, ChainDigest, Spoliation, GENESIS};
-use cgap_aoq::codec;
-use cgap_aoq::header::AoqHeader;
 
 /// Deterministic dual-FNV digest substrate (same construction as the
 /// session's test KDF — the compose law needs one shared substrate).
@@ -32,7 +30,7 @@ fn mix32(parts: &[&[u8]]) -> [u8; 32] {
         }
     }
     let mut out = [0u8; 32];
-    for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
+    for (i, chunk) in out.as_chunks_mut::<8>().0.iter_mut().enumerate() {
         let v = if i % 2 == 0 {
             a.wrapping_add(i as u64)
         } else {
@@ -171,7 +169,7 @@ fn c4_checkpoint_resume_law() {
     assert_eq!(c2.resume(tok), Ok(()));
 
     // Extending past the token stays lawful (append-only forward).
-    assert_eq!(c2.append(0, b"more").is_ok(), true);
+    assert!(c2.append(0, b"more").is_ok());
     assert_eq!(c2.resume(tok), Ok(()));
 
     // Forged head (same links count, different head) refuses.
@@ -412,7 +410,7 @@ fn c9_fold_payload_flip_and_tag_flip_refuse() {
     assert_eq!(fresh.len(), 1);
 
     let head_before = fresh.checkpoint();
-    let mut short = vec![0u8; 4];
+    let short = vec![0u8; 4];
     match fresh.append_verified(&short) {
         Err(cgap_aoq::error::AoqError::HeaderTooShort { got }) => {
             assert_eq!(got, 4, "short-frame fold must classify typed");

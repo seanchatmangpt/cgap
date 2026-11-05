@@ -39,7 +39,7 @@ struct Frame {
 }
 
 fn build_frame(facts: usize, seed: u64) -> Frame {
-    let words = (facts + 63) / 64;
+    let words = facts.div_ceil(64);
     let mut st = seed;
     let mut derived_deps = vec![0u64; words];
     let mut del_mask = vec![0u64; words];
@@ -111,8 +111,8 @@ fn court_cascade_matches_dual_oracle() {
     // the whole chain purges. With alt on fact 2: {0,1,3,4} purge, 2 and
     // its downstream survive.
     let words = 1usize;
-    let mut dd = vec![0b1111_0u64; 1]; // facts 1..4 derived
-    let mut dm = vec![0b0000_1u64; 1]; // root 0 deleted
+    let mut dd = vec![0b1_1110u64; 1]; // facts 1..4 derived
+    let mut dm = vec![0b0_0001u64; 1]; // root 0 deleted
     let mut alt = vec![0u32; 5];
     let edges: Vec<(u32, u32)> = vec![(0, 1), (1, 2), (2, 3), (3, 4)];
     let _ = (words, &mut dd, &mut dm);

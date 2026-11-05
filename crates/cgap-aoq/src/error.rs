@@ -62,6 +62,24 @@ pub enum AoqError {
     /// ciphertext-byte and AAD-byte tamper both land here). Integer
     /// field only — `Copy`, no heap, no strings.
     AeadMismatch,
+    /// PQC composite-seal refusal (additive, L56): the cgap-crypto
+    /// `pqc_seal` kernel refused at seal or open time; the
+    /// [`crate::pqc_seal::PqcSealClass`] code identifies the kernel
+    /// failure class. Integer fields only — `Copy`, no heap, no strings.
+    /// Present under the `pqc` feature (with the alloc-using facade).
+    #[cfg(feature = "pqc")]
+    PqcSealRefused {
+        /// Kernel refusal class (see [`crate::pqc_seal::PqcSealClass`]).
+        class: crate::pqc_seal::PqcSealClass,
+    },
+    /// KEM input-shape refusal (additive, v26.11.6 PQC lane 13): a
+    /// kernel_id was admitted but the input width was wrong (ek != 1184,
+    /// dk != 2400, ct != 1088). Refused BEFORE the kernel is touched.
+    /// Integer field only — `Copy`, no heap, no strings.
+    KemShapeMismatch {
+        /// The offending input width in bytes.
+        got: usize,
+    },
 }
 
 impl AoqError {
@@ -82,6 +100,9 @@ impl AoqError {
             Self::AeadKernelNotAdmitted { .. } => 0x00_0B,
             Self::SlabFull { .. } => 0x00_0C,
             Self::AeadMismatch => 0x00_0D,
+            #[cfg(feature = "pqc")]
+            Self::PqcSealRefused { class } => 0x50_00 | class.class_code() & 0x00_FF,
+            Self::KemShapeMismatch { .. } => 0x00_0E,
         }
     }
 }
@@ -118,6 +139,11 @@ impl fmt::Display for AoqError {
             }
             Self::SlabFull { len } => write!(f, "slab full: {len} links"),
             Self::AeadMismatch => f.write_str("aead open mismatch"),
+            #[cfg(feature = "pqc")]
+            Self::PqcSealRefused { class } => {
+                write!(f, "pqc seal refused: class 0x{:04X}", class.class_code())
+            }
+            Self::KemShapeMismatch { got } => write!(f, "KEM shape mismatch: {got}B"),
         }
     }
 }

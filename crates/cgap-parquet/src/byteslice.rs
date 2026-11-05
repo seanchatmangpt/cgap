@@ -66,9 +66,8 @@ pub fn pack_byteslice(values: &[u32], k: u8) -> Vec<Vec<u8>> {
     let n = values.len();
     let kmask = if k == 16 { 0xFFFF_u32 } else { (1u32 << k) - 1 };
     let mut packed = alloc::vec![alloc::vec![0u8; n]; cols];
-    for j in 0..cols {
+    for (j, col) in packed.iter_mut().enumerate() {
         let shift = 8 * j;
-        let col = &mut packed[j];
         for (i, &v) in values.iter().enumerate() {
             col[i] = ((v & kmask) >> shift) as u8;
         }

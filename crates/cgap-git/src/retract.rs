@@ -105,9 +105,9 @@ pub fn build_csr(
         counts[p as usize] += 1;
     }
     let mut run = 0u32;
-    for f in 0..facts {
-        let c = counts[f];
-        counts[f] = run;
+    for slot in counts[..facts].iter_mut() {
+        let c = *slot;
+        *slot = run;
         run = run.wrapping_add(c);
     }
     counts[facts] = run;
@@ -141,9 +141,9 @@ pub fn keep_mask_swar(
         let mut k = !suspect;
         let lo = w * 64;
         let hi = core::cmp::min(lo + 64, alt_support.len());
-        for lane in lo..hi {
-            if alt_support[lane] != 0 {
-                k |= 1u64 << (lane - lo);
+        for (bit, &support) in alt_support[lo..hi].iter().enumerate() {
+            if support != 0 {
+                k |= 1u64 << bit;
             }
         }
         if lo + 64 > facts {
@@ -162,7 +162,7 @@ pub fn keep_mask_swar(
 /// run += set). CONTRACT: `out` needs ONE slack slot past the worst case;
 /// the returned count is the only authoritative length.
 pub fn compact_lanes(keep: &[u64], base: u32, out: &mut [u32]) -> u32 {
-    debug_assert!(out.len() >= base as usize + keep.len() * 64 + 1);
+    debug_assert!(out.len() > base as usize + keep.len() * 64);
     let mut run = base;
     for (w, &k) in keep.iter().enumerate() {
         let wbase = w * 64;
@@ -193,8 +193,8 @@ pub fn cascade_step(
         let f = worklist[i] as usize;
         let lo = counts[f] as usize;
         let hi = counts[f + 1] as usize;
-        for k in lo..hi {
-            let d = adj[k] as usize;
+        for &d32 in &adj[lo..hi] {
+            let d = d32 as usize;
             let word = d / 64;
             let lane = d % 64;
             if purged[word] & (1u64 << lane) == 0 && alt_support[d] == 0 {
@@ -239,6 +239,9 @@ fn cascade_steps(
 /// surviving fact coordinates. Appends to `out` after `base`; returns the
 /// new total or a typed [`RetractError`] on an under-provisioned lease.
 /// Zero heap allocation inside the hot path.
+// CSR cascade lease takes 11 slice/scalar parameters by design; do not
+// refactor the public hot-path signature.
+#[allow(clippy::too_many_arguments)]
 pub fn revert_cascade(
     derived_deps: &[u64],
     del_mask: &[u64],
@@ -271,9 +274,7 @@ pub fn revert_cascade(
             provided: counts.len(),
         });
     }
-    for w in 0..words {
-        purged[w] = 0;
-    }
+    purged[..words].fill(0);
     // Seed: every deleted fact is a cascade root, enqueued exactly once
     // (marked before push; tail <= facts by construction).
     let mut head = 0usize;
@@ -415,6 +416,9 @@ pub fn count_orphans(
 /// leaves transitive dependents unpurged — injected orphan derivations
 /// the integrity driver must report as typed
 /// [`RetractError::OrphanDerivation`].
+// CSR cascade lease takes 11 slice/scalar parameters by design; do not
+// refactor the public hot-path signature.
+#[allow(clippy::too_many_arguments)]
 pub fn revert_cascade_mutant_one_step(
     derived_deps: &[u64],
     del_mask: &[u64],
@@ -435,9 +439,7 @@ pub fn revert_cascade_mutant_one_step(
             facts,
         });
     }
-    for w in 0..words {
-        purged[w] = 0;
-    }
+    purged[..words].fill(0);
     let mut tail = 0usize;
     for w in 0..words {
         let mut bits = del_mask[w];

@@ -269,7 +269,7 @@ pub fn frame_len(coords: &[(Namespace, Coord)]) -> Result<usize, TreeSynthError>
 }
 
 /// Slice the `i`-th framed entry out of a synthesized buffer.
-pub fn entry_at<'a>(out: &'a [u8], i: usize) -> Result<&'a [u8], TreeSynthError> {
+pub fn entry_at(out: &[u8], i: usize) -> Result<&[u8], TreeSynthError> {
     let mut off = 0usize;
     let mut n = 0usize;
     while off < out.len() {
@@ -284,7 +284,7 @@ pub fn entry_at<'a>(out: &'a [u8], i: usize) -> Result<&'a [u8], TreeSynthError>
 }
 
 /// Slice just the path bytes of one framed entry (`<path>` between '\t' and '\0').
-pub fn entry_path<'a>(entry: &'a [u8]) -> Result<&'a [u8], TreeSynthError> {
+pub fn entry_path(entry: &[u8]) -> Result<&[u8], TreeSynthError> {
     if entry.len() < 78 || &entry[..12] != b"100644 blob " {
         return Err(TreeSynthError::MalformedEntry { at: 0 });
     }

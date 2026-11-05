@@ -858,8 +858,8 @@ fn cbmqs_seven_gates_summary_table() {
     println!();
     println!("================ CBMQS SEVEN-GATE SUMMARY (AF-10) ================");
     println!(
-        "{:<4} {:<44} {:<6} {}",
-        "gate", "composes", "status", "measured / reason"
+        "{:<4} {:<44} {:<6} measured / reason",
+        "gate", "composes", "status"
     );
     println!("{}", "-".repeat(100));
     let mut n_fail = 0usize;

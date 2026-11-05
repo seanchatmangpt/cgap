@@ -313,6 +313,9 @@ fn lz77_tokens_into(
         if best_len >= MIN_MATCH {
             tokens.push(Token::Match(best_len as u16, best_dist));
             // insert the covered positions so later matches can chain them
+            // hash-chain insertion indexes two arrays (prev, head); keep
+            // the indexed form for bounds-check elision in this hot path
+            #[allow(clippy::needless_range_loop)]
             for k in (i + 1)..(i + best_len) {
                 if k + MIN_MATCH <= data.len() {
                     let h = hash3(data, k);
@@ -464,9 +467,9 @@ fn huff_build(lengths: &[u8]) -> Result<Huff, GitError> {
     counts[0] = 0;
     // over-subscribed check
     let mut left: i32 = 1;
-    for len in 1..=15 {
+    for &c in counts[1..=15].iter() {
         left <<= 1;
-        left -= counts[len] as i32;
+        left -= c as i32;
         if left < 0 {
             return Err(GitError::BadVarint);
         }

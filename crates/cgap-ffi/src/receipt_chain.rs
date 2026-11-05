@@ -490,12 +490,12 @@ mod courts {
     fn lease_exhaustion_is_typed_refusal() {
         use crate::sovereign::{cgap_commit_parquet, CGAP_ERR_LEASE_EXHAUSTED, CGAP_OK};
         let path = std::ffi::CString::new("/tmp/p2-lease-court.par2").unwrap();
-        let lanes: Vec<i32> = (0..16).map(|r| (r % 256) as i32).collect();
+        let lanes: Vec<i32> = (0..16).map(|r| r % 256).collect();
         // Grant leg: an in-ceiling call commits OK (lease granted).
         let st = unsafe { cgap_commit_parquet(lanes.as_ptr(), lanes.len(), path.as_ptr()) };
         assert_eq!(st, CGAP_OK, "in-ceiling commit must commit");
         // Over-ceiling leg: 70,000 lanes exceeds the 64 KiB lease.
-        let over: Vec<i32> = (0..70_000).map(|r| (r % 256) as i32).collect();
+        let over: Vec<i32> = (0..70_000).map(|r| r % 256).collect();
         let st = unsafe { cgap_commit_parquet(over.as_ptr(), over.len(), path.as_ptr()) };
         assert_eq!(
             st, CGAP_ERR_LEASE_EXHAUSTED,

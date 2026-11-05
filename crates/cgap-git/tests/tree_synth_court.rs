@@ -138,9 +138,9 @@ fn court_namespace_projection() {
         b"/receipts/10-0-1",
         b"/rules/1-2-3",
     ];
-    for i in 0..expect.len() {
+    for (i, &want) in expect.iter().enumerate() {
         let p = entry_path(entry_at(tree, i).unwrap()).unwrap();
-        assert_eq!(p, expect[i], "entry {i} landed under the wrong virtual dir");
+        assert_eq!(p, want, "entry {i} landed under the wrong virtual dir");
     }
     // Divergence is honest: digest field is 64 hex chars, not Git's 40.
     assert_eq!(entry_at(tree, 0).unwrap()[..12], *PFX);

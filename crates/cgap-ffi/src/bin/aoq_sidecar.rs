@@ -82,6 +82,7 @@ mod imp {
     use cgap_ffi::aoq::status_maps::{
         AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
         AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_OK,
+        AOQ_STATUS_UNSUPPORTED_VERSION,
     };
 
     // ---------------------------------------------------------------------------
@@ -318,12 +319,15 @@ mod imp {
     }
 
     /// Map a [`SessionError`] to a frozen-band status word (mirrors the
-    /// private `status_of` in `aoq_session.rs` — same pinned collisions).
+    /// private `status_of` in `aoq_session.rs` — same pinned mapping).
     fn session_status(err: &SessionError) -> u32 {
         match err {
             SessionError::LengthMismatch { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
+            // KD-COVERS: KD-1 — version refusals carry their own word since
+            // the KD-1 band extension (FM-AOQ-009); no digest-word collision.
+            SessionError::Wire(AoqError::UnsupportedVersion { .. })
+                => AOQ_STATUS_UNSUPPORTED_VERSION,
             SessionError::Wire(AoqError::BadMagic { .. })
-            | SessionError::Wire(AoqError::UnsupportedVersion { .. })
             | SessionError::Wire(AoqError::DigestMismatch { .. })
             // AoqError::AeadMismatch appended mid-wave by lane CG8 (0x00_0D):
             // authenticity failure -> same frozen digest-mismatch status.
@@ -335,6 +339,7 @@ mod imp {
             | SessionError::EpochMismatch { .. }
             | SessionError::UnexpectedFrame { .. } => AOQ_STATUS_EPOCH_MISMATCH,
             SessionError::Wire(AoqError::KemKernelNotAdmitted { .. })
+            | SessionError::Wire(AoqError::KemShapeMismatch { .. })
             | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
             | SessionError::KemRefused { .. }
             // AEAD open refused: an authenticity failure (P2 M1 typed landing).
@@ -932,7 +937,7 @@ mod imp {
                 report.count, 1,
                 "read_window: exactly ONE allocation per window (report: {report:?})"
             );
-            assert_eq!(report.bytes as usize, win.len(), "the alloc IS the window");
+            assert_eq!(report.bytes, win.len(), "the alloc IS the window");
         }
 
         // ---------------------------------------------------------------------
@@ -1038,7 +1043,7 @@ mod imp {
         /// Steady-state law: each additional same-size AppData frame costs
         /// EXACTLY ONE heap allocation — the single window Vec of
         /// [`read_window`] (the alloc-elimination target shape; one alloc
-        /// + two head memcpys, body streamed in place). The response leg
+        /// plus two head memcpys, body streamed in place). The response leg
         /// (open/emit/send_window/PatchSink) contributes ZERO: buffers are
         /// hoisted per connection and resized in place, so frames 2..n
         /// never allocate. Before the lane, the per-frame cost was 2

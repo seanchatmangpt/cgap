@@ -28,11 +28,10 @@ type Ring = EgressRing<EGRESS_RING_BYTES, 64>;
 /// visibility): PaddedIndex is exactly one cache line.
 #[test]
 fn padded_index_is_one_full_cache_line() {
-    assert_eq!(core::mem::size_of::<Ring>() > 0, true); // subject exists
-                                                        // head and tail each occupy exactly one 64-B line: the struct-size
-                                                        // formula proves the pair contributes exactly 2 * 64 B.
-    let quota_slots =
-        ((size_of_refusal_quota() + CACHE_LINE_BYTES - 1) / CACHE_LINE_BYTES) * CACHE_LINE_BYTES;
+    assert!(core::mem::size_of::<Ring>() > 0); // subject exists
+                                               // head and tail each occupy exactly one 64-B line: the struct-size
+                                               // formula proves the pair contributes exactly 2 * 64 B.
+    let quota_slots = size_of_refusal_quota().div_ceil(CACHE_LINE_BYTES) * CACHE_LINE_BYTES;
     let expected = EGRESS_RING_BYTES + 2 * CACHE_LINE_BYTES + quota_slots;
     assert_eq!(
         core::mem::size_of::<Ring>(),
@@ -47,7 +46,7 @@ fn padded_index_is_one_full_cache_line() {
 fn quota_lands_on_its_own_cache_line() {
     // quota offset = CAP + 128 (head line + tail line); it cannot share a
     // line with either index because both indices are exactly 64 B.
-    let quota_slots = (size_of_refusal_quota() + CACHE_LINE_BYTES - 1) / CACHE_LINE_BYTES;
+    let quota_slots = size_of_refusal_quota().div_ceil(CACHE_LINE_BYTES);
     assert!(quota_slots >= 1, "quota occupies at least one line slot");
     // Alignment of the whole ring is the cache line width.
     assert_eq!(core::mem::align_of::<Ring>(), CACHE_LINE_BYTES);

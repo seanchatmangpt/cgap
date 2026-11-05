@@ -383,12 +383,12 @@ fn viewvec_descriptor_law_inline_and_foreign() {
 
         let mut saw_inline = false;
         let mut saw_foreign = false;
-        for i in 0..pushed.len() {
+        for (i, pushed_row) in pushed.iter().enumerate() {
             let base = i * 16;
             let d = v.views_bytes();
             let dlen =
                 u32::from_le_bytes(d[base..base + 4].try_into().expect("16-byte view")) as usize;
-            let pushed_len = pushed[i].as_ref().map_or(0, |r| r.len());
+            let pushed_len = pushed_row.as_ref().map_or(0, |r| r.len());
 
             // (a) descriptor len field == pushed len == row(i).len()
             assert_eq!(
@@ -415,7 +415,7 @@ fn viewvec_descriptor_law_inline_and_foreign() {
                 dlen,
                 inline
             );
-            match &pushed[i] {
+            match pushed_row {
                 Some(row) => {
                     if inline {
                         saw_inline = true;

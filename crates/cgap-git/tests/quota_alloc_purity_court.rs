@@ -110,8 +110,8 @@ fn quota_flood_alloc_purity() {
     // happens MID-FLOOD. Window stays open across flood + recovery.
     let mut ring: IngressRing<1024> = IngressRing::new();
     let mut fill = [0u8; 64];
-    for i in 0..64 {
-        fill[i] = (i as u8) ^ 0xA5;
+    for (i, slot) in fill.iter_mut().enumerate() {
+        *slot = (i as u8) ^ 0xA5;
     }
     for _ in 0..16 {
         ring.push(&fill)
@@ -163,8 +163,8 @@ fn quota_flood_alloc_purity() {
     let mut out = [0u8; 64];
     let n = ring.pop(&mut out).expect("post-flood pop must succeed");
     assert_eq!(n, 64);
-    for i in 0..64 {
-        assert_eq!(out[i], (i as u8) ^ 0xA5, "drain must be byte-exact");
+    for (i, &got) in out.iter().enumerate() {
+        assert_eq!(got, (i as u8) ^ 0xA5, "drain must be byte-exact");
     }
     let legit = [0xABu8; 64];
     ring.push(&legit)
@@ -193,8 +193,8 @@ fn quota_flood_alloc_purity() {
     // wrong-stride pushes (RecordTooLarge class) + overflow pushes.
     let mut ering: EgressRing<512, 64> = EgressRing::new();
     let mut rec = [0u8; 64];
-    for i in 0..64 {
-        rec[i] = (i as u8) ^ 0x3C;
+    for (i, slot) in rec.iter_mut().enumerate() {
+        *slot = (i as u8) ^ 0x3C;
     }
     for _ in 0..8 {
         ering
@@ -274,16 +274,16 @@ fn quota_flood_alloc_purity() {
         let n = ring
             .pop(&mut buf)
             .expect("post-flood drain pop must succeed");
-        for k in 0..n {
+        for (k, &byte) in buf[..n].iter().enumerate() {
             let a = total + k; // absolute byte offset in FIFO stream
             if a < 960 {
                 assert_eq!(
-                    buf[k],
+                    byte,
                     ((a % 64) as u8) ^ 0xA5,
                     "fill frames must be byte-exact at offset {a}"
                 );
             } else {
-                assert_eq!(buf[k], 0xAB, "recovery frame must be intact");
+                assert_eq!(byte, 0xAB, "recovery frame must be intact");
             }
         }
         total += n;

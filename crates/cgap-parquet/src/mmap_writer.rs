@@ -949,11 +949,12 @@ mod courts {
         // Corpus: repeated, literal, mixed, all four kernel widths, empty.
         // The flush path's in-buffer page encoder must be byte-identical to
         // crate::page::write_data_page_v2 (header AND body) on every shape.
-        let mut corpus: Vec<Vec<u32>> = Vec::new();
-        corpus.push(vec![7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2]);
-        corpus.push(vec![9; 257]);
-        corpus.push(vec![0; 4096]);
-        corpus.push(Vec::new());
+        let mut corpus: Vec<Vec<u32>> = vec![
+            vec![7, 7, 7, 7, 7, 7, 7, 7, 2, 2, 2, 2],
+            vec![9; 257],
+            vec![0; 4096],
+            Vec::new(),
+        ];
         for bits in [1u8, 2, 4, 8] {
             let alpha = 1u32 << bits;
             corpus.push((0..300).map(|i| (i as u32 * 7 + 1) % alpha).collect());
@@ -1168,10 +1169,7 @@ mod courts {
     fn clear_meta_flag_bit0(meta: &mut [u8]) {
         let mut pos = 0usize;
         let mut prev: i16 = 0;
-        loop {
-            let Ok(Some((fid, ty))) = crate::thrift::read_field_header(meta, &mut pos, prev) else {
-                break;
-            };
+        while let Ok(Some((fid, ty))) = crate::thrift::read_field_header(meta, &mut pos, prev) {
             prev = fid;
             if fid == 6 && ty == ctype::I32 {
                 // Zigzag bijection: for small non-negative flags, XOR 1 on

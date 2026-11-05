@@ -188,9 +188,9 @@ impl Huffman {
         }
         // Over-subscription check.
         let mut left: i32 = 1;
-        for len in 1..16 {
+        for &c in counts[1..16].iter() {
             left <<= 1;
-            left -= counts[len] as i32;
+            left -= c as i32;
             if left < 0 {
                 return Err(InflateError::BadCodeLengths);
             }

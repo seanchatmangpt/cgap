@@ -279,6 +279,9 @@ mod tests {
         // Host (aarch64) has a CAS: the release-slot swap must be the
         // single-RMW form. The load/store tier is witnessed by the green
         // riscv32imc build, where this branch cannot compile.
-        assert!(RELEASE_SLOT_CAS);
+        // Const-evaluated: the tier predicate is compile-time known.
+        const {
+            assert!(RELEASE_SLOT_CAS);
+        }
     }
 }

@@ -23,8 +23,8 @@ fn ntt_c_reference_pins() {
     );
     // intt_tomont(ntt(f)) == f * 2^16 mod q (montgomery round trip)
     let mut f = [0i16; 256];
-    for i in 0..256 {
-        f[i] = ((i as i32 * 13 % 7) - 3) as i16;
+    for (i, c) in f.iter_mut().enumerate() {
+        *c = ((i as i32 * 13 % 7) - 3) as i16;
     }
     let mut g = f;
     fips203::ntt(&mut g);

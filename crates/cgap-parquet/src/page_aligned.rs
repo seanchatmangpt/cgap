@@ -134,10 +134,7 @@ fn read_page_header_outer(
     let mut compressed: Option<i32> = None;
     let mut v2: Option<AlignedV2> = None;
     let mut prev: i16 = 0;
-    loop {
-        let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? else {
-            break;
-        };
+    while let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? {
         prev = field_id;
         match (field_id, type_id) {
             (1, ctype::I32) => page_type_v = Some(read_i32(src, &mut pos)?),
@@ -167,10 +164,7 @@ fn read_v2_substruct(src: &[u8], pos: &mut usize) -> Result<AlignedV2, ThriftErr
         is_compressed: None,
     };
     let mut prev: i16 = 0;
-    loop {
-        let Some((field_id, type_id)) = read_field_header(src, pos, prev)? else {
-            break;
-        };
+    while let Some((field_id, type_id)) = read_field_header(src, pos, prev)? {
         prev = field_id;
         match (field_id, type_id) {
             (1, ctype::I32) => f.num_values = Some(read_i32(src, pos)?),
@@ -310,6 +304,7 @@ mod tests {
     const SENTINEL: u8 = 0xA5;
 
     /// Test-only header writer with shape knobs (same real-IDL layout).
+    #[allow(clippy::too_many_arguments)] // one knob per Thrift header field; order mirrors the wire
     fn header_with(
         ptype: i32,
         enc: i32,

@@ -33,7 +33,7 @@ const _: () = {
 
 /// Branchless byte select (cmov class).
 fn cmov(r: &mut [u8], x: &[u8], b: u8) {
-    let m = (b as u8).wrapping_neg();
+    let m = b.wrapping_neg();
     for i in 0..r.len() {
         r[i] ^= m & (r[i] ^ x[i]);
     }
@@ -57,11 +57,11 @@ pub fn keygen(d: &[u8; 32], z: &[u8; 32], ek: &mut [u8; EK_LEN], dk: &mut [u8; D
     f3::gen_matrix(&mut a, &rho, false);
     let mut s_hat = [[0i16; f3::N]; f3::K];
     let mut e_hat = [[0i16; f3::N]; f3::K];
-    for i in 0..f3::K {
-        s_hat[i] = f3::sample_poly_cbd_prf(&sigma, i as u8);
+    for (i, slot) in s_hat.iter_mut().enumerate() {
+        *slot = f3::sample_poly_cbd_prf(&sigma, i as u8);
     }
-    for i in 0..f3::K {
-        e_hat[i] = f3::sample_poly_cbd_prf(&sigma, (f3::K + i) as u8);
+    for (i, slot) in e_hat.iter_mut().enumerate() {
+        *slot = f3::sample_poly_cbd_prf(&sigma, (f3::K + i) as u8);
     }
     for p in s_hat.iter_mut() {
         f3::ntt(p);
@@ -143,13 +143,13 @@ fn pke_encrypt(ek: &[u8; EK_LEN], m: &[u8; 32], r: &[u8; 32], ct: &mut [u8; CT_L
     let mut at = [[[0i16; f3::N]; f3::K]; f3::K];
     f3::gen_matrix(&mut at, &rho, true);
     let mut y_hat = [[0i16; f3::N]; f3::K];
-    for i in 0..f3::K {
-        y_hat[i] = f3::sample_poly_cbd_prf(r, i as u8);
-        f3::ntt(&mut y_hat[i]);
+    for (i, slot) in y_hat.iter_mut().enumerate() {
+        *slot = f3::sample_poly_cbd_prf(r, i as u8);
+        f3::ntt(slot);
     }
     let mut e1 = [[0i16; f3::N]; f3::K];
-    for i in 0..f3::K {
-        e1[i] = f3::sample_poly_cbd_prf(r, (f3::K + i) as u8);
+    for (i, slot) in e1.iter_mut().enumerate() {
+        *slot = f3::sample_poly_cbd_prf(r, (f3::K + i) as u8);
     }
     let e2 = f3::sample_poly_cbd_prf(r, (2 * f3::K) as u8);
 

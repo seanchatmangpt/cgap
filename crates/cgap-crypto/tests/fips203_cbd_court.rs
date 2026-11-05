@@ -1,8 +1,9 @@
 //! fips203_cbd_court - CBD sampling courts for fips203::poly_cbd.
 //!
 //! Scalar reference = the spec law (FIPS 203/204 SamplePolyCBD, consecutive
-//! per-coefficient bit fields): coefficient i consumes bits 2·eta·i .. 2·eta·i
-//! + 2·eta − 1 of the byte stream LSB-first; first eta bits are the a-field,
+//! per-coefficient bit fields): coefficient i consumes bits 2·eta·i ..
+//! 2·eta·i + 2·eta − 1 of the byte stream LSB-first; first eta bits are the
+//! a-field,
 //! last eta bits the b-field; r[i] = popcount(a) − popcount(b). Real
 //! collaborator: the crate function under test; no mocks.
 use cgap_crypto::fips203::{self, CbdError};
@@ -120,6 +121,6 @@ fn cbd_unsupported_eta_refused() {
             Err(CbdError::UnsupportedEta(bad_eta))
         );
     }
-    assert_eq!(fips203::poly_cbd(&mut r, &buf[..128], 2).is_ok(), true);
-    assert_eq!(fips203::poly_cbd(&mut r, &buf[..256], 4).is_ok(), true);
+    assert!(fips203::poly_cbd(&mut r, &buf[..128], 2).is_ok());
+    assert!(fips203::poly_cbd(&mut r, &buf[..256], 4).is_ok());
 }

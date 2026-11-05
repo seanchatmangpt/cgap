@@ -727,9 +727,7 @@ pub fn reduce_level_simd(cvs: &mut [[u32; 8]; 64], cv_count: &mut usize) {
                 neon_parent::compress_parents_4way_neon(&left, &right, [PARENT; 4], &mut out);
             }
 
-            for p in 0..4 {
-                cvs[i + p] = out[p];
-            }
+            cvs[i..(4 + i)].copy_from_slice(&out);
             i += 4;
         }
     }
@@ -773,12 +771,12 @@ pub fn hash_wide_simd(data: &[u8]) -> [u8; 32] {
         // when at a 64-chunk boundary and at least 64 chunks remain.
         if (chunk_idx & 63 == 0) && (chunk_idx + 64 <= num_chunks) {
             let mut cvs = [[0u32; 8]; 64];
-            for k in 0..64 {
+            for (k, slot) in cvs.iter_mut().enumerate() {
                 let c_idx = chunk_idx + k;
                 let start = c_idx * 1024;
                 let end = (start + 1024).min(len);
                 let out = hash_chunk(&data[start..end], c_idx as u64, false);
-                cvs[k].copy_from_slice(&out[0..8]);
+                slot.copy_from_slice(&out[0..8]);
             }
             let mut count = 64usize;
             // Reduce 64 -> 32 -> 16 -> 8 -> 4 -> 2 using SIMD parent kernel

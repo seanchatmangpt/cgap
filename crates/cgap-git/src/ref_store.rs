@@ -259,27 +259,26 @@ impl Counter {
     fn load(&self) -> u64 {
         match () {
             #[cfg(target_has_atomic = "8")]
-            () => self.0.load(core::sync::atomic::Ordering::SeqCst) as u64,
+            () => self.0.load(core::sync::atomic::Ordering::SeqCst),
             #[cfg(not(target_has_atomic = "8"))]
             () => self.0.get() as u64,
         }
     }
 
+    // AtomicU64::try_update is stable since 1.95; toolchain is floating
+    // nightly (rust-toolchain.toml) against an MSRV of 1.85.
+    #[allow(clippy::incompatible_msrv)]
     fn fetch_update<F>(&self, mut f: F) -> Result<u64, u64>
     where
         F: FnMut(u64) -> Option<u64>,
     {
         match () {
             #[cfg(target_has_atomic = "8")]
-            () => self
-                .0
-                .try_update(
-                    core::sync::atomic::Ordering::SeqCst,
-                    core::sync::atomic::Ordering::SeqCst,
-                    |c| f(c as u64).map(|v| v as seal_atomic::Prim),
-                )
-                .map(|v| v as u64)
-                .map_err(|v| v as u64),
+            () => self.0.try_update(
+                core::sync::atomic::Ordering::SeqCst,
+                core::sync::atomic::Ordering::SeqCst,
+                |c| f(c).map(|v| v as seal_atomic::Prim),
+            ),
             #[cfg(not(target_has_atomic = "8"))]
             () => seal_atomic::implcell::critical(|| {
                 let cur = self.0.get() as u64;
@@ -302,6 +301,12 @@ pub struct SealRegister {
     ceiling: u64,
     /// FNV-1a chain over every stamp (tamper-evident ordering witness).
     chain: Counter,
+}
+
+impl Default for SealRegister {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SealRegister {
@@ -451,6 +456,12 @@ pub struct Journal {
 pub struct RefStore {
     entries: [Option<RefEntry>; REF_TABLE_CAP],
     len: usize,
+}
+
+impl Default for RefStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RefStore {
@@ -606,6 +617,12 @@ fn lease_tag(lease: u64, oid: &[u8; 20]) -> [u8; 8] {
         t[i % 8] ^= oid[i];
     }
     t
+}
+
+impl Default for Journal {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Journal {

@@ -237,7 +237,6 @@ fn soak_50k_frames_byte_identity_and_throughput() {
         mb_sec
     );
     assert_eq!(writer.seq(), (FRAMES as u32), "final seq == frame count");
-    drop(writer);
     drop(stream);
     drop(peer);
     let _ = std::fs::remove_file(&path);

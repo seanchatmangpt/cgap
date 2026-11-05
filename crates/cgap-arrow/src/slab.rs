@@ -267,6 +267,12 @@ impl<const CAP: usize> ArrowRecordSlab<CAP> {
         self.header.len
     }
 
+    /// True when no rows are written.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.header.len == 0
+    }
+
     /// Row capacity (== `CAP`, pinned in the header at construction).
     #[must_use]
     pub const fn capacity(&self) -> u32 {
@@ -790,7 +796,7 @@ mod wave2_tests {
         assert_eq!(
             Slab64::from_bytes(&m),
             Err(SlabError::BadMagic {
-                got: u32::from_le_bytes([b'X', b'B', b'L', b'S'])
+                got: u32::from_le_bytes(*b"XBLS")
             })
         );
     }
@@ -888,14 +894,14 @@ mod wave2_tests {
     #[test]
     fn c8_shadow_byte_agrees_with_authoritative_mask_sweep() {
         let (slab, mask) = seeded_slab(64);
-        for i in 0..64 {
+        for (i, slot) in slab.slots.iter().enumerate() {
             let expect = matches!(mask.get(i), Ok(true));
             assert_eq!(
-                slab.slots[i].presence_shadow,
+                slot.presence_shadow,
                 u8::from(expect),
                 "shadow disagreement at row {i}"
             );
-            assert_eq!(slab.slots[i].presence_shadow != 0, i % 2 == 0);
+            assert_eq!(slot.presence_shadow != 0, i % 2 == 0);
         }
         assert_eq!(mask.count(), 32);
     }

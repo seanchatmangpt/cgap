@@ -124,8 +124,10 @@ fn arm2_cyclic_injection_refuses_andon_class_state_byte_unchanged() {
     // BEFORE: clean ground facts admit; the ref advances old -> new.
     let mut table = RefTable::new();
     table.set(b"refs/heads/posh", [0x11u8; 20]);
-    let mut clean = ProposedUpdate::default();
-    clean.facts = vec![(1, 900, 2), (2, 900, 3)];
+    let clean = ProposedUpdate {
+        facts: vec![(1, 900, 2), (2, 900, 3)],
+        ..Default::default()
+    };
     table
         .apply(&clean_update(), &clean)
         .expect("clean update admits");
@@ -153,7 +155,7 @@ fn arm2_cyclic_injection_refuses_andon_class_state_byte_unchanged() {
     match err {
         GateError::CyclicDerivation { rounds, facts } => {
             assert!(facts > MAX_DERIVED_FACTS, "budget exceeded: {facts}");
-            assert!(rounds >= 1 && rounds <= cgap_git::admission_gate::MAX_CLOSURE_ROUNDS);
+            assert!((1..=cgap_git::admission_gate::MAX_CLOSURE_ROUNDS).contains(&rounds));
         }
         other => panic!("wrong refusal class: {other:?}"),
     }

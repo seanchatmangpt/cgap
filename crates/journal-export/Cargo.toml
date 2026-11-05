@@ -1,0 +1,18 @@
+[package]
+name = "journal-export"
+# Lane-12 std host crate: sealed-journal -> IPC1 windows -> parquet export.
+# Standalone [workspace] (root manifest member list is NOT lane-12's file —
+# crates/cli precedent). publish=false: internal court surface.
+version = "26.11.5"
+edition = "2021"
+rust-version = "1.85"
+license-file = "../../LICENSE.md"
+publish = false
+
+# Standalone workspace (NOT a member of the cgap root workspace — the
+# coordinator owns that manifest; disclosed in the lane receipt).
+[workspace]
+
+[dependencies]
+cgap-arrow = { path = "../cgap-arrow" }
+cgap-parquet = { path = "../cgap-parquet", features = ["std"] }

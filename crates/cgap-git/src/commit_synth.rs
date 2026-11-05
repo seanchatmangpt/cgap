@@ -221,6 +221,11 @@ impl CommitScratch {
         self.len
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     pub const CAPACITY: usize = SCRATCH_LEN;
 
     /// Render the canonical commit into the scratch. Returns the written
@@ -269,6 +274,12 @@ impl CommitScratch {
         self.push_hex(&rb)?;
         self.push(b"\n")?;
         Ok(self.as_bytes())
+    }
+}
+
+impl Default for CommitScratch {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

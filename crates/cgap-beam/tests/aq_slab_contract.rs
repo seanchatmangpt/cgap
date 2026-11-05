@@ -64,7 +64,7 @@ fn run_court(escript: &PathBuf, dylib: &PathBuf, mutate: &str) -> i32 {
 
 const ESCRIPT: &str = r##"
 -module(cgap_beam).
--export([main/1, aq_slab_open/1, aq_slab_frame/2, aq_slab_window/4, aq_slab_stamp/2, aq_slab_lease/2, aq_slab_sync/1, cgap_new/2, cgap_new_fast/2, cgap_new_i64/2, cgap_len/1, cgap_get/2, cgap_get_i64/2, cgap_free/1, cgap_stats/1, cgap_version/0, cgap_envelope_new/1, cgap_envelope_len/1, cgap_batch_binary/1, pointer_of/1, cgap_binary_data_pointer/1, cgap_dtor_stats/0, cgap_alloc_stats/0, cgap_flush_to_parquet/1, cgap_seal_to_packfile/1, cgap_receipt_query/1, cgap_open/1, cgap_scan/3]).
+-export([main/1, aq_slab_open/1, aq_slab_frame/2, aq_slab_window/4, aq_slab_stamp/2, aq_slab_lease/2, aq_slab_sync/1, aq_quic_open/2, aq_quic_connect/3, aq_quic_send/2, aq_quic_recv/2, aq_quic_serve/4, aq_quic_accept/2, aq_quic_accept_bi/2, aq_quic_stream_open/1, aq_quic_stream_send/2, aq_quic_stream_recv/2, aq_quic_stream_close/1, cgap_new/2, cgap_new_fast/2, cgap_new_i64/2, cgap_len/1, cgap_get/2, cgap_get_i64/2, cgap_free/1, cgap_stats/1, cgap_version/0, cgap_envelope_new/1, cgap_envelope_len/1, cgap_batch_binary/1, pointer_of/1, cgap_binary_data_pointer/1, cgap_dtor_stats/0, cgap_alloc_stats/0, cgap_flush_to_parquet/1, cgap_seal_to_packfile/1, cgap_receipt_query/1, cgap_open/1, cgap_scan/3]).
 
 aq_slab_open(_) -> erlang:nif_error(nif_not_loaded).
 aq_slab_frame(_, _) -> erlang:nif_error(nif_not_loaded).
@@ -72,6 +72,19 @@ aq_slab_window(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_stamp(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_lease(_, _) -> erlang:nif_error(nif_not_loaded).
 aq_slab_sync(_) -> erlang:nif_error(nif_not_loaded).
+%% QUIC scaffold stubs (lib.rs NIF table grew past this court's export list;
+%% load_nif bad_lib's unless every table entry is exported by the module).
+aq_quic_open(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_connect(_, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_send(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_recv(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_serve(_, _, _, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_accept(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_accept_bi(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_open(_) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_send(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_recv(_, _) -> erlang:nif_error(nif_not_loaded).
+aq_quic_stream_close(_) -> erlang:nif_error(nif_not_loaded).
 cgap_alloc_stats() -> erlang:nif_error(nif_not_loaded).
 cgap_new(_, _) -> erlang:nif_error(nif_not_loaded).
 cgap_new_fast(_, _) -> erlang:nif_error(nif_not_loaded).

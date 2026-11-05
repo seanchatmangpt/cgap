@@ -427,7 +427,7 @@ fn status_word_exhaustive_hostile_input_sweep() {
         let cpath = std::ffi::CString::new(tmp.join("shacl.parquet").to_str().expect("utf8 path"))
             .expect("cstring");
         assert_eq!(
-            call_commit(&[1, 2, 300], &cpath.as_c_str()),
+            call_commit(&[1, 2, 300], cpath.as_c_str()),
             CGAP_ERR_SHACL_VIOLATION,
             "lane > 255 refuses SHACL"
         );
@@ -480,12 +480,12 @@ fn status_word_exhaustive_hostile_input_sweep() {
         let path = tmp.join("spill.parquet");
         let path_str = std::sync::Arc::new(path.to_str().expect("utf8 path").to_string());
         let holder_ready = AtomicBool::new(false);
-        let holder = std::thread::scope(|scope| {
+        std::thread::scope(|scope| {
             let ready = &holder_ready;
             let holder_str = path_str.clone();
             scope.spawn(move || {
                 let cpath = std::ffi::CString::new(holder_str.as_str()).expect("cstring");
-                let st = call_commit(&[1, 2, 3], &cpath.as_c_str());
+                let st = call_commit(&[1, 2, 3], cpath.as_c_str());
                 assert_eq!(st, CGAP_OK, "holder's first commit must stage");
                 ready.store(true, Ordering::Release);
                 // Park until the main thread has attempted the denied claim.
@@ -497,14 +497,13 @@ fn status_word_exhaustive_hostile_input_sweep() {
                 std::hint::spin_loop();
             }
             let cpath = std::ffi::CString::new(path_str.as_str()).expect("cstring");
-            let st = call_commit(&[4, 5, 6], &cpath.as_c_str());
+            let st = call_commit(&[4, 5, 6], cpath.as_c_str());
             assert_eq!(
                 st, CGAP_ERR_CONCURRENT_WRITER_DENIED,
                 "second claimer on a live lease must be denied typed"
             );
             DENIED_WITNESSED.store(true, Ordering::Release);
         });
-        let _ = holder;
         let _ = std::fs::remove_dir_all(&tmp);
     }
 

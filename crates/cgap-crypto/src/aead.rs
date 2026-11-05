@@ -90,10 +90,7 @@ impl core::fmt::Debug for Nonce96 {
 
 impl Clone for Nonce96 {
     fn clone(&self) -> Self {
-        Self {
-            epoch: self.epoch,
-            counter: self.counter,
-        }
+        *self
     }
 }
 impl Copy for Nonce96 {}

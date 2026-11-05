@@ -146,7 +146,7 @@ impl ChainDigest for Mix32 {
             }
         }
         let mut out = [0u8; 32];
-        for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
+        for (i, chunk) in out.as_chunks_mut::<8>().0.iter_mut().enumerate() {
             let v = if i % 2 == 0 {
                 a.wrapping_add(i as u64)
             } else {
@@ -199,9 +199,12 @@ fn count_pred(max: u64, m: u64, r: u64) -> u64 {
     if max <= r {
         0
     } else {
-        (max - r + m - 1) / m
+        (max - r).div_ceil(m)
     }
 }
+
+/// (plaintext, ct||tag payload) outcome of read_verify_unseal.
+type UnsealOutcome = Result<Option<([u8; 64], [u8; 80])>, AoqError>;
 
 /// Per-frame body (varies with seq; alloc-free fill).
 fn fill_body(body: &mut [u8; 64], seq: u32) {
@@ -349,7 +352,7 @@ fn read_verify_unseal(
     seq: u32,
     win: &mut [u8; WIN_LEN],
     corrupt: bool,
-) -> Result<Option<([u8; 64], [u8; 80])>, AoqError> {
+) -> UnsealOutcome {
     rx.read_exact(win)
         .map_err(|_| AoqError::HeaderTooShort { got: 0 })?;
     let mut ct = [0u8; 64];
@@ -822,7 +825,6 @@ fn run_soak(total_requested: usize) -> f64 {
 
 /// (designated oversize attempts are counted by lane_loop and summed in
 /// run_soak; no external arithmetic mirror to drift.)
-
 // ------------------------------------------------ test entry points -
 
 /// Scaled saturation soak (default; dossier 1B scaled to CI-adjacent

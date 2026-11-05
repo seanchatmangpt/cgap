@@ -8,7 +8,7 @@
 //! copy must flip BOTH the C-compile leg (cc freestanding, negative-array
 //! offsetof pins) and the Rust parsed-order mirror leg. Courts mutate /tmp
 //! copies only; the shared tree is never touched.
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use cgap_arrow::c_abi::{ArrowArray, ArrowSchema};
@@ -247,6 +247,8 @@ fn canonical(name: &str) -> Vec<(&'static str, Kind)> {
 
 /// Rust-twin observed layout: (field, offset) in declaration order, plus
 /// total size and alignment, read mechanically via offset_of!/size_of.
+// the mirror's return shape tracks the parsed C header inventory 1:1
+#[allow(clippy::type_complexity)]
 fn rust_twin_layout(name: &str) -> Option<(Vec<(&'static str, usize)>, usize, usize)> {
     match name {
         "cgap_frame_view" => Some((
@@ -358,7 +360,7 @@ fn sandbox() -> PathBuf {
 }
 
 /// Copy a header into the sandbox.
-fn stage(sandbox_dir: &PathBuf, src: &PathBuf, name: &str) -> PathBuf {
+fn stage(sandbox_dir: &Path, src: &Path, name: &str) -> PathBuf {
     let dst = sandbox_dir.join(name);
     std::fs::copy(src, &dst).expect("stage header");
     dst
@@ -449,9 +451,9 @@ fn compile_leg(dir: &PathBuf, c99: bool) -> (bool, String) {
     cc_compile(dir, c99)
 }
 
-/// ---------------------------------------------------------------------------
-/// Courts. Every test names its subject and its falsifier.
-/// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Courts. Every test names its subject and its falsifier.
+// ---------------------------------------------------------------------------
 
 /// COURT 1 — header inventory is parseable and matches the canonical
 /// struct/field inventory (nothing added/removed/renamed in either header).

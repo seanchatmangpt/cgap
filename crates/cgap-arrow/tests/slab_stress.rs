@@ -205,7 +205,7 @@ fn run_ordering(seed: u64) -> (Census, std::vec::Vec<u8>) {
         );
         match rng.next() % 6 {
             0 | 1 => {
-                let row = (rng.next() % 256) as u64;
+                let row = rng.next() % 256;
                 match slab.push(&row_payload(row), row % 2 == 0) {
                     Ok(()) => c.ok_push += 1,
                     Err(SlabError::SlabFull) => c.full += 1,
@@ -325,7 +325,7 @@ fn sealed_state_refuses_every_mutation_typed_and_frozen() {
     assert_eq!(
         Slab64::from_bytes(&m),
         Err(SlabError::BadMagic {
-            got: u32::from_le_bytes([b'X', b'B', b'L', b'S'])
+            got: u32::from_le_bytes(*b"XBLS")
         })
     );
     assert_eq!(

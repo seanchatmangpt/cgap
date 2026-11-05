@@ -35,7 +35,7 @@ struct Registered {
 
 /// Registered modules of the lib target (must match src/lib.rs `pub mod`,
 /// cfg'd or not — the file-walk counts on-disk sources regardless of cfg).
-const REGISTERED: [Registered; 14] = [
+const REGISTERED: [Registered; 15] = [
     Registered {
         name: "aead.rs",
         exempt: &[],
@@ -118,6 +118,20 @@ const REGISTERED: [Registered; 14] = [
     Registered {
         name: "pin_table.rs",
         exempt: &[],
+    },
+    // [L56 SLA sync 2026-11-04] pqc_seal.rs landed in src/ (registered in
+    // lib.rs behind #[cfg(feature = "pqc")]). Same alloc precedent as the
+    // cert module: the `pqc` feature is alloc-using by design (`pqc_seal`
+    // returns an owned buffer); the DEFAULT build stays core-only and
+    // zero-alloc because the whole module is cfg'd out without `pqc`.
+    Registered {
+        name: "pqc_seal.rs",
+        exempt: &[
+            (
+                "alloc::",
+                "pqc feature is alloc-using by design; default build remains zero-alloc",
+            ),
+        ],
     },
 ];
 

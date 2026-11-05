@@ -41,6 +41,11 @@ mod ops_persist;
 // slab, zero-copy egress, lease bitmask. Owned by aq_slab.rs.
 mod aq_slab;
 
+// AOQ phase-2 QUIC scaffold (lane L50, aq-quic-transport-decision.md): quinn
+// behind the LANE-02 NIF boundary. Real engine compiles under the `quic`
+// feature; without it the four NIFs answer the `error` atom (loud skip).
+mod aq_quic;
+
 pub mod shm;
 pub mod spsc_ring;
 
@@ -233,6 +238,7 @@ pub(crate) fn make_atom(env: *mut ErlNifEnv, name: &str) -> ErlNifTerm {
 /// fill` and `cgap_get(id, n-1) == fill + n - 1`. Runs on the dirty CPU
 /// scheduler (see NIF_FUNCS): n >= 16384 rows means a >= 64 KiB aligned
 /// allocation, which must not block a normal scheduler.
+#[no_mangle]
 extern "C" fn cgap_new(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm) -> ErlNifTerm {
     let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
     let (mut n, mut fill) = (0i64, 0i64);
@@ -270,6 +276,7 @@ extern "C" fn cgap_new(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm
 /// `test/sched_crossover.escript`): same allocation work, two dispatch
 /// regimes. Correctness surface (ramp, caps, `error` cases) is shared by
 /// construction; only the thread that runs it differs.
+#[no_mangle]
 extern "C" fn cgap_new_fast(
     env: *mut ErlNifEnv,
     argc: c_int,
@@ -310,6 +317,7 @@ extern "C" fn cgap_new_fast(
 /// overflow-checked here — the i32 gate needs no such check because its
 /// `fill` is already clamped to the i32 range. Same dirty-CPU class as
 /// `cgap_new/2` (see NIF_FUNCS).
+#[no_mangle]
 extern "C" fn cgap_new_i64(
     env: *mut ErlNifEnv,
     argc: c_int,
@@ -343,6 +351,7 @@ extern "C" fn cgap_new_i64(
 }
 
 /// `cgap_len(id) -> Len :: non_neg_integer() | error`
+#[no_mangle]
 extern "C" fn cgap_len(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm) -> ErlNifTerm {
     let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
     let mut id = 0i64;
@@ -360,6 +369,7 @@ extern "C" fn cgap_len(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm
 ///
 /// Length plus element bit width as two integers in a 2-tuple: the API stays
 /// integer-based and the type tag is the element width, not an atom.
+#[no_mangle]
 extern "C" fn cgap_stats(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm) -> ErlNifTerm {
     let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
     let mut id = 0i64;
@@ -385,6 +395,7 @@ extern "C" fn cgap_stats(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTe
 /// Non-integer arguments are `badarg`; unknown handle, out-of-range index,
 /// or an i64-registered batch is the atom `error` (type-tagged dispatch:
 /// use `cgap_get_i64/2` for those).
+#[no_mangle]
 extern "C" fn cgap_get(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm) -> ErlNifTerm {
     let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
     let (mut id, mut idx) = (0i64, 0i64);
@@ -408,6 +419,7 @@ extern "C" fn cgap_get(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm
 /// i64 twin of `cgap_get/2`, same error split (badarg for non-integer
 /// arguments; `error` for unknown handle, out-of-range index, or an
 /// i32-registered batch).
+#[no_mangle]
 extern "C" fn cgap_get_i64(
     env: *mut ErlNifEnv,
     argc: c_int,
@@ -431,6 +443,7 @@ extern "C" fn cgap_get_i64(
 }
 
 /// `cgap_free(id) -> ok | error` — second free of the same handle: `error`.
+#[no_mangle]
 extern "C" fn cgap_free(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTerm) -> ErlNifTerm {
     let args = unsafe { std::slice::from_raw_parts(argv, argc.max(0) as usize) };
     let mut id = 0i64;
@@ -448,6 +461,7 @@ extern "C" fn cgap_free(env: *mut ErlNifEnv, argc: c_int, argv: *const ErlNifTer
 }
 
 /// `cgap_version() -> Version :: binary()` — the cgap-arrow version string.
+#[no_mangle]
 extern "C" fn cgap_version(
     env: *mut ErlNifEnv,
     argc: c_int,
@@ -481,7 +495,7 @@ extern "C" fn cgap_version(
 /// `ERL_NIF_DIRTY_JOB_CPU_BOUND` (erl_drv_nif.h:50: `= 1`), i.e. 0x01.
 const ERL_NIF_DIRTY_JOB_CPU_BOUND: u32 = 0x01;
 
-static NIF_FUNCS: [ErlNifFunc; 27] = [
+static NIF_FUNCS: [ErlNifFunc; 38] = [
     // n >= 16384 fills build a >= 64 KiB aligned buffer; run it dirty.
     ErlNifFunc {
         name: b"cgap_new\0".as_ptr() as *const c_char,
@@ -679,6 +693,81 @@ static NIF_FUNCS: [ErlNifFunc; 27] = [
         fptr: aq_slab::aq_slab_sync,
         flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
     },
+    // AOQ phase-2 QUIC scaffold (aq_quic.rs, lane L50): quinn behind the
+    // LANE-02 NIF boundary. All four are blocking real-I/O surfaces
+    // (engine-thread spawn + socket bind / TLS handshake / stream write /
+    // bounded recv) — DirtyIo. Without the `quic` feature they answer the
+    // `error` atom (loud skip, never a fake pass).
+    ErlNifFunc {
+        name: b"aq_quic_open\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_open,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_connect\0".as_ptr() as *const c_char,
+        arity: 3,
+        fptr: aq_quic::aq_quic_connect,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_send\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_send,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_recv\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_recv,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    // Server role (aq_quic.rs, same engine thread — no second engine):
+    // serve/accept/accept_bi are real UDP + TLS handshakes; stream_open/
+    // send/recv are blocking stream ops on the engine thread; all DirtyIo.
+    // Without the `quic` feature they answer the `error` atom (loud skip).
+    ErlNifFunc {
+        name: b"aq_quic_serve\0".as_ptr() as *const c_char,
+        arity: 4,
+        fptr: aq_quic::aq_quic_serve,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_accept\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_accept,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_accept_bi\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_accept_bi,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_stream_open\0".as_ptr() as *const c_char,
+        arity: 1,
+        fptr: aq_quic::aq_quic_stream_open,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_stream_send\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_stream_send,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_stream_recv\0".as_ptr() as *const c_char,
+        arity: 2,
+        fptr: aq_quic::aq_quic_stream_recv,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
+    ErlNifFunc {
+        name: b"aq_quic_stream_close\0".as_ptr() as *const c_char,
+        arity: 1,
+        fptr: aq_quic::aq_quic_stream_close,
+        flags: aq_slab::ERL_NIF_DIRTY_JOB_IO_BOUND,
+    },
 ];
 
 /// OTP 26+ no-argument entry point. The BEAM resolves this symbol when
@@ -693,7 +782,7 @@ static NIF_ENTRY: ErlNifEntry = ErlNifEntry {
     major: ERL_NIF_MAJOR_VERSION,
     minor: ERL_NIF_MINOR_VERSION,
     name: b"cgap_beam\0".as_ptr() as *const c_char,
-    num_of_funcs: 27,
+    num_of_funcs: 38,
     funcs: NIF_FUNCS.as_ptr() as *mut ErlNifFunc,
     load: Some(resources::nif_load),
     reload: None,

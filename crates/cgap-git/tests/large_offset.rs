@@ -68,7 +68,7 @@ fn entries_for(tag: u64, offsets: &[u64]) -> Vec<(Oid, u64)> {
         .enumerate()
         .map(|(i, &off)| (oid_for(tag, i as u64), off))
         .collect();
-    v.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    v.sort_unstable_by_key(|a| a.0);
     v
 }
 
@@ -282,12 +282,12 @@ fn case4_corrupt_msb_on_small_entry_is_typed_error_never_panic() {
     let o = idx.offset(row as u32);
     let l = idx.lookup(&entries[row].0);
     assert!(
-        matches!(o, Err(_)),
+        o.is_err(),
         "variant A offset(): expected typed error, got {:?}",
         o
     );
     assert!(
-        matches!(l, Err(_)),
+        l.is_err(),
         "variant A lookup(): expected typed error, got {:?}",
         l
     );
@@ -301,12 +301,12 @@ fn case4_corrupt_msb_on_small_entry_is_typed_error_never_panic() {
     let o_b = idx_b.offset(0);
     let l_b = idx_b.lookup(&entries_b[0].0);
     assert!(
-        matches!(o_b, Err(_)),
+        o_b.is_err(),
         "variant B offset(): expected typed error, got {:?}",
         o_b
     );
     assert!(
-        matches!(l_b, Err(_)),
+        l_b.is_err(),
         "variant B lookup(): expected typed error, got {:?}",
         l_b
     );

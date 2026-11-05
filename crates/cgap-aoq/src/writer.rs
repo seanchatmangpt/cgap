@@ -140,7 +140,7 @@ impl AoqWriter {
     /// [`AoqError::BufferTooShort`] when `body` exceeds the u32 `body_len`
     /// padding word (documented overflow-class representative).
     #[allow(clippy::missing_panics_doc)] // slicing at pinned consts, never panics
-    pub fn frame_segments<'s, 'a>(
+    pub fn frame_segments<'a>(
         &mut self,
         epoch: u16,
         key_id: u64,

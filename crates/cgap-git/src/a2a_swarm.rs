@@ -111,6 +111,12 @@ pub struct LeaseTable {
     registered: usize,
 }
 
+impl Default for LeaseTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LeaseTable {
     /// All-vacant table.
     pub fn new() -> LeaseTable {

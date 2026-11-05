@@ -685,6 +685,7 @@ pub struct ParquetFile {
     /// per-row accessors do offset arithmetic only: the Thrift page header
     /// and the Hook 1/2 checks run at most once per column, not per value.
     /// Errors are never cached — a refused column stays refused loudly.
+    #[allow(clippy::type_complexity)] // private cache cell; a type alias would hide the (rg, col) -> lanes shape
     resolved: core::cell::RefCell<Vec<Vec<Option<(usize, usize)>>>>,
     /// Observable for the pruning courts: how many Thrift page headers
     /// have actually been parsed (one per (row_group, column) resolve).

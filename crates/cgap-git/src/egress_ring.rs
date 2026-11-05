@@ -389,9 +389,9 @@ pub fn parse_page(bytes: &[u8]) -> Result<Page<'_>, EgressError> {
         offset: 0,
         width: 0,
     }; MAX_COLS];
-    for i in 0..ncols {
+    for (i, slot) in schema.iter_mut().enumerate().take(ncols) {
         let b = PAGE_FIXED_HEADER + i * DESC_ENTRY_BYTES;
-        schema[i] = ColumnDesc {
+        *slot = ColumnDesc {
             name_hash: rd32(b),
             offset: rd16(b + 4),
             width: rd16(b + 6),
@@ -468,8 +468,7 @@ const _: () = assert!(
     core::mem::size_of::<EgressRing<EGRESS_RING_BYTES, 64>>()
         == EGRESS_RING_BYTES
             + 2 * CACHE_LINE_BYTES
-            + ((core::mem::size_of::<RefusalQuota>() + CACHE_LINE_BYTES - 1) / CACHE_LINE_BYTES)
-                * CACHE_LINE_BYTES
+            + core::mem::size_of::<RefusalQuota>().div_ceil(CACHE_LINE_BYTES) * CACHE_LINE_BYTES
 );
 
 const _: () = assert!(EGRESS_RING_BYTES % 32 == 0);
@@ -679,7 +678,7 @@ impl<const CAP: usize, const STRIDE: usize> EgressRing<CAP, STRIDE> {
             });
         }
         out[0..4].copy_from_slice(&PARQUET_MAGIC);
-        out[4..8].copy_from_slice(&((nrows * (STRIDE as usize)) as u32).to_le_bytes());
+        out[4..8].copy_from_slice(&((nrows * STRIDE) as u32).to_le_bytes());
         out[8..PAGE_FIXED_HEADER].fill(0);
         let win = self.window(0, nrows)?;
         win.copy_into(&mut out[PAGE_FIXED_HEADER..PAGE_FIXED_HEADER + win.total_len()]);

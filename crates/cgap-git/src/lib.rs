@@ -8,6 +8,9 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+// Toolchain is floating nightly (rust-toolchain.toml); code intentionally uses
+// post-1.85 stable APIs (u64::is_multiple_of, AtomicU64::try_update).
+#![allow(clippy::incompatible_msrv)]
 
 #[cfg(feature = "std")]
 extern crate std;

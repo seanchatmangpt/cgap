@@ -343,8 +343,7 @@ fn sha256(data: &str) -> String {
                     .map(str::to_string)
                     .unwrap_or_default())
             } else {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                Err(std::io::Error::other(
                     "shasum failed",
                 ))
             }

@@ -48,7 +48,7 @@ fn bench_keygen_sign_verify() {
     let mut best_s = f64::MAX;
     let mut best_v = f64::MAX;
     for _ in 0..100 {
-        for (name, best, iters, mut f) in [
+        for (name, best, iters, f) in [
             ("keygen", &mut best_k, 10usize, &mut mk as &mut dyn FnMut()),
             ("sign", &mut best_s, 10, &mut ms as &mut dyn FnMut()),
             ("verify", &mut best_v, 10, &mut mv as &mut dyn FnMut()),

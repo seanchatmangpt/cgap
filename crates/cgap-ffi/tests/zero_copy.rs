@@ -28,7 +28,7 @@
 use cgap_arrow::c_abi::{export, ArrowArray};
 use cgap_arrow::primitive::PrimitiveBuilder;
 
-const FMT_I: *const core::ffi::c_char = b"i\0".as_ptr() as *const _;
+const FMT_I: *const core::ffi::c_char = c"i".as_ptr();
 
 /// The static export slots (`cgap_array_addr`/`cgap_schema_addr`/`ROWS`)
 /// are process-global singletons: tests that drive `cgap_i32_batch` race

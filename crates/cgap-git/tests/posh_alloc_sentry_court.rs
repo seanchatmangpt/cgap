@@ -27,7 +27,6 @@
 #[path = "../src/ingress_ring.rs"]
 mod ingress_ring;
 
-use cgap_blake3;
 use cgap_bn3::sigil::{encode_term, Sigil};
 use cgap_bn3::unify::{unify_to_fixpoint, BodyAtom, Rule, StatementColumns};
 
@@ -313,8 +312,8 @@ fn posh_alloc_sentry_driver() {
     let batches = unify_to_fixpoint(&[closure_rule()], &cols).expect("fixpoint converges");
     let mut derived_total = 0usize;
     for b in &batches {
-        for i in 0..b.rows.len() {
-            assert_eq!(b.rows.p[i], cst(E_PRED), "derived predicate is E");
+        for &p_val in b.rows.p.iter().take(b.rows.len()) {
+            assert_eq!(p_val, cst(E_PRED), "derived predicate is E");
             derived_total += 1;
         }
     }

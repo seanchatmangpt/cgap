@@ -60,7 +60,7 @@ impl CourtRng {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_490B_BADD_03);
+        z = (z ^ (z >> 27)).wrapping_mul(0x0094_D049_0BBA_DD03);
         z ^ (z >> 31)
     }
 }
@@ -88,9 +88,9 @@ fn build_corpus(n_heads: usize, n_rows: usize) -> Vec<Vec<(u64, u64, u64)>> {
         heads[h].push(*t);
     }
     let share = n_rows / 8;
-    for h in 0..n_heads {
+    for heads_lane in heads.iter_mut().take(n_heads) {
         for t in universe.iter().take(share) {
-            heads[h].push(*t);
+            heads_lane.push(*t);
         }
     }
     heads

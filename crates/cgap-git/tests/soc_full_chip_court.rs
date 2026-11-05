@@ -36,7 +36,6 @@ mod pack_demux;
 mod tree_synth;
 
 extern crate alloc;
-use cgap_blake3;
 use cgap_git::pack_write;
 
 use ingress_ring::StdIngressRing;
@@ -333,7 +332,7 @@ fn run_pipeline(sram: &mut [u8; SRAM_BYTES], out: &mut PipelineOut) -> Result<()
             }
             fed += seg;
         }
-        if &b[..wlen] != &a[..wlen] {
+        if b[..wlen] != a[..wlen] {
             return Err(StageError::RingFidelity);
         }
         out.ring_bytes += wlen;

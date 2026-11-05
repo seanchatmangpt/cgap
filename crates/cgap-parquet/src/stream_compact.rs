@@ -16,9 +16,8 @@ pub fn compact_lanes_branchless(
 ) {
     let mut current_offset = *write_head;
 
-    for i in 0..8 {
+    for (i, &val) in values.iter().enumerate() {
         let is_valid = ((mask_byte >> i) & 1) as usize;
-        let val = values[i];
 
         // Unconditional store: write either to the active head or overwrite slot
         out[current_offset] = val;

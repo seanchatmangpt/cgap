@@ -788,7 +788,7 @@ mod tests {
             }
         }
         let mut out = [0u8; 32];
-        for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
+        for (i, chunk) in out.as_chunks_mut::<8>().0.iter_mut().enumerate() {
             let v = if i % 2 == 0 {
                 a.wrapping_add(i as u64)
             } else {
@@ -1171,16 +1171,6 @@ mod tests {
         // v3 parse law refuses the v2-shaped body BEFORE the machine sees
         // it; the session is untouched.
         assert_eq!(s.fingerprint(), fp, "v2 refusal mutated the session");
-    }
-
-    /// Stack-array shim: parse_frame borrows, so the v2 refusal leg
-    /// re-parses a copied wire image.
-    fn finish_wire_v2(
-        buf: &[u8; crate::header::SIZE_BYTES + 1 + CT_BYTES],
-    ) -> [u8; crate::header::SIZE_BYTES + 1 + CT_BYTES] {
-        let mut out = [0u8; crate::header::SIZE_BYTES + 1 + CT_BYTES];
-        out.copy_from_slice(buf);
-        out
     }
 
     /// M2a court — emit_finish roundtrip mirrors the Finish cell: the

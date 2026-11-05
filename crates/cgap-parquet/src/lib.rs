@@ -9,6 +9,8 @@
 
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
+// Code intentionally uses post-1.85 stable APIs; toolchain is floating nightly (rust-toolchain.toml).
+#![allow(clippy::incompatible_msrv)]
 
 extern crate alloc;
 

@@ -230,8 +230,8 @@ fn e2e_seed_keygen_sign_verify_court() {
     // hash must mismatch unless the honest hint is zero; assert the
     // negative honestly either way (this court proves no panic, not pass).
     let mut zero_hint = sig;
-    for i in 3248..3309 {
-        zero_hint[i] = 0;
+    for b in zero_hint[3248..3309].iter_mut() {
+        *b = 0;
     }
     let _ = m::verify(&ek, &mu, &zero_hint);
 }

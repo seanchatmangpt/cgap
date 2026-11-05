@@ -98,7 +98,7 @@ pub const FROZEN_SLOT_SURFACE: [&str; 6] = [
 mod surface_court {
     use super::{FROZEN_SLOT_SURFACE, OABI_LOOKUP_UNSUPPORTED};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
     use std::time::{Duration, Instant};
 
@@ -226,7 +226,7 @@ mod surface_court {
         })
     }
 
-    fn find_lease_cdylib(target_root: &PathBuf) -> Option<PathBuf> {
+    fn find_lease_cdylib(target_root: &Path) -> Option<PathBuf> {
         let names = ["libcgap_ffi.dylib", "libcgap_ffi.so", "cgap_ffi.dll"];
         for name in names {
             let p = target_root.join("debug").join(name);
@@ -282,7 +282,7 @@ mod surface_court {
         Ok(out)
     }
 
-    fn nm_gu(path: &PathBuf) -> Result<String, String> {
+    fn nm_gu(path: &Path) -> Result<String, String> {
         let (status, out, err) =
             run_bounded("nm", &["-gU", path.display().to_string().as_str()], &[])?;
         let st = status.ok_or_else(|| "nm exceeded deadline".to_string())?;
@@ -376,7 +376,7 @@ mod surface_court {
         let mutant = cc_fixture(&dir.join("mutant"), FIXTURE_OABI, "libmutant.dylib")
             .unwrap_or_else(|e| panic!("mutant fixture: {e}"));
         let mutant_out = nm_gu(&mutant).unwrap_or_else(|e| panic!("nm mutant: {e}"));
-        let refusal = oabi_verb_refusal(&mutant_out).err().expect(
+        let refusal = oabi_verb_refusal(&mutant_out).expect_err(
             "VACUOUS GATE: the cgap_oabi_lookup export was NOT refused — the detector cannot flip",
         );
         assert!(

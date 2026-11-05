@@ -928,8 +928,7 @@ fn build_node_tree(
     }
     let mut oids: Vec<Oid> = vec![GENESIS_OID; blocks.len()];
     let mut level: Vec<Box<TreeNode>> = Vec::with_capacity(blocks.len());
-    let mut ordinal = 0usize;
-    for &i in &order {
+    for (ordinal, &i) in order.iter().enumerate() {
         let (body, seq) = blocks[i];
         if body.is_empty() {
             return Err(DagError::EmptyBlock(seq));
@@ -946,10 +945,9 @@ fn build_node_tree(
             left: None,
             right: None,
         }));
-        ordinal += 1;
     }
     while level.len() > 1 {
-        let mut next: Vec<Box<TreeNode>> = Vec::with_capacity((level.len() + 1) / 2);
+        let mut next: Vec<Box<TreeNode>> = Vec::with_capacity(level.len().div_ceil(2));
         let mut iter = level.into_iter();
         while let Some(left) = iter.next() {
             match iter.next() {
@@ -997,11 +995,7 @@ fn sibling_path(root: &TreeNode, target_leaf_index: usize) -> Vec<(u8, DagDigest
     let mut path = Vec::new();
     let mut node = root;
     let mut k = target_leaf_index;
-    loop {
-        let left = match &node.left {
-            Some(left) => left,
-            None => break,
-        };
+    while let Some(left) = &node.left {
         match &node.right {
             None => node = left, // promoted single child: no sibling at this level
             Some(right) => {
@@ -1803,7 +1797,7 @@ mod tests {
             // promoted paths stay shorter than the full-height bound
             if l >= 3 {
                 let last = lineage_proof(&refs, &GENESIS_OID, l as u64 - 1).expect("proof");
-                let bitlen = (usize::BITS - (l as usize).leading_zeros()) as usize;
+                let bitlen = (usize::BITS - l.leading_zeros()) as usize;
                 assert!(
                     last.siblings.len() < bitlen,
                     "promoted path must be shorter than bitlen(L) at L={l}"

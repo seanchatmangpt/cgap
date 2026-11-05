@@ -78,7 +78,7 @@ impl Lcg {
 }
 
 const SEED_ACCEPT: u64 = 0x5746_3134_C0FF_EE01;
-const SEED_REJECT: u64 = 0x5746_3134_BAD_5EED;
+const SEED_REJECT: u64 = 0x0574_6313_4BAD_5EED;
 
 const KIB: usize = 1024;
 const MIB: usize = 1024 * 1024;
@@ -93,7 +93,7 @@ fn draw_size(lcg: &mut Lcg) -> usize {
         0..=3 => (0, 4 * KIB),          // tiny
         4..=6 => (4 * KIB, 64 * KIB),   // small
         7..=8 => (64 * KIB, 256 * KIB), // medium
-        _ => (256 * KIB, 1 * MIB + 1),  // large
+        _ => (256 * KIB, MIB + 1),      // large
     };
     lo + lcg.below((hi - lo) as u64) as usize
 }
@@ -316,6 +316,8 @@ fn guard<T>(f: impl FnOnce() -> T) -> Result<T, String> {
 
 /// Build (oid, content) pairs, deduped by git OID, preserving first-seen
 /// order. Returns (pairs, dropped_duplicate_count).
+// Test-local dedupe tuple contract; kept inline by design.
+#[allow(clippy::type_complexity)]
 fn dedupe_blobs(blobs: &[Vec<u8>]) -> (Vec<([u8; 20], Vec<u8>)>, usize) {
     let total = blobs.len();
     let mut seen = std::collections::HashSet::new();

@@ -215,7 +215,7 @@ fn ntt_intt_plain_identity_vs_scalar() {
 #[test]
 fn ntt_pointwise_convolution_vs_scalar() {
     let mut rng = Lcg(0xA20C_0FFE_E5A7_E003);
-    let n = mldsa::N as usize;
+    let n = mldsa::N;
     for _ in 0..4 {
         let a = rng.poly();
         let b = rng.poly();
@@ -288,8 +288,8 @@ fn decompose_tiling_exhaustive_vs_scalar() {
             "a = {}",
             a
         );
-        assert!(r1 >= 0 && r1 < mldsa::M_BUCKETS, "a = {}", a);
-        assert!(r0 >= -mldsa::GAMMA2 && r0 <= mldsa::GAMMA2, "a = {}", a);
+        assert!((0..mldsa::M_BUCKETS).contains(&r1), "a = {}", a);
+        assert!((-mldsa::GAMMA2..=mldsa::GAMMA2).contains(&r0), "a = {}", a);
     }
     q_ = 0; // silence unused-mut warning if any
     let _ = q_;

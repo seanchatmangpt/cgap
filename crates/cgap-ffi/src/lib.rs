@@ -53,7 +53,7 @@ pub unsafe extern "C" fn cgap_i32_batch(n: i64, null_every: i64) -> *mut ArrowAr
         }
         i += 1;
     }
-    let (array, schema) = export(b.finish(), b"i\0".as_ptr() as *const _);
+    let (array, schema) = export(b.finish(), c"i".as_ptr());
     ROWS.store(n, Ordering::Relaxed);
     ARRAY_SLOT.store(Box::leak(Box::new(array)), Ordering::Relaxed);
     SCHEMA_SLOT.store(Box::leak(Box::new(schema)), Ordering::Relaxed);
@@ -228,7 +228,7 @@ mod digest_ffi {
     use cgap_arrow::digest::digest_of;
     use cgap_arrow::primitive::PrimitiveBuilder;
 
-    const FMT_I: *const core::ffi::c_char = b"i\0".as_ptr() as *const _;
+    const FMT_I: *const core::ffi::c_char = c"i".as_ptr();
 
     /// Heap-export `rows` like the static slots do (Box::leak) and return
     /// the ArrowArray address, mirroring foreign-consumer consumption.

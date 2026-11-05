@@ -9,11 +9,13 @@
 //!   - C: a cc compile court against the versioned header include/cgap_c_data.h
 //!     (the Arrow structs ARE declared there — this is where G19's C pins lived;
 //!     include/cgap.h itself carries no Arrow declarations).
+//!
 //! Anti-vacuity (both sides flip):
 //!   - C leg: a field-swapped /tmp copy of cgap_c_data.h must fail the same pins.
 //!   - Rust leg: a rustc twin crate (#[path]-including the real c_abi.rs) with a
 //!     deliberately wrong pin (size 79) must fail to compile; the correct-pin twin
 //!     must succeed.
+//!
 //! Courts mutate /tmp copies only; the shared tree is never touched.
 use std::process::Command;
 

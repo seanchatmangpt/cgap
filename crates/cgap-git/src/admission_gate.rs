@@ -49,8 +49,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-// ---- GIT-02 pkt-line codec, composed by path (no lib.rs wire-in) ----
-
+// pkt_line is composed by path: once via lib.rs (`pub mod pkt_line`)
+// and once here because admission_gate.rs is itself path-composed into
+// the admission_gate_court test crate, which has no crate::pkt_line.
+#[allow(clippy::duplicate_mod)]
 #[path = "pkt_line.rs"]
 mod pkt_line;
 
@@ -367,6 +369,9 @@ type Fact = (u64, u64, u64);
 /// against `seen`, emits each complete binding's head instantiation into
 /// `seen`. Every derived fact re-enters the set membership; the bounded
 /// domain forces termination or the round budget refuses.
+// `functional` is threaded through recursive joins unchanged; removing the
+// parameter would change the internal call shape for no gain.
+#[allow(clippy::only_used_in_recursion)]
 fn match_body(
     rule: &GateRule,
     atom_idx: usize,

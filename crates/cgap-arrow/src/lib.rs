@@ -17,6 +17,9 @@
 
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
+// Toolchain is floating nightly (rust-toolchain.toml); code intentionally uses
+// post-1.85 stable APIs (u64::is_multiple_of, Option::is_none_or).
+#![allow(clippy::incompatible_msrv)]
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -40,6 +43,7 @@ extern crate alloc;
 pub mod bitmask;
 pub mod blake3;
 pub mod chase_lev;
+pub mod flatbuf;
 pub mod ipc;
 pub mod slab;
 // StreamWriter (lane e80-06, v26.11.3): writev scatter of IPC1 windows to

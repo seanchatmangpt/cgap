@@ -8,8 +8,11 @@ publish = true
 
 # ZP-21: cert feature gates the alloc-using RFC-0089 §8.4 certificate
 # module (no new dependencies — digest substrate injected).
+# L56: pqc feature gates the alloc-using PQC composite-seal facade
+# (src/pqc_seal.rs) — typed delegation to cgap-crypto's pqc_seal kernel.
 [features]
 cert = []
+pqc = []
 
 # Embedded surface: exactly ONE dependency — the R-K1 crypto body crate
 # (v3 wire law Stage 2, 2026-11-04: the AEAD facade in src/aead.rs
@@ -47,3 +50,9 @@ cgap-audit = { path = "../audit", version = "26.11.3" }
 name = "cbmqs_runner"
 harness = false
 required-features = []
+
+# L56 delegation court: declared (not silently skipped) — needs the
+# alloc-using `pqc` feature for the facade surface.
+[[test]]
+name = "l56_pqc_facade_court"
+required-features = ["pqc"]

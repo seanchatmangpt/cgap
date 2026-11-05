@@ -391,8 +391,8 @@ fn run_all() -> Report {
     }
 
     let mut p0 = [0i16; 256];
-    for i in 0..256 {
-        p0[i] = ((i * 7 + 3) % 3329) as i16;
+    for (i, c) in p0.iter_mut().enumerate() {
+        *c = ((i * 7 + 3) % 3329) as i16;
     }
     let mut q = p0;
     cgap_crypto::fips203::ntt(&mut q);
@@ -453,14 +453,15 @@ fn run_all() -> Report {
     );
 
     // ---- Build the flip cases.
-    let mut cases: Vec<(
-        &'static str,
-        String,
-        Vec<(&'static str, String)>,
-        &'static str,
-        &str,
-        bool,
-    )> = Vec::new();
+type FlipCase<'a> = (
+    &'static str,
+    String,
+    Vec<(&'static str, String)>,
+    &'static str,
+    &'a str,
+    bool,
+);
+    let mut cases: Vec<FlipCase<'_>> = Vec::new();
     for word in 0..4usize {
         for bit in 0..32u32 {
             cases.push((

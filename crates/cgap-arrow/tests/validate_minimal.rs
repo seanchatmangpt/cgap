@@ -31,7 +31,7 @@ fn view(
 fn court1_minimal_passes_wellformed() {
     let s = validate_minimal(&view(4, 0, 0, None, 32, 8)).expect("well-formed");
     assert_eq!(s.offset_plus_length, 4);
-    assert_eq!(s.validity_skipped, true);
+    assert!(s.validity_skipped);
     assert_eq!(s.validity_checks, 0);
     // offset window inside the buffer also passes
     let s = validate_minimal(&view(4, 8, 0, Some(8), 1024, 8)).expect("offset ok");
@@ -80,7 +80,7 @@ fn court3_validity_skipped_when_null_count_le_zero() {
     assert_eq!((s.validity_skipped, s.validity_checks), (false, 1));
     // negative null_count is treated as "no nulls known" -> still skip
     let s = validate_minimal(&view(8, 0, -1, None, 64, 8)).expect("ok");
-    assert_eq!(s.validity_skipped, true);
+    assert!(s.validity_skipped);
 }
 
 // Court 4: negative length / offset and i64 overflow refused fail-closed.

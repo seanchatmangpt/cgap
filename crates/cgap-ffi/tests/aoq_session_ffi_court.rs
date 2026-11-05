@@ -111,16 +111,6 @@ impl KemSeam for CourtSeam {
     }
 }
 
-/// The session's recv_key law: kdf(CTX_RECV || handshake master) where the
-/// master derives from (ss, ek) via CTX_HANDSHAKE. `ss` comes from the
-/// court-held dk, so the derivation is independent of the FFI surface.
-fn court_recv_key(ek: &[u8; EK_BYTES], dk: &[u8], ct: &[u8; CT_BYTES]) -> [u8; 32] {
-    let kem = CourtSeam;
-    let ss = kem.decapsulate(dk, ct).expect("decapsulate");
-    let hs_master = derive(&kem, CTX_HANDSHAKE, &ss, ek);
-    kem.kdf(&[CTX_RECV, &hs_master])
-}
-
 /// The session's send_key law (emit direction, same handshake master).
 fn court_send_key(ek: &[u8; EK_BYTES], _dk: &[u8]) -> [u8; 32] {
     let kem = CourtSeam;
@@ -576,15 +566,18 @@ fn court6_status_band_is_closed() {
         AOQ_STATUS_EPOCH_MISMATCH,
         AOQ_STATUS_KEY_UNKNOWN,
         AOQ_STATUS_EPOCH_RETIRED,
+        cgap_ffi::aoq::status_maps::AOQ_STATUS_UNSUPPORTED_VERSION,
     ];
     assert_eq!(band.len(), cgap_ffi::aoq::status_maps::AOQ_STATUS_COUNT);
     for w in band {
-        let name = aoq_status_name(w).expect("band word must map to a name");
+        let name = aoq_status_name(w).expect("band word A001..A009 must map to a name");
         let back = cgap_ffi::aoq::status_maps::aoq_status_word(name).expect("name round trip");
         assert_eq!(back, w, "round-trip drift for {name}");
     }
-    // Outside-band words map to None (typed refusal at call sites).
+    // Outside-band words map to None (typed refusal at call sites). A009 was
+    // the pre-extension out-of-band probe; post-KD-1 it is in-band, so the
+    // outside-band probe moves to A00A.
     assert_eq!(aoq_status_name(0x4347_0001), None);
-    assert_eq!(aoq_status_name(0x4347_A009), None);
+    assert_eq!(aoq_status_name(0x4347_A00A), None);
     assert_eq!(aoq_status_name(0), None);
 }

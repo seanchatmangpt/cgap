@@ -20,7 +20,7 @@
 //! - Leg 5 (FIX-02, RED-12): the SRAM gate itself refuses bn3 — typed
 //!   subprocess assertion of `verify_cscb_sram.py --subject bn3` (exit 1
 //!   + `BN3_ENCLAVE_REFUSED`), plus the gate's own `--mutate bn3-pin`
-//!   anti-vacuity court (exit 0 = flip witnessed).
+//!     anti-vacuity court (exit 0 = flip witnessed).
 //!
 //! Anti-vacuity law: every leg names its mutation (see the per-leg doc
 //! comments and the lane receipt). Mutations were applied to /tmp sandbox

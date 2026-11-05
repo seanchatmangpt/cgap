@@ -288,6 +288,11 @@ const _: () = assert!(PINNED_INSTRUMENT_HEADER.len() == 413);
 /// evidence, non-80-byte evidence, wire-parse failure, and any §5.2-§5.8
 /// predicate failure (including a digest not bound to the pinned instrument).
 /// Hostile bytes never panic — they refuse typed.
+///
+/// # Safety
+/// `evidence` must point to `len` readable bytes (NULL is refused typed,
+/// never dereferenced); `out_digest`, when non-NULL, must point to one
+/// writable `u64`. Ownership of all memory stays with the caller.
 #[no_mangle]
 #[cfg(not(target_os = "none"))]
 pub unsafe extern "C" fn cgap_verify_p28(
@@ -374,15 +379,15 @@ fn map_frame_error(e: cgap_core::frame::FrameError) -> CgapStatus {
         // Not-a-CGAP-frame class (A14 row 1/2 overload: bad magic, wrong
         // version, or a buffer the gate cannot address).
         E::BadMagic | E::BadVersion | E::Misaligned | E::BufferTooSmall => {
-            return CGAP_ERR_INVALID_MAGIC;
+            CGAP_ERR_INVALID_MAGIC
         }
         // O-ABI coherence class (A14 row 3: digest/length coherence).
-        E::PayloadLenMismatch | E::DigestMismatch => return CGAP_ERR_OABI_MISMATCH,
+        E::PayloadLenMismatch | E::DigestMismatch => CGAP_ERR_OABI_MISMATCH,
         // Shape violation (reserved bits set = the frame is not the declared
         // shape; A19 register: SHACL_VIOLATION, producers A14+A16).
-        E::ReservedBitsSet => return CGAP_ERR_SHACL_VIOLATION,
+        E::ReservedBitsSet => CGAP_ERR_SHACL_VIOLATION,
         // P28 spoliation (A17 attestation validity fails).
-        E::AttestationMismatch => return CGAP_ERR_P28_SPOLIATION,
+        E::AttestationMismatch => CGAP_ERR_P28_SPOLIATION,
     }
 }
 
@@ -408,6 +413,12 @@ fn map_frame_error(e: cgap_core::frame::FrameError) -> CgapStatus {
 /// divergence (the view fields predate the A04 §6 header landing; a future
 /// frame version, the only field-addition path, may populate them).
 /// `out_view == NULL` probes (§2). Hostile bytes never panic.
+///
+/// # Safety
+/// `bytes` must point to `len` readable bytes; `out_view`, when non-NULL,
+/// must point to one writable `CgapFrameView`. On admission the view
+/// borrows the caller's bytes — keep them alive while reading
+/// `out_view.payload`. NULL inputs are refused typed, never dereferenced.
 #[no_mangle]
 #[cfg(not(target_os = "none"))]
 pub unsafe extern "C" fn cgap_admit_frame(
@@ -529,6 +540,13 @@ fn read_le_word(bytes: &[u8], off: usize) -> Result<u64, CgapStatus> {
 /// map to the register's A12+A13 class `CGAP_ERR_OABI_MISMATCH`; shape and
 /// domain faults map to `CGAP_ERR_SHACL_VIOLATION`; the caller's exhausted
 /// `out_lanes` lease maps to `CGAP_ERR_LEASE_EXHAUSTED`.
+///
+/// # Safety
+/// `view` must point to a valid, initialized `CgapFrameView` whose payload
+/// region stays alive for the duration of the call; `bn3_rodata` must point
+/// to `bn3_len` readable bytes; `out_lane_count`, when non-NULL, must point
+/// to one writable `usize`; `out_lanes` must be writable up to `lanes_cap`
+/// elements. NULL shape inputs are refused typed, never dereferenced.
 #[no_mangle]
 #[cfg(not(target_os = "none"))]
 pub unsafe extern "C" fn cgap_eval_bn3(
@@ -693,6 +711,12 @@ pub unsafe extern "C" fn cgap_eval_bn3(
 ///   sink IO failure -> CGAP_ERR_LEASE_EXHAUSTED (the register carries no
 ///   IO class; the documented-capacity-exhaustion class is the least-wrong
 ///   typed value — RECORDED MAPPING DIVERGENCE in the lane receipt).
+///
+/// # Safety
+/// `lanes` must point to `lane_count` readable `i32` values (NULL with a
+/// nonzero count is refused typed); `path` must point to a NUL-terminated
+/// UTF-8 C string for the duration of the call. Ownership stays with the
+/// caller; NULL shape inputs are refused typed, never dereferenced.
 #[no_mangle]
 #[cfg(not(target_os = "none"))]
 pub unsafe extern "C" fn cgap_commit_parquet(
@@ -1095,7 +1119,7 @@ mod spill_gate {
     }
 
     thread_local! {
-        static OWNERS_GUARD: OwnersGuard = OwnersGuard;
+        static OWNERS_GUARD: OwnersGuard = const { OwnersGuard };
     }
 
     /// Process-lifetime ownership table. Bounded by the number of distinct
@@ -1356,6 +1380,7 @@ mod wave3_courts {
         Ok(out)
     }
 
+    #[allow(clippy::type_complexity)] // header-drift parser mirror: the nested map IS the C-header shape under test
     fn parse_prototypes(
         text: &str,
     ) -> Result<BTreeMap<String, (String, Vec<(String, String)>)>, String> {
@@ -1949,7 +1974,7 @@ int main() {
             if p.is_dir() {
                 let is_build_root = skip_build_roots
                     && p.file_name()
-                        .map_or(false, |n| n.to_string_lossy().starts_with("target"));
+                        .is_some_and(|n| n.to_string_lossy().starts_with("target"));
                 if !is_build_root {
                     walk_impl(&p, depth + 1, files, skip_build_roots);
                 }
@@ -2200,7 +2225,7 @@ int main() {
         let has = |files: &[PathBuf], name: &str| {
             files
                 .iter()
-                .any(|f| f.file_name().map_or(false, |n| n.to_string_lossy() == name))
+                .any(|f| f.file_name().is_some_and(|n| n.to_string_lossy() == name))
         };
         let mut filtered = Vec::new();
         let mut unfiltered = Vec::new();
@@ -2985,7 +3010,7 @@ mod wave9_courts {
 mod xip_courts {
     use super::wave9_courts::{run_bounded, tail};
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::Duration;
 
     /// Fixture build deadline. Generous on purpose (first run builds the
@@ -3167,7 +3192,7 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
     }
 
     fn build_fixture(
-        dir: &PathBuf,
+        dir: &Path,
         envs: &[(&str, String)],
         main_src: &str,
         deadline: Duration,
@@ -3254,7 +3279,7 @@ pub extern "C" fn cgap_xip_start() -> ! { loop { unsafe { asm!("wfi") } } }
             };
             assert!(sz > 0, "{name} linked with size 0");
             assert!(
-                addr >= FLASH_ORIGIN && addr < FLASH_ORIGIN + FLASH_LEN,
+                (FLASH_ORIGIN..FLASH_ORIGIN + FLASH_LEN).contains(&addr),
                 "{name} at {addr:#x} outside the FLASH region [{FLASH_ORIGIN:#x}, +{FLASH_LEN:#x})"
             );
             assert_eq!(
@@ -3594,9 +3619,9 @@ mod wave_f2_p28_courts {
     /// CLEAR-flips of the SET bits of the ceiling field (bytes 8..16).
     fn predicted_ceiling_survivors(good: &[u8; ATTESTATION_LEN]) -> Vec<(usize, u8)> {
         let mut v = Vec::new();
-        for i in 8..16 {
+        for (i, &byte) in good.iter().enumerate().skip(8).take(8) {
             for j in 0..8u8 {
-                if good[i] & (1 << j) != 0 {
+                if byte & (1 << j) != 0 {
                     v.push((i, j));
                 }
             }
@@ -4113,14 +4138,14 @@ mod wave_gap1_courts {
         // The unaligned twin: the SAME bytes at a 1-aligned buffer must take
         // the decode path and reach the same verdict (recorded divergence:
         // the C surface cannot promise 64-byte alignment).
-        let mut unaligned = frame.clone();
+        let unaligned = frame.clone();
         let mut uview = CgapFrameView {
             payload: core::ptr::null(),
             payload_len: 0,
             schema_id: 0,
             rule_count: 0,
         };
-        let st_u = call_admit(&mut unaligned, &mut uview);
+        let st_u = call_admit(&unaligned, &mut uview);
         assert_eq!(
             st_u, CGAP_OK,
             "unaligned twin must admit via the decode path"
@@ -4482,7 +4507,7 @@ mod wave_gap1_courts {
         // byte-identity claim is preserved EXACTLY: the spill file must
         // equal the CONCATENATION of owner-API sealed blocks over the same
         // lane, in commit order.
-        let lanes: Vec<i32> = (0..64).map(|i| (i % 251) as i32).collect();
+        let lanes: Vec<i32> = (0..64).map(|i| i % 251).collect();
         let dir = sandbox_dir("commit");
         let p1 = dir.join("out1.par2");
         let p2 = dir.join("out2.par2");
@@ -4619,7 +4644,7 @@ mod wave_gap1_courts {
         // documented 64 KiB static lease. INCOMPRESSIBLE values: the A02
         // hybrid codec RLE-collapses constant runs, so a constant lane fits
         // easily — alternating values keep the page at full width.
-        let big: Vec<i32> = (0..70_000).map(|i| (i % 251) as i32).collect();
+        let big: Vec<i32> = (0..70_000).map(|i| i % 251).collect();
         assert_eq!(
             call_commit(&big, &cpath("e.par2")),
             CGAP_ERR_LEASE_EXHAUSTED,
@@ -4742,7 +4767,7 @@ mod wave_gap1_courts {
         );
         // Commit.
         let good = vec![1i32; 64];
-        let big: Vec<i32> = (0..70_000).map(|i| (i % 251) as i32).collect();
+        let big: Vec<i32> = (0..70_000).map(|i| i % 251).collect();
         let dir = sandbox_dir("stub-commit");
         let path = std::ffi::CString::new(dir.join("s.par2").as_os_str().as_encoded_bytes())
             .expect("cstr");

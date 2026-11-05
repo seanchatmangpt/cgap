@@ -260,10 +260,8 @@ pub fn resolve_chain<'a>(
     let mut len: usize = 0;
     for (i, delta) in deltas.iter().enumerate() {
         let fp = fnv1a(delta);
-        for j in 0..i {
-            if seen[j] == fp {
-                return Err(DeltaError::DeltaCycle { at: i });
-            }
+        if seen[..i].contains(&fp) {
+            return Err(DeltaError::DeltaCycle { at: i });
         }
         seen[i] = fp;
         len = match cur {

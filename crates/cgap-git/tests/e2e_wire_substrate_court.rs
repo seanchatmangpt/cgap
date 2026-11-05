@@ -299,7 +299,7 @@ fn wire_to_substrate_e2e() {
 
     // The FULL pipeline runs inside ONE window; every heap value is
     // born and dies inside this block.
-    let _pipeline_done = {
+    {
         open_window();
         let root = std::env::temp_dir().join(format!("cgap-gap08-e2e-{}", std::process::id()));
         std::fs::create_dir_all(&root).expect("mkdir root");

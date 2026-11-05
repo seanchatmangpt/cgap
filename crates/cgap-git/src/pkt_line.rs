@@ -46,7 +46,7 @@ fn hex_nibble(c: u8) -> (u32, u32) {
         // caller discards the value, so timing is input-shape-uniform.
         _ => (c as u32) & 0xF,
     };
-    let ok = matches!(c, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') as u32;
+    let ok = c.is_ascii_hexdigit() as u32;
     (v, ok)
 }
 
@@ -86,7 +86,7 @@ pub fn decode_header(h: &[u8; 4]) -> Result<Header, PktError> {
         return Ok(Header::ResponseEnd);
     }
     let total = parse_hex_len(h)? as usize;
-    if total < 4 || total > MAX_PKT_PAYLOAD + 4 {
+    if !(4..=MAX_PKT_PAYLOAD + 4).contains(&total) {
         return Err(PktError::BadLength(total));
     }
     Ok(Header::Data(total))

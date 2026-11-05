@@ -792,40 +792,40 @@ fn keyed_digest_parts_equals_concatenated_and_is_part_order_bound() {
     // Equivalence across many part splittings of the same bytes.
     let data = corpus(300);
     let k = OFFICIAL_KEY;
-    let whole = keyed_digest(&k, &data).expect("300 B within bound");
+    let whole = keyed_digest(k, &data).expect("300 B within bound");
     // 1 part
     assert_eq!(
-        keyed_digest_parts(&k, &[&data]).expect("within bound"),
+        keyed_digest_parts(k, &[&data]).expect("within bound"),
         whole,
         "single part == whole"
     );
     // 2 parts at an interior boundary
     assert_eq!(
-        keyed_digest_parts(&k, &[&data[..128], &data[128..]]).expect("within bound"),
+        keyed_digest_parts(k, &[&data[..128], &data[128..]]).expect("within bound"),
         whole,
         "2 parts == whole"
     );
     // 3 parts incl. an empty part (empty part must contribute nothing)
     assert_eq!(
-        keyed_digest_parts(&k, &[&data[..7], &[], &data[7..]]).expect("within bound"),
+        keyed_digest_parts(k, &[&data[..7], &[], &data[7..]]).expect("within bound"),
         whole,
         "3 parts with an empty part == whole"
     );
     // Reordering the parts is NOT equivalent (order-sensitive engine).
     assert_ne!(
-        keyed_digest_parts(&k, &[&data[128..], &data[..128]]).expect("within bound"),
+        keyed_digest_parts(k, &[&data[128..], &data[..128]]).expect("within bound"),
         whole,
         "reordered parts must not equal the concatenated digest"
     );
     // Key sensitivity + determinism.
     assert_ne!(
-        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
+        keyed_digest_parts(k, &[b"a", b"b"]).expect("within bound"),
         keyed_digest_parts(&[0u8; 32], &[b"a", b"b"]).expect("within bound"),
         "a different key must derive a different digest"
     );
     assert_eq!(
-        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
-        keyed_digest_parts(&k, &[b"a", b"b"]).expect("within bound"),
+        keyed_digest_parts(k, &[b"a", b"b"]).expect("within bound"),
+        keyed_digest_parts(k, &[b"a", b"b"]).expect("within bound"),
         "deterministic"
     );
 }
@@ -840,12 +840,12 @@ fn keyed_digest_parts_length_boundary_is_the_concatenated_total() {
     let a = corpus(KEYED_MAX_INPUT_LEN - 1);
     let b = [7u8; 1];
     assert!(
-        keyed_digest_parts(&OFFICIAL_KEY, &[&a, &b]).is_ok(),
+        keyed_digest_parts(OFFICIAL_KEY, &[&a, &b]).is_ok(),
         "exactly {KEYED_MAX_INPUT_LEN} B across parts is within the bound"
     );
     let a2 = corpus(KEYED_MAX_INPUT_LEN - 1);
     let b2 = [7u8; 2];
-    match keyed_digest_parts(&OFFICIAL_KEY, &[&a2, &b2]) {
+    match keyed_digest_parts(OFFICIAL_KEY, &[&a2, &b2]) {
         Err(DigestError::InputTooLong { len, max }) => {
             assert_eq!(len, KEYED_MAX_INPUT_LEN + 1, "total length, not per-part");
             assert_eq!(max, KEYED_MAX_INPUT_LEN);

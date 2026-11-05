@@ -94,6 +94,8 @@ fn block_pool() -> Vec<&'static SealedBlock<'static>> {
 /// One full append run over `n` links against the cyclic block pool.
 /// Returns the chain, the blocks slice reference list, and per-bucket
 /// (wall_ns, allocs, bytes) census.
+// census tuple shape mirrors the court's three measured surfaces 1:1
+#[allow(clippy::type_complexity)]
 fn build_chain(
     n: usize,
     pool: &[&'static SealedBlock<'static>],
@@ -219,7 +221,7 @@ fn scale_append_verify_100k_census() {
             "[run {run}] append 100k: {append_ms:.1}ms | verify_all: {verify_ms:.1}ms | \
              span(0..10k): {span10_ms:.3}ms"
         );
-        if best.as_ref().map_or(true, |(a, _)| append_ms < *a) {
+        if best.as_ref().is_none_or(|(a, _)| append_ms < *a) {
             best = Some((append_ms, (census, verify_ms)));
         }
     }
@@ -239,7 +241,7 @@ fn scale_append_verify_100k_census() {
          per-1k bytes first {} -> last {}",
         ms(first.0),
         ms(last.0),
-        ms(last.0) as f64 / ms(first.0).max(1e-9),
+        ms(last.0) / ms(first.0).max(1e-9),
         first.1,
         last.1,
         first.2,
@@ -285,7 +287,7 @@ fn verify_span_from_checkpoints_o_span_curve() {
     for span in spans {
         let mut best = u128::MAX;
         let stride = if span == 50_000 { 4 } else { 1 };
-        for &cp in all_checkpoints.iter().skip(0).step_by(stride) {
+        for &cp in all_checkpoints.iter().step_by(stride) {
             if cp + span > N_LINKS {
                 continue;
             }

@@ -26,7 +26,7 @@ fn mix32(parts: &[&[u8]]) -> [u8; 32] {
         }
     }
     let mut out = [0u8; 32];
-    for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
+    for (i, chunk) in out.as_chunks_mut::<8>().0.iter_mut().enumerate() {
         let v = if i % 2 == 0 {
             a.wrapping_add(i as u64)
         } else {
@@ -63,8 +63,8 @@ fn bench_verify(links: usize) -> f64 {
     }
     let t0 = Instant::now();
     assert_eq!(c.verify_all(), Ok(()));
-    let per_op_us = cgap_aoq::profile_guard::fence(t0.elapsed().as_secs_f64() * 1e6 / links as f64);
-    per_op_us
+    
+    cgap_aoq::profile_guard::fence(t0.elapsed().as_secs_f64() * 1e6 / links as f64)
 }
 
 /// Min-of-N across 1k / 10k / 100k links.

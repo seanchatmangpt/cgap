@@ -230,7 +230,7 @@ pub fn ntt(r: &mut [i16; N]) {
             for j in start..start + len {
                 let t = fqmul(zeta, r[j + len]);
                 r[j + len] = r[j] - t;
-                r[j] = r[j] + t;
+                r[j] += t;
             }
             start += 2 * len;
         }
@@ -399,8 +399,8 @@ pub fn byte_encode<const D: usize>(f: &[i16; N], out: &mut [u8]) {
     let mut acc: u64 = 0;
     let mut bits = 0u32;
     let mut oi = 0usize;
-    for i in 0..N {
-        let v = cond_add_q(f[i]) as u64 & ((1u64 << D) - 1);
+    for &fi in f.iter() {
+        let v = cond_add_q(fi) as u64 & ((1u64 << D) - 1);
         acc |= v << bits;
         bits += D as u32;
         while bits >= 8 {
@@ -419,13 +419,13 @@ pub fn byte_decode<const D: usize>(inp: &[u8]) -> [i16; N] {
     let mut acc: u64 = 0;
     let mut bits = 0u32;
     let mut ii = 0usize;
-    for i in 0..N {
+    for fi in f.iter_mut() {
         while bits < D as u32 {
             acc |= (inp[ii] as u64) << bits;
             ii += 1;
             bits += 8;
         }
-        f[i] = (acc & ((1u64 << D) - 1)) as i16;
+        *fi = (acc & ((1u64 << D) - 1)) as i16;
         acc >>= D as u32;
         bits -= D as u32;
     }
@@ -672,14 +672,14 @@ pub fn sample_poly_cbd_prf(seed: &[u8; 32], nonce: u8) -> [i16; N] {
 /// XOF(rho || j || i)); true gives A^T (entry [i][j] from XOF(rho || i || j)).
 /// Matches the reference gen_a / gen_at index convention.
 pub fn gen_matrix(a: &mut [[[i16; N]; K]; K], seed: &[u8; 32], transposed: bool) {
-    for i in 0..K {
-        for j in 0..K {
+    for (i, arow) in a.iter_mut().enumerate() {
+        for (j, cell) in arow.iter_mut().enumerate() {
             let (b0, b1) = if transposed {
                 (i as u8, j as u8)
             } else {
                 (j as u8, i as u8)
             };
-            a[i][j] = sample_ntt(seed, b0, b1);
+            *cell = sample_ntt(seed, b0, b1);
         }
     }
 }

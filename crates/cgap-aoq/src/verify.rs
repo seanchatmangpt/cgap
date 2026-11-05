@@ -10,6 +10,7 @@
 //! - auth tag, 16 bytes at window offset 76 (`TAG_AT`)
 //! - remaining pad zero on write, nonzero-pad refused on read
 //!   (`AoqError::ReservedNotZero`, pad-class)
+//!
 //! Verified AOQ1 windows are alignment-64 only: a 64-byte metadata span
 //! (alignment 8) has no padding, so no tag/body_len can be carried; such
 //! windows refuse at the span gate.

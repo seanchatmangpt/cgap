@@ -252,7 +252,7 @@ fn c3b_ofs_offset_mutation_moves_decoded_base() {
     let off_byte = 17 + 1; // offset varint sits right after obj1's header byte
     let before = pack[off_byte];
     pack[off_byte] = before ^ 0x01; // 12 -> 13
-    let recs = demux_all_stride(&mut pack);
+    let recs = demux_all_stride(&pack);
     assert_eq!(
         recs[1].base,
         DeltaBase::Ofs(13),
@@ -313,7 +313,7 @@ fn c5b_ofs_200_varint_mutation_changes_value() {
     let mut pack = build_pack(&[(3u8, Base::None, filler), (6u8, Base::Ofs(200), body)]);
     let varint_pos = 12 + 2 + 160 + 1; // after obj1 header byte at 174
     pack[varint_pos] ^= 0x7F; // 0x48 -> 0x37
-    let recs = demux_all_stride(&mut pack);
+    let recs = demux_all_stride(&pack);
     assert_ne!(
         recs[1].base,
         DeltaBase::Ofs(200),
@@ -367,7 +367,7 @@ fn c7_parse_path_is_zero_alloc() {
     assert_eq!(n_drain, 0, "drain allocated {} times", n_drain);
     assert!(d.is_done());
     // instrument self-check (flip twin): the builder allocates.
-    let (_, n_build) = alloc_delta(|| ref_pack());
+    let (_, n_build) = alloc_delta(ref_pack);
     assert!(
         n_build > 0,
         "VACUOUS: alloc counter never moved — instrument is pinned"

@@ -260,15 +260,12 @@ fn busy_drain_mutation_flips() {
     let mut total_bytes = 0usize;
     while Instant::now() < deadline {
         let mut word_b = [0u8; 4];
-        match b.read(&mut word_b) {
-            Ok(n) => {
-                total_bytes += n;
-                if n == 4 && u32::from_le_bytes(word_b) == 0x4347_A003 {
-                    busy_words += 1;
-                }
+        if let Ok(n) = b.read(&mut word_b) {
+            total_bytes += n;
+            if n == 4 && u32::from_le_bytes(word_b) == 0x4347_A003 {
+                busy_words += 1;
             }
-            Err(_) => {} // WouldBlock / not yet drained: retry
-        }
+        } // WouldBlock / not yet drained: retry
     }
     assert_eq!(
         busy_words, 0,
@@ -340,8 +337,7 @@ fn sha256(data: &str) -> String {
                     .map(str::to_string)
                     .unwrap_or_default())
             } else {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                Err(std::io::Error::other(
                     "shasum failed",
                 ))
             }

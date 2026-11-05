@@ -38,6 +38,7 @@ use cgap_crypto::fips202::Shake256;
 
 use crate::aoq::status_maps::{
     AOQ_STATUS_BUSY, AOQ_STATUS_DIGEST_MISMATCH, AOQ_STATUS_EPOCH_MISMATCH,
+    AOQ_STATUS_UNSUPPORTED_VERSION,
     AOQ_STATUS_EPOCH_RETIRED, AOQ_STATUS_INCOMPLETE_FRAME, AOQ_STATUS_KEY_UNKNOWN, AOQ_STATUS_OK,
 };
 
@@ -103,11 +104,12 @@ const fn status_of(err: &SessionError) -> u32 {
         // Truncated / out-of-order frame law.
         SessionError::LengthMismatch { .. } => AOQ_STATUS_INCOMPLETE_FRAME,
         // Frame-integrity law (magic/version/digest/kind tag/ct-echo bind).
-        // KD-1 (docs/jira/v26.11.4/KNOWN_DIVERGENCES.md): UnsupportedVersion
-        // collides onto the digest word because the frozen band has no
-        // version-specific status; closes at the next band bump.
+        // KD-COVERS: KD-1 — version refusals carry their own word since the
+        // KD-1 band extension (FM-AOQ-009); they no longer collide with the
+        // digest word.
+        SessionError::Wire(AoqError::UnsupportedVersion { .. })
+            => AOQ_STATUS_UNSUPPORTED_VERSION,
         SessionError::Wire(AoqError::BadMagic { .. })
-        | SessionError::Wire(AoqError::UnsupportedVersion { .. })
         | SessionError::Wire(AoqError::DigestMismatch { .. })
         // AoqError::AeadMismatch appended mid-wave by lane CG8 (0x00_0D):
         // authenticity failure -> same frozen digest-mismatch status.
@@ -121,6 +123,7 @@ const fn status_of(err: &SessionError) -> u32 {
         | SessionError::UnexpectedFrame { .. } => AOQ_STATUS_EPOCH_MISMATCH,
         // KEM / table identity law (also serves stale/unknown handles).
         SessionError::Wire(AoqError::KemKernelNotAdmitted { .. })
+        | SessionError::Wire(AoqError::KemShapeMismatch { .. })
         | SessionError::Wire(AoqError::AeadKernelNotAdmitted { .. })
         | SessionError::KemRefused { .. }
         // AEAD open refused: an authenticity failure (P2 M1 typed landing).
@@ -453,6 +456,7 @@ mod tests {
         AOQ_STATUS_INCOMPLETE_FRAME,
         AOQ_STATUS_KEY_UNKNOWN,
         crate::aoq::status_maps::AOQ_STATUS_PENDING,
+        AOQ_STATUS_UNSUPPORTED_VERSION,
     ];
 
     #[test]

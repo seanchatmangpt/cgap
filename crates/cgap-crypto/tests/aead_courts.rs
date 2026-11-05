@@ -241,8 +241,7 @@ fn cross_check_rustcrypto_byte_identical_both_directions() {
         let xtag: [u8; TAG_LEN] = xtag.try_into().expect("16-byte tag");
 
         // Local detached seal.
-        let mut ct = std::vec::Vec::with_capacity(len);
-        ct.resize(len, 0);
+        let mut ct = vec![0; len];
         let mut tag = [0u8; TAG_LEN];
         aead::seal_detached(&mut ct, &mut tag, &pt, &aad, &key, &nonce);
 
@@ -250,8 +249,7 @@ fn cross_check_rustcrypto_byte_identical_both_directions() {
         assert_eq!(tag, xtag, "tag byte-identical (len {len})");
 
         // Direction 1: local open of RustCrypto output.
-        let mut back = std::vec::Vec::with_capacity(len);
-        back.resize(len, 0);
+        let mut back = vec![0; len];
         aead::open_detached(&mut back, xct, &xtag, &aad, &key, &nonce)
             .expect("local open of rustcrypto seal");
         assert_eq!(back.as_slice(), pt.as_slice());
@@ -283,13 +281,11 @@ fn seal_open_round_trip(len: usize, state: &mut u64) {
     let aad = aad36(state);
     let pt: std::vec::Vec<u8> = (0..len).map(|_| splitmix64(state) as u8).collect();
 
-    let mut ct = std::vec::Vec::with_capacity(len);
-    ct.resize(len, 0);
+    let mut ct = vec![0; len];
     let mut tag = [0u8; TAG_LEN];
     aead::seal_detached(&mut ct, &mut tag, &pt, &aad, &key, &nonce);
 
-    let mut back = std::vec::Vec::with_capacity(len);
-    back.resize(len, 0);
+    let mut back = vec![0; len];
     aead::open_detached(&mut back, &ct, &tag, &aad, &key, &nonce).expect("round trip must open");
     assert_eq!(back.as_slice(), pt.as_slice(), "round trip (len {len})");
 }
@@ -319,13 +315,11 @@ fn flip_kills_are_mismatch() {
     let aad = aad36(&mut state);
     let pt: std::vec::Vec<u8> = (0..128).map(|_| splitmix64(&mut state) as u8).collect();
 
-    let mut ct = std::vec::Vec::with_capacity(pt.len());
-    ct.resize(pt.len(), 0);
+    let mut ct = vec![0; pt.len()];
     let mut tag = [0u8; TAG_LEN];
     aead::seal_detached(&mut ct, &mut tag, &pt, &aad, &key, &nonce);
 
-    let mut back = std::vec::Vec::with_capacity(pt.len());
-    back.resize(pt.len(), 0);
+    let mut back = vec![0; pt.len()];
 
     // AAD flip (every position class: first, AAD-adjacent, last).
     for i in [0usize, AAD_LEN / 2, AAD_LEN - 1] {
@@ -363,8 +357,7 @@ fn flip_kills_are_mismatch() {
     // Plaintext flip changes both ct and tag (never an accept path).
     let mut pt2 = pt.clone();
     pt2[7] ^= 0x01;
-    let mut ct2 = std::vec::Vec::with_capacity(pt.len());
-    ct2.resize(pt.len(), 0);
+    let mut ct2 = vec![0; pt.len()];
     let mut tag2 = [0u8; TAG_LEN];
     aead::seal_detached(&mut ct2, &mut tag2, &pt2, &aad, &key, &nonce);
     assert_ne!(ct2[7], ct[7], "pt flip must change ct");
@@ -384,9 +377,8 @@ fn flip_kills_are_mismatch() {
 /// (the bypass path is separately killed by the count-law scan below).
 #[test]
 fn epoch_exhausted_boundary() {
-    assert_eq!(
-        Nonce96::new(0xFFFF_FFFE, 0x1111_2222_3333_4444).is_ok(),
-        true
+    assert!(
+        Nonce96::new(0xFFFF_FFFE, 0x1111_2222_3333_4444).is_ok()
     );
     assert_eq!(Nonce96::new(0xFFFF_FFFF, 0), Err(EpochExhausted));
     // 0xFFFF_FFFE seals and opens end-to-end.
@@ -550,7 +542,7 @@ fn throughput_min_of_n_floor() {
 /// immediately; a stubbed-to-false fails the positive leg.
 #[test]
 fn verify_tag_var_aad_negative_legs() {
-    let mut state: u64 = 0x1E51FAA_C000_0001 ^ 0x5EED_C000;
+    let mut state: u64 = 0x1E51_FAAC_0000_0001 ^ 0x5EED_C000;
     let key = key32(&mut state);
     let nonce = nonce_from(&mut state);
     let aad: std::vec::Vec<u8> = (0..24).map(|_| splitmix64(&mut state) as u8).collect();

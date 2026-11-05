@@ -184,7 +184,6 @@ mod tests {
     use crate::c_abi::export;
     use crate::primitive::PrimitiveBuilder;
     use alloc::vec::Vec;
-    use core::ffi::c_char;
 
     /// Build a nullable i32 array, export it through the C Data Interface,
     /// and read it back through the typed foreign view: values and
@@ -197,7 +196,7 @@ mod tests {
         b.push(None);
         b.push(Some(-9));
         let arr = b.finish();
-        let format = b"i\0".as_ptr() as *const c_char;
+        let format = c"i".as_ptr();
         let (array, schema) = export(arr, format);
         let validity_bytes = crate::bitmap::bitmap_bytes(3);
 
@@ -222,7 +221,7 @@ mod tests {
     #[test]
     fn format_mismatch_is_refused() {
         let arr = PrimitiveBuilder::<i64>::new().finish();
-        let format = b"l\0".as_ptr() as *const c_char;
+        let format = c"l".as_ptr();
         let (array, schema) = export(arr, format);
         let error =
             unsafe { primitive_view::<i32>(&schema, &array, 8 * core::mem::size_of::<i32>()) }
@@ -241,7 +240,7 @@ mod tests {
         let mut b = PrimitiveBuilder::<i32>::new();
         b.push(Some(5));
         let arr = b.finish();
-        let format = b"i\0".as_ptr() as *const c_char;
+        let format = c"i".as_ptr();
         let (array, schema) = export(arr, format);
         let error = unsafe { primitive_view::<i32>(&schema, &array, 0) }.unwrap_err();
         assert_eq!(

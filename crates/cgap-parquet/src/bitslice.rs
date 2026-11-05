@@ -399,6 +399,7 @@ pub fn semi_join_masks(a: &[u64], b: &[u64], out: &mut [u64]) -> u64 {
 /// count (their group counts must match, loud assert); `out` receives the
 /// composed mask (see [`semi_join_masks`] for its contract). Returns the
 /// qualifying-row popcount.
+#[allow(clippy::too_many_arguments)] // flat 8-arg scan kernel; call sites pass the two (lo,hi) pairs symmetrically
 pub fn semi_join_two_hop(
     col_a: &[u64],
     col_b: &[u64],
@@ -491,14 +492,14 @@ mod tests {
 
             // Ground truth: scalar materialize-and-sum
             let mut true_sum: i64 = 0;
-            for i in 0..64 {
+            for (i, &v) in values.iter().take(64).enumerate() {
                 if (mask0 >> i) & 1 == 1 {
-                    true_sum += base + values[i] as i64;
+                    true_sum += base + v as i64;
                 }
             }
-            for i in 0..64 {
+            for (i, &v) in values.iter().skip(64).enumerate() {
                 if (mask1 >> i) & 1 == 1 {
-                    true_sum += base + values[64 + i] as i64;
+                    true_sum += base + v as i64;
                 }
             }
 
@@ -842,8 +843,8 @@ mod tests {
             for &bits in words.iter().rev() {
                 let hb = (((hi >> 7) & 1) as u64).wrapping_neg();
                 let lb = (((lo >> 7) & 1) as u64).wrapping_neg();
-                let eq_hi = !(hi_gt | 0); // MUTANT: hi decision never persists
-                let eq_lo = !(lo_lt | 0);
+                let eq_hi = !hi_gt; // MUTANT: hi decision never persists
+                let eq_lo = !lo_lt;
                 hi_gt |= eq_hi & bits & !hb;
                 lo_lt |= eq_lo & lb & !bits;
             }

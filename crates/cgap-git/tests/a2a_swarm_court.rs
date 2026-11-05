@@ -1,10 +1,10 @@
 //! Lane GIT-15 mutation court: agent lease table + coordinate zoning
-//! + per-agent CAS refs. Chicago discipline: real collaborators, final
-//! state asserts, no mocks. Anti-vacuity flip twins: the cross-zone
-//! refusal court inverts (returns Ok) if the bitmask-AND zone gate is
-//! removed; the foreign-ref-path court inverts if the namespace gate
-//! is removed; the revoke court inverts if the revoked gate is
-//! removed. Each twin names its mutation in the test body.
+//! plus per-agent CAS refs. Chicago discipline: real collaborators,
+//! final state asserts, no mocks. Anti-vacuity flip twins: the
+//! cross-zone refusal court inverts (returns Ok) if the bitmask-AND
+//! zone gate is removed; the foreign-ref-path court inverts if the
+//! namespace gate is removed; the revoke court inverts if the revoked
+//! gate is removed. Each twin names its mutation in the test body.
 
 // Module wired in by #[path] (lib.rs off limits this lane). If the
 // coordinator later adds `pub mod a2a_swarm;` to lib.rs, this include

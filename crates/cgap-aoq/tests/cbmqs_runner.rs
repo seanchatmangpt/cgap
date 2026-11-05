@@ -158,7 +158,7 @@ impl Report {
     fn canonical_body(&self) -> String {
         let mut s = String::new();
         s.push_str("{\n");
-        s.push_str(&format!("  \"runner\": \"cbmqs-runner\",\n"));
+        s.push_str("  \"runner\": \"cbmqs-runner\",\n");
         s.push_str(&format!(
             "  \"runner_version\": \"{}\",\n",
             json_escape(RUNNER_VERSION)
@@ -189,7 +189,7 @@ impl Report {
         s.push_str(&format!("  \"verdict\": \"{}\",\n", self.verdict));
         s.push_str("  \"report_hash_algo\": \"blake3-32\",\n");
         s.push_str("  \"report_hash\": \"\"\n");
-        s.push_str("}");
+        s.push('}');
         s
     }
 
@@ -530,6 +530,9 @@ fn gate_g5_self() -> GateResult {
                 AoqError::SlabFull { .. } => "SlabFull",
                 // P2 M1 SLA-disclosed minimal unblock (lane co-edit): new error variant.
                 AoqError::AeadMismatch => "AeadMismatch",
+                // L56 SLA-disclosed minimal unblock: pqc-feature error variant.
+                #[cfg(feature = "pqc")]
+                AoqError::PqcSealRefused { .. } => "PqcSealRefused",
             }
             .to_string(),
         };
@@ -948,6 +951,7 @@ fn verdict_from(gates: &[GateResult], refusal: &Option<String>) -> &'static str 
     }
 }
 
+#[allow(clippy::too_many_arguments)] // report-plumbing fn; arg group is the report schema
 fn emit_report(
     subject_mode: &'static str,
     subject_id: &str,

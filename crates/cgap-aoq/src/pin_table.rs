@@ -88,7 +88,15 @@ impl PinTable {
             len: 0,
         }
     }
+}
 
+impl Default for PinTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PinTable {
     /// The one entry point. No pin: TOFU (record + return). Pin matches:
     /// [`PinOutcome::Pinned`]. Pin mismatches: [`PinError::PinMismatch`]
     /// and the table is byte-identical to before the call.

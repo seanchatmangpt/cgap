@@ -59,8 +59,7 @@ pub const BN3_NETWORK_LEN: usize = 152;
 
 /// The REAL A06 `.oabi` slot table: the committed A09 pack bytes,
 /// byte-identical to `ontology-packs/fibo/fibo_sec_dbt_v1.oabi` on disk
-/// (asserted every run by `r2_courts::r2_oabi_table_identity_court`).
-
+/// (asserted every run by `r2_courts::r2_oabi_table_identity_court`)
 pub const OABI_PACK_FIBO_SEC_DBT_V1: [u8; OABI_PACK_LEN] = [
     0x4f, 0x41, 0x42, 0x49, 0x76, 0x31, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
     0x03, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00, 0x4b, 0x03, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,
@@ -98,8 +97,7 @@ pub const OABI_PACK_FIBO_SEC_DBT_V1: [u8; OABI_PACK_LEN] = [
 /// The REAL A11 `.bn3` network: the arena byte image re-derived through the
 /// owner API (`Arena::flatten` + `Arena::to_image` over the cited program
 /// shape), byte-identical to a live re-derivation every run
-/// (`r2_courts::r2_bn3_network_identity_court`).
-
+/// (`r2_courts::r2_bn3_network_identity_court`)
 pub const BN3_NETWORK_A11_W2_10: [u8; BN3_NETWORK_LEN] = [
     0x04, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -587,8 +585,7 @@ pub extern "C" fn cgap_xip_start() -> ! {
         assert_eq!(mutant[8], 0x40, "premise: header_len LSB is 0x40 (64)");
         mutant[8] = 0x41;
         let err = oabi_shape_gate(&mutant)
-            .err()
-            .expect("VACUOUS GATE: the A06 shape gate accepted header_len=65");
+            .expect_err("VACUOUS GATE: the A06 shape gate accepted header_len=65");
         assert!(
             err.contains("header_len"),
             "M-R2-0 flip must name its leg (header_len), got: {err}"
@@ -742,7 +739,7 @@ embedded == live owner-API derivation (byte-identical); from_image restores; M-R
                 "{name} linked size {sz} != the real owner-table size"
             );
             assert!(
-                addr >= FLASH_ORIGIN && addr < FLASH_ORIGIN + FLASH_LEN,
+                (FLASH_ORIGIN..FLASH_ORIGIN + FLASH_LEN).contains(&addr),
                 "{name} at {addr:#x} outside FLASH"
             );
             assert_eq!(

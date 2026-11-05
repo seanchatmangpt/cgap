@@ -37,3 +37,13 @@ pub mod writer;
 // embedded surface stays no-dep / no-alloc.
 #[cfg(feature = "cert")]
 pub mod rfc0089_certificate;
+// L56 (v26.11.5): PQC composite-seal facade — typed delegation to
+// cgap-crypto's pqc_seal kernel (R-K1: the crypto body stays in
+// cgap-crypto; cgap-aoq hosts the facade only, zero crypto logic here).
+// `pqc_seal` returns an owned buffer, so this surface is alloc-using and
+// rides the `pqc` feature (same gating precedent as `cert`); the default
+// embedded surface stays no-alloc / no_std.
+#[cfg(feature = "pqc")]
+extern crate alloc;
+#[cfg(feature = "pqc")]
+pub mod pqc_seal;

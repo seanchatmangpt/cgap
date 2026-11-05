@@ -184,9 +184,9 @@ fn mutation_refusals_with_flip_twins() {
         Err(DeltaError::ReservedOpcode)
     );
     // Flip twin: same ops without the injected zero opcode succeed.
-    let mut ops_ok = ops[..ops.len() - 1].to_vec();
+    let ops_ok = ops[..ops.len() - 1].to_vec();
     // ...but the target size must be corrected (copy+insert produced 16).
-    let d_ok = delta(16, base.len(), &mut ops_ok);
+    let d_ok = delta(16, base.len(), &ops_ok);
     let t = apply_delta(base, &d_ok, &mut sc).expect("twin applies");
     assert_eq!(t, b"quick brownFOX! ");
     // Copy out of range: refused.

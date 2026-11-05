@@ -414,7 +414,7 @@ impl SealDigests {
             let w = u64::from_le_bytes(word_bytes.try_into().expect("8-byte chunk"));
             let mut b = w;
             for _ in 0..8 {
-                let byte = (b & 0xFF) as u64;
+                let byte = b & 0xFF;
                 b >>= 8;
                 for lane in states.iter_mut() {
                     *lane ^= byte;
@@ -617,7 +617,7 @@ impl<'a> FooterSealer<'a> {
             });
         }
         let mut pos = body_len;
-        self.buf[pos..pos + m].copy_from_slice(&meta);
+        self.buf[pos..pos + m].copy_from_slice(meta);
         pos += m;
         match &self.attestation {
             Some(slot) => self.buf[pos..pos + ATTESTATION_LEN].copy_from_slice(slot),
@@ -834,7 +834,7 @@ pub fn verify_seal(bytes: &[u8], digest: &[u8; 32]) -> Result<Verified, SealErro
         bytes[content_end + 7],
     ]);
     if fnv1a64(&bytes[..content_end]) != stored {
-        let region = if fnv1a64(&bytes[..body_len]) == u64::from(parsed.body_digest) {
+        let region = if fnv1a64(&bytes[..body_len]) == parsed.body_digest {
             CorruptRegion::Footer
         } else {
             CorruptRegion::Body
@@ -884,11 +884,7 @@ fn parse_meta(meta: &[u8]) -> Result<ParsedMeta, SealError> {
     let mut flags: Option<i32> = None;
     let mut pos = 0usize;
     let mut prev: i16 = 0;
-    loop {
-        let Some((fid, ty)) = read_field_header(meta, &mut pos, prev).map_err(|_| malformed)?
-        else {
-            break;
-        };
+    while let Some((fid, ty)) = read_field_header(meta, &mut pos, prev).map_err(|_| malformed)? {
         prev = fid;
         match (fid, ty) {
             (1, ctype::I16) => {
@@ -1408,9 +1404,8 @@ mod courts {
         let bomb = hostile_meta(&{
             let mut a = Vec::new();
             write_field_header(&mut a, 7, 1, ctype::STRUCT);
-            for _ in 0..40 {
-                a.push(0xFC); // delta-15, STRUCT: one nesting level per byte
-            }
+            // delta-15, STRUCT: one nesting level per byte
+            a.resize(a.len() + 40, 0xFC);
             a
         });
         assert_eq!(
@@ -1517,6 +1512,8 @@ mod courts {
     /// not a mock). Post-commit final state is observable through the
     /// shared committed store; `commit` copies the committed prefix into
     /// it, so the court asserts on real state, never on call counts.
+    // Test collaborator commitment cell (Rc<RefCell<Option<..>>>) is the shape under test; alias would obscure it
+    #[allow(clippy::type_complexity)]
     struct PageRoundingSink {
         window_buf: Vec<u8>,
         page: usize,
@@ -1526,6 +1523,7 @@ mod courts {
     impl PageRoundingSink {
         /// A sink whose window rounds `len` up to a `page`-byte multiple,
         /// capped at `cap` bytes of backing.
+        #[allow(clippy::type_complexity)] // same commitment-cell shape as the struct field above
         fn new(cap: usize, page: usize, committed: Rc<RefCell<Option<(usize, Vec<u8>)>>>) -> Self {
             Self {
                 window_buf: alloc::vec![0u8; cap],

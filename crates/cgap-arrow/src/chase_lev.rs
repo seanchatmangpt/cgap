@@ -268,8 +268,13 @@ mod tests {
     /// tier; the capability predicate must agree with the cfg selection.
     #[test]
     fn chase_lev_tier_selection_host_is_64bit_cas() {
-        assert!(SUPPORTS_STEAL);
-        assert!(WorkStealingDeque::<u64>::SUPPORTS_STEAL);
+        // Const-evaluated: the capability predicate is compile-time known.
+        const {
+            assert!(SUPPORTS_STEAL);
+        }
+        const {
+            assert!(WorkStealingDeque::<u64>::SUPPORTS_STEAL);
+        }
         assert_eq!(core::mem::size_of::<Index>(), core::mem::size_of::<u64>());
     }
 

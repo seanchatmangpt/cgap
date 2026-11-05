@@ -47,6 +47,7 @@ extern "C" {
 #define CGAP_AOQ_STATUS_EPOCH_MISMATCH 0x4347A006u
 #define CGAP_AOQ_STATUS_KEY_UNKNOWN 0x4347A007u
 #define CGAP_AOQ_STATUS_EPOCH_RETIRED 0x4347A008u
+#define CGAP_AOQ_STATUS_UNSUPPORTED_VERSION 0x4347A009u
 
 /*
  * Little-endian accessors, one per non-reserved field. The reserved-zero

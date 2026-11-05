@@ -17,7 +17,7 @@
 //!   allocating path in the same module, proves the instrument fires.
 //! - Parquet reuse court: `PAR2` magic byte-pinned against
 //!   `footer.rs`'s constant restatement.
-//! Loud `[SKIP]` only, never a fake pass. No skips expected.
+//!   Loud `[SKIP]` only, never a fake pass. No skips expected.
 
 #![cfg(test)]
 
@@ -39,7 +39,7 @@ use egress_ring::{
 fn record(seed: u64) -> [u8; 32] {
     let mut r = [0u8; 32];
     for c in 0..4u64 {
-        let v = (seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(c)) as u64;
+        let v = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(c);
         r[(c * 8) as usize..(c * 8 + 8) as usize].copy_from_slice(&v.to_le_bytes());
     }
     r

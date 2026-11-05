@@ -91,7 +91,6 @@ impl<const CAP: usize, const BYTES: usize> PresenceMask<CAP, BYTES> {
     }
 
     /// Bit `i` present? `Err` when `i >= CAP`.
-    #[must_use]
     pub const fn get(&self, i: usize) -> Result<bool, BitmaskError> {
         if i >= CAP {
             return Err(BitmaskError::OutOfRange);
@@ -100,7 +99,6 @@ impl<const CAP: usize, const BYTES: usize> PresenceMask<CAP, BYTES> {
     }
 
     /// Set bit `i`; `Err` when `i >= CAP` (state unchanged).
-    #[must_use]
     pub const fn set(&mut self, i: usize) -> Result<(), BitmaskError> {
         if i >= CAP {
             return Err(BitmaskError::OutOfRange);
@@ -110,7 +108,6 @@ impl<const CAP: usize, const BYTES: usize> PresenceMask<CAP, BYTES> {
     }
 
     /// Clear bit `i`; `Err` when `i >= CAP` (state unchanged).
-    #[must_use]
     pub const fn clear(&mut self, i: usize) -> Result<(), BitmaskError> {
         if i >= CAP {
             return Err(BitmaskError::OutOfRange);

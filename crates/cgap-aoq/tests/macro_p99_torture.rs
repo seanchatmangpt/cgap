@@ -242,7 +242,7 @@ fn build_frame(
 ) -> usize {
     assert!(body.len() <= BODY_CAP, "bench body cap");
     let (ordinal, seq) = writer.cursor();
-    let h = AoqHeader::new(1, 0x005E_C1D, ordinal, seq);
+    let h = AoqHeader::new(1, 0x0005_EC1D, ordinal, seq);
     let mut hb = [0u8; 64];
     codec::encode(&h, &mut hb).expect("bench: lawful header");
     tag_scratch[..60].copy_from_slice(&hb[..60]);
@@ -251,7 +251,7 @@ fn build_frame(
         .try_into()
         .expect("blake3 32B");
     writer
-        .write_window(out, 1, 0x005E_C1D, &tag, body)
+        .write_window(out, 1, 0x0005_EC1D, &tag, body)
         .expect("bench: lawful frame")
 }
 
@@ -268,7 +268,7 @@ fn expected_tag(win: &[u8], bl: usize, scratch: &mut [u8; 60 + BODY_CAP]) -> [u8
 /// Per-frame risk gate: key-id law + u64 wrapping margin ledger (the
 /// AF-26 gate shape, fixed 10k slots, zero-alloc).
 const INSTRUMENTS: usize = 10_000;
-const ADMITTED_KEY_ID: u64 = 0x005E_C1D;
+const ADMITTED_KEY_ID: u64 = 0x0005_EC1D;
 
 struct Gate {
     ledger: Box<[u64; INSTRUMENTS]>,
@@ -599,8 +599,8 @@ fn i3_cache_stride() {
     let wins: &'static mut [[u8; SMALL_WIN]] = Box::leak(
         (0..FRAMES)
             .map(|_| {
-                let w = [0u8; SMALL_WIN];
-                w
+                
+                [0u8; SMALL_WIN]
             })
             .collect::<Vec<_>>()
             .into_boxed_slice(),
@@ -623,7 +623,7 @@ fn i3_cache_stride() {
     // Cursor expectations per arena slot (ordinal==seq==slot index).
     // Baseline decode-only pass: sequential order, no sweeper.
     let mut base_lat: Vec<u32> = Vec::with_capacity(FRAMES);
-    for (_idx, w) in wins.iter().enumerate() {
+    for w in wins.iter() {
         let t0 = Instant::now();
         let _h = codec::decode(&w[8..72]).expect("I3 baseline decode");
         let d = t0.elapsed();
@@ -637,8 +637,8 @@ fn i3_cache_stride() {
     let r2 = Arc::clone(&run);
     let sweeper = thread::spawn(move || {
         while r2.load(Ordering::Relaxed) {
-            for chunk in sweep.chunks_exact_mut(4096) {
-                for line in chunk.chunks_exact_mut(64) {
+            for chunk in sweep.as_chunks_mut::<4096>().0 {
+                for line in chunk.as_chunks_mut::<64>().0 {
                     line[0] = line[0].wrapping_add(1);
                 }
             }
@@ -865,7 +865,7 @@ fn i5_supervisor_churn() {
         let mut out = [0u8; MAX_WIN];
         let mut scratch = [0u8; 60 + BODY_CAP];
         let mut body = [0u8; SMALL_BODY];
-        for i in 0..FRAMES {
+        for (i, ts) in t_send.iter().take(FRAMES).enumerate() {
             for b in body.iter_mut() {
                 *b = rng.next() as u8;
             }
@@ -873,7 +873,7 @@ fn i5_supervisor_churn() {
             let wl = build_frame(&mut writer, &mut out, &mut scratch, &body);
             let mut item = [0u8; SMALL_WIN];
             item.copy_from_slice(&out[..SMALL_WIN]);
-            t_send[i].store((Instant::now() - base).as_nanos() as u64, Ordering::Relaxed);
+            ts.store((Instant::now() - base).as_nanos() as u64, Ordering::Relaxed);
             tx.send(item).expect("send");
             let _ = wl;
         }
@@ -885,7 +885,6 @@ fn i5_supervisor_churn() {
     let spawn_relay = |run: Arc<AtomicBool>| -> thread::JoinHandle<usize> {
         let rx = Arc::clone(&rx);
         let ack_count = Arc::clone(&ack_count);
-        let base = base;
         thread::spawn(move || {
             let slab: &'static mut [AoqChainRecord] =
                 Box::leak(vec![AoqChainRecord::zeroed(); FRAMES].into_boxed_slice());

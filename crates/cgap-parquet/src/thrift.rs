@@ -467,10 +467,7 @@ pub fn read_page_header(src: &[u8]) -> Result<(PageHeader, usize), ThriftError> 
     let mut compressed: Option<i32> = None;
     let mut v2: Option<DataPageHeaderV2> = None;
     let mut prev: i16 = 0;
-    loop {
-        let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? else {
-            break;
-        };
+    while let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? {
         prev = field_id;
         match (field_id, type_id) {
             (1, ctype::I32) => page_type = Some(read_i32(src, &mut pos)?),
@@ -514,10 +511,7 @@ fn read_data_page_header_v2(src: &[u8], pos: &mut usize) -> Result<DataPageHeade
     let mut is_compressed = true;
     let mut encoding: Option<i32> = None;
     let mut prev: i16 = 0;
-    loop {
-        let Some((field_id, type_id)) = read_field_header(src, pos, prev)? else {
-            break;
-        };
+    while let Some((field_id, type_id)) = read_field_header(src, pos, prev)? {
         prev = field_id;
         match (field_id, type_id) {
             (1, ctype::I32) => num_values = Some(read_i32(src, pos)?),

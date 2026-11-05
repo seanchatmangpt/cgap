@@ -73,7 +73,7 @@ fn sweep_truncation_identity() {
         );
         // exact-needed law: below the header-slot boundary, ipc names the
         // exact byte count the framing needs.
-        if l < 128 && l >= 8 {
+        if (8..128).contains(&l) {
             assert!(
                 matches!(ipc_r, Err(ipc::IpcError::Truncated { needed: 128, .. })),
                 "L={l}: {:?}",

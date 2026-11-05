@@ -224,7 +224,7 @@ fn mlkem768_decaps(b: Bencher) {
 fn mldsa65_ntt(b: Bencher) {
     let mut p = [0i32; mldsa::N];
     for (i, c) in p.iter_mut().enumerate() {
-        *c = ((CORPUS_SEED ^ i as u64) % (2 * mldsa::Q as u64)) as i32 - mldsa::Q as i32;
+        *c = ((CORPUS_SEED ^ i as u64) % (2 * mldsa::Q as u64)) as i32 - mldsa::Q;
     }
     b.bench(|| {
         let mut g = p;
@@ -237,7 +237,7 @@ fn mldsa65_ntt(b: Bencher) {
 fn mldsa65_intt_tomont(b: Bencher) {
     let mut p = [0i32; mldsa::N];
     for (i, c) in p.iter_mut().enumerate() {
-        *c = ((CORPUS_SEED ^ (i as u64 + 1)) % (2 * mldsa::Q as u64)) as i32 - mldsa::Q as i32;
+        *c = ((CORPUS_SEED ^ (i as u64 + 1)) % (2 * mldsa::Q as u64)) as i32 - mldsa::Q;
     }
     mldsa::ntt(&mut p);
     b.bench(|| {

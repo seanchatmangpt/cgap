@@ -513,7 +513,7 @@ mod guard_courts {
                     .metadata()
                     .and_then(|m| m.modified())
                     .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                if best.as_ref().map_or(true, |(t, _)| mtime > *t) {
+                if best.as_ref().is_none_or(|(t, _)| mtime > *t) {
                     best = Some((mtime, p));
                 }
             }

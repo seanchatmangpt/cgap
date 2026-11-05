@@ -729,7 +729,6 @@ fn fail_closed_adversarial_corpus() {
     // {RunOverrun, UnexpectedEof}; odd headers must never panic — the random
     // values deliberately sweep the usize-arithmetic boundaries.
     let mut led = Ledger::new("random_claim_fuzz");
-    let mut idx = 0usize;
     for m in 0..150 {
         let seed = seed_for(11, m);
         let mut rng = Xorshift64::new(seed);
@@ -740,7 +739,7 @@ fn fail_closed_adversarial_corpus() {
             src.push(0x80 | (rng.below(128) as u8)); // continuation byte
         }
         src.push(rng.below(128) as u8); // terminator
-        let seed2 = seed_for(11, idx);
+        let seed2 = seed_for(11, m);
         led.check(
             seed2,
             &format!("m={m} varint_len={varint_len}"),
@@ -748,7 +747,6 @@ fn fail_closed_adversarial_corpus() {
             64,
             Expect::AnyErr,
         );
-        idx += 1;
     }
     total_cases += led.cases;
     total_failures.extend(led.failures);

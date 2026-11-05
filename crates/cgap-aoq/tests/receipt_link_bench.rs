@@ -57,14 +57,12 @@ fn bench_append_per_link() -> (f64, f64) {
         c.append((i % 3) as u16, &payload).unwrap();
     }
     let mut samples: Vec<f64> = Vec::with_capacity(1_000);
-    let mut idx = c.len();
-    for _ in 0..1_000 {
+    for idx in (c.len()..).take(1_000) {
         let e = (idx % 3) as u16;
         let t0 = Instant::now();
         let r = c.append(e, &payload);
         let dt = t0.elapsed();
         cgap_aoq::profile_guard::fence(r.unwrap());
-        idx += 1;
         samples.push(dt.as_secs_f64() * 1e6);
     }
     samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -123,7 +121,8 @@ fn bench_verify(links: usize) -> f64 {
     let mut best = f64::INFINITY;
     for _ in 0..5 {
         let t0 = Instant::now();
-        cgap_aoq::profile_guard::fence(c.verify_all().unwrap());
+        c.verify_all().unwrap();
+        cgap_aoq::profile_guard::fence(());
         let per = t0.elapsed().as_secs_f64() * 1e6 / links as f64;
         if per < best {
             best = per;

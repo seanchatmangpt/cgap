@@ -17,9 +17,9 @@ fn rt<const D: usize>(p: &[i16; 256]) -> bool {
 fn byte_encode_decode_roundtrip_all_d() {
     let mut p = [0i16; 256];
     let mut st = 12345u32;
-    for i in 0..256 {
+    for c in p.iter_mut() {
         st = st.wrapping_mul(1664525).wrapping_add(1013904223);
-        p[i] = ((st >> 17) % 3329) as i16;
+        *c = ((st >> 17) % 3329) as i16;
     }
     assert!(rt::<1>(&p));
     assert!(rt::<2>(&p));

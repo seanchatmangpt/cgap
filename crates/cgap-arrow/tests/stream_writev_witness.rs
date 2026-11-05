@@ -122,7 +122,6 @@ fn handoff(meta: MetaHeader, body: &[u8], tag: &str) -> (Vec<u8>, Vec<u8>) {
     let mut got = vec![0u8; n];
     peer.read_exact(&mut got).expect("read_exact over live UDS");
 
-    drop(writer);
     drop(stream);
     drop(peer);
     let _ = std::fs::remove_file(&path);
@@ -190,7 +189,7 @@ fn w2_received_window_decodes_via_read() {
     let slab = sealed_4row().expect("slab ok");
     let (meta, body) = emit_body(3);
     let (_w, got) = handoff(meta, &body, "w2");
-    let digest = schema_digest_of(&slab.as_bytes().to_vec());
+    let digest = schema_digest_of(slab.as_bytes());
     let mut out = vec![0u8; body.len()];
     let n = read(&got, Some(&digest), &mut out).expect("read ok");
     assert_eq!(n, body.len());
@@ -227,12 +226,12 @@ fn w4_mutated_window_flips_the_byte_diff_court() {
     );
     assert_ne!(
         &got[body_at..body_at + body.len()],
-        &slab.as_bytes()[..],
+        slab.as_bytes(),
         "byte-diff court flipped: received body differs from the sealed slab"
     );
     // And the typed read still accepts it (scoped finding, asserted so a
     // future body-integrity fix in ipc.rs flips this court too).
-    let digest = schema_digest_of(&slab.as_bytes().to_vec());
+    let digest = schema_digest_of(slab.as_bytes());
     let mut out = vec![0u8; body.len()];
     let n = read(&got, Some(&digest), &mut out)
         .expect("scoped finding: read accepts a body-corrupted window");

@@ -159,7 +159,7 @@ pub fn validate_minimal(v: &ArrayView) -> Result<MinStats, MinimalError> {
     };
     // Validity: skip when null_count <= 0 and buffer absent/empty
     // (nanoarrow array.c:1632-1636); else need bytes-for-bits coverage.
-    if v.null_count <= 0 && v.validity_bytes.map_or(true, |b| b == 0) {
+    if v.null_count <= 0 && v.validity_bytes.is_none_or(|b| b == 0) {
         stats.validity_skipped = true;
     } else {
         stats.validity_checks += 1;

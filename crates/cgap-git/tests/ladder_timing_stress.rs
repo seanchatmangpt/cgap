@@ -133,7 +133,7 @@ fn build_fixture() -> (Vec<u8>, Vec<IdxEntry>) {
 /// present-set; same first byte as its base OID).
 fn build_probes(entries: &[IdxEntry]) -> Vec<Probe> {
     let present: HashSet<Oid> = entries.iter().map(|e| e.oid).collect();
-    let mut rng = Lcg(0x57A7_1C);
+    let mut rng = Lcg(0x0057_A71C);
     let mut probes = Vec::with_capacity(LOOKUPS);
     for i in 0..LOOKUPS {
         if i % 2 == 0 {

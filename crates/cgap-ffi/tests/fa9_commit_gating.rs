@@ -46,7 +46,7 @@
 
 use std::ffi::CString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -61,7 +61,7 @@ fn sandbox(tag: &str) -> PathBuf {
     dir
 }
 
-fn cpath(p: &PathBuf) -> CString {
+fn cpath(p: &Path) -> CString {
     CString::new(p.as_os_str().as_encoded_bytes()).expect("NUL-free path")
 }
 

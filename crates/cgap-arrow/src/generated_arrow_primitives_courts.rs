@@ -131,8 +131,8 @@ fn status_lattice_codes_pairwise_distinct() {
     ];
     let mut seen: [i32; 7] = [0; 7];
     for (i, c) in codes.iter().enumerate() {
-        for j in 0..i {
-            assert_ne!(*c, seen[j], "status code {c} duplicated");
+        for prior in seen.iter().take(i) {
+            assert_ne!(*c, *prior, "status code {c} duplicated");
         }
         seen[i] = *c;
     }

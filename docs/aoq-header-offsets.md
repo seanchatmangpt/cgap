@@ -54,6 +54,7 @@ These deny the operation with a typed cause.
 | FM-AOQ-006 | 0x4347A006 | `EPOCH_MISMATCH` | Header epoch is retired or not the active epoch. |
 | FM-AOQ-007 | 0x4347A007 | `KEY_UNKNOWN` | key_id has no entry in the active KEM key table. |
 | FM-AOQ-008 | 0x4347A008 | `EPOCH_RETIRED` | Header epoch is retired; frame readable but not writable. |
+| FM-AOQ-009 | 0x4347A009 | `UNSUPPORTED_VERSION` | Header version is not the admitted AOQ1_VERSION; refusal fires at the codec version gate before digest evaluation (KD-1 close). |
 
 ### Seams-placeholder kernel refusals (XC-5r census)
 KemKernelNotAdmitted / AeadKernelNotAdmitted in AoqError (crates/cgap-aoq/src/error.rs, class codes 0x00_0A / 0x00_0B) are seams-placeholder variants per the XC-5r census: the KEM/AEAD kernel seam is hand-law (aoq:KemParam, aoq:seam "hand-law") and no attack scenario exercises them yet — they are the typed landing for a not-yet-admitted kernel id, not witnessed refusal paths. AB-8 integration owns their population.

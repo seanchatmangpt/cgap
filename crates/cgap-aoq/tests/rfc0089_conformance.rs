@@ -119,7 +119,7 @@ const I5_KILLS: usize = 200;
 
 /// Shared lane law.
 const EPOCH: u16 = 1;
-const KEY_ID: u64 = 0x005E_C1D;
+const KEY_ID: u64 = 0x0005_EC1D;
 /// Largest body the suite builds (I1 ragged cap).
 const BODY_CAP: usize = 4_096;
 /// Window prefix + metadata span (body starts at 128; EOS after pad).
@@ -224,7 +224,7 @@ fn percentile(sorted: &[u32], p: f64) -> u32 {
 }
 
 /// Sort, print a distribution line, return (p50, p99).
-fn dist_line(name: &str, samples: &mut Vec<u32>) -> (u32, u32) {
+fn dist_line(name: &str, samples: &mut [u32]) -> (u32, u32) {
     samples.sort_unstable();
     let p50 = percentile(samples, 50.0);
     let p99 = percentile(samples, 99.0);
@@ -340,7 +340,7 @@ fn run_i1(frames: usize) -> (u64, u32, u32, (usize, usize)) {
     let (mut tx, mut rx) = UnixStream::pair().expect("socketpair");
     let producer = thread::spawn(move || {
         let mut writer = AoqWriter::new();
-        let mut rng = Xorshift(0x0089_00i64 as u64 | (1 << 32));
+        let mut rng = Xorshift(0x0000_8900_i64 as u64 | (1 << 32));
         let mut out = [0u8; WIN_MAX];
         let mut scratch = [0u8; 60 + BODY_CAP];
         for i in 0..frames {
@@ -601,7 +601,7 @@ fn churn_lane(
         };
         let t0 = Instant::now();
         let done = churn_cycle(lane, from, I5_FRAMES_PER_LANE, kill_at, chain, delivered);
-        respawn_ns_total += u128::from(t0.elapsed().as_nanos());
+        respawn_ns_total += t0.elapsed().as_nanos();
         respawns += 1;
         let killed = kill_at.is_some() && done < I5_FRAMES_PER_LANE && done == kill_at.unwrap();
         if killed {
@@ -859,11 +859,11 @@ fn rfc0089_conformance_suite() {
         let unique_kills: usize = kill_points.iter().map(|v| v.len()).sum();
         let delivered = Arc::new(Mutex::new(vec![false; I5_LANES * I5_FRAMES_PER_LANE]));
         let mut handles = Vec::new();
-        for lane in 0..I5_LANES {
+        for (lane, kps_src) in kill_points.iter().take(I5_LANES).enumerate() {
             let slab = chain_slab(I5_FRAMES_PER_LANE + 1);
             let chain = Arc::new(Mutex::new(AoqChain::new(Blake3Digest, slab)));
             let delivered = Arc::clone(&delivered);
-            let kps = kill_points[lane].clone();
+            let kps = kps_src.to_vec();
             handles.push(thread::spawn(move || {
                 let (kills, mean_cycle_ns) = churn_lane(lane, &kps, &chain, &delivered);
                 let chain = Arc::try_unwrap(chain)
@@ -1111,6 +1111,9 @@ fn rfc0089_test_kem_fallback_disclosed() {
 
 #[test]
 fn rfc0089_profile_guard_witness() {
+    // assertions_on_constants: the constantness IS the property under
+    // test (profile axis is a static fact by construction, not runtime state).
+    #[allow(clippy::assertions_on_constants)]
     match profile_guard::assert_release() {
         Ok(()) => {
             // Release build: perf fences above are lawful; assert the inverse

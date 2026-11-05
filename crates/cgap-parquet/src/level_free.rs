@@ -285,10 +285,7 @@ pub fn parse_schema_elements_into(
         let mut name: Option<Vec<u8>> = None;
         let mut num_children: Option<i32> = None;
         let mut prev: i16 = 0;
-        loop {
-            let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? else {
-                break;
-            };
+        while let Some((field_id, type_id)) = read_field_header(src, &mut pos, prev)? {
             prev = field_id;
             match (field_id, type_id) {
                 (1, ctype::I32) => field_type = Some(read_i32(src, &mut pos)?),

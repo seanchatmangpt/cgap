@@ -136,10 +136,7 @@ fn court_mutations_flip_with_distinct_typed_errors() {
         (b"TOOL NotATool s.bin\n", ProtocolError::UnknownTool),
         (b"READ s.bin", ProtocolError::MissingTerminator),
         (&[b'R'; 300], ProtocolError::FrameTooLong(300)),
-        (
-            &[b'R', b'E', b'A', b'D', b' ', b'\n'],
-            ProtocolError::EmptyField,
-        ),
+        (b"READ \n", ProtocolError::EmptyField),
     ];
     for (frame, want) in cases {
         assert_eq!(

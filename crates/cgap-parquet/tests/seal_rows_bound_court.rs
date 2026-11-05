@@ -68,8 +68,8 @@ fn boundary_rows_i64_max_still_seals_and_verifies() {
 
 /// Mutation witness at the seal() level: with the bound removed the
 /// >i64::MAX rows cast-wrap negative on the wire; `verify_seal` on those
-/// bytes refuses MetaMalformed — the exact asymmetry the bound closes.
-/// In-process proof the old behavior was writable-but-unverifiable.
+/// > bytes refuses MetaMalformed — the exact asymmetry the bound closes.
+/// > In-process proof the old behavior was writable-but-unverifiable.
 #[test]
 fn wrapped_negative_wire_rows_are_unverifiable() {
     // Direct meta-oracle: field 3 encoded as zigzag i64 of

@@ -144,7 +144,6 @@ fn uds_handoff(seq: u32, alignment: u32, tag: &str) -> (Vec<u8>, usize) {
         .expect("type emit ok");
     let mut got = vec![0u8; n];
     peer.read_exact(&mut got).expect("read_exact live UDS");
-    drop(writer);
     drop(stream);
     drop(peer);
     let _ = std::fs::remove_file(&path);
@@ -172,7 +171,7 @@ fn t1_writev_handoff_through_type_uds() {
     let slab = sealed_4row().expect("slab ok");
     assert_eq!(
         &got[body_at..body_at + body_len],
-        &slab.as_bytes()[..],
+        slab.as_bytes(),
         "body bytes intact over the socket through the type"
     );
     assert!(
@@ -194,7 +193,7 @@ fn t1_writev_handoff_through_type_uds() {
 fn t1b_received_window_decodes_via_read() {
     let slab = sealed_4row().expect("slab ok");
     let (got, body_len) = uds_handoff(3, 64, "t1b");
-    let digest = schema_digest_of(&slab.as_bytes().to_vec());
+    let digest = schema_digest_of(slab.as_bytes());
     let mut out = vec![0u8; body_len];
     let n = read(&got, Some(&digest), &mut out).expect("read ok");
     assert_eq!(n, body_len);

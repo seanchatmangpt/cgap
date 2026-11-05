@@ -278,7 +278,7 @@ pub fn ntt(r: &mut [i32; N]) {
             for j in start..start + len {
                 let t = montgomery_reduce(zeta as i64 * r[j + len] as i64);
                 r[j + len] = r[j] - t;
-                r[j] = r[j] + t;
+                r[j] += t;
             }
             start += 2 * len;
         }
@@ -477,16 +477,6 @@ pub fn derive_rho_prime(k_seed: &[u8; 32], mu: &[u8; 64], rnd: &[u8; 32]) -> [u8
     let mut out = [0u8; 64];
     Shake256::xof(&input, &mut out);
     out
-}
-
-/// PRF stream prefix: SHAKE256(seed || LE16(nonce)) — the expand-side stream
-/// (ExpandS eta domain and ExpandMask gamma1 domain share the shape; the
-/// nonce space keeps the two domains disjoint by call-site convention).
-fn prf_stream(seed: &[u8], nonce: u16, out: &mut [u8]) {
-    let mut s = Shake256::instance();
-    s.absorb(seed);
-    s.absorb(&[(nonce & 0xFF) as u8, (nonce >> 8) as u8]);
-    s.squeeze_into(out);
 }
 
 /// Branchless nibble popcount (CBD building block).
@@ -821,7 +811,7 @@ pub fn sign_internal(
         // FIPS 204 final: the mask nonce advances by L per attempt
         // (attempt L, 2L, ...), so per-poly nonces kappa+j never repeat
         // across attempts (the pre-KAT draft's kappa+j schedule collided).
-        let kappa = (attempt as u16).wrapping_mul(L as u16);
+        let kappa = attempt.wrapping_mul(L as u16);
         // y = ExpandMask(rho', kappa); w = A·y per row; decompose rows.
         for j in 0..L {
             expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut y[j]);
@@ -1349,16 +1339,16 @@ mod sign_property_tests {
             }
         }
         let mut yhat = [[0i32; N]; L];
-        let mut w = [0i32; N];
+        let mut w;
         let mut w1 = [[0i32; N]; K];
         let mut w0low = [[0i32; N]; K];
         let mut packed = [0u8; K * W1_PACKED_BYTES];
         let mut ct = [0u8; CTILDE_BYTES];
         for attempt in 0..MAX_SIGN_ATTEMPTS {
-            let kappa = (attempt as u16).wrapping_mul(L as u16);
-            for j in 0..L {
-                expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), &mut yhat[j]);
-                ntt(&mut yhat[j]);
+            let kappa = attempt.wrapping_mul(L as u16);
+            for (j, yj) in yhat.iter_mut().enumerate() {
+                expand_mask_poly(&rhoprime, kappa.wrapping_add(j as u16), yj);
+                ntt(yj);
             }
             for r in 0..K {
                 w = [0i32; N];
@@ -1395,7 +1385,7 @@ mod sign_property_tests {
     fn mask_to_bucket(v: i32) -> i32 {
         v & 15
     }
-    use super::*;
+    
 
     fn splitmix64(state: &mut u64) -> u64 {
         *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
@@ -1454,7 +1444,7 @@ mod sign_property_tests {
         let mut y = [0i32; N];
         expand_mask_poly(&rhoprime, 0, &mut y);
         assert!(
-            y.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1),
+            y.iter().all(|&c| (-GAMMA1..GAMMA1).contains(&c)),
             "y in [-g1, g1)"
         );
         let mut y2 = [0i32; N];
@@ -1463,7 +1453,7 @@ mod sign_property_tests {
         let mut coll = 0;
         for k in 1..64u16 {
             expand_mask_poly(&rhoprime, k, &mut y2);
-            assert!(y2.iter().all(|&c| c >= -GAMMA1 && c < GAMMA1));
+            assert!(y2.iter().all(|&c| (-GAMMA1..GAMMA1).contains(&c)));
             if y2 == y {
                 coll += 1;
             }
@@ -1514,7 +1504,7 @@ mod sign_property_tests {
     #[test]
     fn w1_encode_roundtrip() {
         let mut w1 = [0i32; N];
-        let mut sm = 0x6E_C0_DE_0009u64;
+        let mut sm = 0x6E_C0_DE_00_09u64;
         for c in w1.iter_mut() {
             *c = (splitmix64(&mut sm) % 16) as i32;
         }
@@ -1558,7 +1548,7 @@ mod sign_property_tests {
                 *c = (splitmix64(&mut sm) % (1 << 13)) as i32 - (1 << 12);
             }
         }
-        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0.clone());
+        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0);
         // t1 must be consistent for the verifier court: t1 = the honest
         // t1 that a keygen would derive — here the court recomputes w from
         // the honest relation w = A·y and checks hint validity against
@@ -1569,9 +1559,9 @@ mod sign_property_tests {
         let rnd = [0x99u8; 32];
         let sig = sign_internal(&sk, &mu, &rnd).expect("sign must succeed on lawful key");
         // z-norm bound.
-        for j in 0..L {
+        for zj in sig.z.iter() {
             assert!(
-                !poly_chknorm(&sig.z[j], GAMMA1 - BETA),
+                !poly_chknorm(zj, GAMMA1 - BETA),
                 "‖z‖∞ < γ1−β must hold for the emitted signature"
             );
         }
@@ -1620,8 +1610,8 @@ mod sign_property_tests {
             );
         }
         // Hint weight ≤ ω.
-        for r in 0..K {
-            assert!(hw(&sig.h[r]) <= OMEGA, "hint weight ≤ ω");
+        for hrow in sig.h.iter() {
+            assert!(hw(hrow) <= OMEGA, "hint weight ≤ ω");
         }
         // c̃ determinism: same inputs → same signature parts.
         let sig2 = sign_internal(&sk, &mu, &rnd).expect("second sign");
@@ -1644,7 +1634,7 @@ mod sign_property_tests {
                 *c = (splitmix64(&mut sm) % (1 << 13)) as i32 - (1 << 12);
             }
         }
-        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0.clone());
+        let sk = SignKeyInternal::from_seed_and_t0(&xi, t0);
         let mu = [0x55u8; 64];
         let rnd = [0x99u8; 32];
         let sig = sign_internal(&sk, &mu, &rnd).expect("sign");
@@ -1719,7 +1709,7 @@ mod primitive_property_tests {
     /// the congruence on sampled inputs immediately.
     #[test]
     fn decompose_highbits_lowbits_composition() {
-        let mut state: u64 = 0x6DE_1EA_5EED_0004;
+        let mut state: u64 = 0x6D_E1_EA_5E_ED_00_04;
         // Deterministic samples across the full [0, q) domain plus the
         // known edge inputs: 0, q−1, bucket boundaries around α·k, and
         // the collapse region near q.

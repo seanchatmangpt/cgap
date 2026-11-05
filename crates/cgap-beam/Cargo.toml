@@ -17,14 +17,17 @@ crate-type = ["cdylib"]
 # always present in the func table and return the `error` atom (loud skip)
 # when compiled without the feature.
 #
-# Pin law: quinn >= 0.11.12 (re-derived 2026-11-05: 0.11.15 does not
-# exist on crates.io — latest 0.11.12, `cargo info quinn`; the
-# aq-quic-transport-decision.md "CVE-2026-25800 affects < 0.11.15"
-# version claim is UNVERIFIED against the registry — L50 owes the
-# re-derivation of the real patched floor from the advisory before
-# landing; this pin unblocks workspace resolution).
+# Pin law (re-derived 2026-11-05 from RUSTSEC-2026-0185 / CVE-2026-25800,
+# https://rustsec.org/advisories/RUSTSEC-2026-0185.html): the advisory's
+# Patched field is quinn-PROTO ">=0.11.15" — 0.11.15 is a quinn-proto
+# version, NOT a quinn version (the quinn facade's latest 0.11.x is 0.11.12,
+# `cargo info quinn`), which is why the decision record's "quinn >= 0.11.15"
+# pin does not resolve. Mechanically: quinn facade ">=0.11.12, <0.12" (the
+# real facade range) PLUS an explicit quinn-proto ">=0.11.15" floor below,
+# so the resolver can never settle on a pre-patch quinn-proto. Resolved
+# this session: quinn-proto 0.11.19 >= floor.
 [features]
-quic = ["dep:quinn", "dep:tokio", "dep:bytes", "dep:rcgen", "dep:rustls"]
+quic = ["dep:quinn", "dep:quinn-proto", "dep:tokio", "dep:bytes", "dep:rcgen", "dep:rustls"]
 
 [dependencies]
 cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
@@ -36,12 +39,23 @@ quinn = { version = ">=0.11.12, <0.12", optional = true, default-features = fals
     "rustls-ring",
     "runtime-tokio",
 ] }
+# CVE-2026-25800 floor made mechanical: RUSTSEC-2026-0185 patches
+# quinn-proto >= 0.11.15; this constraint (never imported, pin-only)
+# forbids the resolver from settling below the patched line.
+quinn-proto = { version = ">=0.11.15, <0.12", optional = true }
 tokio = { version = "1", optional = true, default-features = false, features = [
     "rt",
     "net",
     "time",
 ] }
 bytes = { version = "1", optional = true }
+# rustls surface for the QUIC client config (ring backend, matching quinn's
+# rustls-ring feature so one provider serves both crates).
+rustls = { version = "0.23", optional = true, default-features = false, features = [
+    "ring",
+    "std",
+    "logging",
+] }
 # Test-only: self-signed server certificate for the loopback handshake court.
 # (L57 SLA unblock: cargo rejects optional dev-deps; `dep:rcgen` in the quic
 # feature requires it in [dependencies].)

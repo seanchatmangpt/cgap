@@ -557,7 +557,7 @@ fn composed_transit_10m() {
     let r = run_transit(10_000_000, false);
     let timer_floor_ns = measure_timer_floor(200_000);
     let frames = build_frames(10_000_000);
-    let s = |st: Stage| run_stage(frames, st).as_secs_f64() * 1e9 / 10_000_000 as f64;
+    let s = |st: Stage| run_stage(frames, st).as_secs_f64() * 1e9 / 10_000_000_f64;
     let stages = StageNs {
         gate: s(Stage::GateOnly),
         decode: s(Stage::DecodeOnly),

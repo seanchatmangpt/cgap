@@ -254,7 +254,7 @@ fn corridor_hop(
 
 /// Segments total length is `Segments::total_len` (prefix+header+pad+body+
 /// body_pad+tail); the court scatters the body pad as its own zero buffer.
-
+///
 /// Tamper-tier wire tag: blake3(body)[..16] (cgap-arrow AOQ1 tag law).
 fn wire_tag_for(body: &[u8]) -> [u8; 16] {
     let mut tag = [0u8; 16];

@@ -142,7 +142,7 @@ fn kem_aead_seams_refuse_loudly() {
         Err(AoqError::KemKernelNotAdmitted { kernel_id: 0xBEEF })
     ));
     assert!(matches!(
-        cgap_aoq::kem::decapsulate(0xBEEF, &[0u8; 48]),
+        cgap_aoq::kem::decapsulate(0xBEEF, &[0u8; 2400], &[0u8; 48]),
         Err(AoqError::KemKernelNotAdmitted { kernel_id: 0xBEEF })
     ));
     // v3 promotion: the AEAD seam delegates to the real cgap-crypto

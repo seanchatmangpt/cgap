@@ -59,9 +59,9 @@ const ENCODE_WIDTHS: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /// Corpus `c` at width `bits`: LCG-chosen mix of literal stretches and
 /// >=3-runs, length cycling through the group-boundary ladder (multiples of
-/// 8 and their +-1 neighbors, the run threshold, and page-scale lengths).
-/// Values are masked into `0..2^bits` — the width's representable alphabet,
-/// the domain over which round-trip identity is the contract.
+/// > 8 and their +-1 neighbors, the run threshold, and page-scale lengths).
+/// > Values are masked into `0..2^bits` — the width's representable alphabet,
+/// > the domain over which round-trip identity is the contract.
 fn corpus(c: usize, bits: u8) -> Vec<u32> {
     const LENGTHS: [usize; 20] = [
         1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 63, 64, 65, 127, 128, 255, 256, 257, 1024,
@@ -225,7 +225,7 @@ fn prop3_level_free_page_round_trip_rows_x_types() {
 /// (all-max fields, all-FF digest); the rest are full-range LCG fields.
 #[test]
 fn prop4_quad64_lcg_wire_identity_5000() {
-    let mut rng = Lcg::new(0x0A11_CE5EED_0001);
+    let mut rng = Lcg::new(0x0A11_CE5E_ED00_0001);
     for c in 0..5_000usize {
         let q = if c == 0 {
             Quad64::ZERO

@@ -94,6 +94,8 @@ impl Quad64 {
     /// Construct a quad with explicit term ids, timestamp, causal register
     /// and policy mask; the digest is supplied separately (it is a receipt,
     /// not a pattern input).
+    // Typed column descriptor constructor; 8 fields are the descriptor law.
+    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         s_id: TermId,
         p_id: TermId,

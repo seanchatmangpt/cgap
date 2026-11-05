@@ -420,7 +420,7 @@ mod tests {
                 }
             }
             let mut out = [0u8; 32];
-            for (i, chunk) in out.chunks_exact_mut(8).enumerate() {
+            for (i, chunk) in out.as_chunks_mut::<8>().0.iter_mut().enumerate() {
                 let v = if i % 2 == 0 {
                     a.wrapping_add(i as u64)
                 } else {
