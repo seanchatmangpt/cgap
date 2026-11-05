@@ -1,4 +1,5 @@
 # LANE-4 — Flip-Ladder Court Receipt (real release sidecar)
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: LANE-4 (FLIP-LADDER PIN + STATUTORY EXPORT FORMATTER).
 Repo: /Users/sac/cgap. New file only: `crates/cgap-ffi/tests/aoq_flip_ladder_court.rs`.

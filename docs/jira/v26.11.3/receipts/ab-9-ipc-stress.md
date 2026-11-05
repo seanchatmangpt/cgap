@@ -1,4 +1,5 @@
 # AB-9 IPC Stress Receipt (v26.11.3)
+Standing: ALIVE
 
 - **Lane**: AB-9 STRESS, `crates/cgap-arrow` IPC1 emit/read path
 - **Subject**: `crates/cgap-arrow/src/ipc.rs` (read-only; zero src edits this lane)

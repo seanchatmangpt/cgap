@@ -1,4 +1,5 @@
 # Receipt: gate-workspace-check-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

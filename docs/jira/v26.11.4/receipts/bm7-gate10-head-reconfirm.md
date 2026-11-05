@@ -1,6 +1,6 @@
 # BM7 — Gate-10 chain-scale reconfirm at committed v3 HEAD
 
-Standing: **BLOCKED** for the committed-state cell (both lane-start HEAD `3e0339e6` and
+Standing: BLOCKED
 lane-close HEAD `b595f276` fail to compile `cgap-aoq`); supplemental working-tree
 measurement obtained under disclosure, **outside the BM-3 band — NOT CONFIRMED**, reported
 as-measured, no fence or target adjusted.

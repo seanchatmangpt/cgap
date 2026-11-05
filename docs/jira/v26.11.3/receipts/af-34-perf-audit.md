@@ -81,7 +81,7 @@ the actual hardware cache-line size here; 64B-aligned windows straddle no
 
 ## Verbatim auditor commands (Linux host with PMU)
 
-Gate: `bash scripts/af34_perf_audit.sh` — exit 0 MEASURED / 1 MEASURED-UNMET
+Gate: PARTIAL_ALIVE
 / 2 subject missing / 3 loud skip (tool blocker). Full audit output:
 `/tmp/af34_perf_audit.out` (this session's run: AUDIT-EXIT=3, blockers
 `perf: absent; xctrace-CPU-Counters: canary-fails(host-level); colima-guest: no-PMU`).

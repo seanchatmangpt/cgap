@@ -1,4 +1,5 @@
 # AF-4: parse_meta read-ahead minimum (closes AB-9)
+Standing: ALIVE
 
 - **Lane**: AF-4 (implementation, src owner), 2026-11-03
 - **Subject**: `crates/cgap-arrow/src/ipc.rs` — `parse_meta` truncation gate only

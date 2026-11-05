@@ -1,4 +1,5 @@
 # AB-11 — wire-shm ring stress courts
+Standing: ALIVE
 
 ## Subject
 - `crates/wire-shm/src/ring.rs` (read-only; no ring.rs changes made)

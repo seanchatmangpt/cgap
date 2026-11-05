@@ -1,4 +1,5 @@
 # PL-X4 — Pinner Lease Hand-Law Receipt (arcus cdata)
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: CODE-LANE-5 (docs+receipts). Status: ALIVE (cdata
 suite re-run this session, exit pasted) with one court LOUD-SKIPped in this

@@ -65,6 +65,12 @@ receipts:
         | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $3); c[$3]++} END {for (s in c) printf "  %-24s %d\n", s, c[s]}' \
         | sort
 
+# Gate 3 (receipt-standing-law) — L21 port of ggen scripts/receipt_lint.py.
+# Scans docs/jira/v*/receipts/*.md for a parseable Standing line (synonym
+# keys + closed vocabulary + annotation stripping + standing-map hash).
+receipt-standing-lint:
+    python3 scripts/receipt_standing_lint.py
+
 # Definition-of-Done gate (script owned by wave-10 lane 1; fails until landed)
 dod:
     @if [ -f scripts/dod.sh ]; then bash scripts/dod.sh; else echo "dod: scripts/dod.sh not present yet (wave-10 lane 1 owns it)" >&2; exit 1; fi

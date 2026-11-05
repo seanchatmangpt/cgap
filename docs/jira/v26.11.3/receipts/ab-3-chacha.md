@@ -1,4 +1,5 @@
 # AB-3 Lane Receipt — ChaCha20 (RFC 8439) — AoQ Wave-1 W1-3a
+Standing: ALIVE
 
 - **Lane**: AB-3, coordinator-dispatched (PG-A3 spec).
 - **Date**: 2026-11-03

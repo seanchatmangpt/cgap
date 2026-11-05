@@ -1,4 +1,5 @@
 # Receipt: gate-blake3-throughput
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

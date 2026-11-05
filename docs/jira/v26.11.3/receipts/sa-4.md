@@ -1,4 +1,5 @@
 # SA-4 — skill-application audit: crates/cli vs run-ggen skill
+Standing: ALIVE
 
 Lane: SKILL-APPLICATION SA-4, 2026-11-03/04. Skill:
 `~/.claude/skills/run-ggen/SKILL.md`. Subject: `/Users/sac/cgap/crates/cli`

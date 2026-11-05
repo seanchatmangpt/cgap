@@ -1,4 +1,5 @@
 # Decision D3: NIF/BEAM-leg doubly refused
+Standing: PARTIAL_ALIVE
 
 ## Decision
 

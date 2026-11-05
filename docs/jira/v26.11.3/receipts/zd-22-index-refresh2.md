@@ -1,4 +1,5 @@
 # ZD-22 Receipt: receipt-index second refresh (yd-6, yd-7, zd-1..zd-4)
+Standing: ALIVE
 
 - Date: 2026-11-04
 - Repo: /Users/sac/cgap

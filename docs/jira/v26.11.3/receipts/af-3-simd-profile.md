@@ -1,4 +1,5 @@
 # af-3-simd-profile
+Standing: ALIVE
 
 AF-3 implementation lane (AB-12 follow-on), v26.11.3. Subject:
 `hash_wide_simd` (crates/cgap-blake3/src/lib.rs) measured ~430 MiB/s vs

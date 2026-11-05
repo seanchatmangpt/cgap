@@ -1,4 +1,5 @@
 # Receipt: AF-1 Corridor Join Court (Systemic Integration Gate)
+Standing: BLOCKED
 
 - **Lane**: AF-1, coordinator-dispatched.
 - **Date**: 2026-11-03

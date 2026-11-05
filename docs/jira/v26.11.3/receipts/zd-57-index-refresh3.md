@@ -1,4 +1,5 @@
 # ZD-57 — index refresh 3 (six new receipt rows + af-43 row refinement)
+Standing: PARTIAL
 
 Lane: ZD-57 (index-only). Date: 2026-11-04. Repo: `/Users/sac/cgap`.
 Owns: `docs/jira/v26.11.3/README.md` (rows + refresh paragraph +

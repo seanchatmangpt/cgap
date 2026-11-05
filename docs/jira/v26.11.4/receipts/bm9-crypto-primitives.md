@@ -1,4 +1,5 @@
 # BM-9 — cgap-crypto primitives first bench
+Standing: ALIVE
 
 Ticket: BM-9 · Repo: /Users/sac/cgap · Branch: main · 2026-11-04T20:56:45Z
 Machine witness: Mac15,9 (Darwin 25.2.0), 16 cores, 48 GB, load 51.17/35.17/24.83

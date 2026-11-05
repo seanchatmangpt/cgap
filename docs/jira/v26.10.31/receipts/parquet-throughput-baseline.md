@@ -1,4 +1,5 @@
 # Receipt: parquet-throughput-baseline
+Standing: PARTIAL
 
 | Field | Value |
 |---|---|

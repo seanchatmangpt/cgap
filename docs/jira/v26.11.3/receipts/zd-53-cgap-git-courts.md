@@ -1,4 +1,5 @@
 # ZD-53 — cgap-git court fixes (soc zero-alloc window + octopus child capture)
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: ZB-4 findings, no git commands.
 Subject (exact files):

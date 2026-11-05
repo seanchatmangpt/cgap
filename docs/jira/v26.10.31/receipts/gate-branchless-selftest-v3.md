@@ -1,4 +1,5 @@
 # Receipt: gate-branchless-selftest-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

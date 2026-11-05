@@ -1,4 +1,5 @@
 # AAD Ruling Executed (Option b — var-AAD promoted to production)
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: IMPLEMENTATION. Ownership held: `aead.rs` +
 `aead_courts.rs` only. No git actions.

@@ -1,4 +1,5 @@
 # ZD-116 — final coverage pass (index refresh)
+Standing: PARTIAL_ALIVE
 
 - **Date**: 2026-11-04
 - **Repo/branch**: `/Users/sac/cgap`, `main` @ 7459848b on disk at

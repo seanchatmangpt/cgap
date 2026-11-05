@@ -44,7 +44,7 @@ NOTE code-mapping divergence: N-07: suite-table code REFUSAL-07 -> artifact code
 NOTE control runs may carry ClosedConstraintComponent results on rdf:type (plane shapes are sh:closed with no ignoredProperties); these carry no REFUSAL code and the binding assertion is on the pinned-code set.
 NOTE probed on pyshacl 0.31.0: sh:hasValue VIOLATES on absent property (not vacuous) — mutation nodes are fully populated with pinned values except the perturbed path; the 30-shacl-validation-suite.md vacuity note is contradicted.
 
-VERDICT: 7/7 cases FLIPPED, self-check PASS — exit 0
+VERDICT: PASS
 ```
 
 <!-- Tree state: dirty (14 entries) -->

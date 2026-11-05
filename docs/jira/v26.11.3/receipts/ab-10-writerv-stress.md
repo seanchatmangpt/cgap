@@ -1,4 +1,5 @@
 # Lane AB-10 Receipt: StreamWriter/VectoredSink Stress Suite
+Standing: ALIVE
 
 Lane: STRESS (AB-10) · Subject: `crates/cgap-arrow/src/stream_writer.rs`
 (`StreamWriter` + `VectoredSink` over real UDS) · Read-only subject; only

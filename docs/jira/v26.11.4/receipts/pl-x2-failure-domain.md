@@ -1,4 +1,5 @@
 # PL-X2 — Supervisor Failure-Domain Receipt (fd/orphan + BUSY drain)
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: CODE-LANE-5 (docs+receipts). Status: ALIVE —
 supervisor courts re-run this session, exit pasted; busy-drain court re-run

@@ -1,6 +1,6 @@
 # BR-2: Linearity fence diagnosis (span flatness) — receipt
 
-Standing: Exit: 5/5 `test result: ok. 3 passed; 0 failed`
+Standing: UNVERIFIED
 
 - **Date**: 2026-11-04
 - **Lane**: BR-2 (benchmark refinement)

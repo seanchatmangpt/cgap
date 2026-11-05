@@ -4,7 +4,7 @@ Lane: AB-5 (AoQ Wave-1 W1-2b). Crate: cgap-crypto. Subject:
 `crates/cgap-crypto/src/fips203.rs`, `crates/cgap-crypto/src/kem.rs`,
 `crates/cgap-crypto/tests/mlkem768_*`, `crates/cgap-crypto/tests/vectors/mlkem768/`.
 FIPS 203 (final) ML-KEM-768: k=3, eta1=eta2=2, du=10, dv=4.
-Standing: **ALIVE** (all gates ran this session, commands + exits below).
+Standing: ALIVE
 
 ## Delivered
 

@@ -1,4 +1,5 @@
 # Receipt: {{RECEIPT_ID}}
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

@@ -1,4 +1,5 @@
 # Receipt: AB-4 AEAD/Poly1305 kernel (PG-A3, AoQ Wave-1 W1-3b)
+Standing: PARTIAL_ALIVE
 
 | Field | Value |
 |---|---|

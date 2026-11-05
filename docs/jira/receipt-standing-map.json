@@ -1,0 +1,1002 @@
+{
+  "entries": {
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/README.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/demo-cargo-version.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/demo-fail.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-arrow-tests-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-arrow-tests.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-beam-bridge-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-blake3-tests-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-blake3-tests-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-blake3-throughput.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-blake3-zero-alloc.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-branchless-manifest-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-branchless-manifest-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-branchless-manifest-v4.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-branchless-selftest-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-branchless-selftest-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cfg-homology-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cfg-homology.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cli-machine-report.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cpk-study-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cpk-study-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cpk-study-v4.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-cpk-study.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-ctq-report-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-ctq-report.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-ctq06-ratified-pass.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-divan-ctq.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-e2e-ctq05.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-e2e-integration-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-e2e-integration-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-gage-quiet-pending.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-gage-rr.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-git-perf-baseline.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-git-tests-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-git-tests-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-git-tests.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-p28sil-adopted.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-parquet-tests.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-perf-guard.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-shacl-negative-a.md": {
+      "annotation": "",
+      "key": "VERDICT",
+      "ok": true,
+      "standing": "PASS"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-shacl-negative-b.md": {
+      "annotation": "",
+      "key": "VERDICT",
+      "ok": true,
+      "standing": "PASS"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-shacl-v2.md": {
+      "annotation": "",
+      "key": "VERDICT",
+      "ok": true,
+      "standing": "PASS"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-shacl-v3.md": {
+      "annotation": "",
+      "key": "VERDICT",
+      "ok": true,
+      "standing": "PASS"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-shacl.md": {
+      "annotation": "",
+      "key": "VERDICT",
+      "ok": true,
+      "standing": "CONFORMANT"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-workspace-check-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-workspace-check-v3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/gate-workspace-check.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/parquet-throughput-baseline.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.10.31/receipts/template.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-1.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNSUPPORTED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-10-writerv-stress.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-11-ring-stress.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-12-blake3-stress.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-15-ffi-stress.md": {
+      "annotation": "",
+      "key": "Gate",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-19-slab-stress.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-2-fips202.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-3-chacha.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-4-aead.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-5-mlkem.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-6-header.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-7-chain-session.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-8-wire.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ab-9-ipc-stress.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-1-corridor.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-10-cbmqs.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNSUPPORTED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-12-flip-demo.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-14-cbmqs-runner.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-21-g7-perlink.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-22-percall-latency.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-24-narrative.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-25-g2-convergence.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-26-clearing.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-27-defense-mesh.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-29-federation.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-3-simd-profile.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-30-contender-a.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-32-saturation.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-33-density.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-34-perf-audit.md": {
+      "annotation": "",
+      "key": "Gate",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-35-transit.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-37-p99-torture.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-4-parse-meta.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-43-cgap-publish.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "VERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-6-version-binding.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/af-8-sandbox-e0583.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/bk-1-takeover.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "CLOSED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/br-2-receipt-lint.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/cg-1.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ga-5-cgap-wiring.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/ga-5b-flipback.md": {
+      "annotation": "",
+      "key": "result",
+      "ok": true,
+      "standing": "CONFORMANT"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/gd-1-dod-pack.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "CONFORMANT"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/rx-2-conformance.md": {
+      "annotation": "",
+      "key": "result",
+      "ok": true,
+      "standing": "UNSUPPORTED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/rx-3-scorecard.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/rx-4-profile-guard.md": {
+      "annotation": "",
+      "key": "result",
+      "ok": true,
+      "standing": "UNKNOWN"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/rx-5-certificate.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/rx-5-correction.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/sa-4.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/sa-5.md": {
+      "annotation": "",
+      "key": "result",
+      "ok": true,
+      "standing": "UNSUPPORTED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/xc-9-cgap-main.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "Exit-code-1"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/xd-1-deny-toml.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/xd-5-error-taxonomy.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "UNKNOWN"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/yd-1-licenses-clarify.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/yd-3-publish-lines.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/yd-5-cgap-index.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/yd-6-buffer-too-short.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/yd-7-dod-rerun.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "Exit-code-11"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-1-dod10-manifest-red.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-102-cgap-prelanding.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-103-ffi-warnings.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-105-cgap-closure.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-113-ladder-refresh.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "VERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-116-index-final.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-119-cgap-preflight.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-13-w2c-sidecar.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-133-closure-addendum.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-134-claude-census.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-136-fleet-census.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-141-sed-portability.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "FAIL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-143-index-refresh5.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-19-audit-alloc-blackbox.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-2-fa9-race-grid.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-22-index-refresh2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-26-frozen-drift.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-3-alloc-scope.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-36-dod-final.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "REFUSED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-4-dod-ontology-f2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "CLOSED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-43-dryrun-ladder.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-53-cgap-git-courts.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-55-dod-commands.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "REFUSED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-56-sidecar-e2e.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "REFUSED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-57-index-refresh3.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-6-w2a-session-ffi.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-63-membrane-closeout.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-76-sweep-verify.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PASS"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-79-gate0-witness.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-8-dod006-quiet.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.3/receipts/zd-97-dryrun-retry.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "Exit-code-7"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/aad-ruling-executed.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm2-crypto-kernels.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm3-chain-scale-v2.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm4-soak-churn.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm6-benchmark-claims-table.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm7-gate10-head-reconfirm.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/bm9-crypto-primitives.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/br2-linearity-fence-form.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/br3-blake3-cliff-fix.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/br3-crypto-bench-depth.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNSUPPORTED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/br6-bench-ledger.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/cgap-blake3-pin-remint.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "UNVERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/code-wave-closing-receipt.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/decision-aad-ruling.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/decision-d1-wire-shm-frozen-datum.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/decision-d2-zero-dep-reinterpretation.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/decision-d3-nif-doubly-refused.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/l7-push-state-sweep.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/lane1-receipt-engine.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/lane2-anti-vacuity-mutation-corpus.md": {
+      "annotation": "",
+      "key": "Status",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/lane4-flip-ladder-court.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/pl-x2-failure-domain.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/pl-x4-pinner-lease.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/pl-x5-batch-admission.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/wire-law-v3-landing.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "BLOCKED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/zp-14-cbmqs-cli.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "VERIFIED"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/zp-17-gate10-settling.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/zp-18-profile-guard-census.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.4/receipts/zp-18b-purity-gate-registration.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "ALIVE"
+    },
+    "/Users/sac/cgap/docs/jira/v26.11.5/receipts/l14-pqc-seal.md": {
+      "annotation": "",
+      "key": "Standing",
+      "ok": true,
+      "standing": "PARTIAL_ALIVE"
+    }
+  },
+  "generated_by": "scripts/receipt_standing_lint.py",
+  "standing_map_hash": "3dec79a5aef7cf5a"
+}

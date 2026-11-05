@@ -1,4 +1,5 @@
 # XD-1: cargo-deny config + CI wiring for cgap (XC-5r rec #2)
+Standing: ALIVE
 
 - **Date**: 2026-11-04
 - **Repo/subject**: `/Users/sac/cgap` @ `f561b563` (uncommitted working-tree diff on top)

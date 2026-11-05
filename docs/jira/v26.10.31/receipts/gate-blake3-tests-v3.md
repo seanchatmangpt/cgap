@@ -1,4 +1,5 @@
 # Receipt: gate-blake3-tests-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

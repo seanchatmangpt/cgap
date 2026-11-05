@@ -1,4 +1,5 @@
 # ZD-102: cgap pre-landing terminal-state certification
+Standing: ALIVE
 
 - Date: 2026-11-04
 - Subject: /Users/sac/cgap @ 95821317bb09419a71f34e93e2995ace49574fe1

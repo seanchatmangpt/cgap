@@ -1,4 +1,5 @@
 # AF-14 CBMQS Runner Receipt
+Standing: ALIVE
 
 - Lane: AF-14 (implementation lane, Prompt 08 executable counterpart)
 - Date: 2026-11-03

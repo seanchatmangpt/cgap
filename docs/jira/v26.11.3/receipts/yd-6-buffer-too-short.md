@@ -1,6 +1,6 @@
 # YD-6: rename `AoqError::HeaderTooLong` -> `AoqError::BufferTooShort`
 
-Standing: `cargo test -p cgap-aoq` x2 — all `test result: ok`, 0 failed; `cargo check --workspace` exit 0
+Standing: UNVERIFIED
 
 XC-5r rec #4 / XD-5 TARGET-UNMEASURED follow-up. The variant fires when an
 OUTPUT buffer is too short (`out.len() < SIZE_BYTES` in `codec.rs:36-40`,

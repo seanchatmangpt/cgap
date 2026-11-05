@@ -1,4 +1,5 @@
 # YD-3 Receipt — explicit publish=false on cgap-mcp and wire-shm (XP-2 Phase 2 hygiene)
+Standing: ALIVE
 
 Lane: YD-3, implementation lane, /Users/sac/cgap. Date: 2026-11-04.
 Contract: XP-2 Phase 2 hygiene — host-process/IPC internals must not be

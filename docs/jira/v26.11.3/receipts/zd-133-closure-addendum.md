@@ -1,4 +1,5 @@
 # zd-133 — cgap closure seal addendum (post-seal landings)
+Standing: ALIVE
 
 - **Subject**: `/Users/sac/cgap` @ c943008650a46251733275a1cada7cbc840493f2
 - **Seal anchor**: cfdd58abff33abf651dce46af7679c1d20c0bbe6

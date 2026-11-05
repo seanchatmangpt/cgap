@@ -1,4 +1,5 @@
 # ZD-56 — Sidecar Sequential Serve + Rung-8 E2E Court
+Standing: REFUSED
 
 Date: 2026-11-04 · Lane: ZD-56 · Repo: /Users/sac/cgap
 Plan: wave-2-membrane-plan.md:189 (rung 8: "E2E ... decrypted == pre-seal bytes, tag gate fires on flipped byte")

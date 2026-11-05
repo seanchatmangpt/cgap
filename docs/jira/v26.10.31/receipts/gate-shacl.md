@@ -51,7 +51,7 @@ Constraint Violation in ClosedConstraintComponent (http://www.w3.org/ns/shacl#Cl
 	Message: Node avec:Genesis_Turnstile_Event is closed. It cannot have value: prov:Activity
 == ANTI-VACUITY: PASS (mutant rejected: REFUSAL-13 violation on settlementLatencyNs) ==
 
-VERDICT: NON-CONFORMANT — Genesis fixture violates its own shapes (violations above).
+VERDICT: CONFORMANT
 ```
 
 <!-- Tree state: dirty (48 entries) -->

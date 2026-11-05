@@ -1,4 +1,5 @@
 # AB-12 — BLAKE3 kernel scale stress
+Standing: ALIVE
 
 - **Lane**: STRESS/AB-12, v26.11.2 starDF campaign
 - **Subject**: vendored BLAKE3 kernel — canonical published copy

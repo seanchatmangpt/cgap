@@ -1,4 +1,5 @@
 # Decision D1: wire-shm frozen-datum (CONFIRMED)
+Standing: PARTIAL_ALIVE
 
 ## Decision
 

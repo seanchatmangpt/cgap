@@ -1,6 +1,6 @@
 # BM3 — Chain/Receipt Throughput (v2), cgap-ffi RingReceiptChain plane
 
-Standing: ALIVE: exit 0, 3 passed / 0 failed
+Standing: ALIVE
 
 Date: 2026-11-04 (UTC 20:36Z close). Lane: benchmark lane 3 (staggered vs lanes 1/4).
 

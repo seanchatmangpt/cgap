@@ -1,4 +1,5 @@
 # Receipt: gate-beam-bridge-v2
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

@@ -1,4 +1,5 @@
 # Receipt: gate-e2e-ctq05
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

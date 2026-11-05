@@ -1,6 +1,6 @@
 # LANE-1 — Forensic receipt engine + census enforcement
 
-Standing: ALIVE: engine built, tested both profiles, court 5/5 flipped, census self-check green
+Standing: ALIVE
 
 Date: 2026-11-04 (UTC ~21:10Z close). Repo: /Users/sac/cgap. Lane: LANE-1
 (receipt engine + census enforcement), staggered vs benchmark lanes on the

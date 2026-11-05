@@ -1,4 +1,5 @@
 # ZD-26 — frozen-drift close-out: both GGM-SRC-002 drifts lifted into source
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: ZB-1 audit follow-up. Two repos touched (disclosure:
 ggen-marketplace committed+pushed on branch `zd-26-frozen-drift`; cgap left

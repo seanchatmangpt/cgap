@@ -1,4 +1,5 @@
 # AF-26 Receipt — Flash Crash Clearinghouse (macro-benchmark)
+Standing: ALIVE
 
 Lane: AF-26 IMPLEMENTATION. Date: 2026-11-03.
 Bench: `crates/cgap-aoq/tests/macro_clearing_stress.rs` (new; scaled 1M default,

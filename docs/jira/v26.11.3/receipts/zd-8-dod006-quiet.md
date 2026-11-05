@@ -1,4 +1,5 @@
 # ZD-8: dod-006 Quiet-Machine Close Condition (throughput_min_of_n_floor)
+Standing: ALIVE
 
 Date: 2026-11-04
 Lane: ZD-8 (verification lane — no source edits, no git commands)

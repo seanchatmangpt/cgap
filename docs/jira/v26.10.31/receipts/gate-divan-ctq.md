@@ -1,4 +1,5 @@
 # Receipt: gate-divan-ctq
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

@@ -1,4 +1,5 @@
 # GA-5: cgap consumer wiring + first real sync (PG-A6 step 6)
+Standing: PARTIAL_ALIVE
 
 Date: 2026-11-03 (night wave) | Lane: GA-5 | Repo: /Users/sac/cgap
 

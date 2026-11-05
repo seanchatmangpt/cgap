@@ -1,4 +1,5 @@
 # af-24-narrative
+Standing: UNVERIFIED
 
 AF-24 implementation lane (AF-3 post-fix narrative propagation), v26.11.3.
 AF-3's fix changed the story: the "4x SIMD inversion" in ab-12 was a

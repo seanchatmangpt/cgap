@@ -1,4 +1,5 @@
 # Receipt: gate-blake3-zero-alloc
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

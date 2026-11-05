@@ -1,4 +1,5 @@
 # AF-30 Receipt — Cage Match Contender A harness (cgap-aoq)
+Standing: ALIVE
 
 Lane: AF-30 (implementation lane; comparative report hosted in arcus:
 `/Users/sac/arcus/docs/jira/v26.11.3/receipts/af-30-cage-match.md`).

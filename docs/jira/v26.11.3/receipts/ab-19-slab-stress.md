@@ -1,4 +1,5 @@
 # AB-19 — Slab Stress (STRESS lane, v26.11.3)
+Standing: UNVERIFIED
 
 - **Subject**: `crates/cgap-arrow/src/slab.rs` + `crates/cgap-arrow/src/{bitmask,blake3}.rs` (read-only; zero lines changed in src/).
 - **Lane file**: `crates/cgap-arrow/tests/slab_stress.rs` (new, 5 courts).

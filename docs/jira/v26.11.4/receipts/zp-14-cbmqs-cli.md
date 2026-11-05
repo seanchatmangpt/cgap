@@ -1,4 +1,5 @@
 # ZP-14 — CBMQS-CLI Standalone Crate Gap-Close Receipt
+Standing: VERIFIED
 
 Date: 2026-11-04. Lane: GAP-CLOSE. Status: ALIVE (build, tests, and a real
 emit/verify/tamper cycle re-run this session in /tmp).

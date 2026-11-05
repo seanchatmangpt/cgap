@@ -1,4 +1,5 @@
 # AF-8 — sandbox-court copier recursion (E0583 fix)
+Standing: BLOCKED
 
 Lane: AF-8. Date: 2026-11-03. No git commands run.
 

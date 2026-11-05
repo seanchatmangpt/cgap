@@ -1,4 +1,5 @@
 # Gate Receipt: CFG Homology Proxy (DMADV Analyze)
+Standing: ALIVE
 
 - **Gate**: `scripts/cfg_homology.sh` — source decision constructs vs emitted
   banned-branch opcodes per declared hot kernel (documented PROXY, not a

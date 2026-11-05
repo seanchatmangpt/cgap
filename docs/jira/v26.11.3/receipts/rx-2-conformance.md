@@ -127,7 +127,7 @@ disclosed by RX-4's receipt, still true at 23:5x this session; scoped
 - The debug-profile scorecard row labels differ cosmetically from the
   release ones (shorter gate names in the SKIP rows); content equal.
 
-result: RX-2 landed crates/cgap-aoq/tests/rfc0089_conformance.rs — 5-injection RFC-0089 court (I1
+result: UNSUPPORTED
   bimodal deluge, I2 skip-read stall-walk, I3 24MB-sweeper cache-stride, I4 60% tamper 41ns parity
   vs the 50ns absolute fence, I5 194/194 kill churn over 8x500 zero-loss) with G1-G7 scorecard,
   release+debug x2 green, neighbor suites unregressed; receipt at

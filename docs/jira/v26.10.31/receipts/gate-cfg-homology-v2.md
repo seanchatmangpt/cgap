@@ -1,4 +1,5 @@
 # Receipt: gate-cfg-homology-v2
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

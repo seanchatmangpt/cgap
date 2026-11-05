@@ -1,4 +1,5 @@
 # BR-3 — cgap-crypto bench deepening
+Standing: UNSUPPORTED
 
 - Date: 2026-11-04, 21:10 UTC
 - Subject: `crates/cgap-crypto/benches/primitives.rs` (only file owned/edited). Disclosure: the BR-3 edits to this file were swept into a concurrent lane's commit `ede3fe4d` ("wire: AOQ v3 wire law landing...", 19 files, 75-line diff to primitives.rs) before BR-3 could commit them — mid-flight collision, disclosed per lane law; BR-3's own commit carries the receipt only.

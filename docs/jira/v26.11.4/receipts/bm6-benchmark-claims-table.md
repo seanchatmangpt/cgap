@@ -1,4 +1,5 @@
 # bm6 — Benchmark Claims Table (Closing Lane 6)
+Standing: BLOCKED
 
 - Date: 2026-11-04. Lane: BENCHMARK LANE 6 (closing consolidation).
 - Inputs: bm1, bm2, bm3, bm4 (cgap + arcus), bm5 — all five on disk at

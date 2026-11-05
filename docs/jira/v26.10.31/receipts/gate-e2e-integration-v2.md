@@ -1,4 +1,5 @@
 # Receipt: gate-e2e-integration-v2
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

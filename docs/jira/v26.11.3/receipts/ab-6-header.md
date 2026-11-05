@@ -1,4 +1,5 @@
 # AB-6 Receipt: AOQ1 Header Kernel (W1-5a)
+Standing: ALIVE
 
 Lane: AB-6, AoQ Wave-1 W1-5a. Repo: /Users/sac/cgap. Date: 2026-11-03.
 Charter: execute PG-A2's header.rs spec under R-H1 (the landed ontology

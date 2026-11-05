@@ -1,6 +1,6 @@
 # BR-3 follow-up: BLAKE3 ≥256 KiB throughput cliff — ROOT-CAUSED AND FIXED
 
-Standing: FIXED — kernel-dispatch boundary, not an algorithm cost
+Standing: ALIVE
 
 Date: 2026-11-04 · Repo: /Users/sac/cgap @ b73f64cb (lane: DIAGNOSIS, BR-3 follow-up)
 

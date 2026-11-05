@@ -1,4 +1,5 @@
 # Receipt: zd-2 FA9 race-grid release reds (XA-2 census reds #2-4)
+Standing: ALIVE
 
 Milestone: v26.11.3 · Lane: zd-2 (XA-2 census reds #2-4) · Date: 2026-11-04
 

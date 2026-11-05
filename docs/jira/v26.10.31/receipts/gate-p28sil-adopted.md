@@ -1,4 +1,5 @@
 # Receipt: gate-p28sil-adopted
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

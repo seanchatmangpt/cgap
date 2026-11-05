@@ -1,4 +1,5 @@
 # AF-33 — Benchmark 03: Kinetic Mass-to-Velocity Density
+Standing: BLOCKED
 
 Date: 2026-11-03 (PST) · Lane: AF-33 IMPLEMENTATION · Repo: /Users/sac/cgap
 Subject: `crates/cgap-aoq/tests/macro_density_bench.rs` (new)

@@ -1,4 +1,5 @@
 # Decision D2: zero-dep reinterpretation (ADOPTED)
+Standing: ALIVE
 
 ## Decision
 

@@ -1,4 +1,5 @@
 # AF-10 — CBMQS Seven-Gate Evaluator (v26.11.3)
+Standing: UNSUPPORTED
 
 - **Lane**: AF-10 IMPLEMENTATION, Chicago Bare-Metal Qualification Standard
   as an executable evaluator composing the LANDED courts' machinery.

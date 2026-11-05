@@ -1,4 +1,5 @@
 # Receipt: gate-ctq06-ratified-pass
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

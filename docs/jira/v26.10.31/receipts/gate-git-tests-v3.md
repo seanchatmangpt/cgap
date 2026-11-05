@@ -1,4 +1,5 @@
 # Receipt: gate-git-tests-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

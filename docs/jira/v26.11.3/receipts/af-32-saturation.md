@@ -1,4 +1,5 @@
 # AF-32 saturation soak receipt
+Standing: UNVERIFIED
 
 Lane: AF-32 (Benchmark 02, zero-snaps saturation soak), v26.11.3.
 Subject: `crates/cgap-aoq/tests/macro_saturation_soak.rs` (new file, this

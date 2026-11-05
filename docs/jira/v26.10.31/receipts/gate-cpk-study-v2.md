@@ -1,4 +1,5 @@
 # Receipt: gate-cpk-study-v2
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

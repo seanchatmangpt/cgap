@@ -1,4 +1,5 @@
 # AB-7 Receipt — chain.rs + session.rs (AoQ Wave-1 W1-4)
+Standing: ALIVE
 
 Date: 2026-11-03. Lane: AB-7 (implementation). Repo: /Users/sac/cgap.
 Never ran git (lane law).

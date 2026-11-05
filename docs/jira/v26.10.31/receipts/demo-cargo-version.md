@@ -1,4 +1,5 @@
 # Receipt: demo-cargo-version
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

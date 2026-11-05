@@ -71,4 +71,4 @@ context strings.
   (semantics-identical swaps; CBMQS G1b/G2 numbers unchanged in kind:
   debug G2 context 748.1 ns, matching the prior receipt's ~743.5 ns).
 
-result: RX-4 landed profile_guard in cgap-aoq (assert_release + fence, no_std), migrated AF-25 G2 and AF-10 G1b to compose it, gates green ×2 debug+release + riscv32imc check clean; receipt at docs/jira/v26.11.3/receipts/rx-4-profile-guard.md
+result: UNKNOWN

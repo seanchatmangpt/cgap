@@ -1,4 +1,5 @@
 # Receipt: gate-perf-guard
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

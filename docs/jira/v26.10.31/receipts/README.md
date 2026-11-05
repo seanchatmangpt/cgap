@@ -1,4 +1,5 @@
 # Receipts
+Standing: ALIVE
 
 Machine-minted receipts for the v26.10.31 benchmark-harness milestone
 (spec: [29-benchmark-harness-plan.md](../29-benchmark-harness-plan.md) §CI

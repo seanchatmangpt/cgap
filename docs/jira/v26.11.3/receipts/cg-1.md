@@ -1,4 +1,5 @@
 # Receipt: CG-1 wire-tier gates (v26.11.3)
+Standing: PARTIAL_ALIVE
 
 | Field | Value |
 |---|---|

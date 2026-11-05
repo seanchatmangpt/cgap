@@ -1,4 +1,5 @@
 # Receipt: gate-cli-machine-report
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

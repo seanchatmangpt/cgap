@@ -1,4 +1,5 @@
 # ZD-105 — cgap v26.11.3 closure seal receipt
+Standing: PARTIAL_ALIVE
 
 Date: 2026-11-04. Lane: ZD-105 (seal). Repo: `/Users/sac/cgap`
 main @ `b6d685177d6d62b95708b75627fc1b617265a82d` (+ this commit),

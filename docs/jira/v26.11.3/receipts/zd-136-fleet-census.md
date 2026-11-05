@@ -1,4 +1,5 @@
 # ZD-136: Fleet Census (ZP-8 Fill-In)
+Standing: ALIVE
 
 **As-of**: 2026-11-04T16:43:02Z (live git/gh reads; no state changes)
 **Purpose**: ZP-8 fill-in for the wave-closing receipt.

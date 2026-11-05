@@ -1,4 +1,5 @@
 # Decision: AAD Ruling (Option b adopted)
+Standing: ALIVE
 
 Date: 2026-11-04. Coordinator decision receipt; execution receipt at
 `aad-ruling-executed.md` (same directory).

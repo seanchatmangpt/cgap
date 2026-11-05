@@ -1,4 +1,5 @@
 # Receipt: gate-gage-rr
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

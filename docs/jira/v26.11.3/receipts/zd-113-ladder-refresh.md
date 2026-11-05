@@ -1,4 +1,5 @@
 # ZD-113 — crates-io-ladder-plan §3.2/§5 refresh (post-dry-run reconciliation)
+Standing: VERIFIED
 
 Date: 2026-11-04. Subject: /Users/sac/cgap @ 7459848b3b274399d783352019a30452b777c063.
 Owned files: `docs/jira/v26.11.3/plans/crates-io-ladder-plan.md` (edited),

@@ -1,6 +1,6 @@
 # Code Wave v26.11.4 — Closing Court Receipt
 
-Standing: Exit code 0
+Standing: PARTIAL
 
 Date: 2026-11-04. Lane: CLOSING COURT (verification only — no git
 transitions performed by this lane). Poll discipline: 60s intervals,

@@ -1,4 +1,5 @@
 # ZD-134 Receipt — CLAUDE.md publish-law paragraph re-derived from the zd-119 live census
+Standing: ALIVE
 
 Lane: ZD-134, docs lane, /Users/sac/cgap @ 09e8c7c7 (pulled, already
 up to date with origin). Date: 2026-11-04.

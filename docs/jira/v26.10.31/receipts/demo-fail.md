@@ -1,4 +1,5 @@
 # Receipt: demo-fail
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

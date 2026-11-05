@@ -1,4 +1,5 @@
 # Receipt: gate-parquet-tests
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

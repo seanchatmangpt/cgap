@@ -1,4 +1,5 @@
 # Receipt: gate-git-perf-baseline
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

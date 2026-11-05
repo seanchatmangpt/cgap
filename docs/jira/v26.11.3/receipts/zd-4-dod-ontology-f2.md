@@ -1,4 +1,5 @@
 # ZD-4: dod-pack ontology dod-006 TARGET-UNMEASURED -> MEASURED (YD-7 Finding F2)
+Standing: CLOSED
 
 - **Date**: 2026-11-04
 - **Lane**: ZD-4 (create/update agent), YD-7 finding F2

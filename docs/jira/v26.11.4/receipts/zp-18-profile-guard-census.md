@@ -1,4 +1,5 @@
 # ZP-18 — Profile-Guard Census Gate Gap-Close Receipt
+Standing: PARTIAL
 
 Date: 2026-11-04. Lane: GAP-CLOSE. Status: ALIVE (census gate + self-check
 re-run this session, both exit 0).

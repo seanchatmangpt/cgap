@@ -1,4 +1,5 @@
 # AF-6: version binding + python binding audit (findings 2+3)
+Standing: ALIVE
 
 Lane: AF-6 (IMPLEMENTATION). Date: 2026-11-03. Repo: /Users/sac/cgap.
 Never ran git. Files touched: `ontology/cgap.ttl`, `crates/cgap-arrow/src/generated_version.rs` (via `ggen sync run` only), `bindings/python/avec` → `bindings/python/cgap` (rename + symbol sweep).

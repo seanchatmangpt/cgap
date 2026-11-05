@@ -103,7 +103,7 @@ byte-stable incl. the canonical header.
 - "Freeze slots never mint" — REFUTED: 5/5 `.blake3` pins minted on first
   canonical sync.
 
-result: cgap flipped to canonical marketplace aoq-pack — 9 gates green LIVE
+result: CONFORMANT
 in cgap, sync written:[] deterministic, gate0 PASS, header freestanding-C99
 PASS, cargo 6/6 aoq tests, witness court executable 9/9 flip, staged pack
 retired; receipt /Users/sac/cgap/docs/jira/v26.11.3/receipts/ga-5b-flipback.md

@@ -1,6 +1,6 @@
 # zd-141 — sed portability fix in verify_v26.10.31.sh classify branch
 
-Standing: LANDED
+Standing: FAIL
 
 Date: 2026-11-04. Status: LANDED (unpushed at receipt time; see git log).
 

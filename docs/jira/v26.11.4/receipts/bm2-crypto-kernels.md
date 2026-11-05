@@ -1,4 +1,5 @@
 # BM2 — Crypto Kernel Surfaces (Benchmark Lane 2)
+Standing: ALIVE
 
 Date: 2026-11-04 · Repo: /Users/sac/cgap · Lane: bm2 · No git operations.
 

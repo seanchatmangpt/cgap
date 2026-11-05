@@ -29,7 +29,7 @@ Lane: XC-5r documentation half. Date: 2026-11-04.
 ## Scope boundaries honored
 
 - `HeaderTooLong` NOT renamed/retargeted — owned by a follow-up lane.
-  Status: **TARGET-UNMEASURED** (its doc-comment "Output buffer shorter
+Status: UNKNOWN
   than the fixed 64-byte envelope" vs the name's "too long" remains an
   open measurement item for the follow-up lane; this lane did not touch it).
 - Doc-only diff; no error.rs match arms, Display strings, or class codes changed.

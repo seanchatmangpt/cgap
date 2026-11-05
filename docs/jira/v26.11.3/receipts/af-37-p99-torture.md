@@ -1,4 +1,5 @@
 # AF-37 Receipt: the 5-injection p99 torture bench
+Standing: ALIVE
 
 Lane: AF-37 IMPLEMENTATION. Date: 2026-11-04.
 Bench: `crates/cgap-aoq/tests/macro_p99_torture.rs` (new, ~880 lines,

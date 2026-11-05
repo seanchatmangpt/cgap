@@ -1,4 +1,5 @@
 # YD-5 Receipt: cgap v26.11.3 wave-index backfill (XD-3 finding)
+Standing: PARTIAL
 
 Lane: YD-5 (index-only). Date: 2026-11-04. Repo: /Users/sac/cgap.
 Constraint honored: no git commands run.

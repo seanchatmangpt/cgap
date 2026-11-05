@@ -1,4 +1,5 @@
 # Receipt: gate-gage-quiet-pending
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

@@ -1,4 +1,5 @@
 # AF-25 — G2 Methodology Convergence (v26.11.3)
+Standing: ALIVE
 
 - **Lane**: AF-25 IMPLEMENTATION, G2 methodology convergence (coordinator
   ruling executed; AF-17's two-axis audit incorporated).

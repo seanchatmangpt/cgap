@@ -1,6 +1,6 @@
 # AF-12 — kat_flip_demo.rs (runnable negative-mutation demonstration court)
 
-Standing: gates this session — `test result: ok. 4 passed; 0 failed` (x2)
+Standing: UNVERIFIED
 
 Lane: AF-12, completed by BK-3 takeover (dead-lane inheritance). Date: 2026-11-03. No git commands run.
 

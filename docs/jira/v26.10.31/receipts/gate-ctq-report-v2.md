@@ -1,4 +1,5 @@
 # Receipt: gate-ctq-report-v2
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

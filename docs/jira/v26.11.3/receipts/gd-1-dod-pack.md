@@ -1,4 +1,5 @@
 # Receipt: GD-1 cgap definition-of-done pack (v26.11.3)
+Standing: CONFORMANT
 
 | Field | Value |
 |---|---|

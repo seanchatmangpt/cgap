@@ -1,4 +1,5 @@
 # BK-1 Takeover Receipt — AB-4 + AB-5 gate close-out
+Standing: CLOSED
 
 - **Date**: 2026-11-04
 - **Charter**: BK-1 takeover of AB-4 (AEAD) + AB-5 (ML-KEM) dead lanes; gates, not rewrites.

@@ -25,7 +25,7 @@ are publish-neutral). Revert = delete the two lines.
 
 ## Rust side (ALIVE: ran this session, outputs cited)
 
-Gate: `cargo test -p cgap-ffi --test ffi_stress` → **4 passed, 0 failed**
+Gate: PARTIAL
 (exit 0), re-run green at 22:16 after the last crypto freeze cleared.
 Full integration sweep at 22:16 (`cargo test -p cgap-ffi` over ALL 7
 --test binaries): 28 passed, 0 failed — ffi_stress 4, alloc_courts 4,

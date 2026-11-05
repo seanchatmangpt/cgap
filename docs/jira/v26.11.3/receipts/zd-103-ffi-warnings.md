@@ -1,6 +1,6 @@
 # zd-103: cgap-ffi aoq_sidecar warning fix-forward
 
-Standing: ALIVE, this session, exact subject
+Standing: ALIVE
 
 Lane zd-103 (fan-out wave, repo `/Users/sac/cgap` @ b6d68517). Ownership:
 `crates/cgap-ffi/src/bin/aoq_sidecar.rs` (warning sites only) + this receipt.

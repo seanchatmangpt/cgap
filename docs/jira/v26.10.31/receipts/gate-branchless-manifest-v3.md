@@ -1,4 +1,5 @@
 # Receipt: gate-branchless-manifest-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

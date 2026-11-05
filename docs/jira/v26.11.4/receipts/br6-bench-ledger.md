@@ -1,6 +1,6 @@
 # BR-6 — Bench-Results Ledger (v26.11.4)
 
-Standing: zero arithmetic MISMATCH found; every derived quantity re-derives
+Standing: PARTIAL
 
 Date: 2026-11-04. Scope: every numbered receipt in
 `/Users/sac/cgap/docs/jira/v26.11.4/receipts/` and

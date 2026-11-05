@@ -96,4 +96,4 @@ Consumer: `/Users/sac/cgap/ggen.lock` regenerated twice by real `ggen sync run`
   untracked prior-lane state in packs/cgap-pack plus my additions awaits the
   coordinator's git transitions.
 
-result: SA-5 landed — cgap-pack now carries 19 sync-time [FM-PACK-013] validation gates (arcus shape), including new fail-closed layout-closure and TX-7/CG-1 status-closure SPARQL gates, each proven to flip by shim court with byte-exact restores, clean exit-0 sync, zero generated-artifact drift, and a green 228-test cgap-arrow suite.
+result: UNSUPPORTED

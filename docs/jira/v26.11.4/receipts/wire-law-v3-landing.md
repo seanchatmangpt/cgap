@@ -1,4 +1,5 @@
 # Wire Law v3 Landing — IMPLEMENTATION Lane (Stage 2)
+Standing: BLOCKED
 
 Date: 2026-11-04. Lane: v3 wire law Stage 2 (AEAD emit/open + version bump
 2→3 + AeadMismatch unblock). Repos: /Users/sac/cgap +

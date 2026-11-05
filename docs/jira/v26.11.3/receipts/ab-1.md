@@ -1,4 +1,5 @@
 # AB-1 Receipt — cgap-aoq skeleton (AoQ Wave-1 W1-1)
+Standing: UNSUPPORTED
 
 Lane: AB-1, implementation lane, /Users/sac/cgap. Date: 2026-11-03.
 Contract: PG-A1 skeleton per coordinator dispatch; rulings R-K1/R-H2 binding.

@@ -1,4 +1,5 @@
 # ZD-143 — index refresh 5 (post-zd-116 coverage loop re-run)
+Standing: PARTIAL
 
 Lane: ZD-143 (index-only). Date: 2026-11-04. Repo: `/Users/sac/cgap`.
 Owns: `docs/jira/v26.11.3/README.md` (rows only) and this receipt.

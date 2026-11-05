@@ -1,4 +1,5 @@
 # Receipt: ZD-63 — Wave-2 membrane closeout (plan status flip + rung witness ledger)
+Standing: PARTIAL_ALIVE
 
 **Lane**: Wave-2 closeout (zd-63)
 **Date**: 2026-11-04

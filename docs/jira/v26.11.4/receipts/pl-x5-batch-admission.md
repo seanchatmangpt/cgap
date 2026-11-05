@@ -1,4 +1,5 @@
 # PL-X5 — Blake3 Independent Batch + Admitted Batch-Append Receipt
+Standing: ALIVE
 
 Date: 2026-11-04. Lane: CODE-LANE-5 (docs+receipts). Status: ALIVE — perf
 court, equality courts, and chain courts re-run this session, outputs pasted.

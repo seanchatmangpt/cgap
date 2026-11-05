@@ -1,4 +1,5 @@
 # Receipt: gate-arrow-tests-v3
+Standing: ALIVE
 
 | Field | Value |
 |---|---|

@@ -1,4 +1,5 @@
 # AB-8 Wire Receipt (PG-A2, AoQ Wave-1 W1-5b)
+Standing: PARTIAL
 
 Lane: AB-8, implementation. Subject: `/Users/sac/cgap` crates
 `cgap-arrow` (sanctioned ipc.rs touch only) + `cgap-aoq` (verify.rs,
