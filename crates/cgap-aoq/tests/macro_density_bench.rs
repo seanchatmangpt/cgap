@@ -172,7 +172,10 @@ fn af33_density_court() {
                 // Typed slab-full refusal at the 1M-link boundary: reset to
                 // a fresh chain over the same slab (counted, disclosed in
                 // the receipt — the chain is reused, not grown).
-                Err(cgap_aoq::error::AoqError::BufferTooShort { .. }) => {
+                Err(
+                    cgap_aoq::error::AoqError::BufferTooShort { .. }
+                    | cgap_aoq::error::AoqError::SlabFull { .. },
+                ) => {
                     chain = AoqChain::new(Mix32, slab);
                     resets += 1;
                 }
@@ -209,7 +212,8 @@ fn af33_density_court() {
 
     // Density laws (final-state asserts, real observables):
     // 1. the chain holds at most one slab's worth of links at any reset
-    assert!((chain.len() as u64) <= SLAB_LINKS as u64);
+    let chain_len = chain.len();
+    assert!(chain_len <= SLAB_LINKS);
     // 1b. the pipeline never stalled: total frames equals links appended
     //     plus the one in-flight frame per reset boundary (bounded by resets+1)
     assert!(frames >= resets);
@@ -217,8 +221,12 @@ fn af33_density_court() {
     //    process baseline (< slab_mb + 32 MB margin) — proves the pipeline
     //    adds no runaway per-frame heap (corroborates AF-30's alloc-free
     //    census with an OS-level bound).
+    const KB_PER_MB: f64 = 1024.0;
+    const HOST_PROCESS_MARGIN_MB: f64 = 32.0;
+    let peak_rss_mb_measured = peak_kB as f64 / KB_PER_MB;
+    let allowed_slab_ceiling_mb = slab_mb + HOST_PROCESS_MARGIN_MB;
     assert!(
-        (peak_kB as f64 / 1024.0) < slab_mb + 32.0,
+        peak_rss_mb_measured < allowed_slab_ceiling_mb,
         "peak RSS {} MB exceeds slab {} MB + 32 MB baseline margin",
         peak_mb,
         slab_mb

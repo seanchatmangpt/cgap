@@ -164,8 +164,9 @@ fn build_bench(n: usize, hops: usize) -> BgpBench {
     let corpus = build_corpus(n, key_dom);
     let rule = bgp_rule(hops);
     let expected = oracle_count(&corpus.cols(), hops);
+    const MIN_ORACLE_MATCHES: usize = 0;
     assert!(
-        expected > 0,
+        expected > MIN_ORACLE_MATCHES,
         "oracle empty at N={n}: bench would be vacuous"
     );
     eprintln!("[bench-bgp] N={n} hops={hops} key_dom={key_dom} expected_matches={expected}");

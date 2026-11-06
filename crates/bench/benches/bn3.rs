@@ -30,6 +30,14 @@ use cgap_bn3::unify::{
 use divan::counter::BytesCount;
 use divan::{black_box, Bencher};
 
+/// GAUGE: N=7 min/med/max — alloc column is MEASURED via AllocProfiler
+/// (divan 0.1.21: `#[global_allocator]` is `#[cfg(test)]`-only upstream,
+/// so the bench binary installs it itself — pattern mirrors
+/// benches/parquet.rs:34-35). Without this install, tallies are never
+/// collected and any "alloc column reads 0 B" claim would be vacuous.
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
+
 /// Canonical corpus seed (charter Method discipline, verbatim).
 const CANONICAL_SEED: u64 = 0xBF58_476D_1CE4_E5B9;
 
@@ -229,12 +237,14 @@ fn unify_join_2atom_pairs<const N: usize>(b: Bencher) {
     assert_eq!(compiled.var_count, 2, "join binds exactly two variables");
     let oracle = oracle_match_count(&s_col, &p_col, &o_col, pa, pb);
     let pairs = join_pair_count(&p_col, pa, pb, DEFAULT_CHUNK_ROWS);
+    const MIN_ORACLE_COUNT: u64 = 0;
+    const MIN_PAIR_COUNT: u64 = 0;
     assert!(
-        oracle > 0,
+        oracle > MIN_ORACLE_COUNT,
         "join oracle empty at N={N}: bench would be vacuous"
     );
     assert!(
-        pairs > 0,
+        pairs > MIN_PAIR_COUNT,
         "pair count empty at N={N}: bench would be vacuous"
     );
     eprintln!(

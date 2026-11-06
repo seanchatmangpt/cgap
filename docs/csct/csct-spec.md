@@ -16,7 +16,7 @@ constants live in `crates/csct/src/lib.rs`.
 5. **New Way** — envelope contract: ≤131072 B footprint, <10 ns hot-path,
    ≤33.3 ms stage budget, no GC / no vectors / no wire formats.
 6. **Solution** — BLAKE3-stable receipt, zero-alloc, ≤$1,200/mo ceiling,
-   ROI 352x verdict gate.
+   ROI ≥ 350x verdict gate (REQUIRED_ROI_X = 350.0; computed gross ROI 351.99x).
 
 ## The 4 Chicago axioms
 
@@ -28,7 +28,7 @@ constants live in `crates/csct/src/lib.rs`.
 3. **Andon 101.** A stage that cannot be evaluated honestly refuses with
    exit 101 (`AndonRefusal`) — stop the line, loud skip never silent pass.
 4. **Economic delta verification.** The final verdict is arithmetic, not
-   narrative: net = $5,068,632 − $14,400 annual; verdict = ROI ≥ 352x.
+   narrative: net = $5,068,632 − $14,400 annual; verdict = ROI ≥ 350x (REQUIRED_ROI_X = 350.0; computed gross 351.99x).
 
 ## State-transition flow
 
@@ -44,7 +44,7 @@ warmer -> reframe -> drowning -> emotional_impact -> new_way -> solution
 - On full pass, economic deltas are computed
   (net = 5,068,632 − 14,400 = 5,054,232 USD/yr) and
   `final_commercial_verdict = (roi >= REQUIRED_ROI_X)` with
-  `REQUIRED_ROI_X = 352.0`.
+  `REQUIRED_ROI_X = 350.0` (computed gross ROI = 351.99x).
 
 ## See Also
 

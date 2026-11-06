@@ -10,12 +10,16 @@
     "transport": "local-exec",
     "authority_ceiling": "DO"
   },
-  "provider_execution_id": "csct-e2e-1793904281",
+  "provider_execution_id": "csct-e2e-1793991074",
   "identity": {
     "subject": "smalt-arcus-cgap-v26.11.6",
     "repo": "/Users/sac/cgap",
-    "subject_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2",
-    "base_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2"
+    "subject_sha": "2aba03098cebf2a14db46ac6fd55db421218268e",
+    "base_sha": "2aba03098cebf2a14db46ac6fd55db421218268e",
+    "subject_digest": {
+      "algorithm": "blake3",
+      "value": "4b8d83082ed4576b4f692c1492d31a043e8bfdec2708916243fb205ab35e90f5"
+    }
   },
   "authority": {
     "ceiling": "DO",
@@ -24,7 +28,7 @@
   },
   "consequence": {
     "commits": [
-      "3f33c67"
+      "2aba030"
     ],
     "files_changed": [
       "reports/challenger_sales_receipt.json"
@@ -43,51 +47,50 @@
   },
   "standing": {
     "value": "PARTIAL",
-    "derived_from": "court_csct_e2e_bench.py exit 0; max lawful standing PARTIAL per CT-23"
+    "derived_from": "court_csct_e2e_bench.py exit 0"
   },
   "provider_ext.csct": {
     "suite_id": "csct-rfc0042",
-    "timestamp_utc": "2026-11-05T18:44:41Z",
-    "sources": {
-      "status_quo_annual_usd": "const(crates/csct/src/drowning_benchmark.rs:45)",
-      "sut_annual_usd": "const(crates/csct/src/drowning_benchmark.rs:47)",
-      "net_savings_usd": "const(crates/csct/src/drowning_benchmark.rs:50)",
-      "gross_roi_multiple": "const(crates/csct/src/receipt.rs:78)",
-      "littles_law_ceiling_ms": "const(crates/csct/src/lib.rs:25)",
-      "p99_latency_ms": "measured(court_csct_e2e_bench.py, 2026-11-05T18:44:41Z)",
-      "st01_ingested": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
-    },
+    "timestamp_utc": "2026-11-06T18:51:14Z",
     "status_quo_annual_usd": 5068632.0,
     "sut_annual_usd": 14400.0,
     "net_savings_usd": 5054232.0,
     "gross_roi_multiple": 351.99,
     "littles_law_ceiling_ms": 10.0,
-    "p99_latency_ms": 0.0006,
+    "p99_latency_ms": 1.944,
     "incumbent_p99_ms": "UNMEASURED",
-    "st01_ingested": 710,
+    "st01_ingested_count": 200,
     "st01_legs": {
-      "aws_kinesis": {
-        "status": "PASS",
-        "records": 500,
-        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
-      },
-      "aws_sqs": {
-        "status": "PASS",
-        "records": 10,
-        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
-      },
       "gcp_pubsub": {
         "status": "PASS",
-        "records": 100,
-        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
+        "records_count": 100
       },
       "aws_msk_kafka": {
         "status": "PASS",
-        "records": 100,
-        "records_source": "measured(official_sdk_loops, 2026-11-05T18:44:41Z)"
+        "records_count": 100
+      },
+      "aws_kinesis": {
+        "status": "NOT_EXECUTED",
+        "records_count": 0
+      },
+      "aws_sqs": {
+        "status": "NOT_EXECUTED",
+        "records_count": 0
       }
     },
-    "alloc_bytes_per_op": null,
-    "standing": "PARTIAL"
+    "alloc_bytes_per_op": 0,
+    "drain_alloc_bytes_per_op": 904.2,
+    "standing": "PARTIAL",
+    "sources": {
+      "status_quo_annual_usd": "parsed(/Users/sac/cgap/reports/sovereign_stack_v26_11_5_receipt.json, 2026-11-06T18:51:14Z)",
+      "sut_annual_usd": "parsed(/Users/sac/cgap/reports/sovereign_stack_v26_11_5_receipt.json, 2026-11-06T18:51:14Z)",
+      "net_savings_usd": "derived(parsed(/Users/sac/cgap/reports/sovereign_stack_v26_11_5_receipt.json), 2026-11-06T18:51:14Z)",
+      "gross_roi_multiple": "derived(parsed(/Users/sac/cgap/reports/sovereign_stack_v26_11_5_receipt.json), 2026-11-06T18:51:14Z)",
+      "littles_law_ceiling_ms": "pinned(RFC-0042; W=L/lambda=1000/100000, 2026-11-06T18:51:14Z)",
+      "p99_latency_ms": "measured(court_csct_e2e_bench.py ST-04, 2026-11-06T18:51:14Z)",
+      "st01_ingested_count": "measured(court_csct_e2e_bench.py ST-01, 2026-11-06T18:51:14Z)",
+      "alloc_bytes_per_op": "pinned-not-measured(pinned(cgap Go-side alloc census; not observable from this Python harness), 2026-11-06T18:51:14Z)",
+      "drain_alloc_bytes_per_op": "pinned-not-measured(pinned(cgap Go-side alloc census; not observable from this Python harness), 2026-11-06T18:51:14Z)"
+    }
   }
 }

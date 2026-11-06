@@ -27,16 +27,16 @@ license-file = "../../LICENSE.md" # DOD-01 F3a / DOD-05 FLAG flip: branchless pa
 # runtime library keeps E=0 externals (dev-dependencies never compile into
 # the lib target).
 [dev-dependencies]
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 # Wave 9 cross-lane integration: the A14 dam (cgap-gate penstock `ingress`)
 # consumes real A04 frames in tests/cross_lane_gate_court.rs. Same §3 named
 # exception as cgap-blake3 — dev-only, never compiled into the lib target;
 # the runtime library stays E=0 externals.
-cgap-gate = { path = "../cgap-gate", version = "26.11.3" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.5" }
 # Alloc-density census (tests/alloc_density_census.rs, audit lane
 # 2026-11-04): house counting allocator; dev-only, lib target stays
 # E=0 externals.
-cgap-audit = { path = "../audit", version = "26.11.3" }
+cgap-audit = { path = "../audit", version = "26.11.5" }
 
 
 [package.metadata.docs.rs]

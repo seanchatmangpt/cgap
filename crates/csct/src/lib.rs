@@ -30,7 +30,7 @@ pub const SUT_ANNUAL_USD: f64 = 14_400.0;
 /// Required ROI multiple per RFC-0042. Integration ruling (coordinator,
 /// 2026-11-02): the RFC's "352x" holds only as the GROSS ratio
 /// STATUS_QUO/SUT = 5,068,632/14,400 = 351.99; the net/gross form gives
-/// 351.15. Pinned at 350.0 (gross formula) so the verdict court is
+/// 350.99 ((5,068,632 − 14,400)/14,400). Pinned at 350.0 (gross formula) so the verdict court is
 /// non-vacuous at the RFC economics. Errata: csct-lane-01-scaffold.md.
 pub const REQUIRED_ROI_X: f64 = 350.0;
 

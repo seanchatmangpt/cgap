@@ -34,7 +34,7 @@ fn census_harness_counts_positive_control() {
         // Heap allocation IS the property under test here — the vec! is the
         // point (useless_vec would delete the allocation and vacuous the control).
         #[allow(clippy::useless_vec)]
-        let v = vec![0u8; 32];
+        let v = core::hint::black_box(vec![0u8; 32]);
         assert_eq!(v.len(), 32);
     });
     assert_eq!(

@@ -100,11 +100,12 @@ fn main() {
     }
     // Non-vacuity probe: a deliberate allocation must bump COUNT before any
     // "0 allocs" line below is trusted (counted nothing != allocated nothing).
+    const MIN_ALLOC_EVENTS: usize = 1;
     COUNT.store(0, Ordering::Relaxed);
     let probe: Vec<u8> = vec![0xAB; 4096];
     black_box(&probe);
     assert!(
-        COUNT.load(Ordering::Relaxed) >= 1,
+        COUNT.load(Ordering::Relaxed) >= MIN_ALLOC_EVENTS,
         "allocator hook not wired: deliberate Vec alloc did not bump COUNT"
     );
 
@@ -137,21 +138,22 @@ fn main() {
         let mut mask = vec![0u64; mask_words];
         scan_eq_byteslice(&packed, k, needle, &mut mask);
         let mut ref_mask = vec![0u64; mask_words];
-        let mut hits = 0u64;
+        const MIN_HITS: u64 = 1;
+        let mut observed_hits = 0u64;
         for (i, &v) in values.iter().enumerate() {
             if v == needle {
                 ref_mask[i / 64] |= 1u64 << (i % 64);
-                hits += 1;
+                observed_hits += 1;
             }
         }
         assert_eq!(
             mask, ref_mask,
             "k={k}: scan mask != materialize-then-filter reference"
         );
-        assert!(hits > 0, "k={k}: bench needle never hits — vacuous scan");
+        assert!(observed_hits >= MIN_HITS, "k={k}: bench needle never hits — vacuous scan");
         println!(
             "byteslice pre-flight k={k}: rows={ROWS}, sub-columns={cols} ({} B), \
-             needle={needle} hits {hits} rows (masks bitwise-equal)",
+             needle={needle} hits {observed_hits} rows (masks bitwise-equal)",
             ROWS * cols
         );
 

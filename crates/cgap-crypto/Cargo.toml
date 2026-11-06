@@ -21,7 +21,7 @@ license-file = "../../LICENSE.md"
 # engine in `src/chatman.rs` binds cgap-blake3's public `compress_scalar`
 # + chunk/parent/root flags. cgap-blake3 itself exposes NO keyed API (its
 # external-vector test says so loudly); the keyed mode lives here.
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 
 [features]
 # decaps-only: soft gate (keygen/encaps dead_code-allowed) for the
@@ -43,7 +43,7 @@ divan = "=0.1.21"
 cgap-aoq = { path = "../cgap-aoq" }
 # Courts compute Merkle leaves/parents and cross-check digests against the
 # real unkeyed kernel (Chicago: real collaborators, no mocks).
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 # AB-4 (PG-A3): RFC 8439 cross-check court — the REAL RustCrypto
 # chacha20poly1305 validates the local donna kernel byte-for-byte, both
 # directions. DEV-ONLY: the lib dependency surface stays zero-dep.

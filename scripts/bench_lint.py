@@ -21,11 +21,21 @@ import re
 import sys
 
 FINDING_CLASSES = ("LITERAL_ASSERT", "DEAD_COURT", "TAUTOLOGY",
-                   "PRINT_ASSERT_MISMATCH", "UNCONDITIONAL_PASS")
+                   "PRINT_ASSERT_MISMATCH", "UNCONDITIONAL_PASS",
+                   "NON_ARROW_MARSHAL")
+
+BANNED_BENCH_PATTERNS = [
+    (re.compile(r'\b(?:import\s+json|json\.loads|json\.dumps)\b'),
+     'NON_ARROW_MARSHAL', 'JSON serialization in benchmark harness violates on-device Arrow substrate law'),
+    (re.compile(r'\b(?:proto\.Marshal|proto\.Unmarshal)\b'),
+     'NON_ARROW_MARSHAL', 'Protobuf marshalling in benchmark harness violates on-device Arrow substrate law'),
+    (re.compile(r'\bserde_json::to_\w+\b'),
+     'NON_ARROW_MARSHAL', 'serde_json serialization in benchmark path violates on-device Arrow substrate law'),
+]
 
 INT_SUFFIX = (r'(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|'
               r'f32|f64)')
-NUM_RE = re.compile(r'\d[\d_]*(?:\.\d+)?(?:' + INT_SUFFIX + r')?')
+NUM_RE = re.compile(r'(?<![A-Za-z0-9_])\d[\d_]*(?:\.\d+)?(?:' + INT_SUFFIX + r')?(?![A-Za-z0-9_])')
 
 # ---------------------------------------------------------------- scanner ---
 def scan_strings_and_strip(text):
@@ -348,6 +358,12 @@ def lint_file(path, text):
             findings.append((pl, 'UNCONDITIONAL_PASS',
                 'file prints PASS on a path with zero executed asserts '
                 '(assert count = 0)'))
+
+    # (e) NON_ARROW_MARSHAL
+    for idx, line in enumerate(text.splitlines(), start=1):
+        for pat, fcls, fmsg in BANNED_BENCH_PATTERNS:
+            if pat.search(line):
+                findings.append((idx, fcls, fmsg))
 
     return findings
 

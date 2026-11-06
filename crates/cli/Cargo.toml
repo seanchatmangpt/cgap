@@ -3,7 +3,7 @@
 
 [package]
 name = "cgap-cli"
-version = "26.11.3"
+version = "26.11.5"
 edition = "2021"
 rust-version = "1.85"
 publish = false

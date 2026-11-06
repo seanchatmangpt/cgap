@@ -189,10 +189,13 @@ fn main() {
         "ENTROPY_VARIANCE max/min={variance:.4} (absolute spread {:.4} ns/lane, informational)",
         mx - mn
     );
+    const MIN_VARIANCE: f64 = 0.0;
+    const MAX_VARIANCE: f64 = 4.0;
+    const MIN_LEVELS_LEN: usize = 9;
     // A degenerate sweep (0 or 1 levels) folds to 0.0 or NaN and would
     // print a vacuous ENTROPY_VARIANCE line; refuse it loudly.
     assert!(
-        ENTROPY_LEVELS.len() >= 9 && variance.is_finite() && variance > 0.0 && variance < 4.0,
+        ENTROPY_LEVELS.len() >= MIN_LEVELS_LEN && variance.is_finite() && variance > MIN_VARIANCE && variance < MAX_VARIANCE,
         "entropy-variance fence failed: max/min {variance:.4} across {} levels (degenerate sweep or spread >= 4.0)",
         ENTROPY_LEVELS.len()
     );
@@ -245,8 +248,9 @@ fn main() {
             "{frac:8}% | {:.0} | {} | {:.2} (retract {} ns, oracle {} ns) | 15M-target {}",
             fps, asserts, ratio, frac_best_ns, best_oracle, met
         );
+        const MIN_RATIO: f64 = 1.0;
         assert!(
-            ratio >= 1.0,
+            ratio >= MIN_RATIO,
             "ratio fence failed: SWAR retract slower than full recompute at {frac}% churn"
         );
     }

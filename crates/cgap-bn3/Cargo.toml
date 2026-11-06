@@ -20,7 +20,7 @@ keywords = ['datalog', 'unifier', 'sigil', 'no_std']
 # (crates/audit/Cargo.toml precedent). Coordinator: review or revert this
 # edge; the lane did not touch the root workspace manifest.
 [dependencies]
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 
 # ZP-18: timing fences for benches/tests (dev-only edge; the lib surface
 # stays zero-dep no_std).

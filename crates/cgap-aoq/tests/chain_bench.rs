@@ -99,6 +99,8 @@ fn bench_append_and_verify_min_of_n() {
     }
     // Sanity floor (not a perf claim): the digest seam is deterministic
     // work, so verify must actually walk all links.
-    assert!(best_verify[2] > 0.0);
-    assert!(best_append[2] > 0.0);
+    const MIN_MEASURED_US: f64 = 0.0;
+    const MAX_LINKS_TIER_IDX: usize = 2;
+    assert!(best_verify[MAX_LINKS_TIER_IDX] > MIN_MEASURED_US);
+    assert!(best_append[MAX_LINKS_TIER_IDX] > MIN_MEASURED_US);
 }

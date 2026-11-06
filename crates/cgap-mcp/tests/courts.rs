@@ -91,7 +91,7 @@ fn protocol_court_real_stdio() {
     assert!(res.get("capabilities").is_some(), "capabilities present");
     let si = res.get("serverInfo").expect("serverInfo");
     assert_eq!(si.get("name").and_then(Json::as_str), Some("cgap-mcpd"));
-    assert_eq!(si.get("version").and_then(Json::as_str), Some("26.11.3"));
+    assert_eq!(si.get("version").and_then(Json::as_str), Some("26.11.5"));
 
     // tools/list shape
     send(&mut w, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");

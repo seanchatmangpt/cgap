@@ -145,8 +145,9 @@ fn main() {
     COUNT.store(0, Ordering::Relaxed);
     let probe: Vec<u8> = vec![0xAB; 4096];
     black_box(&probe);
+    const MIN_PROBE_ALLOCS: usize = 1;
     assert!(
-        COUNT.load(Ordering::Relaxed) >= 1,
+        COUNT.load(Ordering::Relaxed) >= MIN_PROBE_ALLOCS,
         "allocator hook not wired: deliberate Vec alloc did not bump COUNT"
     );
 
@@ -203,7 +204,8 @@ fn main() {
             );
         }
         let ones = mask_ones(&mask_ref);
-        assert!(ones > 0, "w={w}: bench needle never hits — vacuous filter");
+        const MIN_NEEDLE_HITS: u64 = 0;
+        assert!(ones > MIN_NEEDLE_HITS, "w={w}: bench needle never hits — vacuous filter");
         println!(
             "packed_filter pre-flight w={w}: rows={rows}, packed={} B, mask={} B, \
              needle={needle} hits {ones} rows (masks bitwise-equal)",

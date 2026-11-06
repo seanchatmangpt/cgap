@@ -144,3 +144,19 @@ harness = false
 [[bench]]
 name = "mctq_consolidation"
 harness = false
+
+[[bench]]
+name = "stream_compact_simd"
+harness = false
+
+[[bench]]
+name = "ring_cache_coherency"
+harness = false
+
+[[bench]]
+name = "memory_bounds"
+harness = false
+
+[[bench]]
+name = "parquet_cold_streaming"
+harness = false

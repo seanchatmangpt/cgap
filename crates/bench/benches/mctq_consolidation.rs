@@ -421,6 +421,8 @@ fn station_seal() {
     );
 }
 
+const MIN_STATION_RUNS: usize = 7;
+
 fn main() {
     if let Err(v) = cgap_aoq::profile_guard::assert_release() {
         eprintln!(
@@ -439,5 +441,6 @@ fn main() {
     station_ffi();
     println!("=== station 3: MCTQ-06 mmap zero-copy read ===");
     station_mmap();
+    assert!(RUNS >= MIN_STATION_RUNS, "MCTQ consolidation station reps insufficient");
     println!("[MCTQ-DONE] all three stations measured, controls PASS, standing ALIVE");
 }

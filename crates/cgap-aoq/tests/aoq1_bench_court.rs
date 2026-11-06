@@ -69,7 +69,8 @@ fn bench_encode_decode_ns_per_header() {
         min_enc = min_enc.min(enc);
         min_dec = min_dec.min(dec);
     }
-    assert!(min_enc > 0.0 && min_dec > 0.0);
+    const MIN_SANITY_NS: f64 = 0.0;
+    assert!(min_enc > MIN_SANITY_NS && min_dec > MIN_SANITY_NS);
     println!(
         "bench[amortized]: encode {min_enc:.1} ns/header, decode {min_dec:.1} ns/header (min of {ROUNDS}x{ITERS})"
     );
@@ -99,7 +100,7 @@ fn bench_encode_decode_ns_per_header() {
     dec_samples.sort_by(|a, b| a.partial_cmp(b).expect("no NaN"));
     let med_enc = enc_samples[CALLS / 2];
     let med_dec = dec_samples[CALLS / 2];
-    assert!(med_enc > 0.0 && med_dec > 0.0);
+    assert!(med_enc > MIN_SANITY_NS && med_dec > MIN_SANITY_NS);
     println!(
         "bench[per-call]: encode {med_enc:.1} ns/call, decode {med_dec:.1} ns/call (median of {CALLS} individually-timed calls, AF-10 method)"
     );

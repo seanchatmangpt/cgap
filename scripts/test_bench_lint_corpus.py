@@ -56,6 +56,14 @@ fn main() {
 }
 '''
 
+PLANTED_JSON_MARSHAL = '''\
+const BOUND: usize = 1;
+fn main() {
+    let _ = serde_json::to_string(&"test");
+    assert!(BOUND >= 1);
+}
+'''
+
 
 def run(args):
     p = subprocess.run([sys.executable, LINT] + args,
@@ -96,6 +104,17 @@ def main():
     if rc != 2 or 'refusing to fake-pass' not in err:
         failures.append('falsifier-3: missing subject did not exit 2 '
                         'fail-loud (rc=%d)' % rc)
+
+    # --- falsifier 4: planted non-Arrow marshal must fire ---
+    f4 = os.path.join(tmp, 'planted_marshal.rs')
+    with open(f4, 'w') as fh:
+        fh.write(PLANTED_JSON_MARSHAL)
+    rc, out, _ = run([f4])
+    print('--- falsifier: planted non-Arrow marshal (rc=%d) ---' % rc)
+    print(out, end='')
+    if rc != 1 or 'NON_ARROW_MARSHAL' not in out:
+        failures.append('falsifier-4: planted non-Arrow marshal did not fire '
+                        'NON_ARROW_MARSHAL (rc=%d)' % rc)
 
     # --- corpus: real crates/bench sources, read-only ---
     for subject in (SOVEREIGN, CSCT):

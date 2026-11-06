@@ -99,7 +99,7 @@ fn blake3_wide_simd_attest(b: Bencher, len: usize) {
     }
 
     b.counter(BytesCount::new(len))
-        .counter(ItemsCount::new(1))
+        .counter(ItemsCount::new(1u64))
         .bench_local(|| {
             let digest = hash_wide_simd(black_box(&frame));
             black_box(digest);
@@ -157,7 +157,7 @@ fn spsc_ring_slot_transit(b: Bencher) {
     let mut ring = SpscRingBuffer::new(RING_CAPACITY);
     let payload = 0xA20C_0FFE_E5A7_E000u64;
 
-    b.counter(ItemsCount::new(1)).bench_local(|| {
+    b.counter(ItemsCount::new(1u64)).bench_local(|| {
         let pushed = ring.push(black_box(payload));
         assert!(pushed, "SPSC ring capacity overflow");
         let popped = ring.pop();

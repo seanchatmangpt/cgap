@@ -30,10 +30,10 @@ crate-type = ["cdylib"]
 quic = ["dep:quinn", "dep:quinn-proto", "dep:tokio", "dep:bytes", "dep:rcgen", "dep:rustls"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.3" }
-cgap-git = { path = "../cgap-git", version = "26.11.3" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.5" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.5" }
+cgap-git = { path = "../cgap-git", version = "26.11.5" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 wire-shm = { path = "../wire-shm", version = "26.11.5" }
 quinn = { version = ">=0.11.12, <0.12", optional = true, default-features = false, features = [
     "rustls-ring",

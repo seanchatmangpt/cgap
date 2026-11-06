@@ -15,7 +15,7 @@ import ctypes
 import os
 import sys
 
-__version__ = "26.11.3"
+__version__ = "26.11.5"
 
 __all__ = [
     "__version__",

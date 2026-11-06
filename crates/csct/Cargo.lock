@@ -4,29 +4,29 @@ version = 4
 
 [[package]]
 name = "cgap-blake3"
-version = "26.11.3"
+version = "26.11.5"
 
 [[package]]
 name = "cgap-bn3"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-blake3",
 ]
 
 [[package]]
 name = "cgap-core"
-version = "26.11.3"
+version = "26.11.5"
 
 [[package]]
 name = "cgap-storage"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-blake3",
 ]
 
 [[package]]
 name = "csct"
-version = "26.11.3"
+version = "26.11.5"
 dependencies = [
  "cgap-blake3",
  "cgap-bn3",

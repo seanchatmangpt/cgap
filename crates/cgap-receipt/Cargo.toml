@@ -17,7 +17,7 @@
 
 [package]
 name = "cgap-receipt"
-version = "26.11.4"
+version = "26.11.5"
 edition = "2021"
 license-file = "../../LICENSE.md"
 description = "Forensic receipt header engine: byte-faithful bench/court receipt headers, fail-closed on non-release profiles"

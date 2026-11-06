@@ -865,7 +865,7 @@ fn i5_supervisor_churn() {
         let mut out = [0u8; MAX_WIN];
         let mut scratch = [0u8; 60 + BODY_CAP];
         let mut body = [0u8; SMALL_BODY];
-        for (i, ts) in t_send.iter().take(FRAMES).enumerate() {
+        for (_i, ts) in t_send.iter().take(FRAMES).enumerate() {
             for b in body.iter_mut() {
                 *b = rng.next() as u8;
             }

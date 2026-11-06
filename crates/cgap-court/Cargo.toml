@@ -18,10 +18,10 @@ path = "../../tests/court_verdict.rs"
 # this test binary (the struct is pub and reusable) — same crate-as-dev-dep
 # pattern as cgap-ffi, lane-18 disclosed unblock. Path dep; the tree it
 # pulls (cgap-arrow, cgap-parquet) is zero-external-dependency no_std.
-cgap-audit = { path = "../audit", version = "26.11.3" }
+cgap-audit = { path = "../audit", version = "26.11.5" }
 # A20 §5.2: the frozen A05 WAL ABI (cgap_storage::atomic_commit constants
 # and layouts) the interleave engine builds against. Zero-dependency crate.
-cgap-storage = { path = "../cgap-storage", version = "26.11.3" }
+cgap-storage = { path = "../cgap-storage", version = "26.11.5" }
 # Wave 3 (full lane scope): A20 §3 consumes the sealed sibling surfaces via
 # their public APIs only. All four are path deps on zero-external crates
 # (every covered crate's [dependencies] is path-only — enforced by the
@@ -37,10 +37,10 @@ cgap-storage = { path = "../cgap-storage", version = "26.11.3" }
 #   cgap-gate   — the A14 penstock ingress (the dam's refusal boundary) the
 #                 dam court consumes, plus the frozen A19 status register
 #                 values the cross-lane pin court asserts.
-cgap-core = { path = "../cgap-core", version = "26.11.3" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
-cgap-bn3 = { path = "../cgap-bn3", version = "26.11.3" }
-cgap-gate = { path = "../cgap-gate", version = "26.11.3" }
+cgap-core = { path = "../cgap-core", version = "26.11.5" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
+cgap-bn3 = { path = "../cgap-bn3", version = "26.11.5" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.5" }
 # SEAL (GATE-3) repair: the seal court composes the owning kernels' public
 # APIs through the frozen A19 sovereign signatures — cgap-parquet (A02+A03
 # commit kernels; `std` for the Tier H FileSink), cgap-p28 (A17 license +
@@ -49,7 +49,7 @@ cgap-gate = { path = "../cgap-gate", version = "26.11.3" }
 # aliases the court coerces through — coercion is the compile-time
 # signature pin). Path deps on zero-external crates; same disclosed
 # crate-as-dev-dep pattern as the Wave-3 consumption set above.
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.3", features = ["std"] }
-cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
-cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
-cgap-ffi = { path = "../cgap-ffi", version = "26.11.3" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.5", features = ["std"] }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.5" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.5" }
+cgap-ffi = { path = "../cgap-ffi", version = "26.11.5" }

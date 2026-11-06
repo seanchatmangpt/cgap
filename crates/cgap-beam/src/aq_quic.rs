@@ -540,9 +540,11 @@ mod imp {
                                 let _ = reply.send(Ok(id));
                             }
                             Ok(Err(e)) => {
+                                eprintln!("AQ-DIAG connect handshake error: {e}");
                                 let _ = reply.send(Err(format!("handshake: {e}")));
                             }
                             Err(_) => {
+                                eprintln!("AQ-DIAG connect handshake timeout");
                                 let _ = reply.send(Err("handshake timeout".into()));
                             }
                         }
@@ -658,8 +660,12 @@ mod imp {
                     return;
                 };
                 let fut = async {
+                    eprintln!("AQ-DIAG server accept waiting for incoming...");
                     let incoming = ep.accept().await.ok_or_else(|| "listener closed".to_string())?;
-                    incoming.await.map_err(|e| e.to_string())
+                    eprintln!("AQ-DIAG server incoming connection received, awaiting handshake...");
+                    let conn = incoming.await.map_err(|e| e.to_string())?;
+                    eprintln!("AQ-DIAG server connection established!");
+                    Ok::<quinn::Connection, String>(conn)
                 };
                 match tokio::time::timeout(Duration::from_millis(timeout_ms), fut).await {
                     Ok(Ok(conn)) => {
@@ -669,11 +675,13 @@ mod imp {
                         let _ = reply.send(Ok(id));
                     }
                     Ok(Err(e)) => {
+                        eprintln!("AQ-DIAG accept handshake error: {e}");
                         let _ = reply.send(Err(format!("accept: {e}")));
                     }
                     Err(_) => {
                         // Bounded timeout (no-sleep law): the mutant court
                         // RELIES on this deadline firing.
+                        eprintln!("AQ-DIAG accept timeout firing");
                         let _ = reply.send(Err("accept timeout".into()));
                     }
                 }

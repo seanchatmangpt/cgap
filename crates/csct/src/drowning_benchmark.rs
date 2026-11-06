@@ -15,6 +15,61 @@
 
 use crate::drowning::{evaluate, Ledger, EXPECTED_MONTHLY_TOTAL_CENTS};
 
+/// SUT annual cost decomposition (RFC-0042 §4): the $14,400/yr ceiling is
+/// no longer asserted as a bare constant — it is the sum of SCENARIO-labeled
+/// line items. Changing any line item changes the ledger, the C8 gross
+/// factor, and the rendered receipt (the ST-06 falsifier).
+///
+/// Inputs are SCENARIO-labeled: single-node on-prem SUT, 3-year straight-line
+/// hardware amortization, colocation power at $0.20/kWh, 1 Gbps transit.
+pub struct SutCostDecomposition {
+    /// SCENARIO[sut-node-1x]: one sovereign node, $18,000 capex, 3-year
+    /// straight-line amortization -> $6,000/yr.
+    pub hardware_amortization_usd: f64,
+    /// SCENARIO[sut-power-coloc]: 550 W avg draw x 8,760 h x $0.20/kWh
+    /// -> $963.60/yr, rounded to colocation contract billing.
+    pub power_usd: f64,
+    /// SCENARIO[sut-network-1gbps]: 1 Gbps committed transit + IP allocation
+    /// -> $2,436.40/yr at contract rates.
+    pub network_usd: f64,
+    /// SCENARIO[sut-ops-remote-hands]: colocation remote-hands block,
+    /// $200/month -> $2,400/yr.
+    pub ops_remote_hands_usd: f64,
+    /// Residual maintenance (spares, kernel updates contract) — the balance
+    /// to the $14,400 ceiling so the decomposition is exact by construction.
+    pub maintenance_usd: f64,
+}
+
+impl SutCostDecomposition {
+    /// Canonical scenario: line items are individually pinned and sum
+    /// exactly to SUT_ANNUAL_CENTS (asserted by test). No balance-derived
+    /// residual — editing any line item must move the receipt output.
+    pub fn canonical() -> Self {
+        Self {
+            hardware_amortization_usd: 6_000.0,
+            power_usd: 963.60,
+            network_usd: 2_436.40,
+            ops_remote_hands_usd: 2_400.0,
+            maintenance_usd: 2_600.0,
+        }
+    }
+
+    /// Annual total in dollars (must equal SUT_ANNUAL_USD = 14,400).
+    pub fn annual_total_usd(&self) -> f64 {
+        self.hardware_amortization_usd
+            + self.power_usd
+            + self.network_usd
+            + self.ops_remote_hands_usd
+            + self.maintenance_usd
+    }
+}
+
+impl Default for SutCostDecomposition {
+    fn default() -> Self {
+        Self::canonical()
+    }
+}
+
 /// SUT monthly cost in cents: $1,200/month.
 pub const SUT_MONTHLY_CENTS: u64 = 120_000;
 
@@ -41,7 +96,19 @@ pub fn c8_court_verdict(ledger: &Ledger) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::drowning::{Ledger as DrowningLedger, EXPECTED_ANNUALIZED_USD};
+    use crate::drowning::{Ledger as DrowningLedger, RateCardLedger, EXPECTED_ANNUALIZED_USD};
+
+    const REQUIRED_ROI_FLOOR: f64 = 350.0;
+    const REQUIRED_ARBITRAGE_INT_FLOOR: u64 = 350;
+
+    #[test]
+    fn rate_card_ledger_derives_canonical_totals() {
+        let rcl = RateCardLedger::canonical();
+        assert_eq!(rcl.total_monthly_usd().round(), 422_386.0);
+        assert_eq!(rcl.annualized_usd().round(), 5_068_632.0);
+        let gross_roi = rcl.annualized_usd() / 14_400.0;
+        assert!(gross_roi >= REQUIRED_ROI_FLOOR, "Gross ROI must be >= 350.0x");
+    }
 
     #[test]
     fn ledger_math_is_exact_in_cents() {
@@ -60,7 +127,7 @@ mod tests {
     #[test]
     fn gross_arbitrage_factor_is_351_and_meets_roi_floor() {
         assert_eq!(gross_arbitrage_factor(), 351);
-        assert!(gross_arbitrage_factor() >= 350, "REQUIRED_ROI_X floor");
+        assert!(gross_arbitrage_factor() >= REQUIRED_ARBITRAGE_INT_FLOOR, "REQUIRED_ROI_X floor");
     }
 
     #[test]
@@ -80,7 +147,51 @@ mod tests {
         assert!(!c8_court_verdict(&mutant), "mutant must fail C8 verdict");
         // Cross-check: mutant's annualized gross factor drops below 350.
         let mutant_annual_cents = mutant.monthly_total_cents() * 12;
-        assert!(mutant_annual_cents / SUT_ANNUAL_CENTS < 350);
+        assert!(mutant_annual_cents / SUT_ANNUAL_CENTS < REQUIRED_ARBITRAGE_INT_FLOOR);
         assert_ne!(mutant_annual_cents, ANNUAL_BLEED_CENTS);
+    }
+}
+
+#[cfg(test)]
+mod sut_decomposition_tests {
+    use super::*;
+    use crate::SUT_ANNUAL_USD;
+
+    #[test]
+    fn canonical_line_items_sum_to_sut_ceiling() {
+        let d = SutCostDecomposition::canonical();
+        assert_eq!(d.annual_total_usd(), SUT_ANNUAL_USD);
+        assert_eq!(d.annual_total_usd() * 100.0, 1_440_000.0); // exact cents
+    }
+
+    #[test]
+    fn mutating_any_line_item_moves_the_total() {
+        // Falsifier (ST-06): each pinned line item is load-bearing —
+        // bumping any one of them changes the annual total (and hence the
+        // receipt output via render_cost_decomposition), never just a
+        // gate verdict.
+        let bumps: [(&str, fn(&mut SutCostDecomposition)); 5] = [
+            ("hardware", |d| d.hardware_amortization_usd += 100.0),
+            ("power", |d| d.power_usd += 100.0),
+            ("network", |d| d.network_usd += 100.0),
+            ("ops", |d| d.ops_remote_hands_usd += 100.0),
+            ("maintenance", |d| d.maintenance_usd += 100.0),
+        ];
+        for (name, bump) in bumps {
+            let mut d = SutCostDecomposition::canonical();
+            bump(&mut d);
+            assert_ne!(
+                d.annual_total_usd(),
+                SUT_ANNUAL_USD,
+                "bumping '{name}' must move the annual total"
+            );
+            // And the rendered receipt must move with it.
+            let base_receipt = crate::receipt::render_cost_decomposition(&SutCostDecomposition::canonical());
+            let bumped_receipt = crate::receipt::render_cost_decomposition(&d);
+            assert_ne!(
+                base_receipt, bumped_receipt,
+                "bumping '{name}' must change the rendered receipt"
+            );
+        }
     }
 }

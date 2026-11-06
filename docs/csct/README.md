@@ -14,7 +14,7 @@ single dep `cgap-blake3`).
 
 - `crates/csct/src/lib.rs` — scaffold: module declarations, economics constants
   (`STATUS_QUO_ANNUAL_USD = 5_068_632.0`, `SUT_ANNUAL_USD = 14_400.0`,
-  `REQUIRED_ROI_X = 352.0`), `run_suite()` executing the 6 stages in order with
+  `REQUIRED_ROI_X = 350.0`), `run_suite()` executing the 6 stages in order with
   early-return on first failing stage.
 - `src/types.rs` — `ExitCode` (Pass=0, GateFail=1, SubjectMissing=2,
   LoudSkip=3, AndonRefusal=101), `StateAssertion`, `StageResult`, `Report`.

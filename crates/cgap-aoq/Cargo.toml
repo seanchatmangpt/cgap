@@ -22,7 +22,7 @@ pqc = []
 # RFC-0089 §8.4 certificate module, digest substrate still injected via
 # the `*_with` seam forms.
 [dependencies]
-cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.5" }
 
 [dev-dependencies]
 # AB-8 classification-identity sweep + UDS soak: the sweep pairs cgap-arrow
@@ -42,7 +42,7 @@ cgap-blake3 = { path = "../cgap-blake3", features = ["std"] }
 # alloc census (tests/session_alloc_census.rs) — linking cgap_audit
 # installs CountingAlloc for the test binary and exposes
 # with_alloc_tracking. Dev-dep only: the lib surface stays zero-dep/no_std.
-cgap-audit = { path = "../audit", version = "26.11.3" }
+cgap-audit = { path = "../audit", version = "26.11.5" }
 
 # AF-14 CBMQS runner (tests/cbmqs_runner.rs): a harness=false gate whose
 # process exit status IS the verdict (repo exit-record law).

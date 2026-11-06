@@ -61,6 +61,57 @@ impl Ledger {
 pub const EXPECTED_MONTHLY_TOTAL_CENTS: u64 = 42_238_600;
 pub const EXPECTED_ANNUALIZED_USD: f64 = 5_068_632.0;
 
+/// Detailed rate-card ledger inputs for volume-based TCO derivation (RFC-0042 §4).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct RateCardLedger {
+    /// Egress traffic in GB/month @ $0.09/GB
+    pub egress_gb: f64,
+    pub egress_rate_per_gb: f64,
+    /// Shard hours per month @ $0.015/shard-hour
+    pub shard_hours: f64,
+    pub shard_rate_per_hour: f64,
+    /// Provisioned IOPS per month @ $0.065/IOPS-month
+    pub provisioned_iops: f64,
+    pub iops_rate: f64,
+    /// Cross-AZ replication in GB/month @ $0.01/GB
+    pub cross_az_gb: f64,
+    pub cross_az_rate_per_gb: f64,
+    /// Managed broker compute cluster instances USD/month
+    pub broker_compute_usd: f64,
+    /// Operator / platform engineering maintenance burden USD/month
+    pub operator_maintenance_usd: f64,
+}
+
+impl RateCardLedger {
+    pub fn canonical() -> Self {
+        Self {
+            egress_gb: 313_355.55,
+            egress_rate_per_gb: 0.09, // 28,202.0 USD (S3 + KMS egress)
+            shard_hours: 4_269_066.67,
+            shard_rate_per_hour: 0.015, // 64,036.0 USD (Shard fleet)
+            provisioned_iops: 100_000.0,
+            iops_rate: 0.065, // 6,500.0 USD
+            cross_az_gb: 1_127_500.0,
+            cross_az_rate_per_gb: 0.01, // 11,275.0 USD (Cross-AZ replication)
+            broker_compute_usd: 312_373.0, // Spark compute nodes (318,873 - 6,500)
+            operator_maintenance_usd: 0.0,
+        }
+    }
+
+    pub fn total_monthly_usd(&self) -> f64 {
+        (self.egress_gb * self.egress_rate_per_gb)
+            + (self.shard_hours * self.shard_rate_per_hour)
+            + (self.provisioned_iops * self.iops_rate)
+            + (self.cross_az_gb * self.cross_az_rate_per_gb)
+            + self.broker_compute_usd
+            + self.operator_maintenance_usd
+    }
+
+    pub fn annualized_usd(&self) -> f64 {
+        self.total_monthly_usd() * 12.0
+    }
+}
+
 /// Evaluate the ledger against the RFC-0042 totals. `false` on any drift.
 pub fn evaluate(ledger: &Ledger) -> bool {
     let monthly_ok = ledger.monthly_total_cents() == EXPECTED_MONTHLY_TOTAL_CENTS;

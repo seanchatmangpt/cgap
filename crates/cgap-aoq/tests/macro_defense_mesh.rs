@@ -32,11 +32,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::Instant;
 
+use cgap_aoq::aead::{Nonce96, TAG_LEN};
 use cgap_aoq::chain::{verify_records, AoqChain, AoqChainRecord, ChainDigest, RECORD_BYTES};
 use cgap_aoq::codec;
 use cgap_aoq::header::AoqHeader;
 use cgap_aoq::session::{
-    parse_frame, FrameKind, KemSeam, Session, SessionError, SessionState, CT_BYTES, EK_BYTES,
+    confirm_tag, parse_frame, FrameKind, KemSeam, Session, SessionError, SessionState, CT_BYTES,
+    EK_BYTES, FINISH_BODY_BYTES,
 };
 
 // ---- scale decisions (recorded, honest) --------------------------------
@@ -193,13 +195,39 @@ fn launch_body(seq: u32, c: usize) -> [u8; 4 + 16] {
     b
 }
 
-/// One telemetry frame, sealed via the REAL `Session::emit_verified`
-/// compose law (tag = H(whole-frame-body)[0..4]); returns (wire, len).
+/// One telemetry frame, sealed under the session's recv_key so the
+/// session's authenticated step absorbs it; returns (wire, len).
 fn emit_frame(s: &Session<'static, TestKem>, seq: u32, body: &[u8]) -> (Vec<u8>, usize) {
-    let mut buf = vec![0u8; 64 + 1 + 4 + body.len() + 4];
-    let n = s.emit_verified(seq, body, &mut buf).unwrap();
-    buf.truncate(n);
-    (buf, n)
+    let mut prefix = [0u8; 69];
+    let h = AoqHeader::new(s.epoch(), (s.ordinal() as u64) + 1, s.ordinal(), seq);
+    codec::encode(&h, &mut prefix).expect("encode prefix");
+    prefix[64] = FrameKind::AppData.id();
+    prefix[65..69].copy_from_slice(&seq.to_le_bytes());
+
+    let mut body_bytes = vec![0u8; 4 + body.len() + TAG_LEN];
+    body_bytes[..4].copy_from_slice(&seq.to_le_bytes());
+    let nonce = Nonce96::new(
+        u32::from(s.epoch()),
+        ((u64::from(s.ordinal())) << 32) | u64::from(seq),
+    )
+    .expect("nonce");
+    let mut tag = [0u8; TAG_LEN];
+    cgap_aoq::aead::seal_detached(
+        &mut body_bytes[4..4 + body.len()],
+        &mut tag,
+        body,
+        &prefix,
+        &s.recv_key(),
+        &nonce,
+    );
+    body_bytes[4 + body.len()..].copy_from_slice(&tag);
+
+    let mut wire = vec![0u8; 64 + 1 + body_bytes.len()];
+    codec::encode(&h, &mut wire).expect("encode wire header");
+    wire[64] = FrameKind::AppData.id();
+    wire[65..].copy_from_slice(&body_bytes);
+    let len = wire.len();
+    (wire, len)
 }
 
 /// Handshake a channel to Established at (epoch, key_id, ordinal 0).
@@ -216,14 +244,16 @@ fn handshake(c: usize) -> Session<'static, TestKem> {
     ek_wire[65..].copy_from_slice(&ek);
     s.step(&parse_frame(&ek_wire).unwrap()).unwrap();
     let (ct, _) = KEM.encapsulate(&ek).unwrap();
-    let mut fin = vec![0u8; 64 + 1 + CT_BYTES];
+    let mut fin = vec![0u8; 64 + 1 + FINISH_BODY_BYTES];
     codec::encode(
         &AoqHeader::new((c % 3) as u16, (c as u64) + 1, 1, 0),
         &mut fin,
     )
     .unwrap();
     fin[64] = FrameKind::HandshakeFinish.id();
-    fin[65..].copy_from_slice(&ct);
+    fin[65..65 + CT_BYTES].copy_from_slice(&ct);
+    let tag = confirm_tag(&KEM, &s.recv_key(), &s.transcript(), &ct);
+    fin[65 + CT_BYTES..65 + FINISH_BODY_BYTES].copy_from_slice(&tag);
     s.step(&parse_frame(&fin).unwrap()).unwrap();
     assert_eq!(s.state(), SessionState::Established);
     s
@@ -395,7 +425,7 @@ fn run_slot(slot: usize, tx: &mpsc::Sender<(usize, Vec<AoqChainRecord>)>) {
                     let err = chains[i].append_verified(&w).unwrap_err();
                     assert!(matches!(
                         err,
-                        cgap_aoq::error::AoqError::DigestMismatch { .. }
+                        cgap_aoq::error::AoqError::HeaderTooShort { .. }
                     ));
                     TAG_REFUSED.fetch_add(1, Ordering::Relaxed);
                 }

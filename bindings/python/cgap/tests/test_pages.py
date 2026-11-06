@@ -1,6 +1,6 @@
 """Page-pipeline language-surface tests for the cgap Python binding.
 
-Lane OPT20-L11 (version law 26.11.3). The page pipeline (write page ->
+Lane OPT20-L11 (version law 26.11.5). The page pipeline (write page ->
 RLE-encode -> decode -> read back) has NO servable surface in any language
 binding today: crates/cgap-ffi/src/lib.rs exports only the i32-batch and
 version symbols (cgap_i32_batch, cgap_schema_addr, cgap_array_addr,
@@ -31,7 +31,7 @@ import pytest
 import cgap
 from cgap.tests.test_cdata import _assert_bitmap_bitwise, _expected
 
-VERSION_LAW = "26.11.3"
+VERSION_LAW = "26.11.5"
 
 # Fresh configs: disjoint from test_cdata.CONFIGS [(100_000, 7), (1000, 0),
 # (65537, 1000)]; 257 and 33 exercise the partial-byte validity mask path.

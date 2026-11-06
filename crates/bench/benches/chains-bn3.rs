@@ -29,6 +29,14 @@ use cgap_bn3::unify::{
 use divan::counter::{BytesCount, ItemsCount};
 use divan::{black_box, Bencher};
 
+/// GAUGE: N=7 min/med/max — alloc column is MEASURED via AllocProfiler
+/// (divan 0.1.21: `#[global_allocator]` is `#[cfg(test)]`-only upstream,
+/// so the bench binary installs it itself — pattern mirrors
+/// benches/parquet.rs:34-35). Without this install, tallies are never
+/// collected and any "alloc column reads 0 B" claim would be vacuous.
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
+
 /// Canonical corpus seed (charter Method discipline, verbatim).
 const CANONICAL_SEED: u64 = 0xBF58_476D_1CE4_E5B9;
 
@@ -185,12 +193,14 @@ fn build_corpus(n: usize) -> ChainCorpus {
     let (expected_sel, expected_join) = oracle_counts(&slab, pa, pb);
     let p_words: Vec<u64> = slab.statements().iter().map(|st| st.p).collect();
     let pairs = join_pair_count(&p_words, pa, pb, DEFAULT_CHUNK_ROWS);
+    const MIN_ORACLE_COUNT: usize = 0;
+    const MIN_PAIR_COUNT: u64 = 0;
     assert!(
-        expected_sel > 0 && expected_join > 0,
+        expected_sel > MIN_ORACLE_COUNT && expected_join > MIN_ORACLE_COUNT,
         "oracle empty at N={n}: bench would be vacuous"
     );
     assert!(
-        pairs > 0,
+        pairs > MIN_PAIR_COUNT,
         "pair count empty at N={n}: bench would be vacuous"
     );
     eprintln!(
@@ -690,7 +700,8 @@ struct ClosureCorpus {
 
 fn build_closure_corpus(n: usize) -> ClosureCorpus {
     let chains = n / CL_CHAIN_LEN;
-    assert!(chains > 0, "N too small for one chain");
+    const MIN_CHAINS: usize = 0;
+    assert!(chains > MIN_CHAINS, "N too small for one chain");
     let edge = const_word(CL_EDGE_PAYLOAD);
     let per_chain = CL_CHAIN_LEN * (CL_CHAIN_LEN - 1) / 2 - (CL_CHAIN_LEN - 1);
     let expected_derived = chains * per_chain;

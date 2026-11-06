@@ -19,5 +19,5 @@ exclude = ["RECEIPT.md"] # DOD-05 Finding 2 coordinator call: internal receipt d
 # its own output through A06's real loader before writing (Chicago: real
 # collaborators end to end).
 [dependencies]
-cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.3" }
-cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.3" }
+cgap-blake3 = { path = "../../crates/cgap-blake3", version = "26.11.5" }
+cgap-bont = { path = "../../crates/cgap-bont", version = "26.11.5" }

@@ -9,6 +9,14 @@
 //! so the minimum is the closest approach to the kernel's true line rate.
 
 use cgap_arrow::bitmap::mask_words;
+
+// H9: Tier-2 measured/pinned provenance types. Wiring only — the CTQ-5 gate
+// below is unchanged. The types are shared with ctq_report via the lib target
+// (`bench::provenance`).
+#[allow(dead_code)]
+mod provenance;
+#[allow(unused_imports)]
+pub use provenance::Verdict;
 use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;

@@ -5,6 +5,47 @@
 
 use crate::types::{report_digest, Report};
 
+/// Render the SUT annual cost decomposition ([`crate::drowning_benchmark::
+/// SutCostDecomposition`]) as a deterministic markdown block. Byte-for-byte
+/// stable on identical input; renders each SCENARIO-labeled line item and
+/// the annual total.
+pub fn render_cost_decomposition(d: &crate::drowning_benchmark::SutCostDecomposition) -> String {
+    let mut out = String::new();
+    out.push_str("## SUT Annual Cost Decomposition\n\n");
+    out.push_str("| line item | annual usd |\n");
+    out.push_str("|---|---|\n");
+    let rows: [(&str, f64); 5] = [
+        (
+            "hardware_amortization [SCENARIO=sut-node-1x, 3yr straight-line]",
+            d.hardware_amortization_usd,
+        ),
+        (
+            "power [SCENARIO=sut-power-coloc, $0.20/kWh]",
+            d.power_usd,
+        ),
+        (
+            "network [SCENARIO=sut-network-1gbps]",
+            d.network_usd,
+        ),
+        (
+            "ops_remote_hands [SCENARIO=sut-ops-remote-hands]",
+            d.ops_remote_hands_usd,
+        ),
+        ("maintenance [SCENARIO=sut-spares-contract]", d.maintenance_usd),
+    ];
+    for (label, v) in rows {
+        out.push_str("| ");
+        out.push_str(label);
+        out.push_str(" | $");
+        push_usd(&mut out, v);
+        out.push_str(" |\n");
+    }
+    out.push_str("| **annual_total** | $");
+    push_usd(&mut out, d.annual_total_usd());
+    out.push_str(" |\n");
+    out
+}
+
 /// Render a [`Report`] as a deterministic markdown receipt string.
 ///
 /// Byte-for-byte stable across calls on identical input: fixed field
@@ -75,6 +116,10 @@ pub fn render_report(report: &Report) -> String {
 
 /// Comma-formatted integer dollar rendering (e.g. `$5,068,632`).
 fn push_usd(out: &mut String, amount: f64) {
+    if amount.fract() != 0.0 {
+        push_usd_cents(out, amount);
+        return;
+    }
     let whole = amount as u64;
     let digits = whole.to_string();
     let bytes = digits.as_bytes();
@@ -84,6 +129,20 @@ fn push_usd(out: &mut String, amount: f64) {
         }
         out.push(*b as char);
     }
+}
+
+/// Comma-formatted dollars with exact cents (e.g. `$963.60`), used when a
+/// line item carries a fractional dollar amount.
+fn push_usd_cents(out: &mut String, amount: f64) {
+    let cents = (amount * 100.0).round() as u64;
+    let whole = cents / 100;
+    let frac = cents % 100;
+    push_usd(out, whole as f64);
+    out.push('.');
+    if frac < 10 {
+        out.push('0');
+    }
+    out.push_str(&frac.to_string());
 }
 
 /// ROI as `<whole>x` from post-adoption cost, e.g. `352x` for 5,068,632 / 14,400.

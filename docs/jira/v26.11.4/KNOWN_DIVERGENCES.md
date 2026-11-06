@@ -29,6 +29,20 @@ its close condition; a court that documents a row is not a fix.
   `UnsupportedVersion` arm in BOTH mapping sites and re-pin the L2/L3 court
   legs to the new word.
 - **Registered**: 2026-11-04 (FIX-or-REGISTER lane, option b).
+- **Recount 2026-11-05 (KD-RC)**: STAYS OPEN — close condition met in code but
+  closure is UNWITNESSED. The band was extended exactly as the close condition
+  prescribed: `status_maps.rs` (regenerated, committed a216b486 2026-11-04
+  21:22, tree clean) now carries `UNSUPPORTED_VERSION 0x4347A009` with
+  `AOQ_STATUS_COUNT = 9`, and BOTH mapping sites remap the
+  `UnsupportedVersion` arm (`aoq_session.rs:110`, `aoq_sidecar.rs:340`, both
+  carrying `// KD-COVERS: KD-1` markers, FM-AOQ-009). However a repo-wide
+  grep over `docs/jira/` for `FM-AOQ-009|UNSUPPORTED_VERSION` returns only
+  this register — **no witness receipt exists for the closure**; the L2/L3
+  court legs were not re-pinned to the new word (close condition's final
+  step). Per register law a row closing silently is the failure class, so the
+  row cannot flip CLOSED. FINDING KD-RC-1: mint a witness receipt
+  (sidecar wire probe asserting a version-skew status word of 0x4347A009 +
+  re-pinned L2/L3 legs), then flip.
 
 ## KD-2 — benchmark ns/frame claims do not bound contention (claims row 28)
 
@@ -58,6 +72,9 @@ frame.rs:44 `ATTESTATION_LEN: usize = 80`, const-pinned to the layout at
 frame.rs:390; runtime-tied and court-enforced (f3-06:9-13, 18-19).
 **Close**: the twin collapses into the generated surface (surface-gate
 regeneration removes the hand twin). **Status**: OPEN.
+**Recount 2026-11-05 (KD-RC)**: OPEN confirmed live —
+`crates/cgap-core/src/frame.rs:44` still carries
+`pub const ATTESTATION_LEN: usize = 80`.
 
 ### KD-4 — oabi-lookup UNSUPPORTED(scope)
 
@@ -65,7 +82,9 @@ regeneration removes the hand twin). **Status**: OPEN.
 the A19 four-verb surface law (A19:47, 157-166 cited in-file); A10 T5's
 blocker stays BLOCKED-on-A19 (oabi_lookup.rs:36-40). **Close**: A19
 lands slot resolution and oabi-lookup gains a real implementation.
-**Status**: OPEN (BLOCKED-on-A19).
+**Status**: OPEN (BLOCKED-on-A19). **Recount 2026-11-05 (KD-RC)**: OPEN
+confirmed live — `crates/cgap-ffi/src/oabi_lookup.rs` header still reads
+"typed UNSUPPORTED(scope) decision record".
 
 ### KD-5 — Quad64 double-def in cgap-arrow
 
@@ -78,7 +97,9 @@ struct Quad64 definitions repo-wide). **Status**: CLOSED 2026-11-05 —
 transpose.rs is now a re-export (`pub use crate::layout::Quad64`,
 canonical def at layout.rs:36 with static size==64 / align==64
 asserts at layout.rs:59-60); witnessed on disk this session after the
-collapse landed on main.
+collapse landed on main. **Recount 2026-11-05 (KD-RC)**: closure
+re-verified live — `crates/cgap-arrow/src/transpose.rs:24` is
+`pub use crate::layout::Quad64`; verdict unchanged (CLOSED).
 
 ### KD-6 — cgap-blake3/tests/bench_tmp.rs ships in the package
 
@@ -89,6 +110,9 @@ does not exist on disk and is not tracked in git (`git ls-files
 crates/cgap-blake3/tests/` has no bench_tmp.rs; ls of the tests dir
 confirms). Nothing to rename; the registered subject is gone.
 Witnessed by the coordinator after lane L31 died on the task.
+- **Recount 2026-11-05 (KD-RC)**: closure re-verified live — `git ls-files
+  crates/cgap-blake3/tests/` has no bench_tmp.rs and the tests dir listing
+  confirms; verdict unchanged (CLOSED-PREMISE-ROTTED).
 
 ### KD-7 — `_cgap_p28_invariant_check` header question
 
@@ -98,3 +122,11 @@ at ledger time); include/cgap.h carries the four frozen prototypes only
 if the symbol is intended to be public, mint the header prototype; if
 not, declare it internal with a gate. **Status**: PARTIAL (GAP-1 was in
 flight at ledger time; nothing on disk to cite yet).
+**Recount 2026-11-05 (KD-RC)**: PARTIAL confirmed, with movement — the
+symbol now has three doc-comment occurrences declaring it internal
+(`crates/cgap-ffi/src/sovereign.rs:362,1135,1151`, "typed
+UNSUPPORTED(scope) record — `_cgap_p28_invariant_check` stays
+internal"), i.e. the "declare it internal" half of the close condition
+has on-disk prose but no gate and no GAP-1 resolution receipt; header
+prototype still absent (`include/cgap.h:168` carries only
+`cgap_verify_p28`). Stays PARTIAL/OPEN.

@@ -163,9 +163,10 @@ fn percentile(samples: &mut [u64], p: f64) -> u64 {
 fn run_batch(statements: usize, iters: usize) -> Oid {
     let (ex, ez) = build_edges(statements);
     // Warmup + anti-vacuity validation on the real corpus.
+    const MIN_CLOSURE_ROUNDS: usize = 1;
     let (wx, wz, wr) = semi_naive_closure(&ex, &ez);
     assert!(
-        wx.len() > statements && wr > 1,
+        wx.len() > statements && wr > MIN_CLOSURE_ROUNDS,
         "ANTI-VACUITY ABORT: derived {} pairs in {} rounds for {} stmts          (expected derivations > stmts and rounds > 1)",
         wx.len(),
         wr,

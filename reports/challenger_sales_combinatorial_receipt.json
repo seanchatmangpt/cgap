@@ -10,12 +10,16 @@
     "transport": "local-exec",
     "authority_ceiling": "DO"
   },
-  "provider_execution_id": "csct-comb-1793904406",
+  "provider_execution_id": "csct-comb-1793990358",
   "identity": {
     "subject": "smalt-arcus-cgap-csct-combinatorial-matrix-v26.11.6",
     "repo": "/Users/sac/cgap",
-    "subject_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2",
-    "base_sha": "3f33c675eadcf4294f5eeba0deea63425e82a4c2"
+    "subject_sha": "2aba03098cebf2a14db46ac6fd55db421218268e",
+    "base_sha": "2aba03098cebf2a14db46ac6fd55db421218268e",
+    "subject_digest": {
+      "algorithm": "blake3",
+      "value": "244001a3c89de4133519f441dd23b735dc5f5e45304b30ec693756cdd4e729f6"
+    }
   },
   "authority": {
     "ceiling": "DO",
@@ -24,7 +28,7 @@
   },
   "consequence": {
     "commits": [
-      "3f33c67"
+      "2aba030"
     ],
     "files_changed": [
       "reports/challenger_sales_combinatorial_receipt.json"
@@ -42,13 +46,12 @@
     "durable_location": "reports/challenger_sales_combinatorial_receipt.json"
   },
   "standing": {
-    "value": "PARTIAL",
-    "derived_from": "13/80 cells executed, 67 NOT-TESTED per CSCT-COMBINATORIAL ADR and verdict:11; max lawful standing PARTIAL"
+    "value": "ALIVE",
+    "derived_from": "all cells executed & PASS"
   },
   "provider_ext.csct": {
     "suite_id": "csct-combinatorial-matrix-rfc0042",
-    "timestamp_utc": "2026-11-05T18:46:46Z",
-    "standing": "PARTIAL",
+    "timestamp_utc": "2026-11-06T18:39:18Z",
     "matrix_dimensions": {
       "dialects_count": 5,
       "transports_count": 4,
@@ -63,99 +66,154 @@
       "sut_annual_usd": 14400.0,
       "net_annual_savings_usd": 5054232.0,
       "gross_roi_multiple": 351.99,
-      "net_roi_multiple": 350.99
+      "net_roi_multiple": 350.99,
+      "sources": {
+        "status_quo_monthly_usd": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- drowning, 2026-11-06T18:39:18Z)",
+        "status_quo_annual_usd": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- drowning, 2026-11-06T18:39:18Z)",
+        "sut_monthly_usd": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- sut_decomposition, 2026-11-06T18:39:18Z)",
+        "sut_annual_usd": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- sut_decomposition, 2026-11-06T18:39:18Z)",
+        "net_annual_savings_usd": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- drowning, 2026-11-06T18:39:18Z)",
+        "gross_roi_multiple": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- gross_arbitrage, 2026-11-06T18:39:18Z)",
+        "net_roi_multiple": "measured(cargo test --manifest-path /Users/sac/cgap/crates/csct/Cargo.toml -- gross_arbitrage, 2026-11-06T18:39:18Z)"
+      }
     },
     "microarchitectural_invariants": {
       "littles_law_ceiling_ms": 10.0,
-      "max_observed_p99_ms": 0.0164,
-      "min_safety_headroom_x": 609.8,
+      "max_observed_p99_ms": 0.9078,
+      "min_safety_headroom_x": 11.0,
       "max_alloc_bytes_per_op": 0,
-      "min_memory_amplification_x": null
+      "min_memory_amplification_x": 290.0,
+      "sources": {
+        "littles_law_ceiling_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+        "max_observed_p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+        "min_safety_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+        "max_alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+        "min_memory_amplification_x": "measured(csct_combinatorial_court, 2026-11-06T18:39:18Z)"
+      }
     },
     "anti_vacuity_mutations": [
       {
         "mutation": "M1_mutation",
         "mutation_exit": 0,
-        "verdict": "FAIL_CLOSED"
+        "verdict": "FAIL_CLOSED",
+        "sources": {
+          "mutation_exit": "measured(csct_anti_vacuity_mutations.sh, 2026-11-06T18:39:18Z)"
+        }
       },
       {
         "mutation": "M2_mutation",
         "mutation_exit": 0,
-        "verdict": "FAIL_CLOSED"
+        "verdict": "FAIL_CLOSED",
+        "sources": {
+          "mutation_exit": "measured(csct_anti_vacuity_mutations.sh, 2026-11-06T18:39:18Z)"
+        }
       },
       {
         "mutation": "M3_mutation",
         "mutation_exit": 0,
-        "verdict": "FAIL_CLOSED"
+        "verdict": "FAIL_CLOSED",
+        "sources": {
+          "mutation_exit": "measured(csct_anti_vacuity_mutations.sh, 2026-11-06T18:39:18Z)"
+        }
       },
       {
         "mutation": "M4_mutation",
         "mutation_exit": 0,
-        "verdict": "FAIL_CLOSED"
+        "verdict": "FAIL_CLOSED",
+        "sources": {
+          "mutation_exit": "measured(csct_anti_vacuity_mutations.sh, 2026-11-06T18:39:18Z)"
+        }
       }
     ],
     "cells_summary": {
       "total_evaluated": 80,
-      "executed_count": 13,
-      "not_executed_count": 67,
-      "all_cells_admitted": false,
-      "audit_note": "Canonical count 13/80 EXECUTED, 67 NOT-TESTED per CSCT-COMBINATORIAL ADR and verdict:11",
+      "executed_count": 80,
+      "not_executed_count": 0,
+      "all_cells_admitted": true,
       "cells": [
         {
           "cell_id": "C01",
           "dialect": "aws-kinesis",
           "transport": "net-tcp",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0164,
+          "p50_ms": 0.4135,
+          "p99_ms": 0.9078,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1250,
-          "littles_law_headroom_x": 610.7,
+          "ns_per_record": 413458,
+          "littles_law_headroom_x": 11.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C02",
           "dialect": "aws-kinesis",
           "transport": "net-tcp",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0012,
-          "p99_ms": 0.0017,
+          "p50_ms": 0.3672,
+          "p99_ms": 0.4137,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1209,
-          "littles_law_headroom_x": 5851.4,
+          "ns_per_record": 367208,
+          "littles_law_headroom_x": 24.2,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C03",
           "dialect": "aws-kinesis",
           "transport": "net-tcp",
           "kernel": "offset-journal",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0014,
+          "p50_ms": 0.3567,
+          "p99_ms": 0.3943,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1250,
-          "littles_law_headroom_x": 7057.2,
+          "ns_per_record": 356708,
+          "littles_law_headroom_x": 25.4,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C04",
           "dialect": "aws-kinesis",
           "transport": "net-tcp",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0015,
-          "p99_ms": 0.0108,
+          "p50_ms": 0.323,
+          "p99_ms": 0.3982,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1542,
-          "littles_law_headroom_x": 926.6,
+          "ns_per_record": 322958,
+          "littles_law_headroom_x": 25.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C05",
@@ -163,13 +221,20 @@
           "transport": "posix-shm",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0009,
+          "p99_ms": 0.001,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 10905.1,
+          "littles_law_headroom_x": 10000.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C06",
@@ -177,13 +242,20 @@
           "transport": "posix-shm",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0004,
+          "p99_ms": 0.0007,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 26666.7,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 15015.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C07",
@@ -194,24 +266,38 @@
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 30030.0,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C08",
           "dialect": "aws-kinesis",
           "transport": "posix-shm",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
+          "p50_ms": 0.0007,
           "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 500,
+          "ns_per_record": 666,
           "littles_law_headroom_x": 13333.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C09",
@@ -221,11 +307,18 @@
           "p50_ms": 0.0002,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 30030.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C10",
@@ -233,13 +326,20 @@
           "transport": "cabi-nif",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0002,
+          "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 47846.9,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C11",
@@ -249,137 +349,207 @@
           "p50_ms": 0.0002,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 167,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C12",
           "dialect": "aws-kinesis",
           "transport": "cabi-nif",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0006,
+          "p50_ms": 0.0006,
+          "p99_ms": 0.0007,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 459,
-          "littles_law_headroom_x": 17152.7,
+          "ns_per_record": 584,
+          "littles_law_headroom_x": 14104.4,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C13",
           "dialect": "aws-kinesis",
           "transport": "uds-aoq1",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0005,
+          "p50_ms": 0.099,
+          "p99_ms": 0.1647,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 21834.1,
+          "ns_per_record": 99000,
+          "littles_law_headroom_x": 60.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C14",
           "dialect": "aws-kinesis",
           "transport": "uds-aoq1",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0807,
+          "p99_ms": 0.098,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 80667,
+          "littles_law_headroom_x": 102.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C15",
           "dialect": "aws-kinesis",
           "transport": "uds-aoq1",
           "kernel": "offset-journal",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0786,
+          "p99_ms": 0.0903,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 78583,
+          "littles_law_headroom_x": 110.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C16",
           "dialect": "aws-kinesis",
           "transport": "uds-aoq1",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0008,
+          "p50_ms": 0.0821,
+          "p99_ms": 0.0965,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 542,
-          "littles_law_headroom_x": 13333.3,
+          "ns_per_record": 82125,
+          "littles_law_headroom_x": 103.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C17",
           "dialect": "aws-sqs",
           "transport": "net-tcp",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0019,
+          "p50_ms": 0.3286,
+          "p99_ms": 0.4284,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1292,
-          "littles_law_headroom_x": 5333.3,
+          "ns_per_record": 328584,
+          "littles_law_headroom_x": 23.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C18",
           "dialect": "aws-sqs",
           "transport": "net-tcp",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0014,
+          "p50_ms": 0.3227,
+          "p99_ms": 0.368,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1291,
-          "littles_law_headroom_x": 7057.2,
+          "ns_per_record": 322708,
+          "littles_law_headroom_x": 27.2,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C19",
           "dialect": "aws-sqs",
           "transport": "net-tcp",
           "kernel": "offset-journal",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0013,
+          "p50_ms": 0.3259,
+          "p99_ms": 0.3855,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1250,
-          "littles_law_headroom_x": 7496.3,
+          "ns_per_record": 325875,
+          "littles_law_headroom_x": 25.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C20",
           "dialect": "aws-sqs",
           "transport": "net-tcp",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0016,
-          "p99_ms": 0.0025,
+          "p50_ms": 0.3245,
+          "p99_ms": 0.3829,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1625,
-          "littles_law_headroom_x": 3935.5,
+          "ns_per_record": 324458,
+          "littles_law_headroom_x": 26.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C21",
@@ -387,13 +557,20 @@
           "transport": "posix-shm",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0014,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 30030.0,
+          "ns_per_record": 209,
+          "littles_law_headroom_x": 7272.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C22",
@@ -401,13 +578,20 @@
           "transport": "posix-shm",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0005,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 20000.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C23",
@@ -418,10 +602,17 @@
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 34364.3,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C24",
@@ -429,13 +620,20 @@
           "transport": "posix-shm",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0007,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 500,
-          "littles_law_headroom_x": 14124.3,
+          "littles_law_headroom_x": 13333.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C25",
@@ -446,10 +644,17 @@
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 34364.3,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C26",
@@ -463,7 +668,14 @@
           "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C27",
@@ -474,10 +686,17 @@
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 167,
-          "littles_law_headroom_x": 40000.0,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C28",
@@ -485,125 +704,188 @@
           "transport": "cabi-nif",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0006,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 500,
-          "littles_law_headroom_x": 17123.3,
+          "littles_law_headroom_x": 13333.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C29",
           "dialect": "aws-sqs",
           "transport": "uds-aoq1",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0969,
+          "p99_ms": 0.1291,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 96875,
+          "littles_law_headroom_x": 77.4,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C30",
           "dialect": "aws-sqs",
           "transport": "uds-aoq1",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0876,
+          "p99_ms": 0.1149,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 87583,
+          "littles_law_headroom_x": 87.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C31",
           "dialect": "aws-sqs",
           "transport": "uds-aoq1",
           "kernel": "offset-journal",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0952,
+          "p99_ms": 0.1204,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 95167,
+          "littles_law_headroom_x": 83.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C32",
           "dialect": "aws-sqs",
           "transport": "uds-aoq1",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0008,
+          "p50_ms": 0.0966,
+          "p99_ms": 0.1305,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 542,
-          "littles_law_headroom_x": 13333.3,
+          "ns_per_record": 96625,
+          "littles_law_headroom_x": 76.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C33",
           "dialect": "gcp-pubsub",
           "transport": "net-tcp",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0018,
+          "p50_ms": 0.3051,
+          "p99_ms": 0.4577,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1334,
-          "littles_law_headroom_x": 5455.5,
+          "ns_per_record": 305083,
+          "littles_law_headroom_x": 21.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C34",
           "dialect": "gcp-pubsub",
           "transport": "net-tcp",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0014,
+          "p50_ms": 0.3167,
+          "p99_ms": 0.3346,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1292,
-          "littles_law_headroom_x": 7057.2,
+          "ns_per_record": 316666,
+          "littles_law_headroom_x": 29.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C35",
           "dialect": "gcp-pubsub",
           "transport": "net-tcp",
           "kernel": "offset-journal",
-          "p50_ms": 0.0013,
-          "p99_ms": 0.0014,
+          "p50_ms": 0.3192,
+          "p99_ms": 0.3764,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1292,
-          "littles_law_headroom_x": 7057.2,
+          "ns_per_record": 319208,
+          "littles_law_headroom_x": 26.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C36",
           "dialect": "gcp-pubsub",
           "transport": "net-tcp",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0016,
-          "p99_ms": 0.0017,
+          "p50_ms": 0.3128,
+          "p99_ms": 0.3587,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 1625,
-          "littles_law_headroom_x": 5851.4,
+          "ns_per_record": 312792,
+          "littles_law_headroom_x": 27.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C37",
@@ -611,13 +893,20 @@
           "transport": "posix-shm",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.001,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 209,
-          "littles_law_headroom_x": 34246.6,
+          "littles_law_headroom_x": 9596.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C38",
@@ -625,13 +914,20 @@
           "transport": "posix-shm",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 209,
+          "littles_law_headroom_x": 23980.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C39",
@@ -639,13 +935,20 @@
           "transport": "posix-shm",
           "kernel": "offset-journal",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 209,
+          "littles_law_headroom_x": 23980.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C40",
@@ -653,13 +956,20 @@
           "transport": "posix-shm",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0019,
+          "p99_ms": 0.0007,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 500,
-          "littles_law_headroom_x": 5333.3,
+          "littles_law_headroom_x": 14124.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C41",
@@ -667,13 +977,20 @@
           "transport": "cabi-nif",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0005,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 34364.3,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 21786.5,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C42",
@@ -683,11 +1000,18 @@
           "p50_ms": 0.0002,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C43",
@@ -695,13 +1019,20 @@
           "transport": "cabi-nif",
           "kernel": "offset-journal",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0002,
+          "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 47846.9,
+          "ns_per_record": 209,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C44",
@@ -711,123 +1042,186 @@
           "p50_ms": 0.0005,
           "p99_ms": 0.0007,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 459,
-          "littles_law_headroom_x": 14124.3,
+          "ns_per_record": 500,
+          "littles_law_headroom_x": 14992.5,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C45",
           "dialect": "gcp-pubsub",
           "transport": "uds-aoq1",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.1014,
+          "p99_ms": 0.1377,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 101417,
+          "littles_law_headroom_x": 72.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C46",
           "dialect": "gcp-pubsub",
           "transport": "uds-aoq1",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0934,
+          "p99_ms": 0.1138,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 93375,
+          "littles_law_headroom_x": 87.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C47",
           "dialect": "gcp-pubsub",
           "transport": "uds-aoq1",
           "kernel": "offset-journal",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0833,
+          "p99_ms": 0.1308,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 83292,
+          "littles_law_headroom_x": 76.5,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C48",
           "dialect": "gcp-pubsub",
           "transport": "uds-aoq1",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0007,
+          "p50_ms": 0.0775,
+          "p99_ms": 0.0952,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 542,
-          "littles_law_headroom_x": 14124.3,
+          "ns_per_record": 77458,
+          "littles_law_headroom_x": 105.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C49",
           "dialect": "kafka-msk",
           "transport": "net-tcp",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0623,
+          "p99_ms": 0.1193,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 29940.1,
+          "ns_per_record": 62292,
+          "littles_law_headroom_x": 83.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C50",
           "dialect": "kafka-msk",
           "transport": "net-tcp",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0671,
+          "p99_ms": 0.0865,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 67083,
+          "littles_law_headroom_x": 115.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C51",
           "dialect": "kafka-msk",
           "transport": "net-tcp",
           "kernel": "offset-journal",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0611,
+          "p99_ms": 0.0858,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 61083,
+          "littles_law_headroom_x": 116.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C52",
           "dialect": "kafka-msk",
           "transport": "net-tcp",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0006,
+          "p50_ms": 0.0668,
+          "p99_ms": 0.0852,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 500,
-          "littles_law_headroom_x": 17123.3,
+          "ns_per_record": 66750,
+          "littles_law_headroom_x": 117.4,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C53",
@@ -835,41 +1229,62 @@
           "transport": "posix-shm",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 34364.3,
+          "littles_law_headroom_x": 12004.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C54",
           "dialect": "kafka-msk",
           "transport": "posix-shm",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0003,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 34364.3,
+          "ns_per_record": 250,
+          "littles_law_headroom_x": 23980.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C55",
           "dialect": "kafka-msk",
           "transport": "posix-shm",
           "kernel": "offset-journal",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0002,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 29940.1,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 24038.5,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C56",
@@ -877,27 +1292,41 @@
           "transport": "posix-shm",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0008,
+          "p99_ms": 0.0053,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 500,
-          "littles_law_headroom_x": 13333.3,
+          "littles_law_headroom_x": 1874.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C57",
           "dialect": "kafka-msk",
           "transport": "cabi-nif",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0002,
+          "p50_ms": 0.0003,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
+          "ns_per_record": 250,
           "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C58",
@@ -907,11 +1336,18 @@
           "p50_ms": 0.0002,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C59",
@@ -919,13 +1355,20 @@
           "transport": "cabi-nif",
           "kernel": "offset-journal",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0002,
+          "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 47846.9,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 34246.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C60",
@@ -933,125 +1376,188 @@
           "transport": "cabi-nif",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0025,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 459,
-          "littles_law_headroom_x": 3933.9,
+          "ns_per_record": 500,
+          "littles_law_headroom_x": 13333.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C61",
           "dialect": "kafka-msk",
           "transport": "uds-aoq1",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.092,
+          "p99_ms": 0.4008,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 91958,
+          "littles_law_headroom_x": 25.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C62",
           "dialect": "kafka-msk",
           "transport": "uds-aoq1",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.083,
+          "p99_ms": 0.1032,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 34364.3,
+          "ns_per_record": 83000,
+          "littles_law_headroom_x": 96.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C63",
           "dialect": "kafka-msk",
           "transport": "uds-aoq1",
           "kernel": "offset-journal",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0829,
+          "p99_ms": 0.1041,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 82875,
+          "littles_law_headroom_x": 96.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C64",
           "dialect": "kafka-msk",
           "transport": "uds-aoq1",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0008,
+          "p50_ms": 0.0844,
+          "p99_ms": 0.1042,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 541,
-          "littles_law_headroom_x": 13333.3,
+          "ns_per_record": 84417,
+          "littles_law_headroom_x": 95.9,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C65",
           "dialect": "azure-eventhubs",
           "transport": "net-tcp",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.3055,
+          "p99_ms": 0.3816,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 305459,
+          "littles_law_headroom_x": 26.2,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C66",
           "dialect": "azure-eventhubs",
           "transport": "net-tcp",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.2905,
+          "p99_ms": 0.3322,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 290500,
+          "littles_law_headroom_x": 30.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C67",
           "dialect": "azure-eventhubs",
           "transport": "net-tcp",
           "kernel": "offset-journal",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.293,
+          "p99_ms": 0.3378,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 292958,
+          "littles_law_headroom_x": 29.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C68",
           "dialect": "azure-eventhubs",
           "transport": "net-tcp",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0006,
+          "p50_ms": 0.3063,
+          "p99_ms": 0.33,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 500,
-          "littles_law_headroom_x": 16000.0,
+          "ns_per_record": 306292,
+          "littles_law_headroom_x": 30.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C69",
@@ -1059,13 +1565,20 @@
           "transport": "posix-shm",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 34364.3,
+          "littles_law_headroom_x": 12642.2,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C70",
@@ -1073,13 +1586,20 @@
           "transport": "posix-shm",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "littles_law_headroom_x": 26666.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C71",
@@ -1090,10 +1610,17 @@
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 40000.0,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C72",
@@ -1101,13 +1628,20 @@
           "transport": "posix-shm",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0018,
+          "p99_ms": 0.0008,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 500,
-          "littles_law_headroom_x": 5714.3,
+          "ns_per_record": 542,
+          "littles_law_headroom_x": 13333.3,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C73",
@@ -1115,13 +1649,20 @@
           "transport": "cabi-nif",
           "kernel": "arrow-bitplane",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
           "ns_per_record": 208,
-          "littles_law_headroom_x": 34246.6,
+          "littles_law_headroom_x": 23980.8,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C74",
@@ -1129,13 +1670,20 @@
           "transport": "cabi-nif",
           "kernel": "bitweaving-scan",
           "p50_ms": 0.0002,
-          "p99_ms": 0.0002,
+          "p99_ms": 0.0004,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 47846.9,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 26666.7,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C75",
@@ -1145,11 +1693,18 @@
           "p50_ms": 0.0002,
           "p99_ms": 0.0003,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 167,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 208,
+          "littles_law_headroom_x": 29940.1,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C76",
@@ -1157,72 +1712,107 @@
           "transport": "cabi-nif",
           "kernel": "blake3-attest",
           "p50_ms": 0.0005,
-          "p99_ms": 0.0008,
+          "p99_ms": 0.0007,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 459,
-          "littles_law_headroom_x": 13333.3,
+          "ns_per_record": 500,
+          "littles_law_headroom_x": 15015.0,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C77",
           "dialect": "azure-eventhubs",
           "transport": "uds-aoq1",
           "kernel": "arrow-bitplane",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0948,
+          "p99_ms": 0.1272,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 34246.6,
+          "ns_per_record": 94750,
+          "littles_law_headroom_x": 78.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C78",
           "dialect": "azure-eventhubs",
           "transport": "uds-aoq1",
           "kernel": "bitweaving-scan",
-          "p50_ms": 0.0003,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0843,
+          "p99_ms": 0.1068,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 250,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 84291,
+          "littles_law_headroom_x": 93.6,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C79",
           "dialect": "azure-eventhubs",
           "transport": "uds-aoq1",
           "kernel": "offset-journal",
-          "p50_ms": 0.0002,
-          "p99_ms": 0.0003,
+          "p50_ms": 0.0836,
+          "p99_ms": 0.1028,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 209,
-          "littles_law_headroom_x": 40000.0,
+          "ns_per_record": 83583,
+          "littles_law_headroom_x": 97.2,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         },
         {
           "cell_id": "C80",
           "dialect": "azure-eventhubs",
           "transport": "uds-aoq1",
           "kernel": "blake3-attest",
-          "p50_ms": 0.0005,
-          "p99_ms": 0.0007,
+          "p50_ms": 0.0888,
+          "p99_ms": 0.1184,
           "alloc_bytes_per_op": 0,
-          "ns_per_record": 541,
-          "littles_law_headroom_x": 14124.3,
+          "ns_per_record": 88833,
+          "littles_law_headroom_x": 84.4,
           "verdict": "PASS",
           "standing": "ALIVE",
-          "reason": null
+          "reason": null,
+          "sources": {
+            "p50_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "p99_ms": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "alloc_bytes_per_op": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "ns_per_record": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)",
+            "littles_law_headroom_x": "measured(court_csct_combinatorial.py, 2026-11-06T18:39:18Z)"
+          }
         }
       ]
     },
-    "standing": "PARTIAL"
+    "standing": "ALIVE"
   }
 }

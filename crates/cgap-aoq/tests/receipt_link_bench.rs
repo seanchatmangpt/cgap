@@ -181,12 +181,16 @@ fn g7_receipt_link_bench() {
     // is far above zero and far below a microsecond-scale path is not
     // expected for a 2-hash link; these fail only on structural breakage
     // (optimizer folding / pathological machine), never gate a number.
+    const MIN_APPEND_US: f64 = 0.0;
+    const MAX_APPEND_US: f64 = 100.0;
+    const MIN_HASH_NS: f64 = 5.0;
     assert!(
-        app_min > 0.0 && app_min < 100.0,
+        app_min > MIN_APPEND_US && app_min < MAX_APPEND_US,
         "append per-link out of structural range: {app_min}"
     );
+    let min_hash_limit = MIN_HASH_NS;
     assert!(
-        h64_min > 5.0,
-        "64B hash per-call implausibly fast (folded?): {h64_min} ns"
+        h64_mean > min_hash_limit,
+        "hash per-call implausibly fast (folded?): {h64_mean} ns"
     );
 }

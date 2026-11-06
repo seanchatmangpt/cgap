@@ -27,6 +27,7 @@ use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
+use bench::provenance::{Measured, Pinned, Source, Verdict};
 use cgap_arrow::layout::Quad64 as LayoutQuad;
 use cgap_arrow::layout::QUAD_SIZE;
 use cgap_arrow::predicates::filter_quads_eq;
@@ -35,6 +36,63 @@ use cgap_blake3::{hash, hash_many_simd, hash_wide_simd, is_small_batch_eligible}
 use cgap_parquet::level_free::{read_page_payload, write_page, LevelFreeType};
 
 const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
+
+/// ISO-8601 UTC timestamp of "now" (std-only; civil-from-days, Hinnant).
+fn iso_now() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let (h, mi, s) = ((secs % 86400) / 3600, (secs % 3600) / 60, secs % 60);
+    let z = (secs / 86400) as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
+}
+
+/// H9 adoption: wrap a gate statistic in a `Measured` value (real command +
+/// ISO timestamp) and derive the row verdict from the types. If the measured
+/// construction refuses (empty provenance — tamper fence), the row verdict
+/// renders REFUSED, never PASS. Returns the verdict string plus a
+/// `measured(cmd,ts)` source tag for the receipt.
+fn measured_row_verdict(value: f64, cmd: &str, gate_pass: bool) -> (String, String) {
+    let ts = iso_now();
+    let verdict = match Measured::new(value, cmd, &ts) {
+        Ok(m) => match Verdict::pass(&[m]) {
+            Ok(Verdict::Pass) => {
+                if gate_pass {
+                    "PASS"
+                } else {
+                    "FAIL"
+                }
+            }
+            _ => "REFUSED",
+        },
+        Err(_) => "REFUSED",
+    };
+    let tag = Measured::new(value, cmd, &ts)
+        .map(|m| m.source_tag())
+        .unwrap_or_else(|_| "measured-refused(empty_provenance)".to_string());
+    (verdict.to_string(), tag)
+}
+
+/// H9 adoption: a pinned constant (path:line) rendered as a source row — its
+/// verdict is REFUSED by construction, never PASS.
+fn pinned_row_verdict(value: f64, path: &str, line: u32) -> (String, String) {
+    let p = Pinned::new(value, path, line);
+    let verdict = match Verdict::pass_sources(&[Source::Pinned(p.clone())]) {
+        Verdict::Refused(_) => "REFUSED",
+        _ => "REFUSED", // unreachable; a Pinned can never pass
+    };
+    (verdict.to_string(), p.source_tag())
+}
 
 /// CTQ-06 amendment hook (20-PRD amendment mechanism, wave-7): while None the
 /// gate stays at the original LSL 8.5 GiB/s and FAILs honestly against it.
@@ -205,8 +263,10 @@ fn ctq03_parquet_roundtrip() -> String {
         best * 1e6,
         gib_s
     ));
+    let (_v9, source9) = measured_row_verdict(gib_s, "ctq_report::ctq03_parquet_roundtrip", false);
+    log(&format!("CTQ-03 provenance: {} -> {_v9}", source9));
     format!(
-        r#"{{"metric":"gib_per_s","value":{gib_s:.3},"page_bytes":{},"rows":{rows},"rounds":{rounds},"min_ns":{:.0},"gate":"informational","verdict":"REPORT"{note}}}"#,
+        r#"{{"metric":"gib_per_s","value":{gib_s:.3},"source":"{source9}","page_bytes":{},"rows":{rows},"rounds":{rounds},"min_ns":{:.0},"gate":"informational","verdict":"REPORT"{note}}}"#,
         page.len(),
         best * 1e9
     )
@@ -316,6 +376,18 @@ fn ctq04_transpose_variance() -> (String, bool) {
     let p99 = percentile_nearest_rank(&sorted, 99.0);
     let ratio = if p50 > 0.0 { p99 / p50 } else { f64::INFINITY };
     let pass = ratio <= USL_P99_OVER_P50;
+    // H9 adoption: the measured statistic is a Measured value; the retired
+    // 15% stdev/mean pin is a Pinned constant and renders REFUSED.
+    let (verdict9, source9) = measured_row_verdict(ratio, "ctq_report::ctq04_transpose_variance", pass);
+    let (retired_verdict9, retired_source9) = pinned_row_verdict(
+        RETIRED_PIN_STDEV_FRAC,
+        "crates/bench/src/bin/ctq_report.rs",
+        225,
+    );
+    log(&format!(
+        "CTQ-04 provenance: statistic {} -> {verdict9}; retired pin {} -> {retired_verdict9}",
+        source9, retired_source9
+    ));
     log(&format!(
         "CTQ-04: n={n} runs={runs} mean={:.3} us p50={:.3} us p99={:.3} us p99/p50={:.3} vs USL 1.30 -> {} (stdev/mean={:.1}% informational; retired pin 15%)",
         mean * 1e6,
@@ -328,7 +400,7 @@ fn ctq04_transpose_variance() -> (String, bool) {
     let verdict = if pass { "PASS" } else { "FAIL" };
     (
         format!(
-            r#"{{"metric":"p99_over_p50","value":{ratio:.4},"usl":1.30,"retired_pin":{RETIRED_PIN_STDEV_FRAC},"p50_ns":{:.0},"p99_ns":{:.0},"stdev_ns":{:.0},"mean_ns":{:.0},"stdev_frac_of_mean_informational":{frac:.4},"gage_reps":{GAGE_REPS},"cv":{cv:.4},"cv_gate":0.02,"runs":{runs},"n":{n},"gate":"REAL","pin_status":"RATIFIED p99/p50 <= 1.30 (49-ctq04-variance-study.md Option b, operator declaration 2026-10-31); 15% stdev/mean pin retired","verdict":"{verdict}"}}"#,
+            r#"{{"metric":"p99_over_p50","value":{ratio:.4},"usl":1.30,"retired_pin":{RETIRED_PIN_STDEV_FRAC},"retired_pin_source":"{retired_source9}","retired_pin_verdict":"{retired_verdict9}","source":"{source9}","p50_ns":{:.0},"p99_ns":{:.0},"stdev_ns":{:.0},"mean_ns":{:.0},"stdev_frac_of_mean_informational":{frac:.4},"gage_reps":{GAGE_REPS},"cv":{cv:.4},"cv_gate":0.02,"runs":{runs},"n":{n},"gate":"REAL","pin_status":"RATIFIED p99/p50 <= 1.30 (49-ctq04-variance-study.md Option b, operator declaration 2026-10-31); 15% stdev/mean pin retired","verdict":"{verdict}"}}"#,
             p50 * 1e9,
             p99 * 1e9,
             stdev * 1e9,
@@ -500,9 +572,11 @@ fn ctq05_e2e_admission() -> (String, bool) {
         if pass { "PASS" } else { "FAIL" }
     ));
     let verdict = if pass { "PASS" } else { "FAIL" };
+    let (verdict9, source9) = measured_row_verdict(us, "ctq_report::ctq05_e2e_admission", pass);
+    log(&format!("CTQ-05 provenance: {} -> {verdict9}", source9));
     (
         format!(
-            r#"{{"metric":"us_per_batch","value":{us:.3},"usl_us":35.0,"batch_bytes":{},"rounds":{rounds},"path":"{fastest_name}","hash_only_us":{fastest_hash_us:.3},"small_batch_eligible":{small_batch_eligible},"gate":"REAL","verdict":"{verdict}"}}"#,
+            r#"{{"metric":"us_per_batch","value":{us:.3},"usl_us":35.0,"source":"{source9}","batch_bytes":{},"rounds":{rounds},"path":"{fastest_name}","hash_only_us":{fastest_hash_us:.3},"small_batch_eligible":{small_batch_eligible},"gate":"REAL","verdict":"{verdict}"}}"#,
             bytes.len()
         ),
         pass,
@@ -560,9 +634,11 @@ fn ctq02_zero_alloc() -> (String, bool) {
         if pass { "PASS" } else { "FAIL" }
     ));
     let verdict = if pass { "PASS" } else { "FAIL" };
+    let (verdict9, source9) = measured_row_verdict(events as f64, "ctq_report::ctq02_zero_alloc", pass);
+    log(&format!("CTQ-02 provenance: {} -> {verdict9}", source9));
     (
         format!(
-            r#"{{"metric":"alloc_events","value":{events},"alloc_bytes":{bytes_alloced},"bytes":{BYTES},"time_s":{dt:.4},"gate":"REAL","verdict":"{verdict}"}}"#
+            r#"{{"metric":"alloc_events","value":{events},"alloc_bytes":{bytes_alloced},"source":"{source9}","bytes":{BYTES},"time_s":{dt:.4},"gate":"REAL","verdict":"{verdict}"}}"#
         ),
         pass,
     )
@@ -659,11 +735,16 @@ fn ctq06_blake3() -> (String, bool) {
         } else {
             ("informational", "REPORT")
         };
+        // H9 adoption: each throughput row is a Measured value; REPORT rows
+        // are still Measured but never gate.
+        let (_v9, row_source) =
+            measured_row_verdict(gib_s, &format!("ctq_report::ctq06_blake3/{name}"), pass);
+        log(&format!("CTQ-06 [{name}] provenance: {} -> {_v9}", row_source));
         log(&format!(
             "CTQ-06 [{name}]: best={best:.4} s -> {gib_s:.2} GiB/s vs LSL {lsl_gib_s} -> {verdict} (gate {gate_tag})"
         ));
         rows.push(format!(
-            r#"{{"path":"{name}","digest_correct":true,"metric":"gib_per_s","value":{gib_s:.2},"lsl_gib_s":{lsl_gib_s},"bytes":{BYTES},"rounds":{ROUNDS},"min_ns":{:.0},"gate":"{gate_tag}","verdict":"{verdict}""#,
+            r#"{{"path":"{name}","digest_correct":true,"metric":"gib_per_s","value":{gib_s:.2},"lsl_gib_s":{lsl_gib_s},"source":"{row_source}","bytes":{BYTES},"rounds":{ROUNDS},"min_ns":{:.0},"gate":"{gate_tag}","verdict":"{verdict}""#,
             best * 1e9
         ) + amendment
             + "}");

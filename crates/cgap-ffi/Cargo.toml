@@ -15,7 +15,7 @@ keywords = ['c-data-interface', 'cabi', 'wire-parity', 'ffi']
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.5" }
 
 # Wave F2 item 5 (SEAM-CRYPTO-FFI) — DISCLOSED CROSS-TOUCH (lane lease was
 # src/sovereign.rs; manifest is coordinator-owned, disclosed both directions
@@ -26,7 +26,7 @@ cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
 # (`target_os = "none"`) build keeps the pre-existing dep set — the T1
 # rv32imc staticlib size court and the rv32imc check gate are unaffected.
 [target.'cfg(not(target_os = "none"))'.dependencies]
-cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
+cgap-p28 = { path = "../cgap-p28", version = "26.11.5" }
 # W2-A (docs/jira/v26.11.3/receipts/zd-6-w2a-session-ffi.md) — DISCLOSED NEW
 # EDGE (manifest is coordinator-owned, disclosed here + in the lane receipt
 # per the A19 cgap-p28 precedent): the host-only session C-ABI surface
@@ -34,11 +34,11 @@ cgap-p28 = { path = "../cgap-p28", version = "26.11.3" }
 # typed refusals onto the frozen status band. HOST-SURFACE ONLY: the
 # `target_os = "none"` XIP build keeps the pre-existing dep set (no
 # allocator in the staticlib).
-cgap-aoq = { path = "../cgap-aoq", version = "26.11.3" }
+cgap-aoq = { path = "../cgap-aoq", version = "26.11.5" }
 # W2-A host KemSeam: the real ML-KEM-768 adapter (AB-5, vendored from the
 # corridor join court's test-local MlkemKem) over cgap-crypto kem/fips202.
 # Host-gated for the same XIP allocator-free law.
-cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
+cgap-crypto = { path = "../cgap-crypto", version = "26.11.5" }
 # GAP-1 (2026-11-01) — DISCLOSED UNAVOIDABLE CROSS-TOUCH (lane lease was
 # src/sovereign.rs + include/cgap.h; manifest is coordinator-owned, disclosed
 # here and in the lane receipt per the Wave-F2 cgap-p28 precedent above):
@@ -50,26 +50,26 @@ cgap-crypto = { path = "../cgap-crypto", version = "26.11.3" }
 # `use cgap_blake3::hash as oabi_digest`). All five stay HOST-surface: the
 # `target_os = "none"` XIP build keeps the pre-existing dep set, so the T1
 # rv32imc ELF size court and the rv32imc check gate are unaffected.
-cgap-core = { path = "../cgap-core", version = "26.11.3" }
-cgap-gate = { path = "../cgap-gate", version = "26.11.3" }
-cgap-bn3 = { path = "../cgap-bn3", version = "26.11.3" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
-cgap-parquet = { path = "../cgap-parquet", version = "26.11.3", features = ["std"] }
+cgap-core = { path = "../cgap-core", version = "26.11.5" }
+cgap-gate = { path = "../cgap-gate", version = "26.11.5" }
+cgap-bn3 = { path = "../cgap-bn3", version = "26.11.5" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
+cgap-parquet = { path = "../cgap-parquet", version = "26.11.5", features = ["std"] }
 
 [dev-dependencies]
 # Same crate as the normal dependency; needed only by tests/ to reach the
 # c_abi release callbacks and ForeignArray for lifecycle assertions.
-cgap-arrow = { path = "../cgap-arrow", version = "26.11.3" }
+cgap-arrow = { path = "../cgap-arrow", version = "26.11.5" }
 # AB-15 ffi-stress lane: canon frame construction for real admit-path stress
 # (crates/cgap-core/tests/common/mod.rs canon: `CgapFrameHeader::encode_into`
 # + `cgap_blake3::hash` as the O-ABI digest substrate). Additive dev-deps
 # only; disclosed in docs/jira/v26.11.2/lanes/ab-15-ffi-stress.md.
-cgap-core = { path = "../cgap-core", version = "26.11.3" }
-cgap-blake3 = { path = "../cgap-blake3", version = "26.11.3" }
+cgap-core = { path = "../cgap-core", version = "26.11.5" }
+cgap-blake3 = { path = "../cgap-blake3", version = "26.11.5" }
 # Hot-path allocation courts (tests/alloc_courts.rs): linking cgap_audit into
 # the test binary installs its CountingAlloc #[global_allocator] and exposes
 # with_alloc_tracking for the zero-alloc assertions.
-cgap-audit = { path = "../audit", version = "26.11.3" }
+cgap-audit = { path = "../audit", version = "26.11.5" }
 # The stardf consumer court now lives with its subject: stardf WIP upstream
 # (2026-10-31), and cgap must not carry any stardf dependency — cargo resolves
 # every workspace member's dev-deps during `cargo publish`, so a stardf

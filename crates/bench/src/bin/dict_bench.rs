@@ -127,8 +127,9 @@ fn main() {
     COUNT.store(0, Ordering::Relaxed);
     let probe: Vec<u8> = vec![0xAB; 4096];
     black_box(&probe);
+    const MIN_PROBE_ALLOCS: usize = 1;
     assert!(
-        COUNT.load(Ordering::Relaxed) >= 1,
+        COUNT.load(Ordering::Relaxed) >= MIN_PROBE_ALLOCS,
         "allocator hook not wired: deliberate Vec alloc did not bump COUNT"
     );
 
@@ -136,8 +137,9 @@ fn main() {
 
     for card in [2usize, 16, 256] {
         let bits = required_bits(card).expect("card <= 256 is representable");
+        const BASE_UNIT: usize = 1;
         assert!(
-            1usize << bits >= card,
+            BASE_UNIT << bits >= card,
             "card={card}: width {bits} must carry the dict domain"
         );
 
