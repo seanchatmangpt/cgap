@@ -299,6 +299,18 @@ int32_t cgap_import_arrow(
     size_t* out_len
 );
 
+/* Decode an O-ABI ("IPC1") encapsulated Arrow window (the KD-1 read half).
+ * body_out == NULL is the probe: writes required body length to *out_body_len and returns 0.
+ * Returns 0 on success, negative on typed error (CGAP_IMPORT_*). */
+int32_t cgap_read_arrow_ipc(
+    const uint8_t* window_ptr,
+    size_t window_len,
+    const uint8_t* expected_schema,
+    uint8_t* body_out,
+    size_t body_cap,
+    size_t* out_body_len
+);
+
 #ifdef __cplusplus
 }
 #endif

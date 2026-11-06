@@ -104,6 +104,56 @@ pub unsafe extern "C" fn cgap_import_arrow(
     }
 }
 
+/// Decode an O-ABI ("IPC1") encapsulated Arrow window (the KD-1 read half).
+///
+/// # Safety
+/// Caller certifies `window_ptr` points to `window_len` readable bytes.
+/// `body_out` must point to `body_cap` writable bytes (or NULL for probe).
+/// `out_body_len` must be a valid writable pointer to `usize`.
+#[no_mangle]
+#[cfg(not(target_os = "none"))]
+pub unsafe extern "C" fn cgap_read_arrow_ipc(
+    window_ptr: *const u8,
+    window_len: usize,
+    expected_schema: *const u8, // MAY be NULL = skip check
+    body_out: *mut u8,          // MAY be NULL = probe body length
+    body_cap: usize,
+    out_body_len: *mut usize,
+) -> i32 {
+    if window_ptr.is_null() || out_body_len.is_null() || window_len == 0 {
+        return status::NULL_ARG;
+    }
+    let win = core::slice::from_raw_parts(window_ptr, window_len);
+
+    if body_out.is_null() {
+        // Probe path
+        match cgap_arrow::read_arrow::probe_arrow_body_len(win) {
+            Ok(blen) => {
+                *out_body_len = blen;
+                status::OK
+            }
+            Err(_) => status::TRUNCATED,
+        }
+    } else {
+        let expected_opt: Option<&[u8; 32]> = if expected_schema.is_null() {
+            None
+        } else {
+            Some(&*expected_schema.cast::<[u8; 32]>())
+        };
+        let sink = core::slice::from_raw_parts_mut(body_out, body_cap);
+        match cgap_arrow::read_arrow::read_arrow(win, expected_opt, sink) {
+            Ok(decoded) => {
+                *out_body_len = decoded.body_len;
+                status::OK
+            }
+            Err(cgap_arrow::read_arrow::ReadArrowError::SchemaMismatch) => status::BAD_ALIGNMENT,
+            Err(cgap_arrow::read_arrow::ReadArrowError::Truncated { .. }) => status::TRUNCATED,
+            Err(cgap_arrow::read_arrow::ReadArrowError::BodyTruncated { .. }) => status::TRUNCATED,
+            Err(_) => status::NULL_BUFFER,
+        }
+    }
+}
+
 #[cfg(all(test, not(target_os = "none")))]
 mod tests {
     use super::status;

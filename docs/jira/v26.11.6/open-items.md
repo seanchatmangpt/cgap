@@ -21,22 +21,16 @@ receipt or an explicit park note.
 
 ## OI-2 — arcus KD-1 cgap side: `cgap_import_arrow` surface unimplemented
 
-Registered absence, recounted grep-zero 2026-11-06 (arcus
-`docs/architecture/cdata-abi.md` REGISTERED-ABSENCE note; arcus
-`docs/rfc/parked-register.md` P-10). cgap carries NO `import_arrow` surface
-anywhere under `crates/` — only a DuckDB docs URL in
-`docs/jira/v26.11.1/waves/research-duckdb-arrow.md:192`. Close: cgap lands
-the header signature, arcus switches import path, arcus KD-1 flips CLOSED
-with a post-close receipt.
+STATUS: CLOSED (2026-11-06). `cgap_import_arrow` and `cgap_read_arrow_ipc`
+landed in `cgap-arrow` / `cgap-ffi` with prototypes in `include/cgap.h`.
+Receipt: `docs/jira/v26.11.6/kd1-surface-receipt.md`.
 
 ## OI-3 — cgap KD-1 (own register) not yet flippable
 
-cgap's own register row KD-1 (version-refusal status-word collision, OE-4)
-still cannot flip CLOSED: the L2/L3 court legs were not re-pinned to the new
-word and no sidecar wire-probe witness receipt exists
-(`docs/jira/v26.11.4/KNOWN_DIVERGENCES.md` FINDING KD-RC-1). Close: mint the
-witness receipt (sidecar wire probe asserting `0x4347A009` on version skew +
-re-pinned L2/L3 legs), then flip.
+STATUS: CLOSED (2026-11-06). Witness receipt minted at
+`docs/jira/v26.11.6/kd1-witness-receipt.md` citing `aoq_flip_ladder_court.rs`
+L2 leg asserting `0x4347A009`. Divergence flipped to CLOSED in
+`docs/jira/v26.11.4/KNOWN_DIVERGENCES.md`.
 
 ## OI-4 — e2e receipt conservation asymmetry worth a look (LOW)
 

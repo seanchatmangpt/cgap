@@ -73,6 +73,8 @@ pub mod foreign;
 #[cfg(not(target_os = "none"))]
 pub mod import_arrow;
 #[cfg(not(target_os = "none"))]
+pub mod read_arrow;
+#[cfg(not(target_os = "none"))]
 pub mod layout;
 #[cfg(not(target_os = "none"))]
 pub mod mmu_arena;

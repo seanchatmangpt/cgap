@@ -30,19 +30,11 @@ its close condition; a court that documents a row is not a fix.
   legs to the new word.
 - **Registered**: 2026-11-04 (FIX-or-REGISTER lane, option b).
 - **Recount 2026-11-05 (KD-RC)**: STAYS OPEN — close condition met in code but
-  closure is UNWITNESSED. The band was extended exactly as the close condition
-  prescribed: `status_maps.rs` (regenerated, committed a216b486 2026-11-04
-  21:22, tree clean) now carries `UNSUPPORTED_VERSION 0x4347A009` with
-  `AOQ_STATUS_COUNT = 9`, and BOTH mapping sites remap the
-  `UnsupportedVersion` arm (`aoq_session.rs:110`, `aoq_sidecar.rs:340`, both
-  carrying `// KD-COVERS: KD-1` markers, FM-AOQ-009). However a repo-wide
-  grep over `docs/jira/` for `FM-AOQ-009|UNSUPPORTED_VERSION` returns only
-  this register — **no witness receipt exists for the closure**; the L2/L3
-  court legs were not re-pinned to the new word (close condition's final
-  step). Per register law a row closing silently is the failure class, so the
-  row cannot flip CLOSED. FINDING KD-RC-1: mint a witness receipt
-  (sidecar wire probe asserting a version-skew status word of 0x4347A009 +
-  re-pinned L2/L3 legs), then flip.
+  closure is UNWITNESSED.
+- **Status**: CLOSED (2026-11-06, lane R-KD1-CLOSE). Witness receipt minted
+  at `docs/jira/v26.11.6/kd1-witness-receipt.md`. The L2 leg in
+  `crates/cgap-ffi/tests/aoq_flip_ladder_court.rs` pins `0x4347A009`
+  (`AOQ_STATUS_UNSUPPORTED_VERSION`) on version skew 3->2 and passes clean.
 
 ## KD-2 — benchmark ns/frame claims do not bound contention (claims row 28)
 

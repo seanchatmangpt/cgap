@@ -58,3 +58,5 @@ tmp/
 
 # Evidence dirs stay tracked (contract: docs/jira receipts are committed evidence)
 !docs/jira/**/coverage/
+# Lane hygiene
+.venv/
