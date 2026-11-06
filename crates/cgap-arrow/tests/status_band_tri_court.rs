@@ -154,7 +154,7 @@ fn print_matrix(rows: &[(String, Vec<(u32, String)>)], producer: &[(u32, String)
 #[test]
 fn rust_and_c_tables_match_producer() {
     let producer = producer_table();
-    assert_eq!(producer.len(), 8);
+    assert_eq!(producer.len(), 9);
 
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let root = manifest
@@ -166,12 +166,12 @@ fn rust_and_c_tables_match_producer() {
     let rust_src = fs::read_to_string(root.join("crates/cgap-ffi/src/aoq/status_maps.rs"))
         .expect("cgap-ffi status_maps.rs readable from cgap-arrow test");
     let rust_table = parse_status_maps_rs(&rust_src);
-    assert_eq!(rust_table.len(), 8, "status_maps.rs arms parsed");
+    assert_eq!(rust_table.len(), 9, "status_maps.rs arms parsed");
 
     let c_src =
         fs::read_to_string(root.join("include/cgap_aoq.h")).expect("include/cgap_aoq.h readable");
     let c_table = parse_cgap_aoq_h(&c_src);
-    assert_eq!(c_table.len(), 8, "CGAP_AOQ_STATUS_* defines parsed");
+    assert_eq!(c_table.len(), 9, "CGAP_AOQ_STATUS_* defines parsed");
 
     // The court itself: all three columns equal the producer, in band order.
     assert_eq!(
@@ -210,7 +210,7 @@ fn go_table_matches_producer() {
         }
     };
     let go_table = parse_aoq_ipc_go(&go_src);
-    assert_eq!(go_table.len(), 8, "8 Go status pairs parsed");
+    assert_eq!(go_table.len(), 9, "9 Go status pairs parsed");
     assert_eq!(
         go_table, producer,
         "arcus aoq_ipc.go DRIFTED from the producer band"

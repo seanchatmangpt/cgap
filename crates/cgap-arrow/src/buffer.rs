@@ -11,6 +11,9 @@ use core::ptr::{self, NonNull};
 /// Allocation alignment for every cgap buffer (charter M-03).
 pub const ALIGNMENT: usize = 64;
 
+/// L1D/L2 core-private cache-tile ceiling (32 KiB) to avoid DRAM controller thrashing (BN3 Law 3).
+pub const L2_CACHE_TILE_BYTES: usize = 32 * 1024;
+
 /// An owned, 64-byte aligned byte buffer. Uninitialized on alloc: every byte
 /// a caller reads must have been written first (callers zero regions they
 /// read via [`Buf::new_zeroed`]).

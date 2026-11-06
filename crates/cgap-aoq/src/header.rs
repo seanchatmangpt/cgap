@@ -163,4 +163,14 @@ impl AoqHeader {
     pub fn frame_order(&self, other: &Self) -> Ordering {
         (self.frame_ordinal, self.seq).cmp(&(other.frame_ordinal, other.seq))
     }
+
+    /// Check if two consecutive headers share identical structural identity
+    /// for temporal in-register RLE burst compaction (BN3 Law 2).
+    #[inline(always)]
+    pub const fn matches_identity(&self, other: &Self) -> bool {
+        self.magic == other.magic
+            && self.version == other.version
+            && self.epoch == other.epoch
+            && self.key_id == other.key_id
+    }
 }

@@ -4,11 +4,7 @@
 # Exit 0 = ran; the caller prints a loud [SKIP rc=3] when python3/pyarrow
 # is absent (Chicago: a skip is loud, never a fake pass).
 import hashlib, io, struct, sys
-
-try:
-    import pyarrow as pa
-except ImportError:
-    pa = None
+import pyarrow as pa
 
 def schema_message_bytes(schema):
     import pyarrow as pa

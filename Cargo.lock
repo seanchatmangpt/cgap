@@ -76,6 +76,7 @@ dependencies = [
  "cgap-arrow 26.11.5",
  "cgap-blake3 26.11.5",
  "cgap-bn3",
+ "cgap-branchless",
  "cgap-core",
  "cgap-crypto",
  "cgap-ffi",

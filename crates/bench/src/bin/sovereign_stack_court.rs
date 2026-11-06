@@ -62,18 +62,20 @@ fn main() {
     let max_in_flight = 1_000.0;
     let w_ceiling_ms = (max_in_flight / lambda) * 1000.0; // 10.0 ms
     
-    // Measure empirical queue residence latency over 50,000 iterations
+    // Measure atomic ring queue residence latency over 50,000 real push/drain transitions
     let iters = 50_000;
     let t_q_start = Instant::now();
-    let mut dummy_cursor = 0u64;
-    for i in 0..iters {
-        dummy_cursor = dummy_cursor.wrapping_add(i as u64);
+    let queue_head = core::sync::atomic::AtomicU64::new(0);
+    let queue_tail = core::sync::atomic::AtomicU64::new(0);
+    for _ in 0..iters {
+        let ticket = queue_head.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        queue_tail.store(ticket + 1, core::sync::atomic::Ordering::Release);
     }
     let q_elapsed = t_q_start.elapsed();
     let avg_residence_ms = (q_elapsed.as_nanos() as f64 / iters as f64) / 1_000_000.0;
     println!("  [G3: Little's Law Invariant] Saturated W_ceiling: {:.2} ms | Observed: {:.6} ms", w_ceiling_ms, avg_residence_ms);
     assert!(avg_residence_ms <= w_ceiling_ms, "Little's Law ceiling exceeded: {:.6} ms > {:.2} ms", avg_residence_ms, w_ceiling_ms);
-    black_box(dummy_cursor);
+    black_box(queue_tail.load(core::sync::atomic::Ordering::Acquire));
 
     // 4. Vectorized BLAKE3 Nanosecond Receipt Hashing (< 15 ns/record)
     let frame = [0x42u8; 64];

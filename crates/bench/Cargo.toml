@@ -33,6 +33,7 @@ cgap-crypto = { path = "../cgap-crypto" }
 cgap-ffi = { path = "../cgap-ffi" }
 cgap-git = { path = "../cgap-git" }
 cgap-storage = { path = "../cgap-storage" }
+cgap-branchless = { path = "../cgap-branchless" }
 # Exact-at-authoring-time pin. `cargo search divan` 2026-11-01 -> 0.1.21
 # (exit 0, witnessed this session). A caret pin drifts silently across 0.1.x;
 # exact only.
@@ -60,6 +61,10 @@ harness = false
 
 [[bench]]
 name = "bn3"
+harness = false
+
+[[bench]]
+name = "bn3_inversion_thesis_court"
 harness = false
 
 [[bench]]
