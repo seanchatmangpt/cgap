@@ -5,6 +5,14 @@
 //! header `[magic][crc32][payload_len][ordinal]` + up to MAX_PAYLOAD = 4080
 //! payload bytes.
 //!
+//! WIRE SELECTION (p09 wire-selection court, 2026-11-06,
+//! arcus docs/jira/v26.11.6/p09-court-receipt.md): the 16-byte WIR0 header
+//! above is the SELECTED format. The parked 64B-header proposal (P-03) is
+//! WITHDRAWN — cgap wire-shm is ORPHANED-DATUM-FROZEN with no production
+//! consumer — and the do-not-unify law is proven mechanically by the shared
+//! fixture boundary legs (neg neg64_crc refuses at CRC; segbad64 refuses at
+//! attach). aq_slab implements the 16B format only.
+//!
 //! The slab resource owns the mapping; `enif_make_resource_binary` wraps the
 //! mmap'd frame bytes directly — the binary term's bytes ARE the slab bytes,
 //! no copy (resbin.rs:40-52 precedent, declared erl_nif_api_funcs.h:134).
@@ -1175,7 +1183,7 @@ mod tests {
 
     /// Hardcoded pin — must match the fixture `# pin:` line and both other
     /// courts (arcus framed_test.go, wire-shm wire_courts_golden.rs).
-    const GOLDEN_PIN: &str = "f56989dcfbcc7ba8135073b162cb24d8c05961aacca4e3e1606d249770eb0da3";
+    const GOLDEN_PIN: &str = "f01cdb98e304ce8fded74e187a4b0b28839b73853d2c77966ccec66496278576";
 
     #[test]
     fn golden_fixture_aq_slab_court() {
@@ -1216,6 +1224,11 @@ mod tests {
                     f[6],
                 ),
                 "seg" => golden_seg(f[1], f[2].parse::<u32>().unwrap(), hex_bytes(f[3])),
+                "segbad64" => golden_segbad64(
+                    f[1],
+                    f[2].parse::<u32>().unwrap(),
+                    hex_bytes(f[3]),
+                ),
                 other => panic!("unknown case kind {other}"),
             }
         }
@@ -1225,7 +1238,8 @@ mod tests {
         if s == "-" {
             return Vec::new();
         }
-        assert!(s.len() % 2 == 0, "odd hex length");
+        const ZERO_REM: usize = 0;
+        assert!(s.len() % 2 == ZERO_REM, "odd hex length");
         (0..s.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex byte"))
@@ -1345,6 +1359,23 @@ mod tests {
 
     fn payload_v(header: &[u8]) -> usize {
         u32::from_be_bytes([header[8], header[9], header[10], header[11]]) as usize
+    }
+
+    /// KD-G17 boundary leg: a slot_len=64 segment image must fail closed at
+    /// attach (the aq_slab open applies WireRing::open's size-mismatch law) —
+    /// a 64B-slot arena is never openable. Do-not-unify, proven mechanically.
+    fn golden_segbad64(name: &str, cap: u32, seg: Vec<u8>) {
+        assert_eq!(seg.len(), BOOK_LEN + cap as usize * 64);
+        let dir = std::env::temp_dir().join(format!("wir0_golden_segbad64_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("seg.wire");
+        std::fs::write(&path, &seg).unwrap();
+        assert!(
+            open_slab(path.as_os_str().to_str().unwrap().as_bytes()).is_err(),
+            "segbad64 {name}: 64B-slot arena must refuse at attach"
+        );
+        std::fs::remove_dir_all(dir).ok();
     }
 
     fn golden_seg(name: &str, cap: u32, seg: Vec<u8>) {

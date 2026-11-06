@@ -172,3 +172,8 @@ harness = false
 [[bench]]
 name = "adversarial_littles_law_court"
 harness = false
+
+# Cross-subsystem continuous pipeline consumer (arcus -> cgap -> smalt).
+[[bin]]
+name = "cgap_e2e_consumer"
+path = "src/bin/cgap_e2e_consumer.rs"

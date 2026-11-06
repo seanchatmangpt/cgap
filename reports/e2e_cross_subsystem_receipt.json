@@ -1,0 +1,10 @@
+{
+  "arcus_admitted": 65536,
+  "arcus_refused": 934464,
+  "arcus_sent": 1000000,
+  "blake3_root": "blake3:90e70f9095fdd8d46c2c040d4636ef9cdd8c5e0f6094dbbb09e24c3e927f3e54",
+  "cgap_bn3_pruned": 65470,
+  "smalt_state_cleared": 66,
+  "standing": "ALIVE",
+  "verified_cleared_slots": 66
+}

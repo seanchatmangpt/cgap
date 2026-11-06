@@ -280,6 +280,25 @@ uint32_t cgap_aoq_session_free(uint64_t handle);
 /* Last status word recorded on the calling thread. */
 uint32_t cgap_aoq_last_error(void);
 
+/* --------------------------------------------------------------------------
+ * Arrow C Data Interface import & O-ABI encapsulation (KD-1 cgap half).
+ * Seals decoded Arrow buffers into an O-ABI ("IPC1") window.
+ * out == NULL is the probe: writes required window length to *out_len and returns 0.
+ * Returns 0 on success, negative on typed error (CGAP_IMPORT_*).
+ * ------------------------------------------------------------------------ */
+int32_t cgap_import_arrow(
+    const struct ArrowArray* array,
+    const struct ArrowSchema* schema,
+    const uint8_t* schema_digest,
+    const uint64_t* buffer_lens,
+    size_t n_buffers,
+    uint32_t alignment,
+    uint32_t seq,
+    uint8_t* out,
+    size_t out_cap,
+    size_t* out_len
+);
+
 #ifdef __cplusplus
 }
 #endif

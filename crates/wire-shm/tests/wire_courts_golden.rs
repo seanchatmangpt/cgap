@@ -22,7 +22,7 @@ use wire_shm::{WireError, WireRing};
 
 // Hardcoded fixture self-pin (must match the fixture's `# pin:` line and the
 // Go court's goldenPin in internal/ringbuf/framed_test.go).
-const GOLDEN_PIN: &str = "f56989dcfbcc7ba8135073b162cb24d8c05961aacca4e3e1606d249770eb0da3";
+const GOLDEN_PIN: &str = "f01cdb98e304ce8fded74e187a4b0b28839b73853d2c77966ccec66496278576";
 
 // --- Minimal pure-std sha256 (FIPS 180-4) ----------------------------------
 
@@ -238,6 +238,11 @@ fn golden_fixture_court() {
                 f[6],
             ),
             "seg" => golden_seg(f[1], f[2].parse::<u32>().unwrap(), &hex_bytes(f[3])),
+            "segbad64" => golden_segbad64(
+                f[1],
+                f[2].parse::<u32>().unwrap(),
+                &hex_bytes(f[3]),
+            ),
             other => panic!("unknown case kind {other}"),
         }
     }
@@ -346,6 +351,24 @@ fn golden_neg(name: &str, cap: u32, ordinal: u32, header: &[u8], payload: &[u8],
             );
         }
         (s, e) => panic!("neg {name}: stage {s}: wrong refusal {e:?}"),
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+/// KD-G17 boundary leg: a slot_len=64 segment image must fail closed at
+/// attach (capacity-vs-size law) — WireRing::open never opens a 64B-slot
+/// arena. Do-not-unify, proven mechanically.
+fn golden_segbad64(name: &str, cap: u32, seg: &[u8]) {
+    assert_eq!(
+        seg.len(),
+        wire_shm::BOOK_LEN + cap as usize * 64,
+        "segbad64 {name}: image size"
+    );
+    let path = tmp_segment(name);
+    std::fs::write(&path, seg).expect("write segbad64 image");
+    if let Ok(ring) = WireRing::open(&path) {
+        drop(ring);
+        panic!("segbad64 {name}: 64B-slot arena must refuse at attach, got open");
     }
     std::fs::remove_file(&path).ok();
 }
