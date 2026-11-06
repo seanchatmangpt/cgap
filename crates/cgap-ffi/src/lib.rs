@@ -338,6 +338,12 @@ pub mod receipt_chain;
 
 pub mod oabi_lookup; // F2-6 SEAM-OABI: typed UNSUPPORTED(scope) + surface-freeze court (A19 §2)
 
+/// KD-1 strategy (b): the `cgap_import_arrow` C-ABI export — seal/publish
+/// half (O-ABI "IPC1" window). Host-gated like the slot exports; the read
+/// half is registered in `docs/jira/v26.11.6/kd1-surface-receipt.md`.
+#[cfg(not(target_os = "none"))]
+pub mod import_arrow;
+
 /// W2-10 (Wave R2 item 10, OABI-PROD-BYTES): the production `.oabi`/`.bn3`
 /// flash-rodata tables for the XIP link — real owner bytes as
 /// `#[used] #[link_section]` statics, cfg-gated to the none-target

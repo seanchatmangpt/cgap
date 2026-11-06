@@ -68,6 +68,10 @@ pub mod digest;
 pub mod fingerprint;
 #[cfg(not(target_os = "none"))]
 pub mod foreign;
+// KD-1 strategy (b) import surface — seal/publish half (host surface; see
+// the module doc for the registered read-half follow-up).
+#[cfg(not(target_os = "none"))]
+pub mod import_arrow;
 #[cfg(not(target_os = "none"))]
 pub mod layout;
 #[cfg(not(target_os = "none"))]
