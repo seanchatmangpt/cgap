@@ -14,6 +14,7 @@
 
 use core::ffi::c_void;
 
+#[cfg(target_os = "macos")]
 extern "C" {
     fn cgap_metal_create_shared_buffer(bytes: *mut c_void, length: usize) -> *mut c_void;
     fn cgap_metal_release_buffer(buffer_ref: *mut c_void);
@@ -29,7 +30,7 @@ pub struct MetalSharedBuffer {
 impl MetalSharedBuffer {
     /// Creates a new `MTLBuffer` wrapping existing aligned memory with zero bus copies.
     ///
-    /// Returns `None` if Metal device initialization fails or if length is 0.
+    /// Returns `None` if Metal device initialization fails, length is 0, or on non-macOS platforms.
     ///
     /// # Safety
     /// The caller must ensure `ptr` points to at least `len` initialized bytes
@@ -39,11 +40,21 @@ impl MetalSharedBuffer {
             return None;
         }
 
-        let raw = cgap_metal_create_shared_buffer(ptr as *mut c_void, len);
-        if raw.is_null() {
+        #[cfg(target_os = "macos")]
+        {
+            let raw = cgap_metal_create_shared_buffer(ptr as *mut c_void, len);
+            if raw.is_null() {
+                None
+            } else {
+                Some(Self { raw, len })
+            }
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = ptr;
+            let _ = len;
             None
-        } else {
-            Some(Self { raw, len })
         }
     }
 
@@ -80,10 +91,16 @@ impl MetalSharedBuffer {
 
 impl Drop for MetalSharedBuffer {
     fn drop(&mut self) {
+        #[cfg(target_os = "macos")]
         if !self.raw.is_null() {
             unsafe {
                 cgap_metal_release_buffer(self.raw);
             }
+            self.raw = core::ptr::null_mut();
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
             self.raw = core::ptr::null_mut();
         }
     }

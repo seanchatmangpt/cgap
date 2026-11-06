@@ -23,7 +23,9 @@ import subprocess
 import sys
 
 REPO = "/Users/sac/cgap"
-DEFAULT_DYLIB = os.path.join(REPO, "target/release/libcgap_ffi.dylib")
+IS_DARWIN = sys.platform == "darwin"
+DYLIB_NAME = "libcgap_ffi.dylib" if IS_DARWIN else ("cgap_ffi.dll" if sys.platform == "win32" else "libcgap_ffi.so")
+DEFAULT_DYLIB = os.path.join(REPO, "target/release", DYLIB_NAME)
 DEFAULT_HEADER = os.path.join(REPO, "include/cgap.h")
 
 PASS, FAIL, MISSING, SKIP = 0, 1, 2, 3
@@ -52,18 +54,19 @@ def header_prototypes(header_path):
 
 
 def dylib_symbols(dylib_path):
+    cmd = ["nm", "-gU", dylib_path] if IS_DARWIN else ["nm", "-D", "--defined-only", dylib_path]
     out = subprocess.run(
-        ["nm", "-gU", dylib_path],
+        cmd,
         capture_output=True, text=True, check=False,
     )
     if out.returncode != 0:
         raise RuntimeError("nm failed on %s: %s" % (dylib_path, out.stderr))
     syms = set()
     for line in out.stdout.splitlines():
-        if " T " not in line:
+        if " T " not in line and " t " not in line:
             continue
         name = line.rsplit(" ", 1)[-1]
-        if name.startswith("_"):
+        if IS_DARWIN and name.startswith("_"):
             name = name[1:]  # macOS C-ABI underscore
         if name.startswith("cgap_"):
             syms.add(name)
@@ -210,7 +213,7 @@ def build_fresh_dylib():
         print("[GATE] loud skip: fresh build failed rc=%d: %s"
               % (out.returncode, out.stderr[-2000:]))
         return None, SKIP
-    dylib = os.path.join(target, "release/libcgap_ffi.dylib")
+    dylib = os.path.join(target, "release", DYLIB_NAME)
     if not os.path.isfile(dylib):
         print("[GATE] loud skip: build ok but no dylib at %s" % dylib)
         return None, SKIP
