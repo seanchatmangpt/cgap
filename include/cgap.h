@@ -244,6 +244,42 @@ typedef struct CgasStatsBlock {
  * never sleeps or blocks the caller (fix-14 R-A1.3). */
 CgapStatus cgap_stats_snapshot(CgasStatsBlock* out);
 
+/* --------------------------------------------------------------------------
+ * AOQ session lifecycle & frame protocol (host-only surface, W2-A).
+ * All return status words from the frozen AOQ1 band (0x4347A001..0x4347A009).
+ * Monotone 64-bit handles; never recycled; tombstoned on free.
+ * ------------------------------------------------------------------------ */
+
+/* Create a session in HandshakeInit at (epoch, key_id, ordinal).
+ * Returns the new monotone handle (> 0), or 0 on internal fault. */
+uint64_t cgap_aoq_session_new(uint16_t epoch, uint64_t key_id, uint32_t ordinal);
+
+/* Advance the session by one wire frame (parse_frame + step).
+ * Returns AOQ_STATUS_OK or a specific failure status word. */
+uint32_t cgap_aoq_session_step(uint64_t handle, const uint8_t* frame_ptr, size_t frame_len);
+
+/* Emit a verified application frame (Established sessions only).
+ * Writes into out_ptr (capacity out_cap) and stores byte length in *out_len. */
+uint32_t cgap_aoq_session_emit_verified(
+    uint64_t handle,
+    uint32_t seq,
+    const uint8_t* body_ptr,
+    size_t body_len,
+    uint8_t* out_ptr,
+    size_t out_cap,
+    size_t* out_len
+);
+
+/* Write the session's canonical 32-byte fingerprint into out32.
+ * Read across boundary to verify no-mutation-on-refusal invariant. */
+uint32_t cgap_aoq_session_fingerprint(uint64_t handle, uint8_t* out32);
+
+/* Free a session. Stale or invalid handles return AOQ_STATUS_KEY_UNKNOWN. */
+uint32_t cgap_aoq_session_free(uint64_t handle);
+
+/* Last status word recorded on the calling thread. */
+uint32_t cgap_aoq_last_error(void);
+
 #ifdef __cplusplus
 }
 #endif

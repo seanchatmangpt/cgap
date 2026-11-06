@@ -82,6 +82,25 @@ impl<T: Copy> SovereignSpscRing<T> {
         self.tail.value.store(t.wrapping_add(1), Ordering::Release);
         Some(item)
     }
+
+    /// Resident item count: head - tail (wrapping counters, monotone per epoch).
+    #[inline(always)]
+    pub fn len(&self) -> u64 {
+        let h = self.head.value.load(Ordering::Acquire);
+        let t = self.tail.value.load(Ordering::Acquire);
+        h.wrapping_sub(t)
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<T: Copy> Default for SovereignSpscRing<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -112,14 +131,30 @@ fn regime2_spsc_ring_burst_fill(b: Bencher) {
     const FILL_COUNT: u64 = 65_536;
 
     b.counter(ItemsCount::new(FILL_COUNT)).bench_local(|| {
+        let mut pushed = 0u64;
+        let mut refused = 0u64;
         for i in 0..FILL_COUNT {
-            let res = ring.try_push(black_box(i));
-            let _ = black_box(res);
+            if ring.try_push(black_box(i)).is_ok() {
+                pushed += 1;
+            } else {
+                refused += 1;
+            }
         }
+        let mut popped = 0u64;
         for _ in 0..FILL_COUNT {
-            let popped = ring.try_pop();
-            black_box(popped);
+            if ring.try_pop().is_some() {
+                popped += 1;
+            }
         }
+        // Conservation identity (arcus E10 parity): injected = admitted + resident + refused.
+        let resident = ring.len();
+        assert_eq!(
+            pushed,
+            popped + resident + refused,
+            "regime2 conservation violated: pushed={pushed} popped={popped} \
+             resident={resident} refused={refused}"
+        );
+        black_box((pushed, popped, resident, refused));
     });
 }
 
@@ -137,12 +172,21 @@ fn regime3_destructive_saturation_refusal(b: Bencher) {
 
     const SATURATION_PROBES: u64 = 10_000;
     b.counter(ItemsCount::new(SATURATION_PROBES)).bench_local(|| {
+        let mut pushed_ok = 0u64;
         let mut refusals = 0u64;
         for i in 0..SATURATION_PROBES {
-            if let Err(()) = ring.try_push(black_box(i)) {
+            if ring.try_push(black_box(i)).is_err() {
                 refusals += 1;
+            } else {
+                pushed_ok += 1;
             }
         }
-        black_box(refusals);
+        // Conservation identity (arcus E10 parity): injected = admitted + refused.
+        assert_eq!(
+            pushed_ok + refusals,
+            SATURATION_PROBES,
+            "regime3 conservation violated: pushed_ok={pushed_ok} refusals={refusals}"
+        );
+        black_box((pushed_ok, refusals));
     });
 }

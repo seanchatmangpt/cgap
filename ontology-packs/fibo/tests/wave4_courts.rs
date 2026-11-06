@@ -55,7 +55,7 @@ fn t7_pack_digest_court() {
 
     // (a) flip one byte in record 0's LexHash field.
     let mut m = bytes.clone();
-    m[64 + 0 * 48 + 16] ^= 0x01;
+    m[64 + 16] ^= 0x01;
     assert_ne!(
         hash(&m),
         PACK_DIGEST,
@@ -288,7 +288,7 @@ fn t10_loader_court() {
 
     // Mutation 2: record 0's ClassId -> 0xFF... (out of range) -> typed.
     let mut m = pack_bytes();
-    m[64 + 0 * 48 + 11] = 0xFF;
+    m[64 + 11] = 0xFF;
     match OabiPackV1::from_bytes(&m) {
         Err(OabiError::ClassOutOfRange { index, .. }) => assert_eq!(index, 0),
         other => panic!("mutation 2 not refused as ClassOutOfRange: {other:?}"),

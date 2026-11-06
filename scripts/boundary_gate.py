@@ -132,7 +132,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

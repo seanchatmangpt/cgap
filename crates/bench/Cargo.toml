@@ -165,3 +165,10 @@ harness = false
 [[bench]]
 name = "parquet_cold_streaming"
 harness = false
+
+# R-CGAP1 (arcus E10 parity): conservation-asserting Little's Law court.
+# Must be harness=false or auto-discovery builds it as a libtest harness,
+# divan::main never runs, and the conservation asserts never execute.
+[[bench]]
+name = "adversarial_littles_law_court"
+harness = false
