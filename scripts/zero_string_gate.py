@@ -1717,6 +1717,26 @@ def _run_debris_leg_a(ns, buf) -> int:
         return -1
 
 
+def _objdump_stub_unreadable(stub_obj: Path):
+    """F7 (v26.11.14): leg A's end-to-end cmd_scan drives `objdump -h` over a
+    macOS-format (Mach-O arm64) stub member. A GNU/Linux objdump cannot read
+    that format ('file format not recognized'), which is a HOST limitation,
+    not a gate defect. Probe the exact stub with the exact tool: return None
+    when objdump reads it (behavior unchanged, macOS), else the exact reason
+    string. Never returns a success-shaped value for an unreadable host."""
+    if not shutil.which("objdump"):
+        return "objdump not found on PATH (leg A needs it to read the Mach-O stub)"
+    try:
+        proc = subprocess.run(["objdump", "-h", str(stub_obj)],
+                              capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return "objdump -h timed out probing the Mach-O stub"
+    if proc.returncode != 0:
+        err = proc.stderr.decode("utf-8", "replace").strip()[:200]
+        return f"objdump cannot read the Mach-O stub format (rc={proc.returncode}): {err}"
+    return None
+
+
 def debris_skip_legs(workdir: Path) -> tuple:
     """RC-08 (v1.4.3) debris-skip legs (anti-vacuity for the metadata-link
     debris classification). Chicago: a REAL end-to-end cmd_scan over a
@@ -1751,6 +1771,27 @@ def debris_skip_legs(workdir: Path) -> tuple:
     vocab_archive.write_bytes(bosym_build([(0xA07D, 2, POISON_TOKEN)]))
     ns = argparse.Namespace(root=fxt, target_dir=fxt / "target",
                             vocab=str(vocab_archive), profile="debug")
+    stub_obj = fxt / "debris_stub.o"
+    stub_obj.write_bytes(stub)
+    skip_reason = _objdump_stub_unreadable(stub_obj)
+    if skip_reason is not None:
+        # LOUD SKIP of leg A only (returns None = skipped, never True). Leg B
+        # needs no objdump (no artifact) and is still executed and enforced.
+        debris_rlib.unlink()
+        lines = [f"leg A (debris present): [SKIP] {skip_reason}"]
+        buf2 = io.StringIO()
+        reason = ""
+        ns_b = ns
+        with contextlib.redirect_stdout(buf2), contextlib.redirect_stderr(buf2):
+            try:
+                cmd_scan(ns_b)
+            except GateRefused as e:
+                reason = e.reason_class
+        ok_b = reason == "crate-no-artifacts"
+        lines.append(f"leg B (debris removed): refusal={reason or 'none'} "
+                     f"({'baseline restored' if ok_b else 'BASELINE BROKEN'})")
+        # leg B broken is a hard FAIL (False); otherwise skipped (None).
+        return (None if ok_b else False), lines
     buf = io.StringIO()
     rc = 0
     # The debris fixture has no cgap-fibo producer artifact, so the
@@ -2176,7 +2217,7 @@ def court_t17_debris_skip(workdir: Path):
     copy reverts leg A to the sections-unreadable hard refusal (exit 1) —
     witnessed this session in /tmp/rc08-mutant-copy.py."""
     ok, lines = debris_skip_legs(workdir)
-    status = "PASS" if ok else "FAIL"
+    status = "SKIP" if ok is None else ("PASS" if ok else "FAIL")
     return ("T17_debris_skip", status, "; ".join(lines))
 
 
@@ -2389,12 +2430,17 @@ def cmd_courts(args) -> int:
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
     failed = 0
+    skipped = 0
     for name, status, detail in results:
         print(f"COURT {name} {status} — {detail}")
         if status == "FAIL":
             failed += 1
-    print(f"COURTS-SUMMARY total={len(results)} failed={failed}")
-    return 1 if failed else 0
+        elif status == "SKIP":
+            skipped += 1
+    print(f"COURTS-SUMMARY total={len(results)} failed={failed} skipped={skipped}")
+    if failed:
+        return 1
+    return 3 if skipped else 0
 
 
 def cmd_register(args) -> int:
@@ -2424,6 +2470,13 @@ def cmd_self_check(args) -> int:
         Path(tempfile.mkdtemp(prefix="a07_debris_selfcheck.")))
     for line in debris_lines:
         print(f"SELF-CHECK DEBRIS {line}")
+    if debris_ok is None:
+        # F7: leg A loud-skipped (objdump cannot read the Mach-O stub). The
+        # self-check can NEVER return 0 here: 1 if any arm failed, else 3.
+        print("SELF-CHECK DEBRIS RESULT SKIP (leg A not exercised; exit 3, never a pass)")
+        print("[SKIP] zero_string_gate --self-check: DEBRIS leg A skipped on this host",
+              file=sys.stderr)
+        return 3 if ok else 1
     print(f"SELF-CHECK DEBRIS RESULT {'PASS' if debris_ok else 'FAIL'}")
     return 0 if (ok and debris_ok) else 1
 
