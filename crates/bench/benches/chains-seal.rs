@@ -51,6 +51,12 @@ use cgap_p28::attestation::{
 };
 use divan::{black_box, Bencher};
 
+/// Divan's own `#[global_allocator]` is `#[cfg(test)]`-only, so this bench
+/// binary installs `AllocProfiler` itself (pattern: chains-parquet.rs,
+/// chains-bn3.rs). Without it the alloc columns are VACUOUS, not zero.
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
+
 /// Canonical SplitMix64 master seed (charter, verbatim).
 const CORPUS_SEED: u64 = 0xBF58_476D_1CE4_E5B9;
 

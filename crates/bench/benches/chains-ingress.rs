@@ -50,6 +50,12 @@ use cgap_gate::penstock as dam;
 use divan::counter::ItemsCount;
 use divan::{black_box, Bencher};
 
+/// Divan's own `#[global_allocator]` is `#[cfg(test)]`-only, so this bench
+/// binary installs `AllocProfiler` itself (pattern: chains-parquet.rs,
+/// chains-bn3.rs). Without it the alloc columns are VACUOUS, not zero.
+#[global_allocator]
+static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
+
 /// Fixed corpus seed (BENCH-1 chains-ingress). The corpus is a
 /// deterministic function of this seed and the frame index.
 const CHAIN_SEED: u64 = 0xC001_0000_5EED_0001;
