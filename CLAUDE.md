@@ -1,7 +1,7 @@
 # cgap
 
 Sovereign `#![no_std]` columnar/deductive substrate; 26-member root
-workspace at 26.11.3 by `cargo metadata` (24 `crates/` members + 2
+workspace at 26.11.5 by `cargo metadata` (24 `crates/` members + 2
 ontology packs); registry census (zd-119, 2026-11-04): cgap-aoq is
 NAME-FREE (first-publish candidate), wasm-footprint max 26.11.1, all
 other censused publish=true crates at 26.11.2, 26.11.3 free everywhere
@@ -47,7 +47,10 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   registry max is 26.11.1 (it skipped 26.11.2); every other censused
   publish=true crate sits at 26.11.2; 26.11.3 is free everywhere —
   zero registry collisions (receipt:
-  `docs/jira/v26.11.3/receipts/zd-119-cgap-preflight.md`). Historical
+  `docs/jira/v26.11.3/receipts/zd-119-cgap-preflight.md`). This census
+  PREDATES 26.11.5 (workspace is now 26.11.5; no fresh census run); the
+  cgap-aoq publish dry-run (Ra5, `docs/jira/v26.11.14/lanes/Ra5.md`) is
+  BLOCKED because cgap-crypto ^26.11.5 is not on the registry. Historical
   2026-11-02 re-derivation table: `docs/jira/v26.11.2/
   01-release-gates.md:325ff` (prior "19/22 published" was UNVERIFIED
   registry state).
@@ -63,7 +66,8 @@ mutation-free green gate run is VACUOUS (exit nonzero).
   23/23 = 20 true / 3 false as of 2026-11-02, superseded by cgap-aoq
   and the two ontology packs joining the true set and cbmqs-cli and
   wire-shm joining the false set). `cgap-mcp` (YD-3)/
-  `cgap-ocel2`/`cgap-fleet-ops`/`cgap-verification`/`csct`/`cli`
+  `cgap-ocel2`/`cgap-fleet-ops`/`cgap-verification`/`csct`/`cli`/
+  `cgap-receipt`/`journal-export`/`wasm-footprint`
   are on disk but NOT root members.
 
 ## CLI (ggen six-pack generated)
@@ -82,7 +86,10 @@ cnv:CustomBehavior hole, filled once) and `crates/cli/manifest_patch.py`
 - `crates/{cgap-ffi,cgap-beam,cgap-gpu,audit,integration,cgap-court}` — membranes, court harness
 - `crates/cgap-verification` — on disk, NOT in the 26-member `cargo metadata` list
 - `crates/wire-shm` — root member, `publish = false` (YD-3),
-  ORPHANED-DATUM-FROZEN: no production-data-path consumer;
+  ORPHANED-DATUM-FROZEN: no first-party production-data-path consumer
+  beyond the bridge/membrane surfaces below; `cgap-beam` consumes it as
+  a NORMAL dependency (`crates/cgap-beam/Cargo.toml:37`,
+  `crates/cgap-beam/src/aq_slab.rs:66`);
   `cgap-mcp` consumes it as a runtime path dep (bridge surface),
   `cgap-aoq` as a dev-dep (AB-11 court surface); arcus p02/p09 name
   its bytes as compat datum (UNBUILT). Escalation ladder: parked
