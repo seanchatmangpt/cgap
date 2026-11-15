@@ -104,16 +104,27 @@ impl CheckpointBuf {
         if d != self.bytes[56..88] {
             return Err(CheckpointMismatch);
         }
-        let head: [u8; 8] = self.bytes[0..8].try_into().expect("exact 8-B slice");
-        let tail: [u8; 8] = self.bytes[8..16].try_into().expect("exact 8-B slice");
-        let nonce: [u8; 8] = self.bytes[16..24].try_into().expect("exact 8-B slice");
-        let parent: [u8; 32] = self.bytes[24..56].try_into().expect("exact 32-B slice");
+        let head: [u8; 8] = self.field(0)?;
+        let tail: [u8; 8] = self.field(8)?;
+        let nonce: [u8; 8] = self.field(16)?;
+        let parent: [u8; 32] = self.field(24)?;
         Ok(CheckpointState {
             ring_head: u64::from_le_bytes(head),
             ring_tail: u64::from_le_bytes(tail),
             receipt_nonce: u64::from_le_bytes(nonce),
             receipt_parent: parent,
         })
+    }
+}
+
+impl CheckpointBuf {
+    /// Typed fixed-width field read (R5: replaces `.expect` on a
+    /// slice->array conversion; a short slice is `CheckpointMismatch`).
+    fn field<const N: usize>(&self, off: usize) -> Result<[u8; N], CheckpointMismatch> {
+        self.bytes
+            .get(off..off + N)
+            .and_then(|s| <[u8; N]>::try_from(s).ok())
+            .ok_or(CheckpointMismatch)
     }
 }
 

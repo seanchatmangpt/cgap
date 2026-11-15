@@ -30,6 +30,13 @@ pub const PLANE_COUNT: usize = KEY_BITS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SeenFull;
 
+/// Typed refusal from [`BitPlaneSeenSet::try_new_boxed`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeenAllocError {
+    /// The allocator returned null.
+    OutOfMemory,
+}
+
 /// Fixed-capacity seen-set over `(u64, u64)` pairs, stored MSB-first as
 /// vertical bit-planes: `planes[p]` holds bit `127 - p` of the key at each
 /// occupied slot. Membership reconstructs keys plane-by-plane.
@@ -52,11 +59,23 @@ impl<const SLOTS: usize> BitPlaneSeenSet<SLOTS> {
     /// before the move into `Box::new(Self::new())`, so the box must happen
     /// at the allocation itself, not at the call site.
     pub fn new_boxed() -> Box<Self> {
-        assert!(core::mem::size_of::<Self>() > 0);
+        match Self::try_new_boxed() {
+            Ok(b) => b,
+            Err(e) => panic!("bitplane seen-set construction refused: {e:?}"),
+        }
+    }
+
+    /// Typed-error form of [`Self::new_boxed`] (R5): zero capacity and
+    /// allocator exhaustion are refusals, not panics.
+    pub fn try_new_boxed() -> Result<Box<Self>, SeenAllocError> {
+        // size_of::<Self>() >= size_of::<usize>() (the `len` field), so
+        // the old `assert!(size_of > 0)` was a dead branch (R5 finding).
         unsafe {
             let ptr = std::alloc::alloc_zeroed(core::alloc::Layout::new::<Self>()) as *mut Self;
-            assert!(!ptr.is_null(), "bitplane seen-set alloc failed");
-            Box::from_raw(ptr)
+            if ptr.is_null() {
+                return Err(SeenAllocError::OutOfMemory);
+            }
+            Ok(Box::from_raw(ptr))
         }
     }
 

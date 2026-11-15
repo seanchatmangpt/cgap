@@ -273,8 +273,11 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for EnclaveTrackingAlloc<A> {
             // Contents must survive a realloc; the disarm above already
             // happened, so this copy is untracked (System.realloc would
             // preserve contents; the serve-fresh form must copy).
-            let nl =
-                Layout::from_size_align(new_size, layout.align()).expect("realloc layout valid");
+            // R5: an unrepresentable layout is a null return (the
+            // GlobalAlloc failure contract), never a panic in the allocator.
+            let Ok(nl) = Layout::from_size_align(new_size, layout.align()) else {
+                return core::ptr::null_mut();
+            };
             let fresh = unsafe { self.inner.alloc(nl) };
             if !fresh.is_null() {
                 unsafe {
