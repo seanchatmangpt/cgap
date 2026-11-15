@@ -1,0 +1,12 @@
+# Gate 040 - output paths: unique, .md, no escape, not reserved.
+PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+SELECT ?subject ?reason WHERE {
+  { ?subject a ddx:Page ; ddx:relPath ?p . ?o a ddx:Page ; ddx:relPath ?p .
+    FILTER(?subject != ?o) BIND("duplicate-relPath" AS ?reason) }
+  UNION
+  { ?subject a ddx:Page ; ddx:relPath ?p . FILTER(!REGEX(?p, "[.]md$"))
+    BIND("not-markdown" AS ?reason) }
+  UNION
+  { ?subject a ddx:Page ; ddx:relPath ?p . FILTER(REGEX(?p, "^/|[.][.]/|^SUMMARY[.]md$"))
+    BIND("escapes-root-or-reserved" AS ?reason) }
+}

@@ -1,0 +1,14 @@
+# Gate 010 - required properties. Rows = violations; any row => FM-PACK-013.
+PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+SELECT ?subject ?missing WHERE {
+  { ?subject a ddx:Page .
+    VALUES ?missing { ddx:position ddx:relPath ddx:body ddx:quadrant dcterms:title }
+    FILTER NOT EXISTS { ?subject ?missing ?v } }
+  UNION
+  { ?subject a ddx:Page ; ddx:quadrant ?q . ?q ddx:requires ?missing .
+    FILTER NOT EXISTS { ?subject ?missing ?v } }
+  UNION
+  { ?subject a ddx:Page . FILTER NOT EXISTS { ?subject ddx:quadrant ?anyq } 
+    BIND(ddx:quadrant AS ?missing) }
+}

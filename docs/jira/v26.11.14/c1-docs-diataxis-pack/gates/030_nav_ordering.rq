@@ -1,0 +1,13 @@
+# Gate 030 - nav ordering: positions unique per quadrant; authored Nav rows
+# must equal quadrant.order*1000+position (SUMMARY order == declared order).
+PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+SELECT ?subject ?reason WHERE {
+  { ?subject a ddx:Page ; ddx:quadrant ?q ; ddx:position ?pos .
+    ?other a ddx:Page ; ddx:quadrant ?q ; ddx:position ?pos . FILTER(?subject != ?other)
+    BIND("duplicate-position-in-quadrant" AS ?reason) }
+  UNION
+  { ?subject a ddx:Nav ; ddx:navFor ?pg ; ddx:navOrder ?no .
+    ?pg ddx:quadrant ?q ; ddx:position ?pos . ?q ddx:order ?qo .
+    FILTER(?no != (?qo * 1000 + ?pos))
+    BIND("nav-order-disagrees-with-position" AS ?reason) }
+}

@@ -1,0 +1,16 @@
+---
+to: "SUMMARY.md"
+sparql: |
+  PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+  PREFIX dcterms: <http://purl.org/dc/terms/>
+  SELECT ?qorder ?qlabel ?position ?title ?relPath WHERE {
+    ?p a ddx:Page ; dcterms:title ?title ; ddx:relPath ?relPath ;
+       ddx:position ?position ; ddx:quadrant ?q .
+    ?q ddx:order ?qorder ; rdfs:label ?qlabel .
+  } ORDER BY ?qorder ?position
+---
+# Summary
+{% set cur = "" %}{% for r in rows %}{% if r.qlabel != cur %}
+## {{ r.qlabel }}
+{% set cur = r.qlabel %}{% endif %}- [{{ r.title }}]({{ r.relPath }})
+{% endfor %}

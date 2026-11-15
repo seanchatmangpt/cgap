@@ -1,0 +1,44 @@
+@prefix ddx:     <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# Classes
+ddx:Doc      a owl:Class ; rdfs:comment "Corpus singleton: one per consumer graph." .
+ddx:Quadrant a owl:Class ; rdfs:comment "Closed enum of exactly four individuals." .
+ddx:Page     a owl:Class ; rdfs:comment "One rendered markdown file, member of exactly one Quadrant." .
+ddx:Nav      a owl:Class ; rdfs:comment "Nav projection entry (SUMMARY.md line); derived, never authored." .
+ddx:Meta     a owl:Class ; rdfs:comment "Optional per-page metadata (audience, status)." .
+
+# Quadrant enum (closed). ddx:order fixes SUMMARY section order.
+ddx:Tutorial    a ddx:Quadrant ; rdfs:label "tutorial"    ; ddx:order 1 ; ddx:requires ddx:goal .
+ddx:HowTo       a ddx:Quadrant ; rdfs:label "how-to"      ; ddx:order 2 ; ddx:requires ddx:task .
+ddx:Reference   a ddx:Quadrant ; rdfs:label "reference"   ; ddx:order 3 ; ddx:requires ddx:subject .
+ddx:Explanation a ddx:Quadrant ; rdfs:label "explanation" ; ddx:order 4 ; ddx:requires ddx:topic .
+
+# Core Page properties (all required by gate 010)
+ddx:quadrant a owl:ObjectProperty ; rdfs:domain ddx:Page ; rdfs:range ddx:Quadrant ;
+  rdfs:comment "Exactly one value (gate 020 single-quadrant membership)." .
+ddx:position a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:range xsd:integer ;
+  rdfs:comment "Declared order within quadrant; unique per quadrant (gate 030)." .
+ddx:relPath  a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:range xsd:string ;
+  rdfs:comment "Output path under docs root, must end .md, globally unique (gate 040)." .
+ddx:body     a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:range xsd:string .
+ddx:inDoc    a owl:ObjectProperty   ; rdfs:domain ddx:Page ; rdfs:range ddx:Doc .
+
+# Per-quadrant required properties (gate 010 part B)
+ddx:goal    a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "Tutorial: learner outcome." .
+ddx:task    a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "How-to: task being solved." .
+ddx:subject a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "Reference: thing described." .
+ddx:topic   a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "Explanation: concept discussed." .
+
+# Meta + Nav
+ddx:meta     a owl:ObjectProperty   ; rdfs:domain ddx:Page ; rdfs:range ddx:Meta .
+ddx:audience a owl:DatatypeProperty ; rdfs:domain ddx:Meta .
+ddx:status   a owl:DatatypeProperty ; rdfs:domain ddx:Meta .
+ddx:navLabel a owl:DatatypeProperty ; rdfs:domain ddx:Nav .
+ddx:navOrder a owl:DatatypeProperty ; rdfs:domain ddx:Nav ;
+  rdfs:comment "If a consumer authors Nav rows, navOrder must equal quadrant.order*1000+position (gate 030 part B)." .
+ddx:navFor   a owl:ObjectProperty   ; rdfs:domain ddx:Nav ; rdfs:range ddx:Page .

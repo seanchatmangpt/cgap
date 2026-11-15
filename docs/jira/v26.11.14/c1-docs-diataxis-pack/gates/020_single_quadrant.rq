@@ -1,0 +1,9 @@
+# Gate 020 - quadrant membership: exactly one value, drawn from the enum.
+PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+SELECT ?subject ?reason WHERE {
+  { ?subject a ddx:Page ; ddx:quadrant ?q1, ?q2 . FILTER(?q1 != ?q2)
+    BIND("multi-quadrant" AS ?reason) }
+  UNION
+  { ?subject a ddx:Page ; ddx:quadrant ?q . FILTER NOT EXISTS { ?q a ddx:Quadrant }
+    BIND("quadrant-not-in-enum" AS ?reason) }
+}

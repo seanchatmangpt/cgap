@@ -1,0 +1,4 @@
+[pack]
+name = "docs-diataxis-pack"
+version = "0.2.0"
+description = "Multi-page Diataxis corpus: Doc/Quadrant/Page/Nav/Meta ontology, SUMMARY.md nav projection, four fail-closed gates."

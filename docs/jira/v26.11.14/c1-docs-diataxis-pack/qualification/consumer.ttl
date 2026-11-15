@@ -1,0 +1,11 @@
+@prefix ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex: <https://example.org/ddx#> .
+
+ex:doc a ddx:Doc ; dcterms:title "Example Corpus" .
+
+ex:p1 a ddx:Page ; dcterms:title "Getting started" ; ddx:quadrant ddx:Tutorial ; ddx:position 1 ; ddx:relPath "tutorials/start.md" ; ddx:body "Install and run." ; ddx:goal "first run" .
+ex:p2 a ddx:Page ; dcterms:title "Rotate keys" ; ddx:quadrant ddx:HowTo ; ddx:position 1 ; ddx:relPath "how-to/rotate.md" ; ddx:body "Steps." ; ddx:task "rotate keys" .
+ex:p3 a ddx:Page ; dcterms:title "CLI flags" ; ddx:quadrant ddx:Reference ; ddx:position 1 ; ddx:relPath "reference/cli.md" ; ddx:body "Flags." ; ddx:subject "cli" .
+ex:p4 a ddx:Page ; dcterms:title "Why columnar" ; ddx:quadrant ddx:Explanation ; ddx:position 1 ; ddx:relPath "explanation/columnar.md" ; ddx:body "Because." ; ddx:topic "columnar" .
+ex:p5 a ddx:Page ; dcterms:title "Second tutorial" ; ddx:quadrant ddx:Tutorial ; ddx:position 2 ; ddx:relPath "tutorials/second.md" ; ddx:body "More." ; ddx:goal "second run" .

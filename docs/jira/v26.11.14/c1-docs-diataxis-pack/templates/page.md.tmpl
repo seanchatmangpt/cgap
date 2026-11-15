@@ -1,0 +1,17 @@
+---
+to: "{{ relPath }}"
+for_each: pages
+sparql: |
+  PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+  PREFIX dcterms: <http://purl.org/dc/terms/>
+  SELECT ?page ?title ?relPath ?body ?quadrantLabel ?position WHERE {
+    ?page a ddx:Page ; dcterms:title ?title ; ddx:relPath ?relPath ;
+          ddx:body ?body ; ddx:position ?position ; ddx:quadrant ?q .
+    ?q rdfs:label ?quadrantLabel .
+  } ORDER BY ?quadrantLabel ?position
+---
+# {{ title }}
+
+> Quadrant: {{ quadrantLabel }}
+
+{{ body }}
