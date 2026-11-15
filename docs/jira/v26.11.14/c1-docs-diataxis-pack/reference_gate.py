@@ -24,7 +24,14 @@ def parse(text):
         pages[m.group(1)] = props
     return pages
 
-def gates(pages):
+def parse_nav(text):
+    navs = {}
+    for line in text.splitlines():
+        m = re.match(r"^(ex:\w+) a ddx:Nav ; ddx:navFor (ex:\w+) ; ddx:navOrder (\d+) \.\s*$", line)
+        if m: navs[m.group(1)] = (m.group(2), int(m.group(3)))
+    return navs
+
+def gates(pages, navs=None):
     rows = []
     paths = defaultdict(list); pos = defaultdict(list)
     for s, p in pages.items():
@@ -46,7 +53,15 @@ def gates(pages):
         if len(ss) > 1: rows += [("040", s, "duplicate-relPath") for s in ss]
     for k, ss in pos.items():
         if len(ss) > 1: rows += [("030", s, "duplicate-position-in-quadrant") for s in ss]
+    for n, (pg, no) in (navs or {}).items():
+        p = pages.get(pg)
+        if p and p.get("ddx:quadrant") and p.get("ddx:position"):
+            q = p["ddx:quadrant"][0].replace("ddx:", "")
+            if q in ORDER and no != ORDER[q] * 1000 + int(p["ddx:position"][0]):
+                rows.append(("030", n, "nav-order-disagrees-with-position"))
     return rows
+
+def text_docs(t): return len(re.findall(r"^ex:\w+ a ddx:Doc\b", t, re.M))
 
 def summary(pages):
     ent = []
@@ -61,8 +76,10 @@ def summary(pages):
 
 if __name__ == "__main__":
     pages = parse(open(sys.argv[1]).read())
+    if text_docs(open(sys.argv[1]).read()) > 1: print("FM-PACK-013 gate 050 doc doc-not-singleton", file=sys.stderr); sys.exit(1)
     if not pages: print("REFUSED: zero pages parsed (vacuous)", file=sys.stderr); sys.exit(2)
-    rows = gates(pages)
+    text = open(sys.argv[1]).read()
+    rows = gates(pages, parse_nav(text))
     for r in rows: print("FM-PACK-013 gate %s %s %s" % r, file=sys.stderr)
     if rows: sys.exit(1)
     sys.stdout.write(summary(pages))

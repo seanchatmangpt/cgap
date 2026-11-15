@@ -2,6 +2,7 @@
 to: "SUMMARY.md"
 sparql: |
   PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+  PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
   PREFIX dcterms: <http://purl.org/dc/terms/>
   SELECT ?qorder ?qlabel ?position ?title ?relPath WHERE {
     ?p a ddx:Page ; dcterms:title ?title ; ddx:relPath ?relPath ;

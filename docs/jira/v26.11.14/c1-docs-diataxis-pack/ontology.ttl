@@ -28,6 +28,12 @@ ddx:relPath  a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:range xsd:stri
 ddx:body     a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:range xsd:string .
 ddx:inDoc    a owl:ObjectProperty   ; rdfs:domain ddx:Page ; rdfs:range ddx:Doc .
 
+# Quadrant-individual properties (declared; used by gate 010 part B, SUMMARY order)
+ddx:order    a owl:DatatypeProperty ; rdfs:domain ddx:Quadrant ; rdfs:range xsd:integer ;
+  rdfs:comment "SUMMARY section order of a Quadrant individual." .
+ddx:requires a owl:ObjectProperty   ; rdfs:domain ddx:Quadrant ; rdfs:range rdf:Property ;
+  rdfs:comment "Property every Page of this Quadrant must carry (gate 010 part B)." .
+
 # Per-quadrant required properties (gate 010 part B)
 ddx:goal    a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "Tutorial: learner outcome." .
 ddx:task    a owl:DatatypeProperty ; rdfs:domain ddx:Page ; rdfs:comment "How-to: task being solved." .

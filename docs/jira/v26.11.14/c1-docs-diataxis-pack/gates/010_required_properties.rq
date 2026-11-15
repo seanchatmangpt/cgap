@@ -1,4 +1,4 @@
-# Gate 010 - required properties. Rows = violations; any row => FM-PACK-013.
+# Gate 010 - required properties (no BIND; missing quadrant is covered by VALUES branch). Rows = violations; any row => FM-PACK-013.
 PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
 PREFIX dcterms: <http://purl.org/dc/terms/>
 SELECT ?subject ?missing WHERE {
@@ -8,7 +8,4 @@ SELECT ?subject ?missing WHERE {
   UNION
   { ?subject a ddx:Page ; ddx:quadrant ?q . ?q ddx:requires ?missing .
     FILTER NOT EXISTS { ?subject ?missing ?v } }
-  UNION
-  { ?subject a ddx:Page . FILTER NOT EXISTS { ?subject ddx:quadrant ?anyq } 
-    BIND(ddx:quadrant AS ?missing) }
 }

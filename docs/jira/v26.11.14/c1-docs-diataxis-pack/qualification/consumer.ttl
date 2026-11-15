@@ -9,3 +9,6 @@ ex:p2 a ddx:Page ; dcterms:title "Rotate keys" ; ddx:quadrant ddx:HowTo ; ddx:po
 ex:p3 a ddx:Page ; dcterms:title "CLI flags" ; ddx:quadrant ddx:Reference ; ddx:position 1 ; ddx:relPath "reference/cli.md" ; ddx:body "Flags." ; ddx:subject "cli" .
 ex:p4 a ddx:Page ; dcterms:title "Why columnar" ; ddx:quadrant ddx:Explanation ; ddx:position 1 ; ddx:relPath "explanation/columnar.md" ; ddx:body "Because." ; ddx:topic "columnar" .
 ex:p5 a ddx:Page ; dcterms:title "Second tutorial" ; ddx:quadrant ddx:Tutorial ; ddx:position 2 ; ddx:relPath "tutorials/second.md" ; ddx:body "More." ; ddx:goal "second run" .
+ex:n1 a ddx:Nav ; ddx:navFor ex:p1 ; ddx:navOrder 1001 .
+ex:n5 a ddx:Nav ; ddx:navFor ex:p5 ; ddx:navOrder 1002 .
+ex:n3 a ddx:Nav ; ddx:navFor ex:p3 ; ddx:navOrder 3001 .

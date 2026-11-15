@@ -1,0 +1,10 @@
+# Gate 050 - non-vacuity: zero Pages, or more than one Doc, is a refusal.
+# Single BIND per branch, distinct var names (FM-GRAPH-013), no STRENDS.
+PREFIX ddx: <https://seanchatmangpt.github.io/ggen-marketplace/docs-diataxis#>
+SELECT ?subject ?reason WHERE {
+  { FILTER NOT EXISTS { ?anyp a ddx:Page }
+    BIND(ddx:Page AS ?subject) BIND("zero-pages" AS ?reason) }
+  UNION
+  { ?subject a ddx:Doc . ?otherdoc a ddx:Doc . FILTER(?subject != ?otherdoc)
+    BIND("doc-not-singleton" AS ?reason) }
+}
