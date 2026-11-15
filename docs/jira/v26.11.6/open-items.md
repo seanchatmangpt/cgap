@@ -7,6 +7,8 @@ Open items register for the cgap side of the v26.11.6 milestone. Census date
 
 ## OI-1 — Untracked v26.11.6 artifacts need a landing decision
 
+STATUS: CLOSED (2026-11-15, v26.11.14 lane E4). Option (b) was already in effect at HEAD: the three files are tracked and `[[bin]] cgap_e2e_consumer` is declared in `crates/bench/Cargo.toml`; `cargo build -p bench --bin cgap_e2e_consumer` exit 0. Receipt: `docs/jira/v26.11.14/lanes/E4.md`.
+
 `crates/bench/src/bin/cgap_e2e_consumer.rs`,
 `reports/e2e_cross_subsystem_receipt.json`,
 `scripts/courts/court_e2e_arcus_cgap_smalt.sh` are untracked but constitute a
