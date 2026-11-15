@@ -7,6 +7,11 @@ Open items register for the cgap side of the v26.11.6 milestone. Census date
 
 ## OI-1 — Untracked v26.11.6 artifacts need a landing decision
 
+STATUS: CLOSED (2026-11-15, omniplatform thread). All three files are tracked
+at HEAD with the receipt (`git ls-files` lists them), and the consumer builds
+as a bench bin: `cargo build -p bench --bin cgap_e2e_consumer` exit 0
+(Linux x86_64, 2026-11-15).
+
 `crates/bench/src/bin/cgap_e2e_consumer.rs`,
 `reports/e2e_cross_subsystem_receipt.json`,
 `scripts/courts/court_e2e_arcus_cgap_smalt.sh` are untracked but constitute a
@@ -33,6 +38,11 @@ L2 leg asserting `0x4347A009`. Divergence flipped to CLOSED in
 `docs/jira/v26.11.4/KNOWN_DIVERGENCES.md`.
 
 ## OI-4 — e2e receipt conservation asymmetry worth a look (LOW)
+
+STATUS: CLOSED (2026-11-15, omniplatform thread). The court script now prints
+the admission ratio, documents why regime-3 refusals are lawful, and asserts
+the lawful band (0, 1]. Not re-run here: the court needs the arcus and smalt
+checkouts (UNVERIFIED this session; the edit is assertion + print only).
 
 `reports/e2e_cross_subsystem_receipt.json`: `admitted == pruned + cleared`
 holds (355,824 == 355,468 + 356), but the producer refused 644,176/1,000,000
