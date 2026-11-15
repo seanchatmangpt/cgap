@@ -1191,9 +1191,7 @@ fn assemble_file(
     out
 }
 
-fn size_i32(v: usize) -> i32 {
-    i32::try_from(v).unwrap_or(i32::MAX)
-}
+use crate::page::size_i32;
 
 // ---------------------------------------------------------------------------
 // Courts

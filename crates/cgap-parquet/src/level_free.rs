@@ -458,9 +458,7 @@ pub fn write_page(
 // whose `ColumnMetaData` points at the shared page — completing the
 // writer/reader isomorphism for the whole file, not just the page.
 
-fn size_i32(v: usize) -> i32 {
-    i32::try_from(v).unwrap_or(i32::MAX)
-}
+use crate::page::size_i32;
 
 /// One row group's footer facts: the file offset its shared DataPageV2
 /// starts at, and the page's byte length (header + full column-major

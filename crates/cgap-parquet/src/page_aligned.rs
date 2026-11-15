@@ -72,9 +72,7 @@ use alloc::vec::Vec;
 /// `i32::MAX` bytes are outside this framer's envelope; the header then
 /// reports the saturation ceiling rather than wrapping silently. Same
 /// discipline as [`crate::page`].
-fn size_i32(v: usize) -> i32 {
-    i32::try_from(v).unwrap_or(i32::MAX)
-}
+use crate::page::size_i32;
 
 /// Parsed `DataPageHeaderV2` (real parquet.thrift ids). `is_compressed`
 /// is `None` when absent on the wire (parquet.thrift default: `true`).

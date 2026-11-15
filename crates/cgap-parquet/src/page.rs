@@ -50,7 +50,7 @@ use alloc::vec::Vec;
 /// Saturate a byte count into the header's i32 envelope. Pages over
 /// `i32::MAX` bytes are outside this minimal framer's envelope; the header
 /// then reports the saturation ceiling rather than wrapping silently.
-fn size_i32(v: usize) -> i32 {
+pub(crate) fn size_i32(v: usize) -> i32 {
     i32::try_from(v).unwrap_or(i32::MAX)
 }
 

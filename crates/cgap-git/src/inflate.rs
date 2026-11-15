@@ -475,23 +475,9 @@ fn ensure_budget(have: usize, add: usize, budget: usize) -> Result<(), InflateEr
     Ok(())
 }
 
-/// Adler-32 (RFC 1950 section 8).
-pub fn adler32(data: &[u8]) -> u32 {
-    const MOD: u32 = 65521;
-    let mut a: u32 = 1;
-    let mut b: u32 = 0;
-    for &byte in data {
-        a += byte as u32;
-        if a >= MOD {
-            a -= MOD;
-        }
-        b += a;
-        if b >= MOD {
-            b %= MOD;
-        }
-    }
-    (b << 16) | a
-}
+/// Adler-32 (RFC 1950 section 8). Single implementation lives in
+/// [`crate::deflate::adler32`]; re-exported here for API compatibility.
+pub use crate::deflate::adler32;
 
 /// Decode a zlib stream (RFC 1950): 2-byte header, DEFLATE body, adler32.
 /// Returns the decompressed bytes. Verifies the header check and adler32.

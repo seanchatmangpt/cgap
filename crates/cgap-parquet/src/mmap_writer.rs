@@ -585,9 +585,7 @@ fn put_varint_scratch(scratch: &mut [u8], pos: &mut usize, mut value: u64) {
     }
 }
 
-fn size_i32(v: usize) -> i32 {
-    i32::try_from(v).unwrap_or(i32::MAX)
-}
+use crate::page::size_i32;
 
 /// Total page byte length (header + body).
 fn page_len(values: &[u32], bits: u8, num_rows: u32) -> usize {
