@@ -48,7 +48,7 @@ static ALLOC: divan::AllocProfiler = divan::AllocProfiler::system();
 use cgap_parquet::footer::{verify_seal, ATTESTATION_LEN};
 use cgap_parquet::mmap_writer::{BlockSink, SlabView, StaticPageWriter};
 use cgap_parquet::page::{decode_page_into, write_data_page_v2};
-use cgap_parquet::rle::{rle_encode, ParquetError};
+use cgap_parquet::rle::{rle_encode, rle_encode_into, ParquetError};
 use divan::{black_box, Bencher};
 
 /// Canonical SplitMix64 master seed (charter, verbatim).
@@ -274,6 +274,23 @@ fn encode_arm<const ROWS: usize>(b: Bencher) {
         let page = rle_encode(black_box(&lane0), 8);
         assert_eq!(page.len(), want_len, "encode wire length drifted");
         black_box(page);
+    });
+}
+
+// R3 (v26.11.14) REDUCE leg: same encode, caller-owned buffer reused across
+// iterations (`rle_encode_into`, the per-frame alloc law). The baseline
+// `encode_arm` stays untouched as the >0 alloc positive control; this leg
+// must hold the SAME wire length (asserted) and read 0 alloc columns.
+// Anti-vacuity: swap the body to `rle_encode` -> the alloc column reappears.
+#[divan::bench(consts = [65536, 1048576])]
+fn encode_into_arm<const ROWS: usize>(b: Bencher) {
+    let lane0 = make_lane(ROWS, 0x0001);
+    let want_len = rle_encode(&lane0, 8).len();
+    let mut out: Vec<u8> = Vec::with_capacity(want_len);
+    b.bench_local(|| {
+        rle_encode_into(black_box(&lane0), 8, &mut out);
+        assert_eq!(out.len(), want_len, "encode_into wire length drifted");
+        black_box(&out);
     });
 }
 
