@@ -227,7 +227,11 @@ pub fn semi_naive_closure_bitplane_count<const SLOTS: usize>(
     edges_z: &[u32],
 ) -> Result<usize, crate::bitplane_seen::SeenFull> {
     debug_assert_eq!(edges_x.len(), edges_z.len());
-    let mut seen = crate::bitplane_seen::BitPlaneSeenSet::<SLOTS>::new();
+    // F3: heap lease (alloc_zeroed). `::new()` stack-staged the whole
+    // SLOTS*128*8-byte value and overflowed the debug stack. Allocator
+    // refusal maps to the existing typed `SeenFull` (capacity unavailable).
+    let mut seen = crate::bitplane_seen::BitPlaneSeenSet::<SLOTS>::try_new_boxed()
+        .map_err(|_| crate::bitplane_seen::SeenFull)?;
     let mut all_x: Vec<u32> = Vec::new();
     let mut delta_x: Vec<u32> = Vec::new();
     let mut delta_z: Vec<u32> = Vec::new();
