@@ -1761,7 +1761,23 @@ def debris_skip_legs(workdir: Path) -> tuple:
     (fxt / "a07debris" / "src" / "lib.rs").write_text(
         "pub static A07_DEBRIS_FIXTURE: &[u8] = b\"clean-fixture-bytes\";\n", encoding="utf-8")
     (fxt / "target" / "debug").mkdir(parents=True)
-    stub = _struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 1, 0, 0, 0, 0)
+    # F8 (v26.11.14): the stub must be in a format the host objdump can read,
+    # else leg A is never exercised. Candidates in order: Mach-O arm64 stub
+    # (the original; macOS reads it, behavior byte-identical there), then a
+    # sectionless ELF64 relocatable (header + one null section header; GNU
+    # objdump reads it and lists zero sections = the same debris class).
+    macho_stub = _struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 1, 0, 0, 0, 0)
+    elf_stub = (b"\x7fELF" + bytes([2, 1, 1, 0]) + bytes(8)
+                + _struct.pack("<HHIQQQIHHHHHH", 1, 0x3E, 1, 0, 0, 64, 0, 64, 0, 0, 64, 1, 0)
+                + bytes(64))
+    stub_obj = fxt / "debris_stub.o"
+    stub, skip_reason = macho_stub, None
+    for cand in (macho_stub, elf_stub):
+        stub = cand
+        stub_obj.write_bytes(stub)
+        skip_reason = _objdump_stub_unreadable(stub_obj)
+        if skip_reason is None:
+            break
     body = b"!<arch>\n" + b"debris_stub.o".ljust(16) + b"0".ljust(12) \
         + b"0".ljust(6) + b"0".ljust(6) + b"644".ljust(8) + str(len(stub)).ljust(10).encode() \
         + b"`\n" + stub
@@ -1771,9 +1787,6 @@ def debris_skip_legs(workdir: Path) -> tuple:
     vocab_archive.write_bytes(bosym_build([(0xA07D, 2, POISON_TOKEN)]))
     ns = argparse.Namespace(root=fxt, target_dir=fxt / "target",
                             vocab=str(vocab_archive), profile="debug")
-    stub_obj = fxt / "debris_stub.o"
-    stub_obj.write_bytes(stub)
-    skip_reason = _objdump_stub_unreadable(stub_obj)
     if skip_reason is not None:
         # LOUD SKIP of leg A only (returns None = skipped, never True). Leg B
         # needs no objdump (no artifact) and is still executed and enforced.
