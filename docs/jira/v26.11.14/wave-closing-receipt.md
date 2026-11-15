@@ -1,8 +1,8 @@
 # v26.11.14 ERRC Sweep — closing receipt (C4)
 
-Standing: PARTIAL. 20 lanes ran (18 parallel + C3 + C4); no lane flipped a
-divergence to CLOSED. Seal gates are green except host-bound checks, which
-are ENV, not passes.
+Standing: PARTIAL. 20 sweep lanes (18 parallel + C3 + C4) plus 9 fix lanes
+F1-F9 ran. KD-7 closed by F2; nothing else flipped to CLOSED. See the final
+seal table below, which supersedes the first-pass table.
 
 Seal pass (gate-runner, code identical at e3aeec5 and b08dd82; the only
 commit between them is the docs-only backlog, verified by `git diff --stat`):
@@ -41,5 +41,23 @@ BLOCKED: E1 (ggen absent), Ra3 (A19 slot resolution), Ra5 (registry chain).
 - A sandbox sharing a cargo target dir with the shared tree gave a false
   FAIL (Ra4); the E2 kd7 link error seen by R1 did not reproduce on a clean
   target dir (orchestrator re-check, in R1.md).
-- Nothing was published. CLAUDE.md was not edited.
+- Nothing was published. CLAUDE.md was edited once, by F1 (stale-claim fixes only).
 - Ranked follow-ups: `errc-backlog.md`.
+
+## Final seal (after F1-F9, gate-runner at HEAD 5004ddc + orchestrator re-checks)
+
+| Check | Exit | Verdict |
+|---|---|---|
+| `cargo build --workspace` | 0 | PASS |
+| `boundary_gate.py --deps` / `--self-check-deps` | 0 / 0 | PASS |
+| `zero_string_gate.py --self-check` (post-F8) | 0 | PASS on Linux, leg A exercised; macOS path UNVERIFIED |
+| `cargo test -p cgap-ffi --lib` (artifacts in target/) | - | wave9_a07 2/2 PASS after F8 (orchestrator run); full lib run not repeated after F8 |
+| `closure_court` | 0 | PASS 3/3 (orchestrator re-run) |
+| cgap-core / cgap-parquet suites | 0 | PASS |
+| cgap-git egress_ring_court | 0 | PASS, 0/40 fails (orchestrator, after F9) |
+| rdflib battery (C1) | 0 | PASS |
+
+Caveats: the seal agent's cgap-git run saw one flaky failure before F9;
+cgap-git's full suite was not re-run end to end after F9 (only the egress
+binary, 40 runs). Courts-mode (T17) and boundary_gate full modes were not
+run. Open items: see "Still open" in errc-backlog.md.

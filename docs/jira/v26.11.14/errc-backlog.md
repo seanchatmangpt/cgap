@@ -1,4 +1,4 @@
-# v26.11.14 ERRC backlog (C3 synthesis)
+# v26.11.14 ERRC backlog (C3 synthesis, updated after fix lanes F1-F9)
 
 Folded from the 18 lane receipts in `lanes/` plus the four crate-scoped
 evals (`errc-eval-{ad,el,mr,sz}.md`). Every row cites its lane receipt; no
@@ -70,3 +70,28 @@ then risk-per-effort. Standing words are the lanes' own.
 - `wire-shm`: delete-first conditions NOT met (E3); keep parked.
 - Ra2: penstock residue already retired by L57; replicated at 50.8x
   worst/best on a 4-core host (not comparable across hosts).
+
+## Closed by fix lanes F1-F9 (post-sweep)
+
+| Item | Lane | Result |
+|---|---|---|
+| Stale CLAUDE.md claims (was #1) | F1 | version, wire-shm/cgap-beam, non-member list, census caveat fixed; wire-shm delete-first clause still names only cgap-mcp (left) |
+| KD-7 register + comments (was #2) | F2 | CLOSED-EXPOSED (cgap.h:214 + kd7 court); KD-4 range 1-50; cdylib courts platform-aware |
+| closure.rs:230 stack overflow (was #3) | F3 | try_new_boxed; closure_court 3/3, storage suite green; mutation reproduces overflow |
+| Vacuous alloc columns ingress/seal (was #5, part) | F4 | AllocProfiler installed; all legs 0-alloc, corroborated |
+| C1 pack gaps (was #8) | F5 | .rq gates ALIVE under rdflib (10 mutations); ggen engine still UNVERIFIED |
+| Court hardening (was #10) | F6 | 3 more courts name flipping mutations (manifest_court flips dod1 only) |
+| zero_string_gate on Linux (was #9, part) | F7+F8 | ELF stub fallback; --self-check exit 0; wave9_a07 passes with artifacts in target/ |
+| Flaky egress_ring_court | F9 | test-side race (global alloc counter); per-thread counter; 0/40 fails on re-check |
+
+## Still open after the sweep
+
+- Publish chain (Ra5): cgap-crypto/cgap-audit ^26.11.5 not on registry.
+- KD-3 twin (E1) and KD-4 slot resolution (Ra3): ggen absent / A19 not landed.
+- cgap_eval_bn3 alloc lever (sovereign.rs:588-622): ABI-visible, owner lane.
+- macOS-only paths UNVERIFIED: ffi_surface_gate.py, crates/cli build, Mach-O
+  debris leg, cdylib .dylib branch.
+- C1: ggen sync x2 replay and Tera rendering; gate 050 only protects wired consumers.
+- R2 5-export riscv footprint / wasm32 path; ingress timings contention-suspect.
+- wire-shm delete-first clause in CLAUDE.md should name cgap-beam too.
+- Remaining un-hardened courts: 37 of the 43 from Ra4's census.
