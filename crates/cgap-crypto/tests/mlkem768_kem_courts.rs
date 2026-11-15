@@ -1,3 +1,6 @@
+//! Anti-vacuity mutation (Ra4, v26.11.14): in a /tmp sandbox copy of
+//! `crates/cgap-crypto/src/fips203.rs`, change `basemul2(&mut hi, &a1, &b1, -z)`
+//! to `+z` (drop the negation); `basemul_matches_schoolbook` must FAIL.
 //! KEM courts part 1: basemul vs schoolbook.
 use cgap_crypto::fips203;
 

@@ -1,3 +1,6 @@
+//! Anti-vacuity mutation (Ra4, v26.11.14): in a /tmp sandbox copy of
+//! `crates/cgap-crypto/src/fips203.rs`, change the first `let zeta = ZETAS[k];`
+//! (in `ntt`) to `ZETAS[k] ^ 1`; `ntt_c_reference_pins` must FAIL.
 //! NTT/INTT courts pinned to the compiled PQClean C ntt.o outputs
 //! (captured in-session via cprobe; external receipts, not self-attestation).
 use cgap_crypto::fips203;

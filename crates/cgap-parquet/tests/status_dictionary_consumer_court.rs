@@ -8,6 +8,10 @@
 //! (clamped up), NOT width-1 as the lane brief assumed. The page is
 //! width-4; the 8-entry band is under the 256-entry cap.
 
+//! Anti-vacuity mutation (Ra4, v26.11.14): in a /tmp sandbox copy of
+//! `crates/cgap-arrow/src/status_band.rs`, rename `"EPOCH_RETIRED"` to
+//! `"EPOCH_RETIREX"`; the round-trip court must FAIL (name pin at index 7).
+
 #![cfg(test)]
 use cgap_arrow::status_dictionary::STATUS_BAND;
 use cgap_parquet::dictionary::{decode_page, encode_page, required_bits};
