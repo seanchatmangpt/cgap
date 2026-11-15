@@ -19,6 +19,39 @@ fi
 RECEIPT_OUT="${WORKSPACE_ROOT}/cgap/reports/e2e_cross_subsystem_receipt.json"
 FRAMES=1000000
 
+# ------------------------------------------------------------------------------
+# OI-4 admission-ratio band (docs/jira/v26.11.6/open-items.md)
+# Observed: 355,824 / 1,000,000 admitted (35.58%); the SPSC membrane refuses at
+# saturation (lawful per regime 3), so a refusal-heavy ratio is EXPECTED.
+# Band is an empirical envelope, not a spec: [ADMIT_BAND_LO, ADMIT_BAND_HI].
+# Below LO = membrane starved/over-refusing; above HI = saturation refusal path
+# no longer exercised (court would be vacuous on regime 3).
+# ------------------------------------------------------------------------------
+ADMIT_BAND_LO="${ADMIT_BAND_LO:-0.20}"
+ADMIT_BAND_HI="${ADMIT_BAND_HI:-0.60}"
+
+band_check() { # $1 = receipt json path; exit 0 in band, 1 out of band
+    python3 -c "
+import json, sys
+r = json.load(open(sys.argv[1]))
+lo, hi = float(sys.argv[2]), float(sys.argv[3])
+ratio = r['arcus_admitted'] / r['arcus_sent']
+print(f'  Admission ratio: {ratio:.4f} (band [{lo}, {hi}])')
+sys.exit(0 if lo <= ratio <= hi else 1)
+" "$1" "${ADMIT_BAND_LO}" "${ADMIT_BAND_HI}"
+}
+
+if [[ "${1:-}" == "--band-selftest" ]]; then
+    T="$(mktemp -d)"
+    echo '{"arcus_sent":1000000,"arcus_admitted":355824}' > "${T}/ok.json"
+    echo '{"arcus_sent":1000000,"arcus_admitted":1000000}' > "${T}/mut.json"
+    band_check "${T}/ok.json" || { echo "[FAIL] observed ratio rejected"; exit 1; }
+    if band_check "${T}/mut.json"; then echo "[FAIL] mutant (100% admitted) passed band: VACUOUS"; exit 1; fi
+    echo "[BAND SELFTEST]: observed in band, mutant (no refusals) flipped."
+    rm -rf "${T}"
+    exit 0
+fi
+
 echo "================================================================================"
 echo "STARTING CROSS-PLATFORM E2E INTEGRATION COURT: arcus -> cgap -> smalt"
 echo "Target Architecture: $(uname -s) $(uname -m)"
@@ -78,6 +111,8 @@ assert admitted > 0, 'Zero frames admitted'
 assert cleared > 0, 'Zero frames cleared'
 print('[PASS 1 WITNESS]: Nominal conservation verified.')
 "
+band_check "${RECEIPT_OUT}" || { echo "[ERROR]: admission ratio outside band"; exit 1; }
+echo "[PASS 1 WITNESS]: admission ratio within band."
 
 # ------------------------------------------------------------------------------
 # PASS 2: Adversarial Anti-Vacuity Control (Tamper Detection)

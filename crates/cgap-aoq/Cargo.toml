@@ -3,6 +3,7 @@ name = "cgap-aoq"
 description = "AOQ1 wire-law header kernel: 64-byte envelope, ontology-pinned layout, alloc-free codec"
 version.workspace = true
 license-file.workspace = true
+repository.workspace = true
 edition.workspace = true
 publish = true
 
