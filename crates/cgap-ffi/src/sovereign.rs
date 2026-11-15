@@ -359,10 +359,12 @@ pub unsafe extern "C" fn cgap_verify_p28(
 // which stays in the none-target build.
 //
 // A19:47 four-verb boundary law: no fifth verb is added here.
-// `_cgap_p28_invariant_check` (cgap-p28 `trap.rs`, riding the link via the
-// cgap-p28 dep) stays UNDECLARED in include/cgap.h — typed UNSUPPORTED
-// record below (`P28_INVARIANT_CHECK_UNSUPPORTED`), same decision form as
-// `oabi_lookup.rs::OABI_LOOKUP_UNSUPPORTED`.
+// KD-COVERS: KD-7
+// `cgap_p28_invariant_check` (cgap-p28 `trap.rs:99-100`, riding the link via
+// the cgap-p28 dep) IS declared in include/cgap.h:214 (FIX-07 slot surface;
+// decision = EXPOSED, court `tests/kd7_p28_header_court.rs`). The historical
+// UNSUPPORTED record below (`P28_INVARIANT_CHECK_UNSUPPORTED`) predates that
+// and is retained as a superseded constant (ABI/value unchanged).
 // ===========================================================================
 
 /// Map an A04 `FrameError` to the A19 register (typed, total). The mapping
@@ -1132,21 +1134,15 @@ mod spill_gate {
     }
 }
 
-/// Typed UNSUPPORTED(scope) record — `_cgap_p28_invariant_check` stays
-/// UNDECLARED in include/cgap.h (dispatch branch b, decided; no silent
-/// middle). The symbol is a real cgap-p28 export (`crates/cgap-p28/src/
-/// trap.rs:82`, `#[no_mangle]`) that rides the cdylib link through the
-/// host cgap-p28 dep edge, so it IS resolvable by a C consumer — but the
-/// A19 boundary law is "the entire cgap capability crosses the boundary as
-/// exactly four functions" (A19:47) and "a fifth verb ... belongs in a
-/// lane, not the ABI" (A19:57-60), the same doctrine the F2-6 record
-/// (`oabi_lookup.rs::OABI_LOOKUP_UNSUPPORTED`) applied to the `.oabi`
-/// lookup verb. The constant + halt semantics are A17 lane property
-/// (trap.rs:8-9: "the FFI *contract* remains A19's; this lane owns the
-/// constant and the halt semantics"); declaring it here would re-litigate
-/// an owner boundary and widen the frozen four-verb freeze. Decision form
-/// mirrors `OABI_LOOKUP_UNSUPPORTED`: any future consumer (court, doc
-/// generator, coordinator roll-up) reads this instead of re-deriving it.
+/// SUPERSEDED historical record (KD-COVERS: KD-7). This constant once said
+/// `cgap_p28_invariant_check` stays UNDECLARED in include/cgap.h. That is no
+/// longer true: the header declares it at include/cgap.h:214 (decision =
+/// EXPOSED; court `crates/cgap-ffi/tests/kd7_p28_header_court.rs`). The
+/// string value below is kept byte-unchanged (public const, ABI-stable) as
+/// the record of the earlier branch-b decision; do not read it as current
+/// behavior. The symbol is a real cgap-p28 export (`trap.rs:99-100`,
+/// `#[no_mangle]`); the ledger name `_cgap_p28_invariant_check` (leading
+/// underscore) was never an export, only a Mach-O mangling artifact.
 pub const P28_INVARIANT_CHECK_UNSUPPORTED: &str = "UNSUPPORTED(scope): \
      _cgap_p28_invariant_check (cgap_p28_invariant_check, cgap-p28 trap.rs:82) \
      rides the link undeclared BY DESIGN; declaring it in include/cgap.h is \
@@ -3867,13 +3863,13 @@ mod wave_f2_p28_courts {
             "cdylib build failed; stderr tail:\n{}",
             super::wave9_courts::tail(&outcome.stderr)
         );
-        let dylib = dir.join("target/debug/libcgap_ffi.dylib");
+        let dylib = dir.join(super::cdylib_platform::artifact_rel());
         assert!(
             dylib.is_file(),
-            "cdylib artifact missing at {} (macOS court)",
+            "cdylib artifact missing at {} (platform cdylib court)",
             dylib.display()
         );
-        let nm = match Command::new("nm").args(["-gU"]).arg(&dylib).output() {
+        let nm = match Command::new("nm").args(super::cdylib_platform::nm_args()).arg(&dylib).output() {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 println!("[SKIP] nm absent — cdylib symbol court unexecuted (loud skip, never a silent pass)");
                 let _ = fs::remove_dir_all(&dir);
@@ -3888,7 +3884,7 @@ mod wave_f2_p28_courts {
             dylib.display(),
             String::from_utf8_lossy(&nm.stderr)
         );
-        let exports = String::from_utf8_lossy(&nm.stdout);
+        let exports = super::cdylib_platform::normalize(&String::from_utf8_lossy(&nm.stdout));
         // The four-symbol list gains cgap_verify_p28 (mach-o leading underscore).
         assert!(
             exports.contains("_cgap_verify_p28"),
@@ -4830,13 +4826,13 @@ mod wave_gap1_courts {
             "cdylib build failed; stderr tail:\n{}",
             super::wave9_courts::tail(&outcome.stderr)
         );
-        let dylib = dir.join("target/debug/libcgap_ffi.dylib");
+        let dylib = dir.join(super::cdylib_platform::artifact_rel());
         assert!(
             dylib.is_file(),
-            "cdylib artifact missing at {} (macOS court)",
+            "cdylib artifact missing at {} (platform cdylib court)",
             dylib.display()
         );
-        let nm = match Command::new("nm").args(["-gU"]).arg(&dylib).output() {
+        let nm = match Command::new("nm").args(super::cdylib_platform::nm_args()).arg(&dylib).output() {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 println!("[SKIP] nm absent — gap1 symbol court unexecuted (loud skip, never a silent pass)");
                 let _ = fs::remove_dir_all(&dir);
@@ -4850,7 +4846,7 @@ mod wave_gap1_courts {
             "nm -gU failed:\n{}",
             String::from_utf8_lossy(&nm.stderr)
         );
-        let exports = String::from_utf8_lossy(&nm.stdout);
+        let exports = super::cdylib_platform::normalize(&String::from_utf8_lossy(&nm.stdout));
         for sym in [
             "_cgap_admit_frame",
             "_cgap_eval_bn3",
@@ -4883,5 +4879,38 @@ mod wave_gap1_courts {
             "GAP1 SYMBOL COURT: nm -gU carries ALL FOUR sovereign bodies; 6 pre-existing exports intact; rename controls absent"
         );
         fs::remove_dir_all(&dir).expect("dylib court lease cleanup");
+    }
+}
+
+/// Platform shim for the cdylib symbol courts. macOS behavior is identical to
+/// the original hard-coded form (`.dylib`, `nm -gU`, Mach-O leading `_`).
+/// Linux: `.so`, `nm -g --defined-only`, ELF symbols carry no leading `_`, so
+/// `normalize` re-adds it per line so the shared assertions stay unchanged.
+#[cfg(test)]
+mod cdylib_platform {
+    pub fn artifact_rel() -> &'static str {
+        if cfg!(target_os = "macos") {
+            "target/debug/libcgap_ffi.dylib"
+        } else {
+            "target/debug/libcgap_ffi.so"
+        }
+    }
+    pub fn nm_args() -> &'static [&'static str] {
+        if cfg!(target_os = "macos") {
+            &["-gU"]
+        } else {
+            &["-g", "--defined-only"]
+        }
+    }
+    pub fn normalize(raw: &str) -> String {
+        if cfg!(target_os = "macos") {
+            return raw.to_string();
+        }
+        raw.lines()
+            .map(|l| match l.rsplit_once(' ') {
+                Some((head, sym)) => format!("{head} _{sym}\n"),
+                None => format!("{l}\n"),
+            })
+            .collect()
     }
 }

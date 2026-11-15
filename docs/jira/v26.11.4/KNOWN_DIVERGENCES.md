@@ -70,7 +70,7 @@ regeneration removes the hand twin). **Status**: OPEN.
 
 ### KD-4 — oabi-lookup UNSUPPORTED(scope)
 
-`crates/cgap-ffi/src/oabi_lookup.rs:1-31` is a typed decision record per
+`crates/cgap-ffi/src/oabi_lookup.rs:1-50` is a typed decision record per
 the A19 four-verb surface law (A19:47, 157-166 cited in-file); A10 T5's
 blocker stays BLOCKED-on-A19 (oabi_lookup.rs:36-40). **Close**: A19
 lands slot resolution and oabi-lookup gains a real implementation.
@@ -106,19 +106,22 @@ Witnessed by the coordinator after lane L31 died on the task.
   crates/cgap-blake3/tests/` has no bench_tmp.rs and the tests dir listing
   confirms; verdict unchanged (CLOSED-PREMISE-ROTTED).
 
-### KD-7 — `_cgap_p28_invariant_check` header question
+### KD-7 — `cgap_p28_invariant_check` header question
 
-Zero occurrences repo-wide (auditor grep over crates/, include/, tests/
-at ledger time); include/cgap.h carries the four frozen prototypes only
-(cgap.h:164 = cgap_verify_p28). **Close**: GAP-1 resolves the question;
-if the symbol is intended to be public, mint the header prototype; if
-not, declare it internal with a gate. **Status**: PARTIAL (GAP-1 was in
-flight at ledger time; nothing on disk to cite yet).
-**Recount 2026-11-05 (KD-RC)**: PARTIAL confirmed, with movement — the
-symbol now has three doc-comment occurrences declaring it internal
-(`crates/cgap-ffi/src/sovereign.rs:362,1135,1151`, "typed
-UNSUPPORTED(scope) record — `_cgap_p28_invariant_check` stays
-internal"), i.e. the "declare it internal" half of the close condition
-has on-disk prose but no gate and no GAP-1 resolution receipt; header
-prototype still absent (`include/cgap.h:168` carries only
-`cgap_verify_p28`). Stays PARTIAL/OPEN.
+The ledger name `_cgap_p28_invariant_check` (leading underscore) was never
+an export; the real `#[no_mangle]` symbol is `cgap_p28_invariant_check`
+(`crates/cgap-p28/src/trap.rs:99-100`). **Close**: GAP-1 resolves the
+question; if the symbol is intended to be public, mint the header
+prototype; if not, declare it internal with a gate. **Decision**: EXPOSED
+— `include/cgap.h:214` declares `uint32_t cgap_p28_invariant_check(const
+uint8_t* att);` (FIX-07 slot surface). Gate:
+`crates/cgap-ffi/tests/kd7_p28_header_court.rs` (exactly one prototype,
+exact signature, phantom underscore name absent, symbol resolves via link;
+`kd7_mutations_all_flip` is the anti-vacuity flip). Stale in-code prose
+("undeclared by design", `sovereign.rs` ~362 and ~1135) corrected in lane
+F2 (v26.11.14); `P28_INVARIANT_CHECK_UNSUPPORTED` kept byte-unchanged,
+documented as SUPERSEDED. **Status**: CLOSED-EXPOSED 2026-11-15 (court
+3/3 passed this session, `CARGO_TARGET_DIR=/tmp/target-F2 cargo test -p
+cgap-ffi --test kd7_p28_header_court` exit 0). Superseded history: the
+2026-11-05 KD-RC recount (PARTIAL, "stays internal") is rotted by the
+header decision above.
