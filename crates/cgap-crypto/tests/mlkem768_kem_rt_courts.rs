@@ -1,3 +1,8 @@
+//! Anti-vacuity mutations (F6, v26.11.14), applied to a /tmp sandbox copy:
+//! (1) `crates/cgap-crypto/src/kem.rs` decaps: `let fail = ...as u8;` -> append
+//!     `^ 1` (invert rejection select); `kem_roundtrip_and_negative` must FAIL.
+//! (2) `crates/cgap-crypto/src/fips203.rs` byte_encode: first `acc >>= 8;` ->
+//!     `acc >>= 7;`; `byte_encode_decode_roundtrip_all_d` must FAIL.
 //! KEM courts part 2: encode/decode round-trips, determinism, KEM
 //! round-trip, and negative corrupted-ct courts.
 use cgap_crypto::{fips203, kem};

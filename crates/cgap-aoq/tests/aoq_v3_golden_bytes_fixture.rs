@@ -1,3 +1,7 @@
+//! Anti-vacuity mutations (F6, v26.11.14), applied to a /tmp sandbox copy:
+//! (1) `crates/cgap-aoq/src/codec.rs` encode: `fnv1a32(&out[0..60])` ->
+//!     `fnv1a32(&out[0..59])`; `golden_frame_matches_committed_fixture` must FAIL.
+//! (2) flip one GOLDEN_HEX byte in this file's copy (first `31` -> `32`); must FAIL.
 //! Golden-byte fixture court (R1-I, S2): the genesis AOQ v3 frame bytes are
 //! DERIVED from the real `codec::encode` and asserted byte-identical against
 //! the committed fixture — never guessed, never hand-written.

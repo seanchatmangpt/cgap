@@ -1,3 +1,6 @@
+//! Anti-vacuity mutation (F6, v26.11.14): in a /tmp sandbox copy of
+//! `crates/cgap-core/Cargo.toml`, append a `[dependencies]` section;
+//! `dod1_manifest_has_zero_runtime_dependencies` must FAIL.
 //! Manifest + README court — lane A04 §9 DoD 1 (zero-deps) and DoD 10
 //! (P28-SIL license URN cited, no SPDX identifiers) — Wave 4 hardening:
 //! the two prose DoD items become executed assertions instead of prose
