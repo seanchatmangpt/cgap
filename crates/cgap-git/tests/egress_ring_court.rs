@@ -307,7 +307,7 @@ fn parquet_page_reuse_court() {
 /// Counting allocator + counters (defined last so the courts above read
 /// naturally; Rust items are order-independent).
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicUsize, Ordering as MO};
+use std::sync::atomic::Ordering as MO;
 use std::sync::{Mutex, MutexGuard};
 
 /// Test-serialization lock (lane DX-6 race fix): COUNT is a
@@ -323,23 +323,44 @@ fn serial() -> MutexGuard<'static, ()> {
 
 struct Counting;
 
-static COUNT: AtomicUsize = AtomicUsize::new(0);
+// F9 race fix: the counter is PER-THREAD. The libtest main thread
+// allocates (result reporting, thread bookkeeping) outside SERIAL and
+// inflated a process-global counter mid-window (witnessed 5/60 runs:
+// "window allocated 1 times", "parse_page allocated 2 times"). Each
+// court measures only its own thread's allocations. Const-init Cell,
+// no destructor: safe to touch from inside the allocator.
+std::thread_local! {
+    static TL_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+struct Count;
+impl Count {
+    fn store(&self, v: usize, _o: MO) {
+        TL_COUNT.with(|c| c.set(v));
+    }
+    fn load(&self, _o: MO) -> usize {
+        TL_COUNT.with(|c| c.get())
+    }
+    fn bump(&self) {
+        TL_COUNT.with(|c| c.set(c.get() + 1));
+    }
+}
+static COUNT: Count = Count;
 const MO_SEQ: MO = MO::SeqCst;
 
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, l: Layout) -> *mut u8 {
-        COUNT.fetch_add(1, MO_SEQ);
+        COUNT.bump();
         System.alloc(l)
     }
     unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
         System.dealloc(p, l)
     }
     unsafe fn realloc(&self, p: *mut u8, l: Layout, n: usize) -> *mut u8 {
-        COUNT.fetch_add(1, MO_SEQ);
+        COUNT.bump();
         System.realloc(p, l, n)
     }
     unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
-        COUNT.fetch_add(1, MO_SEQ);
+        COUNT.bump();
         System.alloc_zeroed(l)
     }
 }
