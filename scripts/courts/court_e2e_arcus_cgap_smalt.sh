@@ -76,6 +76,15 @@ assert sent == (admitted + refused), f'Ingress conservation broken: {sent} != {a
 assert admitted == (pruned + cleared), f'Processing conservation broken: {admitted} != {pruned} + {cleared}'
 assert admitted > 0, 'Zero frames admitted'
 assert cleared > 0, 'Zero frames cleared'
+# Admission ratio (OI-4): the SPSC membrane refuses at saturation (regime 3),
+# so a high refusal share is lawful and data-dependent (the committed
+# reports/e2e_cross_subsystem_receipt.json admits 344,048/1,000,000 = 34.4%;
+# the 2026-11-06 census run admitted 355,824 = 35.6%). The band asserted is the lawful one,
+# (0, 1]: zero admission is a dead pipe, and admitted > sent is impossible.
+# A tighter band would be a perf claim, which stays a TARGET until measured.
+ratio = admitted / sent
+print(f'  Admit ratio:    {ratio:.4f} (lawful band (0, 1]; refusals = regime-3 saturation)')
+assert 0.0 < ratio <= 1.0, f'Admission ratio out of lawful band: {ratio}'
 print('[PASS 1 WITNESS]: Nominal conservation verified.')
 "
 

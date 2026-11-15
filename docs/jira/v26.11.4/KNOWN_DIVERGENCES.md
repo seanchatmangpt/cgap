@@ -122,3 +122,9 @@ internal"), i.e. the "declare it internal" half of the close condition
 has on-disk prose but no gate and no GAP-1 resolution receipt; header
 prototype still absent (`include/cgap.h:168` carries only
 `cgap_verify_p28`). Stays PARTIAL/OPEN.
+- **Status**: CLOSED (2026-11-15, omniplatform thread). Close condition met
+  on the "declare it internal with a gate" branch: `scripts/ffi_surface_gate.py`
+  `INTERNAL_SYMBOLS` fails the gate if `_cgap_p28_invariant_check` is
+  prototyped in the header or exported by the cdylib; self-check mutation 4
+  flips it. Receipt: `docs/jira/v26.11.6/receipts/kd7-internal-symbol-gate.md`
+  (`--self-check` exit 0).

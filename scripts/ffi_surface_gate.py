@@ -22,13 +22,23 @@ import shutil
 import subprocess
 import sys
 
-REPO = "/Users/sac/cgap"
+# Repo root: CGAP_REPO overrides; otherwise derived from this file's location
+# (was hard-pinned to /Users/sac/cgap, which made the gate host-local).
+REPO = os.environ.get("CGAP_REPO") or os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))
 IS_DARWIN = sys.platform == "darwin"
 DYLIB_NAME = "libcgap_ffi.dylib" if IS_DARWIN else ("cgap_ffi.dll" if sys.platform == "win32" else "libcgap_ffi.so")
 DEFAULT_DYLIB = os.path.join(REPO, "target/release", DYLIB_NAME)
 DEFAULT_HEADER = os.path.join(REPO, "include/cgap.h")
 
 PASS, FAIL, MISSING, SKIP = 0, 1, 2, 3
+
+# KD-COVERS: KD-7
+# KD-7 close (GAP-1 resolution = INTERNAL): symbols declared internal. Each
+# must have NO prototype in the public header and NO exported text symbol in
+# the cdylib. Promoting one to public is a deliberate edit of this set plus a
+# header prototype, never a silent export.
+INTERNAL_SYMBOLS = {"_cgap_p28_invariant_check"}
 
 
 def fail(msg):
@@ -51,6 +61,36 @@ def header_prototypes(header_path):
     text = re.sub(r"//[^\n]*", " ", text)
     hits = re.findall(r"\b(cgap_[A-Za-z0-9_]*\s*)\(", text)
     return {h.strip() for h in hits}
+
+
+def header_internal_prototypes(header_path):
+    """INTERNAL_SYMBOLS names that appear as `name(` in the header (comments
+    stripped). header_prototypes() cannot see them: `\\bcgap_` never matches
+    after a leading underscore."""
+    with open(header_path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", " ", text)
+    return {n for n in INTERNAL_SYMBOLS
+            if re.search(r"(?<![A-Za-z0-9_])" + re.escape(n) + r"\s*\(", text)}
+
+
+def dylib_exported_internals(dylib_path):
+    """INTERNAL_SYMBOLS names exported as text symbols by the dylib."""
+    cmd = ["nm", "-gU", dylib_path] if IS_DARWIN else ["nm", "-D", "--defined-only", dylib_path]
+    out = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if out.returncode != 0:
+        raise RuntimeError("nm failed on %s: %s" % (dylib_path, out.stderr))
+    found = set()
+    for line in out.stdout.splitlines():
+        if " T " not in line and " t " not in line:
+            continue
+        name = line.rsplit(" ", 1)[-1]
+        if IS_DARWIN and name.startswith("_"):
+            name = name[1:]
+        if name in INTERNAL_SYMBOLS:
+            found.add(name)
+    return found
 
 
 def dylib_symbols(dylib_path):
@@ -95,6 +135,11 @@ def run_gate(dylib, header):
         print("[GATE] loud skip: zero cgap_* exported text symbols in %s" % dylib)
         return SKIP
     protos = header_prototypes(header)
+    leaked = sorted(header_internal_prototypes(header) | dylib_exported_internals(dylib))
+    if leaked:
+        for name in leaked:
+            print("GATE-FAIL: internal symbol on the public surface (KD-7): %s" % name)
+        return FAIL
     missing = sorted(syms - protos)
     extra = sorted(protos - syms)
     if missing or extra:
@@ -163,12 +208,24 @@ def self_check():
         PASS if sha256(h2) == sha256(DEFAULT_HEADER) else FAIL,
         PASS, "restore verify (drop_proto.h byte-exact)"))
 
+    # Mutation 4 (KD-7): prototype the internal symbol in a sandbox header.
+    h4 = sandbox_copy(DEFAULT_HEADER, "internal_proto.h")
+    with open(h4, "a") as fh:
+        fh.write("int _cgap_p28_invariant_check(void);\n")
+    results.append(expect(run_gate(dylib, h4), FAIL,
+                          "mutation: internal _cgap_p28_invariant_check prototyped"))
+    shutil.copyfile(DEFAULT_HEADER, h4)  # the actual restore
+    results.append(expect(
+        PASS if sha256(h4) == sha256(DEFAULT_HEADER) else FAIL,
+        PASS, "restore verify (internal_proto.h byte-exact)"))
+
     # Mutation 3: foreign shim dylib in /tmp (missing the sovereign symbols).
     shim_src = os.path.join(SBX, "shim.c")
     with open(shim_src, "w") as fh:
         fh.write("int cgap_version(void){return 0;}\n")
     shim_dylib = os.path.join(SBX, "libshim.dylib")
-    cc = subprocess.run(["clang", "-dynamiclib", "-o", shim_dylib, shim_src],
+    cc_cmd = (["clang", "-dynamiclib"] if IS_DARWIN else ["cc", "-shared", "-fPIC"])
+    cc = subprocess.run(cc_cmd + ["-o", shim_dylib, shim_src],
                         capture_output=True, text=True, check=False)
     if cc.returncode != 0:
         print("[SKIP] cannot build shim dylib: %s" % cc.stderr.strip())
