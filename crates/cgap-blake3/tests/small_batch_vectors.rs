@@ -4,6 +4,16 @@
 //! output to (a) the sequential `hash` fallback (via hash_many_simd parity across
 //! every length in the window plus off-window edges) and (b) the reference `b3sum`
 //! binary on real corpora.
+//!
+//! Anti-vacuity mutation (H5, witnessed on x86_64 Linux in a /tmp sandbox):
+//! in cgap-blake3 `src/lib.rs`, (a) `is_small_batch_eligible` `len <= 64 * 1024`
+//! -> `len < 64 * 1024` flips `court_eligibility_predicate`; (b)
+//! `merge_into_stack` `compress_scalar(&IV, &block, 0, 64, PARENT)` -> `0, 63,`
+//! flips `court_exhaustive_small_parity_sequential_vs_4way`. A scalar-core
+//! mutation (e.g. `g` rotate 12 -> 11) does NOT flip the parity court on
+//! non-aarch64 (the 4-way kernel falls back to the same scalar code), and
+//! `court_hash_vs_b3sum_small_batch_window` needs /opt/homebrew/bin/b3sum
+//! (absent on Linux: baseline panics at spawn), so it is host-bound there.
 
 use std::process::Command;
 

@@ -15,6 +15,12 @@
 //! Zero-dep law: the fixture sha256 self-pin uses the in-test SHA-256 below
 //! (the crate itself is no_std zero-dependency; adding a dev-dep is outside
 //! the lane's owned files).
+//!
+//! Anti-vacuity mutation (H5, witnessed in a /tmp sandbox): in cgap-blake3
+//! `src/lib.rs` scalar `g`, `state[b] = (state[b] ^ state[c]).rotate_right(12)`
+//! -> `.rotate_right(11)` flips `shared_vectors_hash_and_simd_differential`
+//! (rc 101); `fixture_sha256_self_pin` correctly stays green (it pins the
+//! fixture bytes, not the hash code).
 
 use cgap_blake3::{hash, hash_many_simd, hash_wide_simd};
 
