@@ -94,4 +94,33 @@ then risk-per-effort. Standing words are the lanes' own.
 - C1: ggen sync x2 replay and Tera rendering; gate 050 only protects wired consumers.
 - R2 5-export riscv footprint / wasm32 path; ingress timings contention-suspect.
 - wire-shm delete-first clause in CLAUDE.md should name cgap-beam too.
-- Remaining un-hardened courts: 37 of the 43 from Ra4's census.
+
+## Round 3 (H1-H14, G1-G9): gaps closed and new findings
+
+Closed: 21 of Ra4's 24 remaining court files now name a mutation, most with a
+witnessed flip (H1-H14 receipts; the generated zero_code_cli.rs is excluded by
+law). manifest_court 3/3 flip (G1). wire-shm clause names cgap-beam (G2, policy
+edit, owner to confirm). Suites green end to end (G3). boundary_gate --strings,
+--shim-court-only, zero_string --courts all rc0 (G4). wasm32 footprint measured:
+raw 4305 B, wasm-opt -Oz 3472 B (G5, sandbox-adapted footprint.sh). e2e script
+preflight exit 2 + cleanup trap (G7). cgap-mcp compile break fixed (G8).
+boundary_gate --mutate: 7 stale EQUIVALENT_TRIAGE keys re-keyed (G9).
+
+New defects/findings, still open:
+- cgap-integration depends on REGISTRY cgap-parquet/arrow/blake3/git 26.11.2, so
+  admission_e2e does not test workspace code (H10).
+- mlkem768_interop_court loud-skips but returns GREEN without liboqs.a (H2):
+  vacuous here, conflicts with "a skip is never a pass".
+- BLAKE3 4-way parity courts cannot flip on scalar-core mutations on non-aarch64
+  (same scalar fallback); b3sum KAT court needs /opt/homebrew/bin/b3sum (H5).
+- csct bn3_falsification_court tests its own in-file cmov helper; attack2/3
+  near-vacuous (H4). wasm-footprint court builds only with sandbox patch (H4).
+- kill_stress flip UNVERIFIED (needs OTP>=26; host OTP 25); xplat script mutation
+  is weak (H14). cgap-mcp: only 1 of 4 courts has a named flip (H8).
+- G9 re-key rests on inference: pre-shift mutant text is not in git; shared tree
+  never run with --mutate. Treat boundary_gate --mutate PASS as sandbox-only.
+- footprint.sh is macOS-pathed (OPT_BIN, target paths, cwd); the w4 export is not
+  in its export/node courts (G5). manifest_court matchers miss license="MIT" (no
+  spaces) and target/build-dependencies sections (G1).
+- Full e2e (arcus/smalt/mix absent) and the 10-minute soak remain NOT RUN.
+- Un-hardened: mlkem768_interop (vacuous), generated zero_code_cli.rs.

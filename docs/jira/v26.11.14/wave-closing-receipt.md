@@ -1,7 +1,7 @@
 # v26.11.14 ERRC Sweep — closing receipt (C4)
 
-Standing: PARTIAL. 20 sweep lanes (18 parallel + C3 + C4) plus 9 fix lanes
-F1-F9 ran. KD-7 closed by F2; nothing else flipped to CLOSED. See the final
+Standing: PARTIAL. 20 sweep lanes (18 parallel + C3 + C4), 9 fix lanes
+F1-F9 and 23 gap lanes (H1-H14, G1-G9) ran. KD-7 closed by F2; nothing else flipped to CLOSED. See the final
 seal table below, which supersedes the first-pass table.
 
 Seal pass (gate-runner, code identical at e3aeec5 and b08dd82; the only
@@ -61,3 +61,20 @@ Caveats: the seal agent's cgap-git run saw one flaky failure before F9;
 cgap-git's full suite was not re-run end to end after F9 (only the egress
 binary, 40 runs). Courts-mode (T17) and boundary_gate full modes were not
 run. Open items: see "Still open" in errc-backlog.md.
+
+## Round 3 seal (HEAD after G3; orchestrator checks, all this session)
+
+| Check | Exit | Verdict |
+|---|---|---|
+| `env -u CARGO_TARGET_DIR cargo build --workspace` | 0 | PASS |
+| `boundary_gate.py --deps` / `--self-check-deps` | 0 / 0 | PASS |
+| `zero_string_gate.py` / `--self-check` | 0 / 0 | PASS (debris leg exercised via ELF stub; macOS path UNVERIFIED) |
+| G3: cgap-git, cgap-ffi --lib (69/69), cgap-storage, cgap-core | 0 each | PASS (one run each; flake rate unknown) |
+| G4: --strings, --shim-court-only, zero_string --courts | 0 each | PASS |
+| `boundary_gate.py --mutate` (G9, /tmp copy only) | 0 | PASS in sandbox, 16/16 killed; shared tree not run; re-key inferential |
+| cgap-mcp (G8, own manifest) | 0 | PASS, compile break fixed |
+
+Not verified: full e2e (arcus/smalt absent), liboqs interop, OTP>=26 kill_stress,
+b3sum KAT, macOS paths, ggen replay, registry publish. Details and open items:
+`errc-backlog.md` (Round 3 section). CLAUDE.md edits: F1 and G2 (G2 is
+policy-adjacent; owner to confirm).
