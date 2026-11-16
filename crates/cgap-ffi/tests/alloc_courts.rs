@@ -24,6 +24,15 @@
 //! tracking is per-thread, so the `SLOTS` mutex also keeps every tracked
 //! window single-threaded by construction.
 //!
+//! ## Anti-vacuity mutation (H8, witnessed 2026-11-16)
+//!
+//! Mutation: in `crates/cgap-ffi/src/lib.rs::digest_of_raw`, insert
+//! `let _h8 = std::hint::black_box(vec![0u8; 8]);` as the first statement.
+//! Flips `digest_over_exported_buffer_is_zero_alloc` and
+//! `digest_shapes_are_zero_alloc_and_deterministic` (report.is_zero() fails);
+//! `slot_and_version_reads_are_zero_alloc` also fails by SLOTS mutex poison
+//! cascade. Receipt: docs/jira/v26.11.14/lanes/H8.md.
+//!
 //! zero_copy.rs lesson applied: the static export slots are process-global —
 //! every test that drives `cgap_i32_batch` serializes on `SLOTS`.
 

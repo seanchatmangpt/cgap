@@ -1,6 +1,14 @@
 //! Chicago courts for cgap-mcp: round-trip, protocol shape over REAL stdio,
 //! persistence. No mocks; assert final state.
 
+//! Anti-vacuity mutation (H8, witnessed 2026-11-16): in
+//! `crates/cgap-mcp/src/lib.rs::wire_error_data`, change
+//! `WireError::FrameTooLarge { .. } => "FrameTooLarge"` to `"FrameTooBig"`;
+//! `internal_error_typed_wire_data` FAILS (rc 101). NOTE: on the committed
+//! tree this court does not currently BUILD (non-exhaustive match: wire-shm
+//! `WireError::BudgetTooSmall` unhandled, E0004); the flip was witnessed in a
+//! sandbox with a one-arm unblock. See docs/jira/v26.11.14/lanes/H8.md.
+
 use cgap_mcp::json::{parse, Json};
 use cgap_mcp::{handle_line, open_ring};
 use std::io::{BufRead, BufReader, BufWriter, Write};
