@@ -23,6 +23,11 @@
 //! - The chain digest seam is Mix32 (the AB-7 landed bench's seam), NOT
 //!   BLAKE3 — disclosed so no one cites the per-link figure as a
 //!   BLAKE3-chain figure.
+//!
+//! ANTI-VACUITY MUTATION (H12): in `src/codec.rs` `decode`, change
+//! `fnv1a32(&buf[0..60])` to `fnv1a32(&buf[0..59])`; run with `--release`
+//! (debug loud-skips). `af30_contender_a_frame_pipeline` FAILS (rc 101) at
+//! the warm-up `assert_eq!(decode(&wire0)...)`. Receipt: docs/jira/v26.11.14/lanes/H12.md.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};

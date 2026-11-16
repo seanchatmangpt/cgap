@@ -30,6 +30,11 @@
 //! The counting allocator is the crate's standard court pattern
 //! (ab8_soak.rs); its `unsafe` blocks are the `GlobalAlloc` contract
 //! itself — no bench logic is unsafe.
+//!
+//! ANTI-VACUITY MUTATION (H12): in `src/chain.rs` `link`, change
+//! `self.len += 1;` to `self.len += 2;`; run with `--release` (debug
+//! loud-skips). `scaled_1m_flash_crash_soak` FAILS (rc 101, unwrap panic
+//! in the chain path). Receipt: docs/jira/v26.11.14/lanes/H12.md.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::io::{Read, Write};
