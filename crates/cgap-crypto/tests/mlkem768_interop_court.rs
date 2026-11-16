@@ -5,6 +5,12 @@
 //!   B: liboqs keypair -> my encaps -> liboqs decaps == my ss
 //! Loud skip when the C toolchain/liboqs is unavailable (skip names its
 //! reason; never a silent pass).
+//!
+//! Anti-vacuity status (H2): VACUOUS on hosts without liboqs. Witnessed on a
+//! Linux host with no /usr/local/lib/liboqs.a: a fips203.rs ntt zeta mutation
+//! (`ZETAS[k]` -> `ZETAS[k] ^ 1`) still gave rc 0 because the test loud-skips.
+//! The intended mutation (same zeta flip) is UNVERIFIED to flip it; it can only
+//! be proven on a host where the oracle builds.
 use cgap_crypto::kem;
 
 fn hx(b: &[u8]) -> String {

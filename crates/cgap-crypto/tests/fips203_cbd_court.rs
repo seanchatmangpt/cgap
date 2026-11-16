@@ -6,6 +6,10 @@
 //! a-field,
 //! last eta bits the b-field; r[i] = popcount(a) − popcount(b). Real
 //! collaborator: the crate function under test; no mocks.
+//!
+//! Anti-vacuity mutation (H2, witnessed): in src/fips203.rs poly_cbd eta=4
+//! branch change `((t >> 3) & 0x1111_1111)` to `((t >> 2) & 0x1111_1111)`;
+//! cbd_exhaustive_per_byte_vs_scalar and cbd_random_polys_vs_scalar FAIL (rc 101).
 use cgap_crypto::fips203::{self, CbdError};
 
 /// Scalar spec-law CBD reference (bit-exact law, one branch per bit).
