@@ -1,3 +1,8 @@
+//! ANTI-VACUITY MUTATION (H6, v26.11.14): in cgap-parquet/src/rle.rs `rle_encode_into`
+//! change the repeated-run header `u64::from(run as u32) << 1` to
+//! `u64::from(run as u32 - 1) << 1` (off-by-one run length). Flips
+//! `exhaustive_lane_values_round_trip` and `every_kernel_width_round_trips_random_and_adversarial`
+//! (rc 101); restore + mtime bump -> rc 0. Receipt: docs/jira/v26.11.14/lanes/H6.md.
 //! RLE codec court (wave-4 lane 8): round-trip byte-equality across every
 //! supported bit width on random + adversarial corpora, and the regression
 //! court for the bits>8 shift-overflow panic class (witnessed at bits=12).

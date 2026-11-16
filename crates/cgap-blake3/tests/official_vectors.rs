@@ -1,3 +1,7 @@
+//! ANTI-VACUITY MUTATION (H6, v26.11.14): in cgap-blake3/src/lib.rs change
+//! `IV[0]` 0x6A09E667 -> 0x6A09E666. Flips `official_vectors_hash_known_answer`,
+//! `chunk_boundary_1024_single_chunk_root`, `chunk_boundary_2048_two_chunk_parent_root`
+//! (rc 101); restore + mtime bump -> rc 0. Receipt: docs/jira/v26.11.14/lanes/H6.md.
 //! FR-06 conformance: official BLAKE3 known-answer tests (external integration test).
 //!
 //! Corpus generator follows the canonical BLAKE3 test_vectors.json recipe:
