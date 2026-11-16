@@ -6,6 +6,15 @@
 # 3. Bare-metal RISC-V (riscv32imc XIP sovereign microcontroller)
 set -euo pipefail
 
+# ANTI-VACUITY MUTATION (H14, v26.11.14): CGAP_COURT_MUTATE=bad-target makes
+# step [1/5] check a nonexistent target triple (cargo must reject it), so the
+# court MUST exit nonzero. Unset (default) = behavior unchanged. A court whose
+# mutant stays rc0 is vacuous. Flip witness: docs/jira/v26.11.14/lanes/H14.md.
+X86_TARGET="x86_64-unknown-linux-gnu"
+if [ "${CGAP_COURT_MUTATE:-}" = "bad-target" ]; then
+  X86_TARGET="x86_64-unknown-linux-gnu-MUTANT"
+fi
+
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CGAP_ROOT="${WORKSPACE_ROOT}/cgap"
 ARCUS_ROOT="${WORKSPACE_ROOT}/arcus"
@@ -17,7 +26,7 @@ echo "==========================================================================
 
 echo "[1/5] Qualifying cgap on Linux x86_64 (x86_64-unknown-linux-gnu)..."
 cd "${CGAP_ROOT}"
-cargo check --target x86_64-unknown-linux-gnu --bin cgap_e2e_consumer
+cargo check --target "${X86_TARGET}" --bin cgap_e2e_consumer
 echo "  [OK]: Linux x86_64 cgap qualification clean."
 
 echo "[2/5] Qualifying cgap on Linux aarch64 (aarch64-unknown-linux-gnu)..."

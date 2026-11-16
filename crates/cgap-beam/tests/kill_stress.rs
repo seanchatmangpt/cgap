@@ -35,6 +35,15 @@
 //! Budget: a healthy run is well under a minute; the escript self-limits at
 //! a 240 s wall-clock watchdog (inside the crate's 600 s test gate).
 
+// ANTI-VACUITY MUTATION (H14, v26.11.14) -- NAMED, flip UNVERIFIED on this host
+// (needs OTP >= 26 / erts-14; see docs/jira/v26.11.14/lanes/H14.md).
+// Mutation `skip-dtor-note`: in a /tmp sandbox copy of
+// crates/cgap-beam/src/resources.rs, delete the
+// `crate::dtor_stats::note_envelope_dtor();` call in `batch_envelope_dtor`.
+// Expected: the DTOR_RUNS counter never advances, so the per-iteration
+// `dead_dtors=200` barrier (settle_dtor) cannot converge and the escript
+// exits nonzero / this test's assertions fail. Restore: sha256-exact copy back
+// plus `touch` (cargo compares mtime). Never mutate the shared tree.
 use std::path::PathBuf;
 use std::process::Command;
 
