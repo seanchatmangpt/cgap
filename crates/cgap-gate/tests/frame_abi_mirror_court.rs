@@ -12,6 +12,14 @@
 //! Chicago: the collaborators are the real structs; the court asserts on
 //! compiled-layout state (size/align/offset), the strongest form of final
 //! state there is.
+//!
+//! Anti-vacuity mutation (H1, witnessed in a /tmp sandbox): in
+//! `crates/cgap-core/src/frame.rs` swap the declaration order of
+//! `CgapFrameHeader::version` and `::flags` AND its two `offset_of!` pins
+//! (4 <-> 5), so cgap-core stays self-consistent. This court then fails to
+//! compile (E0080, `CgapFrameHeaderAbi` flags/version offset != canonical),
+//! rc 101. Note: mutating the mirror alone is caught first by penstock.rs's
+//! own OFF_* pins, not by this court.
 
 use cgap_core::frame::{CgapFrameHeader, P28LicenseAttestation};
 use cgap_gate::penstock::{CgapFrameHeaderAbi, P28LicenseAttestationAbi};

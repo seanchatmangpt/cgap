@@ -6,6 +6,12 @@
 //! The lane docs are the normative layout contracts referenced byte-for-byte
 //! by lanes A14/A17/A19; this court makes doc-vs-code drift a test failure
 //! instead of a prose claim. A missing doc file fails loudly (never a skip).
+//!
+//! Anti-vacuity mutation (H1, witnessed in a /tmp sandbox): in `frame.rs`
+//! swap the declaration order of `CgapFrameHeader::version`/`flags` and
+//! their two `offset_of!` pins (4 <-> 5). `a04_doc_s61_table_matches_compiled_frame_layout`
+//! FAILS (rc 101: "DRIFT — doc says field \"version\" at (4,1), frame.rs
+//! compiles to (5, 1)"); the A17 test stays green (isolation).
 
 use cgap_core::frame::{CgapFrameHeader, P28LicenseAttestation};
 
