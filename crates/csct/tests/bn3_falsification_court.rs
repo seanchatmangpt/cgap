@@ -8,6 +8,13 @@
 //!    during a 10x ingress surge, the Little's Law Shield breaks and downsteam ring buffers saturate.
 //! 3. Attack 3 (Contended Cache & Bus Saturation): Memory bandwidth saturation degrades
 //!    in-place validity bitmap synthesis beyond quiet-host claims.
+//!
+//! Anti-vacuity mutation (H4, witnessed in a /tmp sandbox): swap the select
+//! arms of the in-file `cmov` helper to
+//! `(mask & false_val) | (!mask & true_val)`; `attack1_bpu_predictability_
+//! advantage_at_low_entropy` FAILS (rc 101, acc_br != acc_bl). Caveat: all
+//! code under test lives in this file (no csct/cgap symbol is exercised);
+//! attack3's `> 0` ns floor is near-vacuous (no mutation flips it).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

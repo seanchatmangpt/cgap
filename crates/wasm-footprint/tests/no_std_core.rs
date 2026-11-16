@@ -18,6 +18,11 @@
 //! The stronger per-target gate is an actual
 //! `cargo build --target wasm32-unknown-unknown` of the core crates — see
 //! NOTES-v26.10.31.md for the receipts.
+//!
+//! Anti-vacuity mutation (H4, witnessed in a /tmp sandbox): in
+//! `cgap-arrow/src/predicates.rs` `ct_lt_u32`, invert the subtraction to
+//! `(b as u64).wrapping_sub(a as u64)`; `predicates_masks` FAILS (rc 101 at
+//! the `ct_lt_u32(1, 2)` assertion).
 
 #![no_std]
 
