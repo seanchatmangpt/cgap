@@ -12,6 +12,16 @@
 //! Stage degradation is loud: any missing collaborator prints
 //! `[SKIP stage: reason]` and the remaining stages are still asserted.
 //! No mocks anywhere.
+//!
+//! Anti-vacuity mutation (H10, `docs/jira/v26.11.14/lanes/H10.md`): in
+//! `cgap-parquet` `level_free.rs::read_page_payload` (the admission/refusal
+//! decision on a level-free page), invert
+//! `v2.num_values != v2.num_rows` to `v2.num_values == v2.num_rows`.
+//! `admission_e2e_roundtrip_and_receipt` then FAILS at the `page read`
+//! expect (rc 101). Run in a /tmp sandbox with `[patch.crates-io]` pointing
+//! at a copy of the registry cgap-parquet 26.11.2 (this crate consumes the
+//! registry copy, not the workspace path crate, so mutating
+//! `crates/cgap-parquet` alone does NOT flip this court).
 
 use std::fs;
 use std::path::{Path, PathBuf};
