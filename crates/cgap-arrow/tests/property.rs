@@ -13,6 +13,10 @@
 //!
 //! Varlen/ViewVec expose no base pointers in their public API, so family 5
 //! covers `Buf`, `Bitmap`, and `Primitive` (the pointer-exposing types).
+//!
+//! Anti-vacuity mutation (H3, v26.11.14): in src/bitmap.rs `from_bools` change
+//! `(v as u8) << bit_idx` to `(v as u8) << (7 - bit_idx)`; property_suite FAILS
+//! (rc 101, panic at the bools-family check).
 
 use cgap_arrow::bitmap::Bitmap;
 use cgap_arrow::buffer::ALIGNMENT;

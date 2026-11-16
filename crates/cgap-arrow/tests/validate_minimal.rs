@@ -5,6 +5,10 @@
 //! bounds, offset+length <= i64::MAX, length*elem_size buffer arithmetic,
 //! validity skipped when null_count <= 0. Full nested walks stay ABSENT
 //! (cgap fixed-width only, N7). Typed fail-closed errors, no panics.
+//!
+//! Anti-vacuity mutation (H3, v26.11.14): in src/validate.rs change the data
+//! check `if need > v.data_bytes` to `>=`; court1 and court3 FAIL (rc 101),
+//! because exact-fit buffers become refused.
 
 use cgap_arrow::validate::{validate_minimal, ArrayView, BufferId, MinimalError};
 
