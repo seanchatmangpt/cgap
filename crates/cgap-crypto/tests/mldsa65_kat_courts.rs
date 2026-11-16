@@ -30,6 +30,13 @@
 //!   Algorithm 2 (was H(K || mu || rnd || 0x00, 32));
 //! - mask nonce schedule: kappa advances by L per FS-abort attempt (was
 //!   kappa + 1), so per-poly nonces no longer collide across attempts.
+//!
+//! ANTI-VACUITY MUTATION (H13, v26.11.14): in `src/mldsa.rs`, `expand_s_poly`,
+//! change `let c_lo = 4 - lo;` to `let c_lo = 3 - lo;` (eta centering constant).
+//! `keygen_kat_seed_expansion_byte_exact_vs_nist_acvp` and
+//! `nist_sk_parse_matches_seed_law` flip RED (s1/s2 regions diverge from
+//! NIST). Note: NTT/zeta mutations do NOT flip this file (t1/t0 are not
+//! asserted, see UNVERIFIED above). Run only in a /tmp sandbox copy.
 
 use cgap_crypto::fips202::Shake256;
 use cgap_crypto::mldsa as m;
