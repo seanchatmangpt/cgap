@@ -52,6 +52,33 @@ if [[ "${1:-}" == "--band-selftest" ]]; then
     exit 0
 fi
 
+# ------------------------------------------------------------------------------
+# G7 preflight: verify every artifact BEFORE starting anything (gate contract:
+# exit 2 = subject missing). Nothing is spawned or created until this passes.
+# ------------------------------------------------------------------------------
+MISSING=()
+[[ -x "${CGAP_ROOT}/target/debug/cgap_e2e_consumer" ]] || MISSING+=("cgap consumer: ${CGAP_ROOT}/target/debug/cgap_e2e_consumer")
+[[ -x "${ARCUS_ROOT}/bin/arcus_e2e_producer" ]] || MISSING+=("arcus producer: ${ARCUS_ROOT}/bin/arcus_e2e_producer")
+[[ -d "${SMALT_ROOT}" ]] || MISSING+=("smalt dir: ${SMALT_ROOT}")
+command -v mix > /dev/null 2>&1 || MISSING+=("mix (elixir) not on PATH")
+if (( ${#MISSING[@]} > 0 )); then
+    echo "[PREFLIGHT] subject missing (exit 2); nothing started:" >&2
+    for m in "${MISSING[@]}"; do echo "  - ${m}" >&2; done
+    exit 2
+fi
+
+CGAP_PID=""
+cleanup() {
+    local rc=$?
+    trap - EXIT INT TERM
+    if [[ -n "${CGAP_PID}" ]]; then kill "${CGAP_PID}" 2> /dev/null || true; wait "${CGAP_PID}" 2> /dev/null || true; fi
+    rm -f "${SHM_PATH}"
+    exit "${rc}"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 echo "================================================================================"
 echo "STARTING CROSS-PLATFORM E2E INTEGRATION COURT: arcus -> cgap -> smalt"
 echo "Target Architecture: $(uname -s) $(uname -m)"
@@ -81,6 +108,7 @@ echo "[2/3] Injecting ${FRAMES} frames via arcus (Go) SPSC membrane..."
 "${ARCUS_ROOT}/bin/arcus_e2e_producer" --arena "${SHM_PATH}" --total-frames "${FRAMES}"
 
 wait ${CGAP_PID}
+CGAP_PID=""
 
 echo "[3/3] Finalizing state clearing via smalt (BEAM) clearinghouse..."
 cd "${SMALT_ROOT}"
