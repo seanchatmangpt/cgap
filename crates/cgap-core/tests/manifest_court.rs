@@ -1,3 +1,7 @@
+//! Anti-vacuity (G1, v26.11.14): every test here is flipped by its own
+//! sandbox mutation (docs/jira/v26.11.14/lanes/G1.md): dod10_p28_urn_* by
+//! corrupting the URN in README.md; dod10_no_spdx_* by appending
+//! `license = "MIT"` to Cargo.toml.
 //! Anti-vacuity mutation (F6, v26.11.14): in a /tmp sandbox copy of
 //! `crates/cgap-core/Cargo.toml`, append a `[dependencies]` section;
 //! `dod1_manifest_has_zero_runtime_dependencies` must FAIL.
