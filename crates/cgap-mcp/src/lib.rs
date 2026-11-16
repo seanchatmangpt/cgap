@@ -194,6 +194,7 @@ fn echo(ring: &mut WireRing, message: &[u8]) -> Result<(u32, Vec<u8>), WireError
 fn wire_error_data(e: &WireError) -> Json {
     let kind = match e {
         WireError::FrameTooLarge { .. } => "FrameTooLarge",
+        WireError::BudgetTooSmall { .. } => "BudgetTooSmall",
         WireError::CrcMismatch { .. } => "CrcMismatch",
         WireError::StaleOrdinal { .. } => "StaleOrdinal",
         WireError::BadMagic { .. } => "BadMagic",
@@ -219,4 +220,21 @@ fn error_response(id: Json, code: f64, msg: &str, data: Option<Json>) -> Json {
         ("id", id),
         ("error", Json::obj(err)),
     ])
+}
+
+#[cfg(test)]
+mod g8_tests {
+    use super::*;
+
+    /// G8: BudgetTooSmall maps to typed wire data (kind + wire-shm Display detail).
+    #[test]
+    fn budget_too_small_typed_wire_data() {
+        let e = WireError::BudgetTooSmall { need: 10, have: 3 };
+        let d = wire_error_data(&e);
+        assert_eq!(d.get("kind").and_then(Json::as_str), Some("BudgetTooSmall"));
+        assert_eq!(
+            d.get("detail").and_then(Json::as_str),
+            Some("output budget too small: need 10, have 3")
+        );
+    }
 }
