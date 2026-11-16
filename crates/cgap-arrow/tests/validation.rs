@@ -26,6 +26,22 @@
 //!    literal Arrow spec table `["c","C","s","S","i","I","l","L","f","g"]`,
 //!    via both `Scalar::FORMAT_CODE` and `Primitive::format_code()`.
 //!
+//! Anti-vacuity mutations (lane H11, each applied in a /tmp sandbox copy of
+//! `crates/cgap-arrow/src`, each flips exactly the one named test, rc 101):
+//!
+//! - M1 `bitmap.rs` `from_bools`: `valid.iter().all(|&v| v)` -> `valid.is_empty()`
+//!   flips `null_count_matches_pushed_none_count`.
+//! - M2 `primitive.rs` `const ZERO: Self = 0 as $t;` -> `1 as $t`
+//!   flips `null_slots_carry_zero_bytes`.
+//! - M3 `varlen.rs` null-arm `O::from_usize(self.data.len())` -> `len() + 1`
+//!   flips `varlen_offset_ladder_u32_and_u64`.
+//! - M4 `views.rs` foreign `let off = self.data.len() as u32;` -> `+ 1`
+//!   flips `viewvec_descriptor_law_inline_and_foreign`.
+//! - M5 `bitmap.rs` `from_bools`: set bit 7 of the last byte when
+//!   `len % 8 != 0` (tail-bit leak) flips `bitmap_word_tail_mask_law`.
+//! - M6 `primitive.rs` `scalar_impl!(f64, "g")` -> `"d"`
+//!   flips `scalar_format_codes_match_spec_table`.
+//!
 //! Chicago discipline: real collaborators only — `alloc` is the only
 //! collaborator and it is real; oracles are the builder's own push log, not
 //! stubs. Zero unsafe except the raw-byte read under the typed values slice,
