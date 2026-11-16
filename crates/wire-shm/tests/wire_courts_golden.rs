@@ -16,6 +16,13 @@
 //! validation order MAGIC -> ORDINAL -> LEN -> BUDGET -> CRC) to be the
 //! FIRST failure with the exact `WireError` variant fields; the `seg` case
 //! opens a full segment image from bytes.
+//!
+//! ANTI-VACUITY MUTATION (H9, witnessed): in wire-shm `src/crc32.rs` change
+//! `const POLY: u32 = 0xEDB8_8320;` to `0xEDB8_8321`. `golden_fixture_court`
+//! FAILS (rc 101) at `golden_pos` "header not byte-exact" (the stamped crc
+//! no longer matches the pinned header); `test_sha256_vectors` stays green
+//! (it fences only the local sha256). Run the mutation in a /tmp sandbox
+//! copy, never the shared tree. Receipt: docs/jira/v26.11.14/lanes/H9.md.
 
 use std::path::PathBuf;
 use wire_shm::{WireError, WireRing};
