@@ -314,7 +314,7 @@ EQUIVALENT_TRIAGE = {
         "(distinct class constants), so the != polarity's count is also "
         "> 0 and the all-four-families assert is observation-identical."
     ),
-    "tests/court_verdict.rs:1271:int-bump-up:0": (
+    "tests/court_verdict.rs:1309:int-bump-up:0": (
         "Rule head `a12_var(0)` -> `a12_var(1)`: the pinned laws here are "
         "var_count==3 (derived from the UNmutated body atoms) and the "
         "rule_id==7 compile pin, both head-agnostic; head variable "
@@ -328,38 +328,38 @@ EQUIVALENT_TRIAGE = {
     # class named in the comment above the fn) would convert this to a
     # kill. Registered fail-open under the register's own law so the
     # drift stays visible, flagged here rather than passed silently.
-    "tests/court_verdict.rs:2286:ret-remove:0": (
+    "tests/court_verdict.rs:2383:ret-remove:0": (
         "WEAK-GATE, not equivalence: removing the null-guard return is "
         "only invisible because the current stride sample never calls "
         "seal_commit_parquet with a null batch; the mutant would "
         "diverge (UB path) under a null-batch pin, which the court "
         "lacks. Registered to keep the gap loud."
     ),
-    "tests/court_verdict.rs:1544:int-bump-up:0": (
+    "tests/court_verdict.rs:1599:int-bump-up:0": (
         "`prefilter: 0` -> `1` initializer: ingress MINTS the prefilter "
         "on ADMIT and zeroes it on reject/no-view (penstock.rs struct "
         "doc), so the initializer value is setup material — every "
         "pinned observation overwrites it."
     ),
-    "tests/court_verdict.rs:1768:int-bump-up:1": (
+    "tests/court_verdict.rs:1864:int-bump-up:1": (
         "Streaming-identity corpus modulus `251` -> `252`: the pinned "
         "law is one-shot == byte-at-a-time SHA-256 self-equality, "
         "content-agnostic; the byte-mix constant changes data bytes "
         "only, never lengths or block-boundary structure."
     ),
-    "tests/court_verdict.rs:2569:int-bump-down:0": (
+    "tests/court_verdict.rs:2661:int-bump-down:0": (
         "`SEAL_ROW_GROUPS - 1` -> `- 2`: the round-trip spot-check is a "
         "redundant second observation — group 0 is independently "
         "decode-pinned and every group is committed by the same "
         "uniform writer path, so the tail index choice is setup "
         "material for the pinned round-trip law."
     ),
-    "tests/court_verdict.rs:2687:int-bump-up:0": (
+    "tests/court_verdict.rs:2784:int-bump-up:0": (
         "`digest_flipped[16]` -> `[17]`: the pinned law is any single "
         "digest byte flip must refuse (sibling cases flip other "
         "offsets); the offset is content-agnostic setup material."
     ),
-    "tests/court_verdict.rs:3203:int-bump-up:0": (
+    "tests/court_verdict.rs:3326:int-bump-up:0": (
         "`digest_out: u64 = 0` -> `1` out-slot initializer: verify "
         "overwrites the slot and the assert compares to expected_digest, "
         "so the initial value never reaches a pinned observation."
