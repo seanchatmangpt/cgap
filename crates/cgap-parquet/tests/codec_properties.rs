@@ -1,3 +1,9 @@
+//! ANTI-VACUITY MUTATION (H7): in cgap-parquet/src/rle.rs `rle_encode_into`,
+//! change the run header `u64::from(run as u32) << 1` to `<< 2`; this court
+//! flips (prop1_rle_round_trip_widths_1_to_8_x_500_corpora and
+//! prop2_constant_run_decode_l_1_to_10000 FAIL, rc 101). Receipt:
+//! docs/jira/v26.11.14/lanes/H7.md.
+//!
 //! Codec property court (wave-14 lane 10, recovery): LCG-seeded deterministic
 //! property loops over the cgap-parquet codec surface. No external rng /
 //! property crate — every corpus is a pure function of its index, so any

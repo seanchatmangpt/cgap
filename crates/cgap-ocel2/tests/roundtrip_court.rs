@@ -1,3 +1,8 @@
+//! ANTI-VACUITY MUTATION (H7): in cgap-ocel2/src/lib.rs replace
+//! `hex32(&r.prev_hash)` with `hex32(&[0u8; 32])` in the events projection;
+//! projected_columns_rederive_chain FAILS (prev-hash linkage assert, rc 101).
+//! Receipt: docs/jira/v26.11.14/lanes/H7.md.
+//!
 //! ROUND-TRIP COURT: the projected tables carry enough state to
 //! re-derive the chain linkage and match. From the projected columns
 //! ALONE we re-derive (a) zero-gap ordinals, (b) prev-hash linkage
