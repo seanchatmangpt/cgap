@@ -32,10 +32,11 @@
 //! Deviations from a full transport (scaffolding scale, per dispatch):
 //! client role only in the engine (the court's echo server is pure-Rust
 //! tokio in `tests/aq_quic_contract.rs`); uni-stream echo; ALPN fixed
-//! `aq/1`.
+//! `aoq/1` (ECOSYSTEM-SPEC-27.1.1 R-03 risk-body string; historical
+//! scaffold `aq/1` is RETIRED — not dual-admitted on the wire).
 //!
 //! SHIM-COURT anti-vacuity mutation: `AQ_MUTATE_ALPN_DROP=1` makes
-//! `aq_quic_connect` offer NO ALPN. The court's server requires `aq/1`, so
+//! `aq_quic_connect` offer NO ALPN. The court's server requires `aoq/1`, so
 //! the handshake must refuse (rustls `no_application_protocol` alert). The
 //! BEAM court MUST flip: connect fails under the mutation and succeeds
 //! without it — a court that cannot flip is FAIL. The flag is read per
@@ -61,8 +62,9 @@ mod imp {
     use std::sync::mpsc::channel;
     use std::time::Duration;
 
-    /// The ALPN law: one protocol, `aq/1`.
-    pub(crate) const AQ_ALPN: &[u8] = b"aq/1";
+    /// The ALPN law: one protocol, `aoq/1` (R-03 risk-body pin).
+    /// Historical scaffold `aq/1` is retired — not dual-admitted.
+    pub(crate) const AOQ_ALPN: &[u8] = b"aoq/1";
 
     /// Bounded handshake/send/open budget (tokio timeout; never a sleep).
     const OP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -321,7 +323,7 @@ mod imp {
             id: u64,
         },
         // --- server role (same engine thread, same Job mpsc) ----------------
-        /// Bind the SERVER endpoint (rustls ServerConfig, ALPN aq/1
+        /// Bind the SERVER endpoint (rustls ServerConfig, ALPN aoq/1
         /// REQUIRED server-side — the SHIM-COURT mutation strips it).
         Serve {
             port: u16,
@@ -395,7 +397,7 @@ mod imp {
 
     /// SHIM-COURT mutation flag (read PER CALL — each court run is a fresh
     /// escript process; no OnceLock, no cross-court shared state).
-    /// AQ_MUTATE_ALPN_DROP=1: offer no ALPN -> the aq/1-requiring peer must
+    /// AQ_MUTATE_ALPN_DROP=1: offer no ALPN -> the aoq/1-requiring peer must
     /// refuse the handshake.
     fn mutate_alpn_drop() -> bool {
         std::env::var("AQ_MUTATE_ALPN_DROP").as_deref() == Ok("1")
@@ -435,7 +437,7 @@ mod imp {
             .with_root_certificates(roots)
             .with_no_client_auth();
         if offer_alpn {
-            crypto.alpn_protocols = vec![AQ_ALPN.to_vec()];
+            crypto.alpn_protocols = vec![AOQ_ALPN.to_vec()];
         }
         // quinn 0.11.12 wraps a rustls ClientConfig via TryFrom (the
         // `QuicClientConfig::new` ctor is private in this version; TryFrom
@@ -448,7 +450,7 @@ mod imp {
     }
 
     /// Server TLS config: self-PEM-free DER cert+key, `alpn_protocols`
-    /// REQUIRED to contain `aq/1` server-side (the QUIC-TLS law: a server
+    /// REQUIRED to contain `aoq/1` server-side (the QUIC-TLS law: a server
     /// with no ALPN refuses every client offering one; the SHIM-COURT
     /// mutation strips the list and the handshake must answer
     /// `no_application_protocol`).
@@ -464,7 +466,7 @@ mod imp {
             .with_single_cert(vec![cert], rustls::pki_types::PrivateKeyDer::Pkcs8(key))
             .map_err(|e| format!("server cert: {e}"))?;
         if offer_alpn {
-            crypto.alpn_protocols = vec![AQ_ALPN.to_vec()];
+            crypto.alpn_protocols = vec![AOQ_ALPN.to_vec()];
         }
         let quic_crypto: quinn::crypto::rustls::QuicServerConfig =
             crypto
@@ -988,7 +990,7 @@ mod imp {
     /// error`. DirtyIo: real TLS 1.3 QUIC handshake on the engine thread
     /// (bounded 5 s tokio timeout). Addr is "ip:port" text; ServerName is
     /// the SNI. `AQ_MUTATE_ALPN_DROP=1` is the SHIM-COURT mutation: no ALPN
-    /// offered, an aq/1-requiring peer must refuse.
+    /// offered, an aoq/1-requiring peer must refuse.
     #[no_mangle]
     pub(crate) extern "C" fn aq_quic_connect(
         env: *mut ErlNifEnv,
@@ -1207,7 +1209,7 @@ mod imp {
 
     /// `aq_quic_serve(Engine, Port, CertDer, KeyDer) -> Listener ::
     /// reference() | error`. DirtyIo: rustls ServerConfig build + real
-    /// UDP bind on the engine thread. ALPN `aq/1` is REQUIRED server-side
+    /// UDP bind on the engine thread. ALPN `aoq/1` is REQUIRED server-side
     /// (SHIM-COURT mutation `AQ_MUTATE_ALPN_DROP=1` strips it — the
     /// handshake must then refuse).
     #[no_mangle]
@@ -1552,3 +1554,18 @@ mod imp {
 }
 
 pub(crate) use imp::*;
+
+/// R-03 pin court: `AOQ_ALPN` must be exactly the risk-body bytes `aoq/1`.
+/// Runs under `--features quic` (constant lives only in the real engine).
+#[cfg(all(test, feature = "quic"))]
+mod r03_aoq_alpn_pin {
+    use super::AOQ_ALPN;
+
+    #[test]
+    fn aoq_alpn_is_risk_body_string() {
+        assert_eq!(AOQ_ALPN, b"aoq/1");
+        assert_eq!(AOQ_ALPN.len(), 5);
+        // Retired scaffold must not silently equal the pin.
+        assert_ne!(AOQ_ALPN, b"aq/1");
+    }
+}
