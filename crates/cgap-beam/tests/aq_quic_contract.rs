@@ -46,7 +46,7 @@ fn nif_dylib_path() -> std::path::PathBuf {
     panic!("build the dylib first: cargo build -p cgap-beam --features quic");
 }
 
-/// Real quinn echo server: self-signed cert, ALPN aq/1, one uni-stream
+/// Real quinn echo server: self-signed cert, ALPN aoq/1, one uni-stream
 /// echo per accepted uni-stream. Pure-Rust tokio (the real collaborator).
 struct EchoServer {
     addr: String,
@@ -108,9 +108,9 @@ fn run_server(
                 return;
             }
         };
-        // ALPN aq/1 REQUIRED server-side (the court's echo server law).
+        // ALPN aoq/1 REQUIRED server-side (the court's echo server law).
         let mut server_crypto = server_crypto;
-        server_crypto.alpn_protocols = vec![b"aq/1".to_vec()];
+        server_crypto.alpn_protocols = vec![b"aoq/1".to_vec()];
         let server_crypto = match quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto) {
             Ok(c) => c,
             Err(e) => {
@@ -298,7 +298,7 @@ main([NifPath0, Addr, CertPath]) ->
 
 tmp_base() -> "/tmp".
 
-%% SHIM-COURT leg: connect with no ALPN offered -> the aq/1 server must
+%% SHIM-COURT leg: connect with no ALPN offered -> the aoq/1 server must
 %% refuse. Success of the mutation run means the court cannot flip: FAIL.
 t_alpn_mutant(Addr, CaDer) ->
     Engine = aq_quic_open(0, CaDer),
@@ -453,7 +453,7 @@ fn quinn_client_leg(
         let mut crypto = rustls::ClientConfig::builder()
             .with_root_certificates(roots)
             .with_no_client_auth();
-        crypto.alpn_protocols = vec![b"aq/1".to_vec()];
+        crypto.alpn_protocols = vec![b"aoq/1".to_vec()];
         let quic_crypto: quinn::crypto::rustls::QuicClientConfig = crypto
             .try_into()
             .map_err(|e: quinn::crypto::rustls::NoInitialCipherSuite| format!("tls wrap: {e}"))?;
@@ -662,7 +662,7 @@ serve_contracts(Port, CaDer, KeyDer) ->
     true = is_reference(Listener),
     case os:getenv("AQ_MUTATE_ALPN_DROP") of
         "1" ->
-            %% Server-side ALPN stripped: the aq/1-offering client's
+            %% Server-side ALPN stripped: the aoq/1-offering client's
             %% handshake must fail, so the bounded accept must hit its
             %% deadline and answer `error` (the flip, server-side view).
             error = aq_quic_accept(Listener, 6000),
